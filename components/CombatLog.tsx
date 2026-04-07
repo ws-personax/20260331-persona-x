@@ -1,0 +1,21 @@
+// ?é® ÏßÄ?òÍ??òÏùò ?ÑÏà†???§Ì???Í∞Ä?¥Îìú
+const getCardStyle = (role: string) => {
+    // 1. ÎßàÏö∞???∏Î≤Ñ ???¥Ïßù Ïª§Ï?Í≥?Í∑∏Î¶º?êÍ? ÍπäÏñ¥ÏßÄ???®Í≥º (scale-[1.01])
+    const base = `p-5 rounded-xl transition-all duration-200 cursor-default
+                  hover:scale-[1.01] hover:shadow-lg shadow-sm 
+                  animate-in slide-in-from-bottom-4 `;
+    
+    // 2. ?êÏΩî??Î∞úÏñ∏?Ä ???êÍªçÍ≤?6px), Ï∞∏Î™®?§Ï? Í∏∞Î≥∏(4px)?ºÎ°ú ?§Ï†ï?òÏó¨ Í∂åÏúÑ Ï∞®Î≥Ñ??
+    const borderWidth = role === 'Echo' ? 'border-l-[6px]' : 'border-l-4';
+  
+    if (role === 'Echo') 
+      return base + borderWidth + ' bg-amber-50 border-amber-500 text-amber-900 font-bold shadow-md ring-1 ring-amber-200';
+      
+    if (role === 'Jack') 
+      return base + borderWidth + ' bg-gradient-to-r from-red-50 to-red-100 border-red-500 shadow-red-200 text-red-900';
+      
+    if (role === 'Leo') 
+      return base + borderWidth + ' bg-gradient-to-r from-emerald-50 to-emerald-100 border-emerald-500 shadow-emerald-200 text-emerald-900';
+      
+    return base + borderWidth + ' bg-gradient-to-r from-blue-50 to-blue-100 border-blue-500 shadow-blue-200 text-blue-900';
+  };

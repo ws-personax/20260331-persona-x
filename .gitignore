@@ -1,0 +1,24 @@
+# 1. 의존성 (용량이 크고 npm install로 언제든 다시 만들 수 있음)
+node_modules
+/npm-debug.log*
+/yarn-error.log*
+/pnpm-debug.log*
+
+# 2. 빌드 결과물 (Vercel 배포 시 자동으로 생기는 것들)
+.next/
+out/
+build/
+.vercel
+
+# 3. 🔥 절대 보안 (지휘자님의 API Key가 들어있는 파일들)
+# 이 줄이 없으면 GitHub 등에 올릴 때 열쇠가 다 털립니다!
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env.local
+
+# 4. 운영체제 및 기타 설정
+.DS_Store
+*.pem
