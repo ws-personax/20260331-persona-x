@@ -1,18 +1,18 @@
-import { NewsItem } from '@/types/news';
-import { INVESTMENT_KEYWORDS, API_TIMEOUT_MS } from '@/lib/constants';
+import { NewsItem } from '@/types/news'; // 타입 정의 경로 확인 필요
+import { API_TIMEOUT_MS } from '@/lib/constants'; // 15000ms 설정 확인 필요
 
-// 메모리 내 캐시 (동일 키워드 재요청 방지)
+// 5분간 동일 키워드 뉴스 재사용 (API 쿼타 절약 및 속도 향상)
 const cache = new Map<string, { data: NewsItem[]; timestamp: number }>();
-const CACHE_DURATION = 5 * 60 * 1000; // 5분 캐시 유지
+const CACHE_DURATION = 5 * 60 * 1000;
 
 /**
- * 타임아웃이 포함된 Fetch 함수
+ * 타임아웃 기능이 포함된 Fetch 유틸리티
  */
-async function fetchWithTimeout(url: string, timeout = API_TIMEOUT_MS) {
+async function fetchWithTimeout(url: string, options: RequestInit, timeout = API_TIMEOUT_MS) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await fetch(url, { ...options, signal: controller.signal });
     clearTimeout(id);
     return response;
   } catch (error) {
@@ -22,7 +22,7 @@ async function fetchWithTimeout(url: string, timeout = API_TIMEOUT_MS) {
 }
 
 /**
- * 실시간 투자 뉴스 데이터 수집 함수
+ * 네이버 뉴스 API 연동 함수
  */
 export async function fetchInvestmentNews(query: string): Promise<NewsItem[]> {
   // 1. 캐시 확인
@@ -31,31 +31,48 @@ export async function fetchInvestmentNews(query: string): Promise<NewsItem[]> {
     return cachedData.data;
   }
 
-  try {
-    // [수리 완료] NewsItem 규격에 맞춰 모든 필수 필드(link, date, snippet)를 포함한 데이터
-    const mockData: NewsItem[] = [
-      { 
-        title: `${query} 관련 최신 시장 지표 분석 리포트 도달`, 
-        source: "Financial Times",
-        link: "#",
-        date: new Date().toISOString(),
-        snippet: "시장 지표 분석 데이터가 수급되었습니다."
-      },
-      { 
-        title: `${query} 섹터 흐름 및 수급 데이터 업데이트`, 
-        source: "Reuters",
-        link: "#",
-        date: new Date().toISOString(),
-        snippet: "실시간 섹터 수급 현황이 업데이트되었습니다."
-      }
-    ];
+  // 2. 환경 변수 금고 확인
+  const clientId = process.env.NAVER_CLIENT_ID;
+  const clientSecret = process.env.NAVER_CLIENT_SECRET;
 
-    // 캐시에 저장
-    cache.set(query, { data: mockData, timestamp: Date.now() });
-    return mockData;
+  if (!clientId || !clientSecret) {
+    console.error('[JACK SYSTEM] 네이버 API 키가 .env.local에 설정되지 않았습니다.');
+    return [];
+  }
+
+  try {
+    // 3. 네이버 뉴스 검색 API 호출 (최신순 정렬)
+    const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=5&sort=date`;
+    
+    const res = await fetchWithTimeout(url, {
+      headers: {
+        'X-Naver-Client-Id': clientId,
+        'X-Naver-Client-Secret': clientSecret,
+      }
+    });
+
+    if (!res.ok) {
+      console.error('[JACK SYSTEM] 네이버 API 응답 오류:', res.status);
+      return [];
+    }
+
+    const data = await res.json();
+    
+    // 4. 데이터 정제 (HTML 태그 제거 및 포맷팅)
+    const items: NewsItem[] = (data.items || []).map((a: any) => ({
+      title: a.title.replace(/<[^>]*>?/gm, ''), // <b> 태그 등 제거
+      source: '네이버 뉴스',
+      link: a.originallink || a.link, // 원문 링크 우선
+      date: a.pubDate,
+      snippet: a.description.replace(/<[^>]*>?/gm, '') // 요약문 태그 제거
+    }));
+
+    // 5. 캐시 저장 후 반환
+    cache.set(query, { data: items, timestamp: Date.now() });
+    return items;
 
   } catch (error) {
-    console.error("뉴스 수급 실패:", error);
+    console.error('[JACK SYSTEM] 뉴스 수급 실패:', error);
     return [];
   }
 }

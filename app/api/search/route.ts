@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     const { messages } = await req.json();
     
     // [중앙 통제] .env.local에 설정한 모델명을 사용합니다.
-    const selectedModel = process.env.NEXT_PUBLIC_AI_MODEL || 'gemini-2.0-flash';
+    const selectedModel = process.env.NEXT_PUBLIC_AI_MODEL || 'g2.0-flash-lite';
     console.log(`[Search API] ${selectedModel} 모델로 분석을 시작합니다.`);
 
     const result = await streamText({
