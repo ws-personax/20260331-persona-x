@@ -11,7 +11,6 @@ const getSupabase = () => {
   return createClient(url, key);
 };
 
-// ✅ raw_response + clean_response 둘 다 저장 (디버깅 + 분석용)
 const saveHistory = async (params: {
   keyword:        string;
   question:       string;
@@ -36,8 +35,8 @@ const saveHistory = async (params: {
       price_at_time:   params.priceAtTime,
       confidence:      params.confidence,
       result:          'pending',
-      raw_response:    params.rawResponse.slice(0, 5000),       // 디버깅용 원문
-      clean_response:  params.rawResponse.replace(/\s+/g, ' ').slice(0, 2000), // 분석용 정제본
+      raw_response:    params.rawResponse.slice(0, 8000),
+      clean_response:  params.rawResponse.replace(/\s+/g, ' ').slice(0, 3000),
       created_at:      new Date().toISOString(),
     });
   } catch { console.warn('⚠️ 히스토리 저장 실패'); }
@@ -58,6 +57,26 @@ interface MarketData {
   currency: 'KRW' | 'USD'; source: string;
 }
 
+// [수정 1] ScoreParams 인터페이스 복원 — 누락으로 인한 컴파일 에러 방지
+interface ScoreParams {
+  volScore: number; change: string; newsAvg: number;
+  posScore: number; vitScore: number;
+  hasData: boolean; newsCount: number;
+  volLabel: string; posLabel: string; vixLabel: string; newsSentiment: string;
+}
+
+// CRYPTO_MAP — 단일 소스
+const CRYPTO_MAP: Record<string, string> = {
+  '비트코인': 'KRW-BTC', 'BTC':  'KRW-BTC',
+  '이더리움': 'KRW-ETH', 'ETH':  'KRW-ETH',
+  '리플':     'KRW-XRP', 'XRP':  'KRW-XRP',
+  '솔라나':   'KRW-SOL', 'SOL':  'KRW-SOL',
+  '도지':    'KRW-DOGE', 'DOGE': 'KRW-DOGE',
+  '에이다':   'KRW-ADA', 'ADA':  'KRW-ADA',
+  '바이낸스': 'KRW-BNB', 'BNB':  'KRW-BNB',
+};
+
+// STOCK_MAP — 코인 제거, 주식/지수만
 const STOCK_MAP: Record<string, string> = {
   '나스닥': '^IXIC', 'NASDAQ': '^IXIC', 'S&P500': '^GSPC', 'S&P': '^GSPC', '다우': '^DJI',
   '엔비디아': 'NVDA', 'NVDA': 'NVDA', '테슬라': 'TSLA', 'TSLA': 'TSLA',
@@ -69,14 +88,31 @@ const STOCK_MAP: Record<string, string> = {
   'LG에너지': '373220.KS', 'POSCO': '005490.KS', '셀트리온': '068270.KS',
   '에코프로': '086520.KQ', '알테오젠': '196170.KQ',
   '코스피': '^KS11', '코스닥': '^KQ11', '한국 증시': '^KS11', '한국증시': '^KS11',
-  '비트코인': 'KRW-BTC', 'BTC': 'KRW-BTC', '이더리움': 'KRW-ETH', 'ETH': 'KRW-ETH',
-  '리플': 'KRW-XRP', 'XRP': 'KRW-XRP', '솔라나': 'KRW-SOL', 'SOL': 'KRW-SOL',
-  '도지': 'KRW-DOGE', 'DOGE': 'KRW-DOGE', 'ADA': 'KRW-ADA', 'BNB': 'KRW-BNB',
 };
 
-const CRYPTO_KEYWORDS = new Set([
-  '비트코인', 'BTC', '이더리움', 'ETH', '리플', 'XRP', '솔라나', 'SOL', '도지', 'DOGE', 'ADA', 'BNB',
-]);
+// 우선순위 배열 — for...in 순서 불확실성 제거
+const KEYWORD_PRIORITY: string[] = [
+  '비트코인', 'BTC', '이더리움', 'ETH', '리플', 'XRP', '솔라나', 'SOL',
+  '도지', 'DOGE', '에이다', 'ADA', '바이낸스', 'BNB',
+  '삼성전자', 'SK하이닉스', '현대차', '카카오', '네이버', '기아',
+  'LG에너지', 'POSCO', '셀트리온', '에코프로', '알테오젠',
+  '코스피', '코스닥', '한국 증시', '한국증시',
+  '엔비디아', 'NVDA', '테슬라', 'TSLA', '애플', 'AAPL',
+  '마이크로소프트', 'MSFT', '구글', 'GOOGL', '아마존', 'AMZN',
+  '메타', 'META', '넷플릭스', 'NFLX',
+  '나스닥', 'NASDAQ', 'S&P500', 'S&P', '다우',
+];
+
+// 화폐 단위 추론 — marketData 없어도 정확한 통화 반환
+const inferCurrency = (keyword: string): 'KRW' | 'USD' => {
+  if (CRYPTO_MAP[keyword] || CRYPTO_MAP[keyword.toUpperCase()]) return 'KRW';
+  const sym = STOCK_MAP[keyword] || STOCK_MAP[keyword.toUpperCase()] || '';
+  if (
+    sym.endsWith('.KS') || sym.endsWith('.KQ') ||
+    sym.startsWith('^KS') || sym.startsWith('^KQ')
+  ) return 'KRW';
+  return 'USD';
+};
 
 // ─── 2. 유틸 ─────────────────────────────────────────────
 const safeNum = (val: unknown): number => {
@@ -109,6 +145,7 @@ const getVolumeInfo = (v: number, av: number, t: AssetType) => {
     if (v < 100_000_000_000)   return { label: '코인 거래대금 저조', score: -1, isHigh: false };
     return { label: '코인 거래대금 보통', score: 0, isHigh: false };
   }
+  // KOREAN_STOCK
   if (v > 50_000_000) return { label: '거래량 폭증', score: 2, isHigh: true };
   if (v > 10_000_000) return { label: '거래량 증가', score: 1, isHigh: true };
   if (v < 1_000_000)  return { label: '거래량 저조', score: -1, isHigh: false };
@@ -126,17 +163,16 @@ const getVolatility = (p: number, h: number, l: number) => {
 const getPricePos = (p: number, h: number, l: number) => {
   if (h === l || !p) return { label: '가격 위치 확인 불가', score: 0, ratio: 0.5 };
   const pos = (p - l) / (h - l);
-  if (pos > 0.8) return { label: `고점 근접 (${(pos*100).toFixed(0)}%)`, score: -2, ratio: pos };
-  if (pos < 0.2) return { label: `저점 근접 (${(pos*100).toFixed(0)}%)`, score: 2, ratio: pos };
-  return { label: `중간 구간 (${(pos*100).toFixed(0)}%)`, score: 0, ratio: pos };
+  if (pos > 0.8) return { label: `고점 근접 (${(pos * 100).toFixed(0)}%)`, score: -2, ratio: pos };
+  if (pos < 0.2) return { label: `저점 근접 (${(pos * 100).toFixed(0)}%)`, score: 2,  ratio: pos };
+  return { label: `중간 구간 (${(pos * 100).toFixed(0)}%)`, score: 0, ratio: pos };
 };
 
-// ✅ 뉴스 스코어 보정 — 실제 개수로 나눔
 const getNewsData = (items: Array<{ title: string; source?: string }>) => {
   if (!items.length) return { avgScore: 0, sentiment: '중립', context: '관련 뉴스 없음' };
   const context = items.slice(0, 3).map((n, i) => `${i + 1}. ${n.title}`).join('\n');
-  const count = Math.min(items.length, 3); // ✅ 실제 개수로 나눔
-  const score = items.slice(0, 3).reduce((acc, item) => {
+  const count   = Math.min(items.length, 3);
+  const score   = items.slice(0, 3).reduce((acc, item) => {
     if (/상승|호재|돌파|수익|최고|급등|반등/.test(item.title)) return acc + 1;
     if (/하락|악재|급락|손실|우려|위기|긴장|폭락/.test(item.title)) return acc - 1;
     return acc;
@@ -144,30 +180,18 @@ const getNewsData = (items: Array<{ title: string; source?: string }>) => {
   return { avgScore: score, sentiment: score > 0 ? '긍정' : score < 0 ? '부정' : '중립', context };
 };
 
-interface ScoreParams {
-  volScore: number; change: string; newsAvg: number;
-  posScore: number; vitScore: number;
-  hasData: boolean; newsCount: number;
-  volLabel: string; posLabel: string; vixLabel: string; newsSentiment: string;
-}
-
-// ✅ verdict 보수적 기준 3점 + confidence 데이터 품질 기반
 const calcScores = (p: ScoreParams) => {
   const ch = safeNum(p.change);
   const tr = ch > 0.5 ? 1 : ch < -0.5 ? -1 : 0;
   const ns = Math.round(p.newsAvg * 2);
   const total = p.volScore + tr + ns + p.posScore + p.vitScore;
-
-  // ✅ 보수적 기준: 3점 이상만 매수 승인
   const verdict: Verdict = total >= 3 ? '매수 우위' : total <= -3 ? '매도 우위' : '관망';
 
-  // ✅ confidence = 데이터 품질 기반 (totalScore 영향 최소화)
-  const base = 30; // 최소 신뢰도
-  let conf = base;
-  if (p.hasData)          conf += 30; // 실시간 시세 있음
-  if (p.newsCount > 0)    conf += 20; // 뉴스 있음
-  if (p.volScore !== 0)   conf += 10; // 거래량 신호 있음
-  if (p.newsCount >= 3)   conf += 5;  // 뉴스 3개 이상
+  let conf = 30;
+  if (p.hasData)        conf += 30;
+  if (p.newsCount > 0)  conf += 20;
+  if (p.volScore !== 0) conf += 10;
+  if (p.newsCount >= 3) conf += 5;
 
   const trendLabel = tr > 0 ? '단기 상승 추세' : tr < 0 ? '단기 하락 추세' : '추세 중립';
   const breakdown  = `${p.volLabel} / ${trendLabel} / 뉴스 ${p.newsSentiment} / ${p.posLabel} / ${p.vixLabel}`;
@@ -181,44 +205,40 @@ const getPositionSizing = (v: Verdict, total: number): string => {
   return total >= 4 ? '40~50% 적극 매수' : '20~30% 분할 매수';
 };
 
-// ─── 5. position 기반 진입 조건 생성 ─────────────────────
+// ─── 5. 진입 조건 생성 ───────────────────────────────────
 const buildEntryCondition = (
   marketData: MarketData | null,
   posRatio: number,
   volIsHigh: boolean,
   verdict: Verdict,
+  keyword: string,
 ): string => {
-  if (!marketData) return '시세 데이터 없음 — 뉴스 확인 후 판단 필요';
+  const currency = marketData?.currency ?? inferCurrency(keyword);
+  if (!marketData) return `시세 데이터 없음 (${currency === 'KRW' ? '원화' : 'USD'} 기준) — 뉴스 확인 후 판단 필요`;
 
-  const { rawHigh, rawLow, currency } = marketData;
+  const { rawHigh, rawLow } = marketData;
   const mid     = (rawHigh + rawLow) / 2;
   const volNote = volIsHigh ? ' + 거래량 증가 확인' : '';
 
-  if (verdict === '매도 우위') {
-    return [
-      `지금 행동: 신규 매수 금지. 보유 시 손절 검토`,
-      `매도 조건: ${fmtPrice(rawLow * 0.98, currency)} 이탈 시 전량 정리 (오늘 종가 기준)`,
-      `시간 조건: 3일 내 반등 없으면 보유분 50% 축소`,
-    ].join('\n');
-  }
+  if (verdict === '매도 우위') return [
+    `지금 행동: 신규 매수 금지. 보유 시 손절 검토`,
+    `매도 조건: ${fmtPrice(rawLow * 0.98, currency)} 이탈 시 전량 정리 (오늘 종가 기준)`,
+    `시간 조건: 3일 내 반등 없으면 보유분 50% 축소`,
+  ].join('\n');
 
   if (verdict === '매수 우위') {
-    if (posRatio < 0.3) {
-      return [
-        `지금 행동: 분할 매수 진입 가능 (10~20%)`,
-        `추가 매수: ${fmtPrice(rawLow * 0.99, currency)} 이하 하락 시 2차 매수 (오늘~내일 기준)`,
-        `돌파 조건: ${fmtPrice(rawHigh, currency)} 돌파${volNote} 시 비중 확대`,
-        `시간 조건: 3일 내 반등 미확인 시 관망 전환`,
-      ].join('\n');
-    }
-    if (posRatio <= 0.7) {
-      return [
-        `지금 행동: 소량 분할 매수 (10~15%)`,
-        `매수 조건: ${fmtPrice(rawLow, currency)} 재접근 시 추가 매수 (이번 주 기준)`,
-        `매도 조건: ${fmtPrice(rawLow * 0.97, currency)} 이탈 시 손절`,
-        `돌파 조건: ${fmtPrice(rawHigh, currency)} 돌파${volNote} 시 비중 확대`,
-      ].join('\n');
-    }
+    if (posRatio < 0.3) return [
+      `지금 행동: 분할 매수 진입 가능 (10~20%)`,
+      `추가 매수: ${fmtPrice(rawLow * 0.99, currency)} 이하 하락 시 2차 매수 (오늘~내일 기준)`,
+      `돌파 조건: ${fmtPrice(rawHigh, currency)} 돌파${volNote} 시 비중 확대`,
+      `시간 조건: 3일 내 반등 미확인 시 관망 전환`,
+    ].join('\n');
+    if (posRatio <= 0.7) return [
+      `지금 행동: 소량 분할 매수 (10~15%)`,
+      `매수 조건: ${fmtPrice(rawLow, currency)} 재접근 시 추가 매수 (이번 주 기준)`,
+      `매도 조건: ${fmtPrice(rawLow * 0.97, currency)} 이탈 시 손절`,
+      `돌파 조건: ${fmtPrice(rawHigh, currency)} 돌파${volNote} 시 비중 확대`,
+    ].join('\n');
     return [
       `지금 행동: 고점 추격 자제. 눌림 대기`,
       `매수 조건: ${fmtPrice(mid, currency)} 수준 눌림 시 소량 매수 (3일 내)`,
@@ -228,22 +248,18 @@ const buildEntryCondition = (
   }
 
   // 관망
-  if (posRatio < 0.3) {
-    return [
-      `지금 행동: 신규 진입 금지 (관망)`,
-      `매수 조건: ${fmtPrice(rawLow * 0.98, currency)} 이하 하락 확인 후 소량 진입 (오늘~내일)`,
-      `매도 조건: 보유 중이라면 ${fmtPrice(rawLow * 0.96, currency)} 이탈 시 손절`,
-      `시간 조건: 3일 내 방향성 미확인 시 재분석`,
-    ].join('\n');
-  }
-  if (posRatio <= 0.7) {
-    return [
-      `지금 행동: 신규 진입 금지 (관망)`,
-      `매수 조건: ${fmtPrice(rawLow, currency)} 근접 + 반등 캔들 확인 시 진입 (이번 주)`,
-      `매도 조건: ${fmtPrice(rawLow * 0.97, currency)} 이탈 시 손절`,
-      `돌파 조건: ${fmtPrice(rawHigh, currency)} 돌파${volNote} 확인 후 추세 매수`,
-    ].join('\n');
-  }
+  if (posRatio < 0.3) return [
+    `지금 행동: 신규 진입 금지 (관망)`,
+    `매수 조건: ${fmtPrice(rawLow * 0.98, currency)} 이하 하락 확인 후 소량 진입 (오늘~내일)`,
+    `매도 조건: 보유 중이라면 ${fmtPrice(rawLow * 0.96, currency)} 이탈 시 손절`,
+    `시간 조건: 3일 내 방향성 미확인 시 재분석`,
+  ].join('\n');
+  if (posRatio <= 0.7) return [
+    `지금 행동: 신규 진입 금지 (관망)`,
+    `매수 조건: ${fmtPrice(rawLow, currency)} 근접 + 반등 캔들 확인 시 진입 (이번 주)`,
+    `매도 조건: ${fmtPrice(rawLow * 0.97, currency)} 이탈 시 손절`,
+    `돌파 조건: ${fmtPrice(rawHigh, currency)} 돌파${volNote} 확인 후 추세 매수`,
+  ].join('\n');
   return [
     `지금 행동: 신규 진입 금지 — 고점 구간 (관망)`,
     `매수 조건: ${fmtPrice(mid, currency)} 이하 눌림 확인 후 진입 (3일 내)`,
@@ -252,12 +268,11 @@ const buildEntryCondition = (
   ].join('\n');
 };
 
-// ✅ entryCondition에서 매수/매도 조건 숫자만 안전하게 추출
 const extractConditionPrices = (entryCondition: string): { buy: string; sell: string } => {
-  const lines = entryCondition.split('\n');
+  const lines    = entryCondition.split('\n');
   const buyLine  = lines.find(l => l.includes('매수 조건') || l.includes('추가 매수') || l.includes('돌파 조건'));
   const sellLine = lines.find(l => l.includes('매도 조건') || l.includes('손절') || l.includes('이탈'));
-  const extract  = (line?: string) => {
+  const extract  = (line?: string): string => {
     if (!line) return '';
     const m = line.match(/[\d,]+(?:\.\d+)?(?:원| USD)?/);
     return m ? m[0] : '';
@@ -289,58 +304,57 @@ const fetchWithTimeout = async (url: string, ms = 7000) => {
 
 const fetchMarketPrice = async (keyword: string): Promise<MarketData | null> => {
   try {
-    const isCrypto = CRYPTO_KEYWORDS.has(keyword) || CRYPTO_KEYWORDS.has(keyword.toUpperCase());
-    if (isCrypto) {
-      const tickerMap: Record<string, string> = {
-        '비트코인':'KRW-BTC','BTC':'KRW-BTC','이더리움':'KRW-ETH','ETH':'KRW-ETH',
-        '리플':'KRW-XRP','XRP':'KRW-XRP','솔라나':'KRW-SOL','SOL':'KRW-SOL',
-        '도지':'KRW-DOGE','DOGE':'KRW-DOGE','ADA':'KRW-ADA','BNB':'KRW-BNB',
-      };
-      const ticker = tickerMap[keyword] || tickerMap[keyword.toUpperCase()];
-      if (!ticker) return null;
-      const res = await fetchWithTimeout(`https://api.upbit.com/v1/ticker?markets=${ticker}`, 5000);
+    // CRYPTO_MAP 단일 소스로 코인 판별
+    const cryptoTicker = CRYPTO_MAP[keyword] || CRYPTO_MAP[keyword.toUpperCase()];
+    if (cryptoTicker) {
+      const res = await fetchWithTimeout(`https://api.upbit.com/v1/ticker?markets=${cryptoTicker}`, 5000);
       const d   = (await res.json())[0];
       return {
-        price: d.trade_price.toLocaleString('ko-KR'),
-        change: (d.signed_change_rate * 100).toFixed(2),
-        high: d.high_price.toLocaleString('ko-KR'),
-        low:  d.low_price.toLocaleString('ko-KR'),
-        volume: `${(d.acc_trade_price_24h / 1_000_000_000).toFixed(0)}억`,
-        rawPrice: d.trade_price, rawHigh: d.high_price, rawLow: d.low_price,
+        price:     d.trade_price.toLocaleString('ko-KR'),
+        change:    (d.signed_change_rate * 100).toFixed(2),
+        high:      d.high_price.toLocaleString('ko-KR'),
+        low:       d.low_price.toLocaleString('ko-KR'),
+        volume:    `${(d.acc_trade_price_24h / 1_000_000_000).toFixed(0)}억`,
+        rawPrice:  d.trade_price, rawHigh: d.high_price, rawLow: d.low_price,
         rawVolume: d.acc_trade_price_24h, avgVolume: 0,
-        currency: 'KRW', source: 'Upbit 실시간',
-      };
-    } else {
-      const symbol = STOCK_MAP[keyword] || STOCK_MAP[keyword.toUpperCase()];
-      if (!symbol) return null;
-      const res  = await fetchWithTimeout(
-        `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`
-      );
-      const meta = (await res.json())?.chart?.result?.[0]?.meta;
-      if (!meta?.regularMarketPrice) return null;
-      const isKR  = symbol.endsWith('.KS') || symbol.endsWith('.KQ') || symbol.startsWith('^KS') || symbol.startsWith('^KQ');
-      const price = meta.regularMarketPrice;
-      const prev  = meta.previousClose || price;
-      return {
-        price: isKR ? Math.round(price).toLocaleString('ko-KR') : price.toLocaleString('en-US', { minimumFractionDigits: 2 }),
-        change: ((price - prev) / (prev || 1) * 100).toFixed(2),
-        high:   (meta.regularMarketDayHigh || price).toLocaleString(),
-        low:    (meta.regularMarketDayLow  || price).toLocaleString(),
-        volume: `${((meta.regularMarketVolume || 0) / 1_000_000).toFixed(1)}M`,
-        rawPrice: price, rawHigh: meta.regularMarketDayHigh || price,
-        rawLow: meta.regularMarketDayLow || price, rawVolume: meta.regularMarketVolume || 0,
-        avgVolume: meta.averageDailyVolume3Month || 0,
-        currency: isKR ? 'KRW' : 'USD', source: 'Yahoo Finance (15분 지연)',
+        currency:  'KRW', source: 'Upbit 실시간',
       };
     }
+
+    const symbol = STOCK_MAP[keyword] || STOCK_MAP[keyword.toUpperCase()];
+    if (!symbol) return null;
+    const res  = await fetchWithTimeout(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`
+    );
+    const meta = (await res.json())?.chart?.result?.[0]?.meta;
+    if (!meta?.regularMarketPrice) return null;
+    const isKR  = symbol.endsWith('.KS') || symbol.endsWith('.KQ')
+               || symbol.startsWith('^KS') || symbol.startsWith('^KQ');
+    const price = meta.regularMarketPrice;
+    const prev  = meta.previousClose || price;
+    return {
+      price:     isKR ? Math.round(price).toLocaleString('ko-KR') : price.toLocaleString('en-US', { minimumFractionDigits: 2 }),
+      change:    ((price - prev) / (prev || 1) * 100).toFixed(2),
+      high:      (meta.regularMarketDayHigh || price).toLocaleString(),
+      low:       (meta.regularMarketDayLow  || price).toLocaleString(),
+      volume:    `${((meta.regularMarketVolume || 0) / 1_000_000).toFixed(1)}M`,
+      rawPrice:  price,
+      rawHigh:   meta.regularMarketDayHigh  || price,
+      rawLow:    meta.regularMarketDayLow   || price,
+      rawVolume: meta.regularMarketVolume   || 0,
+      avgVolume: meta.averageDailyVolume3Month || 0,
+      currency:  isKR ? 'KRW' : 'USD',
+      source:    'Yahoo Finance (15분 지연)',
+    };
   } catch { return null; }
 };
 
 // ─── 8. 키워드 추출 ──────────────────────────────────────
 const extractKeyword = (messages: Array<{ role: string; content: string }>): string => {
-  // ✅ 마지막 메시지에서만 추출 — 과거 컨텍스트 재사용 금지
-  const lastMsg = messages.at(-1)?.content || "";
-  for (const t in STOCK_MAP) { if (lastMsg.includes(t)) return t; }
+  const lastMsg = (messages.at(-1)?.content || "").toLowerCase();
+  for (const t of KEYWORD_PRIORITY) {
+    if (lastMsg.includes(t.toLowerCase())) return t;
+  }
   return '시장';
 };
 
@@ -363,25 +377,17 @@ const parseChainedPersonas = (text: string): Partial<PersonaResponse> => {
     }
     return text.slice(start, end).replace(/^[:\s\-—*#]+/, '').trim();
   };
-
-  const jackRaw  = extract('JACK',  'LUCIA');
-  const luciaRaw = extract('LUCIA', 'RAY');
-  const rayRaw   = extract('RAY',   'ECHO');
-  const echoRaw  = extract('ECHO',  null);
-
-  // ✅ 잭 200자 강제 제한 — 루시아/레이 토큰 확보
   const truncate = (t: string, limit: number) => {
     if (t.length <= limit) return t;
-    const cut = t.slice(0, limit);
+    const cut  = t.slice(0, limit);
     const last = Math.max(cut.lastIndexOf('.'), cut.lastIndexOf('다'), cut.lastIndexOf('요'));
     return last > limit * 0.6 ? cut.slice(0, last + 1) : cut + '...';
   };
-
   return {
-    jack:  truncate(jackRaw, 200),
-    lucia: luciaRaw,
-    ray:   rayRaw,
-    echo:  echoRaw,
+    jack:  truncate(extract('JACK',  'LUCIA'), 200),
+    lucia: extract('LUCIA', 'RAY'),
+    ray:   extract('RAY',   'ECHO'),
+    echo:  extract('ECHO',  null),
   };
 };
 
@@ -390,7 +396,8 @@ export async function POST(req: Request) {
   try {
     const { messages, positionContext } = await req.json();
     const lastMsg = messages.at(-1)?.content || "";
-    const keyword = extractKeyword(messages);
+    const keyword  = extractKeyword(messages);
+    const currency = inferCurrency(keyword);
 
     const [marketData, nasdaqData, news] = await Promise.all([
       fetchMarketPrice(keyword),
@@ -398,11 +405,10 @@ export async function POST(req: Request) {
       fetchInvestmentNews(keyword).catch(() => []),
     ]);
 
-    const sym = STOCK_MAP[keyword] || '';
-    const assetType: AssetType =
-      CRYPTO_KEYWORDS.has(keyword) ? 'CRYPTO' :
-      (sym.endsWith('.KS') || sym.endsWith('.KQ') || sym.startsWith('^KS') || sym.startsWith('^KQ'))
-        ? 'KOREAN_STOCK' : 'US_STOCK';
+    // [수정 2] assetType 판별 — CRYPTO_MAP 기반 단일 체크, inferCurrency 중복 제거
+    const isCrypto = !!(CRYPTO_MAP[keyword] || CRYPTO_MAP[keyword.toUpperCase()]);
+    const assetType: AssetType = isCrypto ? 'CRYPTO'
+      : currency === 'KRW' ? 'KOREAN_STOCK' : 'US_STOCK';
 
     const vol   = getVolumeInfo(marketData?.rawVolume || 0, marketData?.avgVolume || 0, assetType);
     const vix   = getVolatility(marketData?.rawPrice  || 0, marketData?.rawHigh   || 0, marketData?.rawLow || 0);
@@ -418,14 +424,12 @@ export async function POST(req: Request) {
 
     const positionSizing  = getPositionSizing(verdict, total);
     const dataSourceLabel = buildDataSourceLabel(assetType, marketData, news.length);
-    const entryCondition  = buildEntryCondition(marketData, pos.ratio, vol.isHigh, verdict);
+    const entryCondition  = buildEntryCondition(marketData, pos.ratio, vol.isHigh, verdict, keyword);
 
-    // ✅ entryCondition에서 숫자만 안전하게 추출
     const { buy: buyPrice, sell: sellPrice } = extractConditionPrices(entryCondition);
     const condSummary = [buyPrice && `매수(${buyPrice})`, sellPrice && `손절(${sellPrice})`]
       .filter(Boolean).join(' / ') || '시장 상황 주시';
 
-    // ✅ confidenceBasis — 데이터 품질 기반, 공백 방지
     const confidenceBasis = [
       marketData ? `시세(${marketData.source})` : null,
       news.length > 0 ? `뉴스 ${news.length}건(${nData.sentiment})` : null,
@@ -436,10 +440,12 @@ export async function POST(req: Request) {
       ? `\n[주의] ${keyword} 실시간 시세 미지원. 뉴스와 거시 데이터 기반으로만 분석하라.`
       : '';
 
-    // ✅ 포지션 수익률 자동 계산
+    // 평단가 정규식 — 다양한 표현 대응
     let profitRateNote = '';
     if (positionContext && marketData) {
-      const avgPriceMatch = positionContext.match(/평단가[:\s]+([\d,.]+)/);
+      const avgPriceMatch = positionContext.match(
+        /(?:평단가?|매수가|취득가|평균가)[:\s]*([\d,.]+)/
+      );
       if (avgPriceMatch) {
         const avgPrice = parseFloat(avgPriceMatch[1].replace(/,/g, ''));
         if (avgPrice > 0) {
@@ -454,6 +460,11 @@ export async function POST(req: Request) {
       ? `\n[유저 포지션]\n${positionContext}${profitRateNote}\n→ 에코는 이 포지션 기준으로 손절/홀딩/추가매수 중 하나를 명확히 권고하라.`
       : '';
 
+    // 화폐 규칙 — assetType 기반 명시적 지시
+    const currencyRule = currency === 'KRW'
+      ? '\n[화폐 규칙] 모든 가격은 반드시 원화(원, KRW)로 표기하라. USD 표기 절대 금지.'
+      : '\n[화폐 규칙] 모든 가격은 USD로 표기하라.';
+
     const rawHistory = messages.slice(-7, -1)
       .filter((m: { role: string; content: string }) => m.role && m.content);
     const dedupedHistory = rawHistory.filter(
@@ -461,7 +472,6 @@ export async function POST(req: Request) {
         i === 0 || m.role !== arr[i - 1].role
     );
 
-    // ✅ 관망 강제 규칙
     const watchConditionRule = verdict === '관망' ? `
 [관망 강제 규칙 — 절대 위반 금지]
 1. 숫자가 포함된 매수 조건 (구체적 가격 또는 %)
@@ -470,12 +480,14 @@ export async function POST(req: Request) {
 절대 금지: "근접", "가능성", "검토", "추후", "상황 지켜보기"
 ` : '';
 
+    // [수정 2] JACK/LUCIA 구체적 지시 복원 — 약화된 프롬프트 보강
     const prompt = `
 [절대 규칙]
 1. 반드시 [JACK],[LUCIA],[RAY],[ECHO] 4개 태그 모두 출력.
 2. 태그는 새 줄 맨 앞에 단독 위치.
 3. 마크다운 완전 금지.
 4. [LUCIA][RAY] 절대 생략 금지.
+${currencyRule}
 ${watchConditionRule}${noDataNote}${positionNote}
 
 [실시간 데이터]
@@ -488,16 +500,16 @@ ${nData.context}
 [퀀트 판단] 결론: ${verdict} | 신뢰도: ${confidence}% | 포지션: ${positionSizing}
 
 [JACK] — 강세 근거만. 리스크 언급 금지. 반드시 2문장.
-문장1: ${keyword} ${marketData?.price || '?'} 기준 상승 근거 1가지 + 수치.
+문장1: ${keyword} ${marketData?.price || '현재가'} 기준 상승 근거 1가지 + 수치.
 문장2: 구체적 매수 액션 1가지.
 
 [LUCIA] — 리스크만. 기회 언급 금지. 반드시 2문장.
-문장1: "하지만 소장님, ~"으로 시작. 하락 리스크 1가지.
+문장1: "하지만 소장님, ~"으로 시작. 잭이 놓친 하락 리스크 1가지.
 문장2: 손절 또는 회피 근거 1가지.
 
-[RAY] — 숫자와 데이터만. 의견 금지. 반드시 2문장.
-문장1: 긍정 지표 1가지 (수치 포함).
-문장2: 부정 지표 1가지 (수치 포함).
+[RAY] — 잭/루시아가 언급하지 않은 외부 시각만. 반드시 2문장. 의견 금지.
+문장1: 나스닥 ${safeNum(nasdaqData?.change)}%와 ${keyword}의 상관관계 또는 외부 지수 영향 (수치 포함).
+문장2: 신뢰도 ${confidence}%의 데이터 한계 명시 — 뉴스 ${news.length}건, 시세 ${marketData ? '수급됨' : '미수급'} 기준.
 
 [ECHO] 에코 감독관 — 최종 결론 (반드시 5줄 고정. 초과 금지)
 결론: ${verdict} (신뢰도 ${confidence}% — ${confidenceBasis} 기반)
@@ -535,26 +547,36 @@ ${nData.context}
       }
     );
 
-    if (!res.ok) throw new Error(`Gemini API 오류: ${res.status}`);
+    if (!res.ok) {
+      const detail = await res.text();
+      console.error('[Gemini API Error]', detail);
+      throw new Error(`Gemini API 오류: ${res.status}`);
+    }
 
     const aiText = (await res.json())?.candidates?.[0]?.content?.parts?.[0]?.text || "";
     const p = parseChainedPersonas(aiText);
 
-    // ✅ 파싱 실패 감지
+    // 파싱 실패 감지
     if (!p.jack || !p.lucia || !p.ray || !p.echo) {
       console.warn('⚠️ 파싱 실패:', { jack: !!p.jack, lucia: !!p.lucia, ray: !!p.ray, echo: !!p.echo });
       console.warn('원문 앞 300자:', aiText.slice(0, 300));
     }
 
-    // ✅ 각 페르소나 fallback
+    // Fallback
     const jackFallback  = `${keyword} ${marketData?.price || ''} 기준, ${breakdown}. 현재 ${verdict} 구간 판단.`;
-    const luciaFallback = `신뢰도 ${confidence}%(${confidenceBasis}) 수준. ${positionSizing} 기준으로 신중한 접근 권장.`;
-    const rayFallback   = [
-      `긍정: ${nData.sentiment === '긍정' ? '뉴스 긍정 흐름' : vol.isHigh ? '거래량 증가' : '저변동성 안정'} / ${vol.label}`,
-      `부정: ${pos.ratio > 0.7 ? '고점 근접 추격 위험' : pos.ratio < 0.3 ? '저점 반등 불확실' : '추세 중립 방향성 미확인'}`,
+    const luciaFallback = `신뢰도 ${confidence}%(${confidenceBasis}). ${positionSizing} 기준으로 신중한 접근 권장.`;
+
+    // [수정 4] rayFallback 내용 보강 — 상관관계 + 데이터 한계 명시
+    const correlationNote = assetType === 'CRYPTO'
+      ? '코인은 나스닥과 독립 변수로 작용하는 경우 多'
+      : assetType === 'KOREAN_STOCK'
+        ? '외국인 수급을 통해 나스닥과 간접 연동'
+        : '나스닥과 직접 연동, 동조화 경향 높음';
+    const rayFallback = [
+      `나스닥 ${safeNum(nasdaqData?.change)}% — ${keyword}와 상관관계: ${correlationNote}.`,
+      `신뢰도 ${confidence}% — 뉴스 ${news.length}건, 시세 ${marketData ? '수급됨' : '미수급'} 기준. ${confidence < 60 ? '데이터 부족으로 판단 불확실.' : ''}`,
     ].join('\n');
 
-    // ✅ echo validation — 결론+비중 포함 여부 확인
     const isValidEcho = p.echo && p.echo.includes('결론:') && p.echo.includes('비중:');
     const echoContent = isValidEcho ? p.echo! : [
       `결론: ${verdict} (신뢰도 ${confidence}% — ${confidenceBasis} 기반)`,
@@ -566,27 +588,23 @@ ${nData.context}
 
     const echoWithMeta = `${echoContent}\n\n${dataSourceLabel}${DISCLAIMER}`;
 
-    // ✅ 히스토리 저장 — raw_response + clean_response 포함
+    // Supabase 저장
     void Promise.race([
       saveHistory({
-        keyword,
-        question:       lastMsg,
-        verdict,
-        totalScore:     total,
-        assetType,
-        entryCondition,
-        priceAtTime:    marketData?.price || '미수급',
-        confidence,
-        rawResponse:    aiText,
+        keyword, question: lastMsg, verdict,
+        totalScore: total, assetType, entryCondition,
+        priceAtTime: marketData?.price || '미수급',
+        confidence, rawResponse: aiText,
       }),
       new Promise(r => setTimeout(r, 1000)),
     ]);
 
+    // [수정 4] 성공 로그 복원
     console.log(
       `✅ ${keyword}(${assetType}) | ${verdict}(${total}점) | 신뢰도:${confidence}% | ` +
-      `pos:${pos.ratio.toFixed(2)} vol:${vol.isHigh?'↑':'-'} | ` +
-      `jack:${p.jack?'✅':'❌'} lucia:${p.lucia?'✅':'❌'} ` +
-      `ray:${p.ray?'✅':'❌'} echo:${isValidEcho?'✅':'fallback'}`
+      `currency:${currency} | pos:${pos.ratio.toFixed(2)} vol:${vol.isHigh ? '↑' : '-'} | ` +
+      `jack:${p.jack ? '✅' : '❌'} lucia:${p.lucia ? '✅' : '❌'} ` +
+      `ray:${p.ray ? '✅' : '❌'} echo:${isValidEcho ? '✅' : 'fallback'}`
     );
 
     return Response.json({
@@ -594,7 +612,7 @@ ${nData.context}
       personas: {
         jack:  p.jack  || jackFallback,
         lucia: (p.lucia && p.lucia.length > 15) ? p.lucia : luciaFallback,
-        ray:   (p.ray  && p.ray.length  > 15) ? p.ray  : rayFallback,
+        ray:   (p.ray   && p.ray.length   > 15) ? p.ray   : rayFallback,
         echo:  echoWithMeta,
         verdict, confidence, breakdown, positionSizing,
       },
