@@ -65,8 +65,23 @@ const sanitizeQuantity = (raw: string): string => {
 const formatTime = (d: Date) =>
   d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
 
+// ✅ KRW: 코인 + 한국 주식 + 한국 지수
+const KRW_KEYWORDS = new Set([
+  // 코인
+  "비트코인", "BTC", "이더리움", "ETH",
+  "리플", "XRP", "솔라나", "SOL",
+  "도지", "DOGE", "ADA", "BNB",
+  // 한국 주식
+  "삼성전자", "SK하이닉스", "현대차",
+  "카카오", "네이버", "기아",
+  "LG엔너지", "POSCO", "셀트리온",
+  "에코프로", "알테오젠",
+  // 한국 지수
+  "코스피", "코스닥", "한국 증시", "한국증시",
+]);
+
 const inferCurrency = (keyword: string): "KRW" | "USD" =>
-  CRYPTO_LIST.has(keyword) ? "KRW" : "USD";
+  KRW_KEYWORDS.has(keyword) ? "KRW" : "USD";
 
 // ─── 에코 파싱 ────────────────────────────────────────────
 const parseEchoParts = (text: string) => {
