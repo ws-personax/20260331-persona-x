@@ -198,10 +198,16 @@ export default function ChatWindow() {
   const [showPosition,    setShowPosition]    = useState(false);
   const [currentPosition, setCurrentPosition] = useState<Position | null>(null);
   const [pendingKeyword,  setPendingKeyword]  = useState('');
+  const [stockKeywords,   setStockKeywords]   = useState<string[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
+    // STOCK_MAP 키 목록 자동 로드
+    fetch('/api/keywords')
+      .then(r => r.json())
+      .then(d => setStockKeywords(d.keywords || []))
+      .catch(() => {});
     setMessages([{
       role: 'assistant',
       content: '[SYSTEM ONLINE]\n\uC9C0\uD718\uAD00\uB2D8, \uC804\uB7B5 \uC13C\uD130 \uAC00\uB3D9\uB428.\n\uBD84\uC11D\uD560 \uC885\uBAA9 \uB610\uB294 \uC2DC\uC7A5\uC744 \uD558\uB2EC\uD558\uC2ED\uC2DC\uC624.',
@@ -252,18 +258,9 @@ export default function ChatWindow() {
     if (!content || isLoading) return;
     setInput('');
 
-    const stockKeywords = [
-      '\uC0BC\uC131\uC804\uC790', 'SK\uD558\uC774\uB2C9\uC2A4', '\uD604\uB300\uCC28', '\uCE74\uCE74\uC624', '\uB124\uC774\uBC84',
-      '\uAE30\uC544', 'LG\uC5D0\uB108\uC9C0', 'POSCO', '\uC140\uD2B8\uB9AC\uC628', '\uC5D0\uCF54\uD504\uB85C', '\uC54C\uD14C\uC624\uC820',
-      '\uBE44\uD2B8\uCF54\uC778', 'BTC', '\uC774\uB354\uB9AC\uC6C0', 'ETH', '\uB9AC\uD50C', 'XRP', '\uC194\uB77C\uB098', 'SOL',
-      '\uB3C4\uC9C0', 'DOGE', 'ADA', 'BNB',
-      '\uC5D4\uBE44\uB514\uC544', 'NVDA', '\uD14C\uC2AC\uB77C', 'TSLA', '\uC560\uD50C', 'AAPL',
-      '\uB9C8\uC774\uD06C\uB85C\uC18C\uD504\uD2B8', 'MSFT', '\uAD6C\uAE00', 'GOOGL', '\uC544\uB9C8\uC874', 'AMZN',
-      '\uBA54\uD0C0', 'META', '\uB137\uD50C\uB9AD\uC2A4', 'NFLX',
-      '\uB098\uC2A4\uB2E5', 'NASDAQ', 'S&P500', '\uB2E4\uC6B0', '\uCF54\uC2A4\uD53C', '\uCF54\uC2A4\uB2E5',
-      '\uD55C\uAD6D \uC99D\uC2DC', '\uD55C\uAD6D\uC99D\uC2DC',
-    ];
-    const hasKeyword = stockKeywords.some(k => content.includes(k));
+    const hasKeyword = stockKeywords.length > 0
+      ? stockKeywords.some(k => content.includes(k))
+      : false;
 
     if (hasKeyword) {
       const kw = stockKeywords.find(k => content.includes(k)) || '';
