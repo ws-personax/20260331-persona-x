@@ -421,10 +421,13 @@ export async function POST(req: Request) {
 
     const prompt = `
 [절대 규칙]
-1. 마크다운(**, ##) 금지. [JACK],[LUCIA],[RAY],[ECHO] 태그 엄수.
-2. 각 페르소나 줄 수 초과 금지.
-3. [ECHO]는 아래 형식을 반드시 완전하게 출력하라.
-4. 후속 질문은 이전 맥락을 참고하라.
+1. 반드시 [JACK], [LUCIA], [RAY], [ECHO] 4개 태그를 모두 출력하라.
+2. 태그는 반드시 새 줄 맨 앞에 단독으로 위치하라. 예: \n[LUCIA]\n내용
+3. 마크다운(**, ##, *) 완전 금지.
+4. 각 페르소나 줄 수 초과 금지.
+5. [ECHO]는 아래 형식을 반드시 완전하게 출력하라.
+6. 후속 질문은 이전 맥락을 참고하라.
+7. [LUCIA]와 [RAY]를 절대 생략하지 마라. 생략하면 시스템 오류다.
 ${watchConditionRule}
 ${noDataNote}${positionNote}
 
@@ -437,14 +440,17 @@ ${nData.context}
 
 [퀀트 판단] 결론: ${verdict} | 신뢰도: ${confidence}% | 포지션: ${positionSizing}
 
-[JACK] 잭 소장 — 강세론 (3줄 이내. 초과 금지)
-뉴스 팩트 기반 핵심 상황 1줄 + 긍정 영향 1줄 + 구체적 대응 1줄.
+[JACK] 잭 소장 — 강세론 (반드시 2줄. 초과 금지)
+1줄: 뉴스 팩트 기반 핵심 상황 요약.
+2줄: 강세 근거 + 구체적 대응 방안.
 
-[LUCIA] 루시아 팀장 — 약세론 (3줄 이내. 초과 금지)
-"하지만 소장님, ~"으로 시작. 잭이 놓친 리스크 3줄.
+[LUCIA] 루시아 팀장 — 약세론 (반드시 2줄. 초과 금지)
+1줄: "하지만 소장님, ~"으로 시작. 잭이 놓친 핵심 리스크.
+2줄: 구체적 위험 요인 + 신중한 이유.
 
-[RAY] 레이 분석관 — 중립 (반드시 1줄. 절대 초과 금지)
-긍정 1가지 + 부정 1가지를 한 문장으로만.
+[RAY] 레이 분석관 — 중립 (반드시 2줄. 초과 금지)
+1줄: 긍정 요인 1가지 (수치 포함).
+2줄: 부정 요인 1가지 (수치 포함).
 
 [ECHO] 에코 감독관 — 최종 결론 (형식 엄수)
 결론: ${verdict} (신뢰도 ${confidence}%)
@@ -530,7 +536,9 @@ ${entryCondition}
       reply: aiText + `\n\n${dataSourceLabel}` + DISCLAIMER,
       personas: {
         jack:  p.jack  || aiText,
-        lucia: p.lucia || "",
+        lucia: (p.lucia && p.lucia.length > 15)
+          ? p.lucia
+          : `현재 ${pos.ratio > 0.7 ? '고점 구간으로 추격 매수는 위험합니다' : pos.ratio < 0.3 ? '저점 구간이나 반등 확인이 필요합니다' : '중립 구간으로 방향성 확인이 필요합니다'}. 시장 신호(${breakdown})를 보면 신중한 접근을 권장합니다.`,
         ray:   rayContent,
         echo:  echoWithMeta,
         verdict, confidence, breakdown, positionSizing,
