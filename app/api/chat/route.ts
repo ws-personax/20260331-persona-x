@@ -322,10 +322,9 @@ const fetchMarketPrice = async (keyword: string): Promise<MarketData | null> => 
 
 // ─── 8. 키워드 추출 ──────────────────────────────────────
 const extractKeyword = (messages: Array<{ role: string; content: string }>): string => {
+  // ✅ 반드시 마지막 메시지에서만 추출 — 과거 컨텍스트 재사용 금지
   const lastMsg = messages.at(-1)?.content || "";
   for (const t in STOCK_MAP) { if (lastMsg.includes(t)) return t; }
-  const ctx = messages.slice(-5, -1).map(m => m.content || "").join(" ");
-  for (const t in STOCK_MAP) { if (ctx.includes(t)) return t; }
   return '시장';
 };
 
@@ -476,7 +475,7 @@ ${entryCondition}
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents,
-          generationConfig: { maxOutputTokens: 2500, temperature: 0.7 },
+          generationConfig: { maxOutputTokens: 2500, temperature: 0.4 },
           safetySettings: [
             { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
             { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_NONE' },
@@ -492,9 +491,16 @@ ${entryCondition}
     const aiText = (await res.json())?.candidates?.[0]?.content?.parts?.[0]?.text || "";
     const p = parseChainedPersonas(aiText);
 
-    if (!p.lucia || p.lucia.length < 20) {
-      console.warn('⚠️ 루시아 파싱 실패. 원문 앞 300자:', aiText.slice(0, 300));
+    // ✅ 파싱 실패 감지 및 로그
+    const parseOk = p.jack && p.lucia && p.ray && p.echo;
+    if (!parseOk) {
+      console.warn('⚠️ 파싱 실패. jack:', !!p.jack, 'lucia:', !!p.lucia, 'ray:', !!p.ray, 'echo:', !!p.echo);
+      console.warn('원문 앞 300자:', aiText.slice(0, 300));
     }
+
+    // ✅ 각 페르소나 fallback
+    const jackFallback  = `${keyword} 데이터 기준, 시장 신호: ${breakdown}. 현재 ${verdict} 구간으로 판단됩니다.`;
+    const luciaFallback = `신뢰도 ${confidence}% 수준으로 불확실성 존재. ${positionSizing} 기준으로 신중한 접근 권장.`;
 
     // ✅ 레이 fallback — 잘렸을 때 breakdown으로 대체
     const rayContent = (p.ray && p.ray.length > 15)
@@ -535,10 +541,8 @@ ${entryCondition}
     return Response.json({
       reply: aiText + `\n\n${dataSourceLabel}` + DISCLAIMER,
       personas: {
-        jack:  p.jack  || aiText,
-        lucia: (p.lucia && p.lucia.length > 15)
-          ? p.lucia
-          : `현재 ${pos.ratio > 0.7 ? '고점 구간으로 추격 매수는 위험합니다' : pos.ratio < 0.3 ? '저점 구간이나 반등 확인이 필요합니다' : '중립 구간으로 방향성 확인이 필요합니다'}. 시장 신호(${breakdown})를 보면 신중한 접근을 권장합니다.`,
+        jack:  p.jack  || jackFallback,
+        lucia: (p.lucia && p.lucia.length > 15) ? p.lucia : luciaFallback,
         ray:   rayContent,
         echo:  echoWithMeta,
         verdict, confidence, breakdown, positionSizing,
