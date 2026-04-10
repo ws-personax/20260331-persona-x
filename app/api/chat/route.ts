@@ -3,8 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 export const maxDuration = 60;
 
-// ─── Supabase 히스토리 저장 ───────────────────────────────
-
+// ─── Supabase ─────────────────────────────────────────────
 const getSupabase = () => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -12,10 +11,7 @@ const getSupabase = () => {
   return createClient(url, key);
 };
 
-/**
- * 분석 결과를 Supabase에 저장합니다.
- * entryCondition + priceAtTime 포함 → 나중에 결과 검증 가능
- */
+// ✅ raw_response + clean_response 둘 다 저장 (디버깅 + 분석용)
 const saveHistory = async (params: {
   keyword:        string;
   question:       string;
@@ -25,6 +21,7 @@ const saveHistory = async (params: {
   entryCondition: string;
   priceAtTime:    string;
   confidence:     number;
+  rawResponse:    string;
 }): Promise<void> => {
   try {
     const supabase = getSupabase();
@@ -39,6 +36,8 @@ const saveHistory = async (params: {
       price_at_time:   params.priceAtTime,
       confidence:      params.confidence,
       result:          'pending',
+      raw_response:    params.rawResponse.slice(0, 5000),       // 디버깅용 원문
+      clean_response:  params.rawResponse.replace(/\s+/g, ' ').slice(0, 2000), // 분석용 정제본
       created_at:      new Date().toISOString(),
     });
   } catch { console.warn('⚠️ 히스토리 저장 실패'); }
@@ -71,6 +70,8 @@ const STOCK_MAP: Record<string, string> = {
   '에코프로': '086520.KQ', '알테오젠': '196170.KQ',
   '코스피': '^KS11', '코스닥': '^KQ11', '한국 증시': '^KS11', '한국증시': '^KS11',
   '비트코인': 'KRW-BTC', 'BTC': 'KRW-BTC', '이더리움': 'KRW-ETH', 'ETH': 'KRW-ETH',
+  '리플': 'KRW-XRP', 'XRP': 'KRW-XRP', '솔라나': 'KRW-SOL', 'SOL': 'KRW-SOL',
+  '도지': 'KRW-DOGE', 'DOGE': 'KRW-DOGE', 'ADA': 'KRW-ADA', 'BNB': 'KRW-BNB',
 };
 
 const CRYPTO_KEYWORDS = new Set([
@@ -130,14 +131,16 @@ const getPricePos = (p: number, h: number, l: number) => {
   return { label: `중간 구간 (${(pos*100).toFixed(0)}%)`, score: 0, ratio: pos };
 };
 
+// ✅ 뉴스 스코어 보정 — 실제 개수로 나눔
 const getNewsData = (items: Array<{ title: string; source?: string }>) => {
   if (!items.length) return { avgScore: 0, sentiment: '중립', context: '관련 뉴스 없음' };
   const context = items.slice(0, 3).map((n, i) => `${i + 1}. ${n.title}`).join('\n');
+  const count = Math.min(items.length, 3); // ✅ 실제 개수로 나눔
   const score = items.slice(0, 3).reduce((acc, item) => {
     if (/상승|호재|돌파|수익|최고|급등|반등/.test(item.title)) return acc + 1;
     if (/하락|악재|급락|손실|우려|위기|긴장|폭락/.test(item.title)) return acc - 1;
     return acc;
-  }, 0) / 3;
+  }, 0) / count;
   return { avgScore: score, sentiment: score > 0 ? '긍정' : score < 0 ? '부정' : '중립', context };
 };
 
@@ -148,18 +151,23 @@ interface ScoreParams {
   volLabel: string; posLabel: string; vixLabel: string; newsSentiment: string;
 }
 
+// ✅ verdict 보수적 기준 3점 + confidence 데이터 품질 기반
 const calcScores = (p: ScoreParams) => {
   const ch = safeNum(p.change);
   const tr = ch > 0.5 ? 1 : ch < -0.5 ? -1 : 0;
   const ns = Math.round(p.newsAvg * 2);
   const total = p.volScore + tr + ns + p.posScore + p.vitScore;
-  const verdict: Verdict = total >= 2 ? '매수 우위' : total <= -2 ? '매도 우위' : '관망';
 
-  let conf = 0;
-  if (p.hasData)        conf += 40;
-  if (p.newsCount > 0)  conf += 20;
-  if (p.volScore !== 0) conf += 20;
-  conf += Math.min(20, Math.abs(total) * 4);
+  // ✅ 보수적 기준: 3점 이상만 매수 승인
+  const verdict: Verdict = total >= 3 ? '매수 우위' : total <= -3 ? '매도 우위' : '관망';
+
+  // ✅ confidence = 데이터 품질 기반 (totalScore 영향 최소화)
+  const base = 30; // 최소 신뢰도
+  let conf = base;
+  if (p.hasData)          conf += 30; // 실시간 시세 있음
+  if (p.newsCount > 0)    conf += 20; // 뉴스 있음
+  if (p.volScore !== 0)   conf += 10; // 거래량 신호 있음
+  if (p.newsCount >= 3)   conf += 5;  // 뉴스 3개 이상
 
   const trendLabel = tr > 0 ? '단기 상승 추세' : tr < 0 ? '단기 하락 추세' : '추세 중립';
   const breakdown  = `${p.volLabel} / ${trendLabel} / 뉴스 ${p.newsSentiment} / ${p.posLabel} / ${p.vixLabel}`;
@@ -186,7 +194,6 @@ const buildEntryCondition = (
   const mid     = (rawHigh + rawLow) / 2;
   const volNote = volIsHigh ? ' + 거래량 증가 확인' : '';
 
-  // ✅ 매도 우위 — 지금 행동은 항상 매도/손절
   if (verdict === '매도 우위') {
     return [
       `지금 행동: 신규 매수 금지. 보유 시 손절 검토`,
@@ -195,10 +202,8 @@ const buildEntryCondition = (
     ].join('\n');
   }
 
-  // ✅ 매수 우위 — verdict와 행동 일치
   if (verdict === '매수 우위') {
     if (posRatio < 0.3) {
-      // 저점 구간 — 매수 우위 + 저점 → 적극 매수
       return [
         `지금 행동: 분할 매수 진입 가능 (10~20%)`,
         `추가 매수: ${fmtPrice(rawLow * 0.99, currency)} 이하 하락 시 2차 매수 (오늘~내일 기준)`,
@@ -207,7 +212,6 @@ const buildEntryCondition = (
       ].join('\n');
     }
     if (posRatio <= 0.7) {
-      // 중간 구간 — 매수 우위지만 신중하게
       return [
         `지금 행동: 소량 분할 매수 (10~15%)`,
         `매수 조건: ${fmtPrice(rawLow, currency)} 재접근 시 추가 매수 (이번 주 기준)`,
@@ -215,7 +219,6 @@ const buildEntryCondition = (
         `돌파 조건: ${fmtPrice(rawHigh, currency)} 돌파${volNote} 시 비중 확대`,
       ].join('\n');
     }
-    // 고점 구간 — 매수 우위지만 추격 자제
     return [
       `지금 행동: 고점 추격 자제. 눌림 대기`,
       `매수 조건: ${fmtPrice(mid, currency)} 수준 눌림 시 소량 매수 (3일 내)`,
@@ -224,7 +227,7 @@ const buildEntryCondition = (
     ].join('\n');
   }
 
-  // ✅ 관망 — 지금 행동은 항상 진입 금지, 미래 조건만 제시
+  // 관망
   if (posRatio < 0.3) {
     return [
       `지금 행동: 신규 진입 금지 (관망)`,
@@ -247,6 +250,19 @@ const buildEntryCondition = (
     `매도 조건: ${fmtPrice(rawLow * 0.97, currency)} 이탈 시 손절`,
     `시간 조건: 이번 주 내 눌림 미발생 시 다음 주 재분석`,
   ].join('\n');
+};
+
+// ✅ entryCondition에서 매수/매도 조건 숫자만 안전하게 추출
+const extractConditionPrices = (entryCondition: string): { buy: string; sell: string } => {
+  const lines = entryCondition.split('\n');
+  const buyLine  = lines.find(l => l.includes('매수 조건') || l.includes('추가 매수') || l.includes('돌파 조건'));
+  const sellLine = lines.find(l => l.includes('매도 조건') || l.includes('손절') || l.includes('이탈'));
+  const extract  = (line?: string) => {
+    if (!line) return '';
+    const m = line.match(/[\d,]+(?:\.\d+)?(?:원| USD)?/);
+    return m ? m[0] : '';
+  };
+  return { buy: extract(buyLine), sell: extract(sellLine) };
 };
 
 // ─── 6. 데이터 출처 레이블 ────────────────────────────────
@@ -322,7 +338,7 @@ const fetchMarketPrice = async (keyword: string): Promise<MarketData | null> => 
 
 // ─── 8. 키워드 추출 ──────────────────────────────────────
 const extractKeyword = (messages: Array<{ role: string; content: string }>): string => {
-  // ✅ 반드시 마지막 메시지에서만 추출 — 과거 컨텍스트 재사용 금지
+  // ✅ 마지막 메시지에서만 추출 — 과거 컨텍스트 재사용 금지
   const lastMsg = messages.at(-1)?.content || "";
   for (const t in STOCK_MAP) { if (lastMsg.includes(t)) return t; }
   return '시장';
@@ -347,17 +363,18 @@ const parseChainedPersonas = (text: string): Partial<PersonaResponse> => {
     }
     return text.slice(start, end).replace(/^[:\s\-—*#]+/, '').trim();
   };
+
   const jackRaw  = extract('JACK',  'LUCIA');
   const luciaRaw = extract('LUCIA', 'RAY');
   const rayRaw   = extract('RAY',   'ECHO');
   const echoRaw  = extract('ECHO',  null);
 
-  // ✅ 잭 길이 강제 제한 (200자) — 루시아/레이 토큰 확보
-  const truncate = (text: string, limit: number) => {
-    if (text.length <= limit) return text;
-    const cut = text.slice(0, limit);
-    const lastPeriod = Math.max(cut.lastIndexOf('.'), cut.lastIndexOf('다'), cut.lastIndexOf('요'));
-    return lastPeriod > limit * 0.6 ? cut.slice(0, lastPeriod + 1) : cut + '...';
+  // ✅ 잭 200자 강제 제한 — 루시아/레이 토큰 확보
+  const truncate = (t: string, limit: number) => {
+    if (t.length <= limit) return t;
+    const cut = t.slice(0, limit);
+    const last = Math.max(cut.lastIndexOf('.'), cut.lastIndexOf('다'), cut.lastIndexOf('요'));
+    return last > limit * 0.6 ? cut.slice(0, last + 1) : cut + '...';
   };
 
   return {
@@ -372,8 +389,8 @@ const parseChainedPersonas = (text: string): Partial<PersonaResponse> => {
 export async function POST(req: Request) {
   try {
     const { messages, positionContext } = await req.json();
-    const lastMsg  = messages.at(-1)?.content || "";
-    const keyword  = extractKeyword(messages);
+    const lastMsg = messages.at(-1)?.content || "";
+    const keyword = extractKeyword(messages);
 
     const [marketData, nasdaqData, news] = await Promise.all([
       fetchMarketPrice(keyword),
@@ -398,29 +415,43 @@ export async function POST(req: Request) {
       hasData: !!marketData, newsCount: news.length,
       volLabel: vol.label, posLabel: pos.label, vixLabel: vix.label, newsSentiment: nData.sentiment,
     });
+
     const positionSizing  = getPositionSizing(verdict, total);
     const dataSourceLabel = buildDataSourceLabel(assetType, marketData, news.length);
     const entryCondition  = buildEntryCondition(marketData, pos.ratio, vol.isHigh, verdict);
 
-    // ✅ 신뢰도 근거 — 뉴스 품질 + 데이터 출처 명시
-    const newsSentimentLabel = nData.sentiment === '긍정'
-      ? `긍정 ${Math.round(news.length * 0.6)}건`
-      : nData.sentiment === '부정'
-        ? `부정 ${Math.round(news.length * 0.6)}건`
-        : '중립';
+    // ✅ entryCondition에서 숫자만 안전하게 추출
+    const { buy: buyPrice, sell: sellPrice } = extractConditionPrices(entryCondition);
+    const condSummary = [buyPrice && `매수(${buyPrice})`, sellPrice && `손절(${sellPrice})`]
+      .filter(Boolean).join(' / ') || '시장 상황 주시';
+
+    // ✅ confidenceBasis — 데이터 품질 기반, 공백 방지
     const confidenceBasis = [
-      marketData ? `실시간 시세(${marketData.source})` : null,
-      news.length > 0 ? `뉴스 ${news.length}건(${newsSentimentLabel})` : null,
+      marketData ? `시세(${marketData.source})` : null,
+      news.length > 0 ? `뉴스 ${news.length}건(${nData.sentiment})` : null,
       vol.isHigh ? '거래량 신호' : null,
-    ].filter(Boolean).join(' + ');
+    ].filter(Boolean).join(' + ') || '데이터 제한적';
 
     const noDataNote = !marketData
       ? `\n[주의] ${keyword} 실시간 시세 미지원. 뉴스와 거시 데이터 기반으로만 분석하라.`
       : '';
 
-    // ✅ 포지션 컨텍스트 — 있으면 에코가 개인화 분석
+    // ✅ 포지션 수익률 자동 계산
+    let profitRateNote = '';
+    if (positionContext && marketData) {
+      const avgPriceMatch = positionContext.match(/평단가[:\s]+([\d,.]+)/);
+      if (avgPriceMatch) {
+        const avgPrice = parseFloat(avgPriceMatch[1].replace(/,/g, ''));
+        if (avgPrice > 0) {
+          const rate = ((marketData.rawPrice - avgPrice) / avgPrice * 100).toFixed(2);
+          const sign = parseFloat(rate) >= 0 ? '+' : '';
+          profitRateNote = `\n현재 수익률: ${sign}${rate}% (평단 ${fmtPrice(avgPrice, marketData.currency)} → 현재 ${marketData.price})`;
+        }
+      }
+    }
+
     const positionNote = positionContext
-      ? `\n[유저 포지션]\n${positionContext}\n→ 에코는 반드시 이 포지션 기준으로 손익률과 행동 권고를 포함하라.`
+      ? `\n[유저 포지션]\n${positionContext}${profitRateNote}\n→ 에코는 이 포지션 기준으로 손절/홀딩/추가매수 중 하나를 명확히 권고하라.`
       : '';
 
     const rawHistory = messages.slice(-7, -1)
@@ -430,30 +461,22 @@ export async function POST(req: Request) {
         i === 0 || m.role !== arr[i - 1].role
     );
 
-    // ✅ 핵심: 관망 조건 강화 프롬프트
+    // ✅ 관망 강제 규칙
     const watchConditionRule = verdict === '관망' ? `
 [관망 강제 규칙 — 절대 위반 금지]
-관망 결론일 경우 에코는 반드시 아래를 포함하라:
 1. 숫자가 포함된 매수 조건 (구체적 가격 또는 %)
-2. 숫자가 포함된 매도/손절 조건 (구체적 가격 또는 %)
-3. 명확한 시간 조건 (예: 3일 내, 이번 주, 오늘 중)
-
-절대 금지 표현: "근접", "가능성", "검토", "추후", "상황 지켜보기"
-→ 이런 표현 쓰면 틀린 답이다.
-→ 모든 조건에 반드시 숫자를 포함하라.
+2. 숫자가 포함된 매도/손절 조건
+3. 명확한 시간 조건 (3일 내, 이번 주 등)
+절대 금지: "근접", "가능성", "검토", "추후", "상황 지켜보기"
 ` : '';
 
     const prompt = `
 [절대 규칙]
-1. 반드시 [JACK], [LUCIA], [RAY], [ECHO] 4개 태그를 모두 출력하라.
-2. 태그는 반드시 새 줄 맨 앞에 단독으로 위치하라. 예: \n[LUCIA]\n내용
-3. 마크다운(**, ##, *) 완전 금지.
-4. 각 페르소나 줄 수 초과 금지.
-5. [ECHO]는 아래 형식을 반드시 완전하게 출력하라.
-6. 후속 질문은 이전 맥락을 참고하라.
-7. [LUCIA]와 [RAY]를 절대 생략하지 마라. 생략하면 시스템 오류다.
-${watchConditionRule}
-${noDataNote}${positionNote}
+1. 반드시 [JACK],[LUCIA],[RAY],[ECHO] 4개 태그 모두 출력.
+2. 태그는 새 줄 맨 앞에 단독 위치.
+3. 마크다운 완전 금지.
+4. [LUCIA][RAY] 절대 생략 금지.
+${watchConditionRule}${noDataNote}${positionNote}
 
 [실시간 데이터]
 - 분석 대상: ${keyword} | 가격: ${marketData?.price || '미지원'} (${safeNum(marketData?.change)}%)
@@ -465,22 +488,23 @@ ${nData.context}
 [퀀트 판단] 결론: ${verdict} | 신뢰도: ${confidence}% | 포지션: ${positionSizing}
 
 [JACK] — 강세 근거만. 리스크 언급 금지. 반드시 2문장.
-문장1: ${keyword} 현재 가격(${marketData?.price || '?'}) 기준 상승 근거 1가지 + 수치.
+문장1: ${keyword} ${marketData?.price || '?'} 기준 상승 근거 1가지 + 수치.
 문장2: 구체적 매수 액션 1가지.
 
 [LUCIA] — 리스크만. 기회 언급 금지. 반드시 2문장.
-문장1: "하지만 소장님, ~"으로 시작. 잭이 놓친 하락 리스크 1가지.
+문장1: "하지만 소장님, ~"으로 시작. 하락 리스크 1가지.
 문장2: 손절 또는 회피 근거 1가지.
 
 [RAY] — 숫자와 데이터만. 의견 금지. 반드시 2문장.
-문장1: 긍정 지표 1가지 (반드시 수치 포함).
-문장2: 부정 지표 1가지 (반드시 수치 포함).
+문장1: 긍정 지표 1가지 (수치 포함).
+문장2: 부정 지표 1가지 (수치 포함).
 
-[ECHO] 에코 감독관 — 최종 결론 (반드시 4줄 고정. 초과 금지)
+[ECHO] 에코 감독관 — 최종 결론 (반드시 5줄 고정. 초과 금지)
 결론: ${verdict} (신뢰도 ${confidence}% — ${confidenceBasis} 기반)
 근거: (잭+루시아+레이 핵심 요약 1줄. 수치 포함)
-지금: (지금 당장 할 행동 1가지. "신규 진입 금지" 또는 "소량 매수" 등)
-조건: (매수 조건 숫자 / 손절 조건 숫자 — entryCondition 기반: ${entryCondition.split('\n').slice(1,3).join(' / ')})
+지금: (지금 당장 할 행동 1가지)
+조건: ${condSummary}
+비중: ${positionSizing}
 
 질문: ${lastMsg}
 `;
@@ -516,32 +540,33 @@ ${nData.context}
     const aiText = (await res.json())?.candidates?.[0]?.content?.parts?.[0]?.text || "";
     const p = parseChainedPersonas(aiText);
 
-    // ✅ 파싱 실패 감지 및 로그
-    const parseOk = p.jack && p.lucia && p.ray && p.echo;
-    if (!parseOk) {
-      console.warn('⚠️ 파싱 실패. jack:', !!p.jack, 'lucia:', !!p.lucia, 'ray:', !!p.ray, 'echo:', !!p.echo);
+    // ✅ 파싱 실패 감지
+    if (!p.jack || !p.lucia || !p.ray || !p.echo) {
+      console.warn('⚠️ 파싱 실패:', { jack: !!p.jack, lucia: !!p.lucia, ray: !!p.ray, echo: !!p.echo });
       console.warn('원문 앞 300자:', aiText.slice(0, 300));
     }
 
     // ✅ 각 페르소나 fallback
-    const jackFallback  = `${keyword} 데이터 기준, 시장 신호: ${breakdown}. 현재 ${verdict} 구간으로 판단됩니다.`;
-    const luciaFallback = `신뢰도 ${confidence}% 수준으로 불확실성 존재. ${positionSizing} 기준으로 신중한 접근 권장.`;
+    const jackFallback  = `${keyword} ${marketData?.price || ''} 기준, ${breakdown}. 현재 ${verdict} 구간 판단.`;
+    const luciaFallback = `신뢰도 ${confidence}%(${confidenceBasis}) 수준. ${positionSizing} 기준으로 신중한 접근 권장.`;
+    const rayFallback   = [
+      `긍정: ${nData.sentiment === '긍정' ? '뉴스 긍정 흐름' : vol.isHigh ? '거래량 증가' : '저변동성 안정'} / ${vol.label}`,
+      `부정: ${pos.ratio > 0.7 ? '고점 근접 추격 위험' : pos.ratio < 0.3 ? '저점 반등 불확실' : '추세 중립 방향성 미확인'}`,
+    ].join('\n');
 
-    // ✅ 레이 fallback — 잘렸을 때 breakdown으로 대체
-    const rayContent = (p.ray && p.ray.length > 15)
-      ? p.ray
-      : `긍정: ${nData.sentiment === '긍정' ? '뉴스 긍정 흐름' : vol.isHigh ? '거래량 증가' : '저변동성 안정'}. 부정: ${pos.ratio > 0.7 ? '고점 근접 추격 위험' : pos.ratio < 0.3 ? '저점 구간 반등 불확실' : '추세 중립 방향성 미확인'}.`;
-
-    const echoContent = p.echo || [
+    // ✅ echo validation — 결론+비중 포함 여부 확인
+    const isValidEcho = p.echo && p.echo.includes('결론:') && p.echo.includes('비중:');
+    const echoContent = isValidEcho ? p.echo! : [
       `결론: ${verdict} (신뢰도 ${confidence}% — ${confidenceBasis} 기반)`,
       `근거: ${breakdown}`,
-      entryCondition,
-      `포지션: ${positionSizing}`,
+      `지금: ${entryCondition.split('\n')[0]?.split(':')[1]?.trim() || '시장 주시'}`,
+      `조건: ${condSummary}`,
+      `비중: ${positionSizing}`,
     ].join('\n');
 
     const echoWithMeta = `${echoContent}\n\n${dataSourceLabel}${DISCLAIMER}`;
 
-    // ✅ 히스토리 저장 — entryCondition + priceAtTime 포함
+    // ✅ 히스토리 저장 — raw_response + clean_response 포함
     void Promise.race([
       saveHistory({
         keyword,
@@ -552,6 +577,7 @@ ${nData.context}
         entryCondition,
         priceAtTime:    marketData?.price || '미수급',
         confidence,
+        rawResponse:    aiText,
       }),
       new Promise(r => setTimeout(r, 1000)),
     ]);
@@ -560,7 +586,7 @@ ${nData.context}
       `✅ ${keyword}(${assetType}) | ${verdict}(${total}점) | 신뢰도:${confidence}% | ` +
       `pos:${pos.ratio.toFixed(2)} vol:${vol.isHigh?'↑':'-'} | ` +
       `jack:${p.jack?'✅':'❌'} lucia:${p.lucia?'✅':'❌'} ` +
-      `ray:${p.ray?'✅':'❌'} echo:${p.echo?'✅':'fallback'}`
+      `ray:${p.ray?'✅':'❌'} echo:${isValidEcho?'✅':'fallback'}`
     );
 
     return Response.json({
@@ -568,7 +594,7 @@ ${nData.context}
       personas: {
         jack:  p.jack  || jackFallback,
         lucia: (p.lucia && p.lucia.length > 15) ? p.lucia : luciaFallback,
-        ray:   rayContent,
+        ray:   (p.ray  && p.ray.length  > 15) ? p.ray  : rayFallback,
         echo:  echoWithMeta,
         verdict, confidence, breakdown, positionSizing,
       },
