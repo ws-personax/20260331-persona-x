@@ -443,8 +443,8 @@ ${nData.context}
 [LUCIA] 루시아 팀장 — 약세론 (3줄 이내. 초과 금지)
 "하지만 소장님, ~"으로 시작. 잭이 놓친 리스크 3줄.
 
-[RAY] 레이 분석관 — 중립 (2줄 이내. 초과 금지)
-데이터로 양면 중재. 2줄만.
+[RAY] 레이 분석관 — 중립 (반드시 1줄. 절대 초과 금지)
+긍정 1가지 + 부정 1가지를 한 문장으로만.
 
 [ECHO] 에코 감독관 — 최종 결론 (형식 엄수)
 결론: ${verdict} (신뢰도 ${confidence}%)
@@ -490,6 +490,11 @@ ${entryCondition}
       console.warn('⚠️ 루시아 파싱 실패. 원문 앞 300자:', aiText.slice(0, 300));
     }
 
+    // ✅ 레이 fallback — 잘렸을 때 breakdown으로 대체
+    const rayContent = (p.ray && p.ray.length > 15)
+      ? p.ray
+      : `긍정: ${nData.sentiment === '긍정' ? '뉴스 긍정 흐름' : vol.isHigh ? '거래량 증가' : '저변동성 안정'}. 부정: ${pos.ratio > 0.7 ? '고점 근접 추격 위험' : pos.ratio < 0.3 ? '저점 구간 반등 불확실' : '추세 중립 방향성 미확인'}.`;
+
     const echoContent = p.echo || [
       `결론: ${verdict} (신뢰도 ${confidence}%)`,
       `근거: ${breakdown}`,
@@ -526,7 +531,7 @@ ${entryCondition}
       personas: {
         jack:  p.jack  || aiText,
         lucia: p.lucia || "",
-        ray:   p.ray   || "",
+        ray:   rayContent,
         echo:  echoWithMeta,
         verdict, confidence, breakdown, positionSizing,
       },
