@@ -451,10 +451,10 @@ ${nData.context}
 1줄: 긍정 요인 1가지 (수치 포함).
 2줄: 부정 요인 1가지 (수치 포함).
 
-[ECHO] 에코 감독관 — 최종 결론 (형식 엄수)
+[ECHO] 에코 감독관 — 최종 결론 (형식 엄수. 6줄 고정)
 결론: ${verdict} (신뢰도 ${confidence}%)
-근거: (토론 핵심 1줄 — 구체적 수치 포함)
-${entryCondition}
+근거: (핵심 1줄)
+${entryCondition.split('\n').slice(0, 3).join('\n')}
 포지션: ${positionSizing}
 
 질문: ${lastMsg}
@@ -475,7 +475,7 @@ ${entryCondition}
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents,
-          generationConfig: { maxOutputTokens: 2500, temperature: 0.4 },
+          generationConfig: { maxOutputTokens: 3000, temperature: 0.4 },
           safetySettings: [
             { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
             { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_NONE' },
