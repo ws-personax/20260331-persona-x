@@ -347,11 +347,24 @@ const parseChainedPersonas = (text: string): Partial<PersonaResponse> => {
     }
     return text.slice(start, end).replace(/^[:\s\-—*#]+/, '').trim();
   };
+  const jackRaw  = extract('JACK',  'LUCIA');
+  const luciaRaw = extract('LUCIA', 'RAY');
+  const rayRaw   = extract('RAY',   'ECHO');
+  const echoRaw  = extract('ECHO',  null);
+
+  // ✅ 잭 길이 강제 제한 (200자) — 루시아/레이 토큰 확보
+  const truncate = (text: string, limit: number) => {
+    if (text.length <= limit) return text;
+    const cut = text.slice(0, limit);
+    const lastPeriod = Math.max(cut.lastIndexOf('.'), cut.lastIndexOf('다'), cut.lastIndexOf('요'));
+    return lastPeriod > limit * 0.6 ? cut.slice(0, lastPeriod + 1) : cut + '...';
+  };
+
   return {
-    jack:  extract('JACK',  'LUCIA'),
-    lucia: extract('LUCIA', 'RAY'),
-    ray:   extract('RAY',   'ECHO'),
-    echo:  extract('ECHO',  null),
+    jack:  truncate(jackRaw, 200),
+    lucia: luciaRaw,
+    ray:   rayRaw,
+    echo:  echoRaw,
   };
 };
 
@@ -388,6 +401,18 @@ export async function POST(req: Request) {
     const positionSizing  = getPositionSizing(verdict, total);
     const dataSourceLabel = buildDataSourceLabel(assetType, marketData, news.length);
     const entryCondition  = buildEntryCondition(marketData, pos.ratio, vol.isHigh, verdict);
+
+    // ✅ 신뢰도 근거 — 뉴스 품질 + 데이터 출처 명시
+    const newsSentimentLabel = nData.sentiment === '긍정'
+      ? `긍정 ${Math.round(news.length * 0.6)}건`
+      : nData.sentiment === '부정'
+        ? `부정 ${Math.round(news.length * 0.6)}건`
+        : '중립';
+    const confidenceBasis = [
+      marketData ? `실시간 시세(${marketData.source})` : null,
+      news.length > 0 ? `뉴스 ${news.length}건(${newsSentimentLabel})` : null,
+      vol.isHigh ? '거래량 신호' : null,
+    ].filter(Boolean).join(' + ');
 
     const noDataNote = !marketData
       ? `\n[주의] ${keyword} 실시간 시세 미지원. 뉴스와 거시 데이터 기반으로만 분석하라.`
@@ -439,23 +464,23 @@ ${nData.context}
 
 [퀀트 판단] 결론: ${verdict} | 신뢰도: ${confidence}% | 포지션: ${positionSizing}
 
-[JACK] (강세론. 반드시 2문장. 각 문장 15단어 이하. 초과시 시스템 오류)
-문장1: 핵심 상황 + 수치 1개.
-문장2: 매수 근거 1가지.
+[JACK] — 강세 근거만. 리스크 언급 금지. 반드시 2문장.
+문장1: ${keyword} 현재 가격(${marketData?.price || '?'}) 기준 상승 근거 1가지 + 수치.
+문장2: 구체적 매수 액션 1가지.
 
-[LUCIA] (약세론. 반드시 2문장. 각 문장 15단어 이하. 초과시 시스템 오류)
-문장1: "하지만 소장님, ~"으로 시작. 리스크 1가지.
-문장2: 위험 근거 1가지.
+[LUCIA] — 리스크만. 기회 언급 금지. 반드시 2문장.
+문장1: "하지만 소장님, ~"으로 시작. 잭이 놓친 하락 리스크 1가지.
+문장2: 손절 또는 회피 근거 1가지.
 
-[RAY] (중립. 반드시 2문장. 각 문장 15단어 이하. 초과시 시스템 오류)
-문장1: 긍정 신호 1가지 + 수치.
-문장2: 부정 신호 1가지 + 수치.
+[RAY] — 숫자와 데이터만. 의견 금지. 반드시 2문장.
+문장1: 긍정 지표 1가지 (반드시 수치 포함).
+문장2: 부정 지표 1가지 (반드시 수치 포함).
 
-[ECHO] 에코 감독관 — 최종 결론 (형식 엄수. 6줄 고정)
-결론: ${verdict} (신뢰도 ${confidence}%)
-근거: (핵심 1줄)
-${entryCondition.split('\n').slice(0, 3).join('\n')}
-포지션: ${positionSizing}
+[ECHO] 에코 감독관 — 최종 결론 (반드시 4줄 고정. 초과 금지)
+결론: ${verdict} (신뢰도 ${confidence}% — ${confidenceBasis} 기반)
+근거: (잭+루시아+레이 핵심 요약 1줄. 수치 포함)
+지금: (지금 당장 할 행동 1가지. "신규 진입 금지" 또는 "소량 매수" 등)
+조건: (매수 조건 숫자 / 손절 조건 숫자 — entryCondition 기반: ${entryCondition.split('\n').slice(1,3).join(' / ')})
 
 질문: ${lastMsg}
 `;
@@ -475,7 +500,7 @@ ${entryCondition.split('\n').slice(0, 3).join('\n')}
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents,
-          generationConfig: { maxOutputTokens: 3000, temperature: 0.4 },
+          generationConfig: { maxOutputTokens: 4000, temperature: 0.4 },
           safetySettings: [
             { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
             { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_NONE' },
@@ -508,7 +533,7 @@ ${entryCondition.split('\n').slice(0, 3).join('\n')}
       : `긍정: ${nData.sentiment === '긍정' ? '뉴스 긍정 흐름' : vol.isHigh ? '거래량 증가' : '저변동성 안정'}. 부정: ${pos.ratio > 0.7 ? '고점 근접 추격 위험' : pos.ratio < 0.3 ? '저점 구간 반등 불확실' : '추세 중립 방향성 미확인'}.`;
 
     const echoContent = p.echo || [
-      `결론: ${verdict} (신뢰도 ${confidence}%)`,
+      `결론: ${verdict} (신뢰도 ${confidence}% — ${confidenceBasis} 기반)`,
       `근거: ${breakdown}`,
       entryCondition,
       `포지션: ${positionSizing}`,

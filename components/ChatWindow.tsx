@@ -5,14 +5,8 @@ import { PositionInput, buildPositionContext } from "./PositionInput";
 import type { Position } from "./PositionInput";
 
 interface PersonaData {
-  jack:  string;
-  lucia: string;
-  ray:   string;
-  echo:  string;
-  verdict:        string;
-  confidence:     number;
-  breakdown:      string;
-  positionSizing: string;
+  jack: string; lucia: string; ray: string; echo: string;
+  verdict: string; confidence: number; breakdown: string; positionSizing: string;
 }
 
 interface Message {
@@ -27,39 +21,63 @@ type PersonaKey = 'jack' | 'lucia' | 'ray' | 'echo';
 
 const PERSONAS: Record<PersonaKey, {
   name: string; label: string; initial: string;
-  iconBg: string; bubbleBg: string; bubbleBorder: string;
-  echoTag?: string;
+  iconBg: string; bubbleBg: string; bubbleBorder: string; echoTag?: string;
 }> = {
-  jack:  { name: 'JACK', label: 'Strategy (INTJ)', initial: 'J', iconBg: '#374151', bubbleBg: '#ffffff', bubbleBorder: '#dcdcdc' },
-  lucia: { name: 'LUCIA', label: 'Risk (ENFP)',    initial: 'L', iconBg: '#a855f7', bubbleBg: '#fdf4ff', bubbleBorder: '#e9d5ff' },
-  ray:   { name: 'RAY',   label: 'Data (INTP)',    initial: 'R', iconBg: '#06b6d4', bubbleBg: '#f0fdff', bubbleBorder: '#a5f3fc' },
-  echo:  { name: 'ECHO',  label: 'Commander',      initial: 'E', iconBg: '#b45309', bubbleBg: '#fffbeb', bubbleBorder: '#FAE100', echoTag: 'Final Strategy' },
-};
-
-const META_MARKER = '\uD83D\uDCE1 \uB370\uC774\uD130 \uCD9C\uCC98';
-const DISC_MARKER = '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500';
-
-interface EchoParts {
-  content: string;
-  dataSource: string;
-  disclaimer: string;
-}
-
-const parseEchoParts = (text: string): EchoParts => {
-  const discIdx = text.indexOf(DISC_MARKER);
-  const metaIdx = text.indexOf(META_MARKER);
-  const splitIdx = metaIdx !== -1 ? metaIdx : discIdx !== -1 ? discIdx : -1;
-  if (splitIdx === -1) return { content: text, dataSource: '', disclaimer: '' };
-  const content   = text.slice(0, splitIdx).trim();
-  const remainder = text.slice(splitIdx);
-  const lines     = remainder.split('\n');
-  const dataLine  = lines.find(l => l.startsWith(META_MARKER)) || '';
-  const discLines = lines.filter(l => l.trim() && !l.startsWith(META_MARKER)).join('\n').trim();
-  return { content, dataSource: dataLine, disclaimer: discLines };
+  jack:  { name: 'JACK',  label: 'Strategy (INTJ)', initial: 'J', iconBg: '#374151', bubbleBg: '#ffffff', bubbleBorder: '#dcdcdc' },
+  lucia: { name: 'LUCIA', label: 'Risk (ENFP)',     initial: 'L', iconBg: '#a855f7', bubbleBg: '#fdf4ff', bubbleBorder: '#e9d5ff' },
+  ray:   { name: 'RAY',   label: 'Data (INTP)',     initial: 'R', iconBg: '#06b6d4', bubbleBg: '#f0fdff', bubbleBorder: '#a5f3fc' },
+  echo:  { name: 'ECHO',  label: 'Commander',       initial: 'E', iconBg: '#b45309', bubbleBg: '#fffbeb', bubbleBorder: '#FAE100', echoTag: 'Final Strategy' },
 };
 
 const formatTime = (d: Date) =>
   d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+// 에코 텍스트에서 데이터 출처/면책 분리
+const parseEchoParts = (text: string) => {
+  const markers = ['\uD83D\uDCE1', '\u2500\u2500\u2500\u2500\u2500'];
+  let splitIdx = -1;
+  for (const m of markers) {
+    const idx = text.indexOf(m);
+    if (idx !== -1 && (splitIdx === -1 || idx < splitIdx)) splitIdx = idx;
+  }
+  if (splitIdx === -1) return { content: text, dataSource: '', disclaimer: '' };
+  const content   = text.slice(0, splitIdx).trim();
+  const remainder = text.slice(splitIdx);
+  const lines     = remainder.split('\n');
+  const dataLine  = lines.find(l => l.includes('\uD83D\uDCE1')) || '';
+  const discLines = lines.filter(l => l.trim() && !l.includes('\uD83D\uDCE1')).join('\n').trim();
+  return { content, dataSource: dataLine, disclaimer: discLines };
+};
+
+// MetaBox: 데이터 출처 + 신뢰도 가이드 + 면책조항
+const MetaBox = ({ dataSource, disclaimer }: { dataSource: string; disclaimer: string }) => {
+  if (!dataSource && !disclaimer) return null;
+  return (
+    <div style={{ marginTop: 8, padding: '0 12px 0 58px' }}>
+      <div style={{ background: 'rgba(0,0,0,0.04)', borderRadius: 8, padding: '8px 12px', border: '1px solid rgba(0,0,0,0.07)' }}>
+        {dataSource && (
+          <p style={{ fontSize: 11, color: '#374151', margin: 0, fontWeight: 600, lineHeight: 1.5 }}>
+            {dataSource}
+          </p>
+        )}
+        <p style={{ fontSize: 10, color: '#2563eb', margin: '5px 0 0', lineHeight: 1.5 }}>
+          {'\uD83D\uDCA1 \uC2E0\uB8B0\uB3C4 \uAC00\uC774\uB4DC: 60%+ \uCC38\uACE0 \u00B7 70%+ \uACE0\uB824 \u00B7 80%+ \uD655\uC2E0'}
+        </p>
+        {disclaimer && (
+          <div style={{ marginTop: 6, borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: 6 }}>
+            {disclaimer.split('\n')
+              .filter(l => l.trim() && !l.startsWith('\u2500'))
+              .map((line, i) => (
+                <p key={i} style={{ fontSize: 10, color: '#6b7280', margin: i > 0 ? '2px 0 0' : 0, lineHeight: 1.5 }}>
+                  {line}
+                </p>
+              ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const TypingIndicator = () => (
   <div style={{ padding: '8px 12px' }}>
@@ -82,26 +100,6 @@ const TypingIndicator = () => (
     </div>
   </div>
 );
-
-const MetaBox = ({ dataSource, disclaimer }: { dataSource: string; disclaimer: string }) => {
-  if (!dataSource && !disclaimer) return null;
-  return (
-    <div style={{ marginTop: 8, padding: '0 12px 0 58px' }}>
-      <div style={{ background: 'rgba(0,0,0,0.04)', borderRadius: 8, padding: '8px 12px', border: '1px solid rgba(0,0,0,0.07)' }}>
-        {dataSource && (
-          <p style={{ fontSize: 11, color: '#374151', margin: 0, fontWeight: 600, lineHeight: 1.5 }}>{dataSource}</p>
-        )}
-        {disclaimer && (
-          <div style={{ marginTop: dataSource ? 6 : 0, borderTop: dataSource ? '1px solid rgba(0,0,0,0.08)' : 'none', paddingTop: dataSource ? 6 : 0 }}>
-            {disclaimer.split('\n').filter(l => l.trim() && !l.startsWith('\u2500')).map((line, i) => (
-              <p key={i} style={{ fontSize: 10, color: '#6b7280', margin: i > 0 ? '2px 0 0' : 0, lineHeight: 1.5 }}>{line}</p>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
 
 const PersonaBubble = ({ personaKey, text, timestamp }: { personaKey: PersonaKey; text: string; timestamp: Date }) => {
   const p = PERSONAS[personaKey];
@@ -163,9 +161,7 @@ const UserBubble = ({ message }: { message: Message }) => (
 );
 
 const PersonaGroup = ({ message }: { message: Message }) => {
-  if (!message.personas) {
-    return <PersonaBubble personaKey="jack" text={message.content} timestamp={message.timestamp} />;
-  }
+  if (!message.personas) return <PersonaBubble personaKey="jack" text={message.content} timestamp={message.timestamp} />;
   const { jack, lucia, ray, echo } = message.personas;
   return (
     <div style={{ marginBottom: 8 }}>
@@ -179,7 +175,11 @@ const PersonaGroup = ({ message }: { message: Message }) => {
 
 const SampleQuestions = ({ onSelect }: { onSelect: (q: string) => void }) => (
   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '6px 12px 10px' }}>
-    {['\uC9C0\uAE08 \uBE44\uD2B8\uCF54\uC778 \uD22C\uC790\uD574\uB3C4 \uB420\uAE4C?', '\uC0BC\uC131\uC804\uC790 \uC624\uB298 \uBD84\uC11D \uBCF4\uACE0\uD574', '\uC5D4\uBE44\uB514\uC544 \uCD5C\uADFC \uD750\uB984 \uBCF4\uACE0\uD574'].map(q => (
+    {[
+      '\uC9C0\uAE08 \uBE44\uD2B8\uCF54\uC778 \uD22C\uC790\uD574\uB3C4 \uB420\uAE4C?',
+      '\uC0BC\uC131\uC804\uC790 \uC624\uB298 \uBD84\uC11D \uBCF4\uACE0\uD574',
+      '\uC5D4\uBE44\uB514\uC544 \uCD5C\uADFC \uD750\uB984 \uBCF4\uACE0\uD574',
+    ].map(q => (
       <button key={q} onClick={() => onSelect(q)}
         style={{ fontSize: 12, background: 'rgba(255,255,255,0.9)', border: '1px solid #d1d5db', color: '#374151', padding: '6px 12px', borderRadius: 16, cursor: 'pointer', fontWeight: 500 }}
         onMouseEnter={e => { const el = e.currentTarget; el.style.background = '#FAE100'; el.style.borderColor = '#FAE100'; }}
@@ -203,17 +203,16 @@ export default function ChatWindow() {
 
   useEffect(() => {
     setMounted(true);
-    // STOCK_MAP 키 목록 자동 로드
-    fetch('/api/keywords')
-      .then(r => r.json())
-      .then(d => setStockKeywords(d.keywords || []))
-      .catch(() => {});
     setMessages([{
       role: 'assistant',
       content: '[SYSTEM ONLINE]\n\uC9C0\uD718\uAD00\uB2D8, \uC804\uB7B5 \uC13C\uD130 \uAC00\uB3D9\uB428.\n\uBD84\uC11D\uD560 \uC885\uBAA9 \uB610\uB294 \uC2DC\uC7A5\uC744 \uD558\uB2EC\uD558\uC2ED\uC2DC\uC624.',
       timestamp: new Date(),
       isRead: true,
     }]);
+    fetch('/api/keywords')
+      .then(r => r.json())
+      .then(d => setStockKeywords(d.keywords || []))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -224,28 +223,20 @@ export default function ChatWindow() {
     const userMsg: Message = { role: 'user', content: text, timestamp: new Date(), isRead: false };
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
-    setTimeout(() => {
-      setMessages(prev => prev.map(m => m === userMsg ? { ...m, isRead: true } : m));
-    }, 600);
+    setTimeout(() => setMessages(prev => prev.map(m => m === userMsg ? { ...m, isRead: true } : m)), 600);
     try {
-      const positionContext = buildPositionContext(position);
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })),
-          positionContext,
+          positionContext: buildPositionContext(position),
         }),
       });
       const data = await response.json();
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: data.reply || '\uBD84\uC11D \uB370\uC774\uD130 \uC5C6\uC74C.',
-        timestamp: new Date(),
-        personas: data.personas || null,
-      }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: data.reply || '', timestamp: new Date(), personas: data.personas || null }]);
     } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: '\uD1B5\uC2E0 \uC7A5\uC560 \uBC1C\uC0DD. \uC7AC\uC2DC\uB3C4 \uBC14\uB78C.', timestamp: new Date() }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: '\uD1B5\uC2E0 \uC7A5\uC560. \uC7AC\uC2DC\uB3C4 \uBC14\uB78C.', timestamp: new Date() }]);
     } finally {
       setIsLoading(false);
       setShowPosition(false);
@@ -273,10 +264,7 @@ export default function ChatWindow() {
     const userMsg: Message = { role: 'user', content, timestamp: new Date(), isRead: false };
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
-
-    setTimeout(() => {
-      setMessages(prev => prev.map(m => m === userMsg ? { ...m, isRead: true } : m));
-    }, 600);
+    setTimeout(() => setMessages(prev => prev.map(m => m === userMsg ? { ...m, isRead: true } : m)), 600);
 
     try {
       const response = await fetch('/api/chat', {
@@ -288,14 +276,9 @@ export default function ChatWindow() {
         }),
       });
       const data = await response.json();
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: data.reply || '\uBD84\uC11D \uB370\uC774\uD130 \uC5C6\uC74C.',
-        timestamp: new Date(),
-        personas: data.personas || null,
-      }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: data.reply || '', timestamp: new Date(), personas: data.personas || null }]);
     } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: '\uD1B5\uC2E0 \uC7A5\uC560 \uBC1C\uC0DD. \uC7AC\uC2DC\uB3C4 \uBC14\uB78C.', timestamp: new Date() }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: '\uD1B5\uC2E0 \uC7A5\uC560. \uC7AC\uC2DC\uB3C4 \uBC14\uB78C.', timestamp: new Date() }]);
     } finally {
       setIsLoading(false);
     }
@@ -307,56 +290,53 @@ export default function ChatWindow() {
 
   if (!mounted) return null;
 
+  const cryptoList = ['\uBE44\uD2B8\uCF54\uC778','BTC','\uC774\uB354\uB9AC\uC6C0','ETH','\uB9AC\uD50C','XRP','\uC194\uB77C\uB098','SOL','\uB3C4\uC9C0','DOGE','ADA','BNB'];
+
   return (
     <>
       <style>{`
-        @keyframes td { 0%,60%,100%{transform:translateY(0);opacity:.5;}30%{transform:translateY(-5px);opacity:1;} }
-        *{box-sizing:border-box;}
-        body{margin:0;padding:0;overflow:hidden;}
-        ::-webkit-scrollbar{width:3px;}
-        ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.1);border-radius:2px;}
+        @keyframes td{0%,60%,100%{transform:translateY(0);opacity:.5;}30%{transform:translateY(-5px);opacity:1;}}
+        *{box-sizing:border-box;}body{margin:0;padding:0;overflow:hidden;}
+        ::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:rgba(0,0,0,.1);border-radius:2px;}
       `}</style>
 
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#b2c7da', fontFamily: "'Apple SD Gothic Neo','Malgun Gothic',sans-serif" }}>
+      <div style={{ display:'flex', flexDirection:'column', height:'100vh', background:'#b2c7da', fontFamily:"'Apple SD Gothic Neo','Malgun Gothic',sans-serif" }}>
 
-        {/* Header */}
-        <div style={{ background: 'rgba(178,199,218,.95)', backdropFilter: 'blur(10px)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(0,0,0,.06)', position: 'sticky', top: 0, zIndex: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ display: 'flex' }}>
-              {(['jack', 'lucia', 'ray', 'echo'] as PersonaKey[]).map((key, i) => (
-                <div key={key} style={{ width: 28, height: 28, borderRadius: 8, background: PERSONAS[key].iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: i > 0 ? -6 : 0, zIndex: 4 - i, border: '2px solid #b2c7da' }}>
-                  <span style={{ color: '#fff', fontWeight: 800, fontSize: 10 }}>{PERSONAS[key].initial}</span>
+        <div style={{ background:'rgba(178,199,218,.95)', backdropFilter:'blur(10px)', padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', borderBottom:'1px solid rgba(0,0,0,.06)', position:'sticky', top:0, zIndex:10 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <div style={{ display:'flex' }}>
+              {(['jack','lucia','ray','echo'] as PersonaKey[]).map((key,i) => (
+                <div key={key} style={{ width:28, height:28, borderRadius:8, background:PERSONAS[key].iconBg, display:'flex', alignItems:'center', justifyContent:'center', marginLeft:i>0?-6:0, zIndex:4-i, border:'2px solid #b2c7da' }}>
+                  <span style={{ color:'#fff', fontWeight:800, fontSize:10 }}>{PERSONAS[key].initial}</span>
                 </div>
               ))}
             </div>
             <div>
-              <span style={{ color: '#1f2937', fontWeight: 700, fontSize: 15 }}>PersonaX</span>
-              <span style={{ color: '#6b7280', fontSize: 11, marginLeft: 5 }}>4</span>
+              <span style={{ color:'#1f2937', fontWeight:700, fontSize:15 }}>PersonaX</span>
+              <span style={{ color:'#6b7280', fontSize:11, marginLeft:5 }}>4</span>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <a href="/history" style={{ background: 'rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 8, padding: '5px 10px', fontSize: 11, fontWeight: 600, color: '#374151', textDecoration: 'none' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <a href="/history" style={{ background:'rgba(0,0,0,0.08)', border:'1px solid rgba(0,0,0,0.1)', borderRadius:8, padding:'5px 10px', fontSize:11, fontWeight:600, color:'#374151', textDecoration:'none' }}>
               History
             </a>
-            <div style={{ fontSize: 11, color: isLoading ? '#b45309' : '#16a34a', fontWeight: 500 }}>
+            <div style={{ fontSize:11, color:isLoading?'#b45309':'#16a34a', fontWeight:500 }}>
               {isLoading ? 'analyzing...' : 'online'}
             </div>
           </div>
         </div>
 
-        {/* Date */}
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 6px' }}>
-          <div style={{ background: 'rgba(0,0,0,.12)', borderRadius: 12, padding: '3px 12px' }}>
-            <span style={{ fontSize: 11, color: '#374151', fontWeight: 500 }}>
-              {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
+        <div style={{ display:'flex', justifyContent:'center', padding:'12px 0 6px' }}>
+          <div style={{ background:'rgba(0,0,0,.12)', borderRadius:12, padding:'3px 12px' }}>
+            <span style={{ fontSize:11, color:'#374151', fontWeight:500 }}>
+              {new Date().toLocaleDateString('ko-KR', { month:'long', day:'numeric', weekday:'short' })}
             </span>
           </div>
         </div>
 
-        {/* Messages */}
-        <div style={{ flex: 1, overflowY: 'auto', paddingTop: 4, paddingBottom: 8 }}>
-          {messages.map((msg, idx) =>
-            msg.role === 'assistant'
+        <div style={{ flex:1, overflowY:'auto', paddingTop:4, paddingBottom:8 }}>
+          {messages.map((msg,idx) =>
+            msg.role==='assistant'
               ? <PersonaGroup key={idx} message={msg} />
               : <UserBubble key={idx} message={msg} />
           )}
@@ -364,40 +344,34 @@ export default function ChatWindow() {
           <div ref={bottomRef} />
         </div>
 
-        {/* Position Input */}
         {showPosition && (
           <PositionInput
             keyword={pendingKeyword}
-            currency={['\uBE44\uD2B8\uCF54\uC778', 'BTC', '\uC774\uB354\uB9AC\uC6C0', 'ETH'].includes(pendingKeyword) ? 'KRW' : 'USD'}
-            onSubmit={(position) => {
-              setCurrentPosition(position);
-              handleSendWithPosition(pendingText, position);
-            }}
+            currency={cryptoList.includes(pendingKeyword) ? 'KRW' : 'USD'}
+            onSubmit={position => { setCurrentPosition(position); handleSendWithPosition(pendingText, position); }}
             onSkip={() => handleSendWithPosition(pendingText, null)}
           />
         )}
 
-        {/* Sample questions */}
         {messages.length <= 1 && !isLoading && !showPosition && (
           <SampleQuestions onSelect={q => handleSend(q)} />
         )}
 
-        {/* Input */}
-        <div style={{ background: '#f9fafb', borderTop: '1px solid #e5e7eb', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ flex: 1, background: '#ffffff', border: '1px solid #d1d5db', borderRadius: 20, padding: '8px 14px', display: 'flex', alignItems: 'center' }}>
+        <div style={{ background:'#f9fafb', borderTop:'1px solid #e5e7eb', padding:'10px 12px', display:'flex', alignItems:'center', gap:8 }}>
+          <div style={{ flex:1, background:'#ffffff', border:'1px solid #d1d5db', borderRadius:20, padding:'8px 14px', display:'flex', alignItems:'center' }}>
             <textarea
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Enter stock or topic..."
               rows={1}
-              style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: '#1f2937', fontSize: 14, resize: 'none', fontFamily: 'inherit', lineHeight: 1.5, maxHeight: 80 }}
+              style={{ width:'100%', background:'transparent', border:'none', outline:'none', color:'#1f2937', fontSize:14, resize:'none', fontFamily:'inherit', lineHeight:1.5, maxHeight:80 }}
             />
           </div>
           <button
             onClick={() => handleSend()}
             disabled={!input.trim() || isLoading}
-            style={{ background: input.trim() && !isLoading ? '#FAE100' : '#e5e7eb', color: '#1a1a1a', border: 'none', padding: '9px 16px', borderRadius: 20, cursor: input.trim() && !isLoading ? 'pointer' : 'not-allowed', fontWeight: 700, fontSize: 13, transition: 'all .2s' }}
+            style={{ background:input.trim()&&!isLoading?'#FAE100':'#e5e7eb', color:'#1a1a1a', border:'none', padding:'9px 16px', borderRadius:20, cursor:input.trim()&&!isLoading?'pointer':'not-allowed', fontWeight:700, fontSize:13, transition:'all .2s' }}
           >
             Send
           </button>
