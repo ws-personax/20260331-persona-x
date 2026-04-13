@@ -33,20 +33,22 @@ export default function ChatWindow() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setMessages([{ id: "init", role: "assistant", timestamp: new Date(), content: "[SYSTEM ONLINE]\n분석할 종목을 입력하십시오." }]);
+    setMessages([{ id: "init", role: "assistant", timestamp: new Date(), content: "[SYSTEM ONLINE]\n지휘관님, 전략 센터 가동됨. 분석할 종목을 하달하십시오." }]);
     fetch("/api/keywords").then(r => r.json()).then(d => setStockKeywords(d.keywords || []));
   }, []);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isLoading]);
 
-  // ✅ 화폐 판별기 보강
-  const getCurrency = (kw: string) => {
-    const krwList = ["삼성전자", "현대차", "에코프로", "비트코인", "리플", "카카오", "네이버", "SK하이닉스"];
-    return krwList.some(k => kw.includes(k)) ? "KRW" : "USD";
+  // ✅ [개선] 더욱 강력해진 화폐 판별기 (한국 주식/코인 리스트 명시)
+  const getInferCurrency = (kw: string): "KRW" | "USD" => {
+    const krwTargets = ["삼성전자", "현대차", "카카오", "네이버", "SK하이닉스", "기아", "LG에너지", "POSCO", "셀트리온", "에코프로", "알테오젠", "비트코인", "리플", "도지", "이더리움", "솔라나", "코스피", "코스닥"];
+    return krwTargets.some(target => kw.includes(target)) ? "KRW" : "USD";
   };
 
   const handleSendWithPosition = useCallback(async (text: string, position: Position | null) => {
-    setShowPosition(false); // ✅ 즉시 닫기
+    // 🔥 [강제 진압] 서버 통신 시작 전에 입력창부터 즉각 제거
+    setShowPosition(false); 
+    
     const userMsg: Message = { id: `${Date.now()}`, role: "user", content: text, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
@@ -62,17 +64,28 @@ export default function ChatWindow() {
         }),
       });
       const data = await res.json();
+      // 백엔드에서 personas.echo 안에 뉴스 링크가 합쳐져서 옵니다.
       setMessages(prev => [...prev, { id: `${Date.now()}-ai`, role: "assistant", timestamp: new Date(), content: data.reply, personas: data.personas }]);
     } catch {
-      setMessages(prev => [...prev, { id: "err", role: "assistant", content: "통신 실패.", timestamp: new Date() }]);
-    } finally { setIsLoading(false); }
+      setMessages(prev => [...prev, { id: "err", role: "assistant", content: "통신 장애 발생. 기지를 재가동하십시오.", timestamp: new Date() }]);
+    } finally { 
+      setIsLoading(false); 
+    }
   }, [messages]);
 
   const handleSend = () => {
     const val = input.trim();
     if (!val || isLoading) return;
-    const matched = stockKeywords.find(k => val.includes(k));
-    if (matched) { setPendingText(val); setPendingKeyword(matched); setShowPosition(true); return; }
+    
+    // 키워드 우선순위 감지
+    const matched = stockKeywords.find(k => val.toLowerCase().includes(k.toLowerCase()));
+    
+    if (matched) { 
+      setPendingText(val); 
+      setPendingKeyword(matched); 
+      setShowPosition(true); // 입력창 활성화
+      return; 
+    }
     handleSendWithPosition(val, null);
   };
 
@@ -107,14 +120,15 @@ export default function ChatWindow() {
             )}
           </div>
         ))}
-        {isLoading && <div style={{ padding: "0 20px", fontSize: 12, color: "#666" }}>분석관들이 토론 중...</div>}
+        {isLoading && <div style={{ padding: "0 20px", fontSize: 12, color: "#666" }}>분석관들이 전략을 조율 중입니다...</div>}
         <div ref={bottomRef} />
       </div>
 
+      {/* 🛠️ [긴급 수리] 화폐 단위 강제 고정 및 즉각 퇴각 트리거 */}
       {showPosition && (
         <PositionInput 
           keyword={pendingKeyword} 
-          currency={getCurrency(pendingKeyword)} 
+          currency={getInferCurrency(pendingKeyword)} 
           onSubmit={pos => handleSendWithPosition(pendingText, pos)} 
           onSkip={() => handleSendWithPosition(pendingText, null)} 
         />
@@ -122,7 +136,14 @@ export default function ChatWindow() {
 
       <footer style={{ background: "#fff", padding: "12px" }}>
         <div style={{ display: "flex", gap: 10 }}>
-          <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleSend())} placeholder="종목명 입력..." style={{ flex: 1, border: "1px solid #ddd", borderRadius: 12, padding: "10px", outline: "none", resize: "none" }} rows={1} />
+          <textarea 
+            value={input} 
+            onChange={e => setInput(e.target.value)} 
+            onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleSend())} 
+            placeholder="종목명 또는 키워드 입력..." 
+            style={{ flex: 1, border: "1px solid #ddd", borderRadius: 12, padding: "10px", outline: "none", resize: "none" }} 
+            rows={1} 
+          />
           <button onClick={handleSend} disabled={!input.trim() || isLoading} style={{ background: "#FAE100", border: "none", borderRadius: 12, padding: "0 20px", fontWeight: 800 }}>전송</button>
         </div>
       </footer>
@@ -143,10 +164,16 @@ function PersonaBubble({ personaKey, text, timestamp, personas }: { personaKey: 
           <div style={{ background: p.bubbleBg, border: isEcho ? "2px solid #FAE100" : "1px solid #ddd", padding: "10px", borderRadius: "0 12px 12px 12px" }}>
             {isEcho && personas && (
               <div style={{ marginBottom: 8, borderBottom: "1px solid #eee", paddingBottom: 4 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700, color: "#b45309" }}><span>신뢰도 {personas.confidence}%</span><span>{personas.breakdown}</span></div>
-                <div style={{ height: 3, background: "#eee", marginTop: 4 }}><div style={{ height: "100%", width: `${personas.confidence}%`, background: "#b45309" }} /></div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700, color: "#b45309" }}>
+                  <span>신뢰도 {personas.confidence}%</span>
+                  <span>{personas.breakdown}</span>
+                </div>
+                <div style={{ height: 3, background: "#eee", marginTop: 4 }}>
+                  <div style={{ height: "100%", width: `${personas.confidence}%`, background: "#b45309" }} />
+                </div>
               </div>
             )}
+            {/* 🔗 [뉴스 가독성] white-space: pre-wrap이 있어야 뉴스 링크가 줄바꿈되어 잘 보입니다. */}
             <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{text}</p>
           </div>
         </div>
