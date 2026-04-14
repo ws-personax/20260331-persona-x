@@ -1,156 +1,172 @@
-"use client";
+'use client';
 
-import { useState } from "react";
+import { useMemo, useState } from 'react';
 
-// ─── 타입 정의 ───────────────────────────────────────────
-export interface Position {
-  keyword:     string;
-  hasPosition: boolean;
-  avgPrice:    string;  // 평단가 (문자열, ChatWindow에서 sanitize 후 전달)
-  quantity:    string;  // 보유 수량/비중 (%, 개수 모두 허용)
-  currency:    'KRW' | 'USD';
-}
+export type Position = {
+  avgPrice: string;
+  quantity: string;
+  buyPrice: string;
+  note: string;
+};
 
-interface PositionInputProps {
-  keyword:  string;
+export const sanitizePrice = (raw: string): string => {
+  const cleaned = raw.replace(/,/g, '').replace(/[^\d.]/g, '');
+  const parts = cleaned.split('.');
+  return parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : cleaned;
+};
+
+export const sanitizeQuantity = (raw: string): string => {
+  const cleaned = raw.replace(/,/g, '').replace(/[^\d.%]/g, '');
+  const parts = cleaned.split('.');
+  return parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : cleaned;
+};
+
+export const buildPositionContext = (pos: Position | null): string => {
+  if (!pos) return '';
+  const parts = [
+    pos.avgPrice ? `평단가: ${pos.avgPrice}` : '',
+    pos.quantity ? `수량: ${pos.quantity}` : '',
+    pos.buyPrice ? `매수가: ${pos.buyPrice}` : '',
+    pos.note ? `메모: ${pos.note}` : '',
+  ].filter(Boolean);
+  return parts.join('\n');
+};
+
+type Props = {
+  keyword: string;
   currency: 'KRW' | 'USD';
-  onSubmit: (position: Position) => void;
-  onSkip:   () => void;
-}
+  onSubmit: (pos: Position) => void;
+  onSkip: () => void;
+};
 
-// ─── 포지션 입력 UI ──────────────────────────────────────
-export function PositionInput({ keyword, currency, onSubmit, onSkip }: PositionInputProps) {
-  const [hasPosition, setHasPosition] = useState<boolean | null>(null);
-  const [avgPrice,    setAvgPrice]    = useState('');
-  const [quantity,    setQuantity]    = useState('');
+export function PositionInput({ keyword, currency, onSubmit, onSkip }: Props) {
+  const [avgPrice, setAvgPrice] = useState('');
+  const [quantity, setQuantity] = useState('');
+  const [buyPrice, setBuyPrice] = useState('');
+  const [note, setNote] = useState('');
+
+  const canSubmit = useMemo(() => {
+    return avgPrice.trim() || quantity.trim() || buyPrice.trim() || note.trim();
+  }, [avgPrice, quantity, buyPrice, note]);
 
   const handleSubmit = () => {
     onSubmit({
-      keyword,
-      hasPosition: hasPosition === true,
-      avgPrice:    avgPrice || '0',
-      quantity:    quantity || '0',
-      currency,
+      avgPrice: avgPrice.trim(),
+      quantity: quantity.trim(),
+      buyPrice: buyPrice.trim(),
+      note: note.trim(),
     });
   };
 
-  const priceLabel  = currency === 'KRW' ? '평단가 (원)' : '평단가 (USD)';
-  const placeholder = currency === 'KRW' ? '예: 63500' : '예: 182.50';
-
   return (
-    <div style={{
-      background: 'rgba(255,255,255,0.95)',
-      borderRadius: 14,
-      padding: '16px',
-      margin: '8px 12px',
-      border: '1px solid #e5e7eb',
-      boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
-    }}>
-      {/* 헤더 */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div>
-          <p style={{ fontSize: 13, fontWeight: 700, color: '#1f2937', margin: 0 }}>
-            📊 {keyword} 포지션 있으신가요?
-          </p>
-          <p style={{ fontSize: 11, color: '#6b7280', margin: '3px 0 0' }}>
-            입력하시면 맞춤 분석을 드립니다
-          </p>
-        </div>
-        <button onClick={onSkip}
-          style={{ fontSize: 11, color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}>
-          건너뛰기
-        </button>
-      </div>
-
-      {/* 보유 여부 선택 */}
-      {hasPosition === null && (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setHasPosition(true)}
-            style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1.5px solid #FAE100', background: '#fffbeb', color: '#92400e', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-            ✅ 보유 중
-          </button>
+    <div
+      style={{
+        position: 'fixed',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: '#fff',
+        borderTop: '1px solid #e5e7eb',
+        boxShadow: '0 -8px 24px rgba(0,0,0,0.12)',
+        zIndex: 50,
+        padding: '14px 12px',
+      }}
+    >
+      <div style={{ maxWidth: 720, margin: '0 auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 14 }}>포지션 입력</div>
+            <div style={{ fontSize: 11, color: '#6b7280' }}>
+              {keyword} 기준으로 평단/수량을 입력하시면 더 정확히 분석합니다. ({currency})
+            </div>
+          </div>
           <button
-            onClick={() => onSubmit({ keyword, hasPosition: false, avgPrice: '0', quantity: '0', currency })}
-            style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1.5px solid #e5e7eb', background: '#f9fafb', color: '#374151', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-            ❌ 미보유
+            onClick={onSkip}
+            style={{
+              border: '1px solid #d1d5db',
+              background: '#fff',
+              borderRadius: 10,
+              padding: '8px 12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            건너뛰기
           </button>
         </div>
-      )}
 
-      {/* 평단가 + 수량 입력 */}
-      {hasPosition === true && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
-              {priceLabel}
-            </label>
-            {/* ✅ type="text" — 자유 입력 허용, ChatWindow에서 sanitize */}
-            <input
-              type="text"
-              value={avgPrice}
-              onChange={e => setAvgPrice(e.target.value)}
-              placeholder={placeholder}
-              inputMode="decimal"
-              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1.5px solid #d1d5db', fontSize: 14, color: '#1f2937', outline: 'none', boxSizing: 'border-box' }}
-              onFocus={e => (e.target.style.borderColor = '#FAE100')}
-              onBlur={e =>  (e.target.style.borderColor = '#d1d5db')}
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
-              보유 비중 (%) 또는 수량
-            </label>
-            <input
-              type="text"
-              value={quantity}
-              onChange={e => setQuantity(e.target.value)}
-              placeholder="예: 20% 또는 0.5개"
-              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1.5px solid #d1d5db', fontSize: 14, color: '#1f2937', outline: 'none', boxSizing: 'border-box' }}
-              onFocus={e => (e.target.style.borderColor = '#FAE100')}
-              onBlur={e =>  (e.target.style.borderColor = '#d1d5db')}
-            />
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <input
+            value={avgPrice}
+            onChange={e => setAvgPrice(sanitizePrice(e.target.value))}
+            placeholder={`평단가 (${currency})`}
+            inputMode="decimal"
+            style={{
+              border: '1px solid #d1d5db',
+              borderRadius: 10,
+              padding: '10px 12px',
+              outline: 'none',
+              fontSize: 14,
+            }}
+          />
+          <input
+            value={quantity}
+            onChange={e => setQuantity(sanitizeQuantity(e.target.value))}
+            placeholder="수량 또는 비중(%)"
+            inputMode="decimal"
+            style={{
+              border: '1px solid #d1d5db',
+              borderRadius: 10,
+              padding: '10px 12px',
+              outline: 'none',
+              fontSize: 14,
+            }}
+          />
+          <input
+            value={buyPrice}
+            onChange={e => setBuyPrice(sanitizePrice(e.target.value))}
+            placeholder={`매수가 (${currency})`}
+            inputMode="decimal"
+            style={{
+              border: '1px solid #d1d5db',
+              borderRadius: 10,
+              padding: '10px 12px',
+              outline: 'none',
+              fontSize: 14,
+            }}
+          />
+          <input
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            placeholder="메모"
+            style={{
+              border: '1px solid #d1d5db',
+              borderRadius: 10,
+              padding: '10px 12px',
+              outline: 'none',
+              fontSize: 14,
+            }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
           <button
             onClick={handleSubmit}
-            disabled={!avgPrice}
+            disabled={!canSubmit}
             style={{
-              padding: '11px', borderRadius: 10, border: 'none',
-              background: avgPrice ? '#FAE100' : '#e5e7eb',
-              color: avgPrice ? '#1a1a1a' : '#9ca3af',
-              fontSize: 13, fontWeight: 700,
-              cursor: avgPrice ? 'pointer' : 'not-allowed',
-            }}>
-            분석 요청 →
+              flex: 1,
+              border: 'none',
+              background: canSubmit ? '#FAE100' : '#e5e7eb',
+              borderRadius: 10,
+              padding: '11px 14px',
+              fontWeight: 800,
+              cursor: canSubmit ? 'pointer' : 'not-allowed',
+            }}
+          >
+            분석에 반영
           </button>
         </div>
-      )}
+      </div>
     </div>
   );
 }
-
-// ─── 포지션 컨텍스트 문자열 생성 ─────────────────────────
-/**
- * 포지션 데이터를 프롬프트용 문자열로 변환합니다.
- * ChatWindow에서 sanitize 완료된 값이 전달됩니다.
- * route.ts 프롬프트에 삽입됩니다.
- */
-export const buildPositionContext = (position: Position | null): string => {
-  if (!position || !position.hasPosition) {
-    return '[포지션] 미보유 — 신규 진입 관점으로 분석';
-  }
-
-  // ✅ ChatWindow에서 이미 sanitize 완료 — 중복 정제 불필요
-  const price = position.avgPrice;
-  if (!price || price === '0') return '[포지션] 미보유';
-
-  const unit = position.currency === 'KRW' ? '원' : ' USD';
-
-  return [
-    `[포지션] 보유 중`,
-    `평단가: ${price}${unit}`,
-    position.quantity && position.quantity !== '0' ? `보유 비중/수량: ${position.quantity}` : '',
-    `→ 에코는 반드시 이 평단가 기준으로 손익 분석을 포함하라`,
-    `→ 현재가 대비 손익률을 계산하여 제시하라`,
-    `→ 손절/홀딩/추가매수 중 하나를 명확히 권고하라`,
-  ].filter(Boolean).join('\n');
-};

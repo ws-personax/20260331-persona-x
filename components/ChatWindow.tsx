@@ -1,117 +1,328 @@
-"use client";
+'use client';
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import Link from "next/link";
-import { PositionInput, buildPositionContext } from "./PositionInput";
-import type { Position } from "./PositionInput";
+import { useState, useRef, useEffect, useCallback } from 'react';
+import Link from 'next/link';
+import { PositionInput, buildPositionContext } from './PositionInput';
+import type { Position } from './PositionInput';
+import { inferCurrency, detectKeyword } from '@/lib/maps';
+
+interface NewsLink { title: string; url: string; }
 
 interface PersonaData {
   jack: string; lucia: string; ray: string; echo: string;
   verdict: string; confidence: number; breakdown: string; positionSizing: string;
+  jackNews?:  NewsLink | null;
+  luciaNews?: NewsLink | null;
+  rayNews?:   NewsLink | null;
+  echoNews?:  NewsLink | null;
 }
 
 interface Message {
-  id: string; role: "user" | "assistant"; content: string;
-  timestamp: Date; isRead?: boolean; personas?: PersonaData | null;
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+  isRead?: boolean;
+  personas?: PersonaData | null;
+  newsLinks?: NewsLink[];
 }
 
-const PERSONAS = {
-  jack:  { name: "JACK",  label: "Strategy (INTJ)", initial: "J", iconBg: "#374151", bubbleBg: "#ffffff", bubbleBorder: "#dcdcdc" },
-  lucia: { name: "LUCIA", label: "Risk (ENFP)",     initial: "L", iconBg: "#a855f7", bubbleBg: "#fdf4ff", bubbleBorder: "#e9d5ff" },
-  ray:   { name: "RAY",   label: "Data (INTP)",     initial: "R", iconBg: "#06b6d4", bubbleBg: "#f0fdff", bubbleBorder: "#a5f3fc" },
-  echo:  { name: "ECHO",  label: "Commander",       initial: "E", iconBg: "#b45309", bubbleBg: "#fffbeb", bubbleBorder: "#FAE100" },
+type PersonaKey = 'jack' | 'lucia' | 'ray' | 'echo';
+
+const PERSONAS: Record<PersonaKey, {
+  name: string; label: string; initial: string;
+  iconBg: string; bubbleBg: string; bubbleBorder: string; echoTag?: string;
+}> = {
+  jack:  { name: 'JACK',  label: 'Strategy (INTJ)', initial: 'J', iconBg: '#374151', bubbleBg: '#ffffff', bubbleBorder: '#dcdcdc' },
+  lucia: { name: 'LUCIA', label: 'Risk (ENFP)',     initial: 'L', iconBg: '#a855f7', bubbleBg: '#fdf4ff', bubbleBorder: '#e9d5ff' },
+  ray:   { name: 'RAY',   label: 'Data (INTP)',     initial: 'R', iconBg: '#06b6d4', bubbleBg: '#f0fdff', bubbleBorder: '#a5f3fc' },
+  echo:  { name: 'ECHO',  label: 'Commander',       initial: 'E', iconBg: '#b45309', bubbleBg: '#fffbeb', bubbleBorder: '#FAE100', echoTag: 'FINAL COMMAND' },
 };
+
+const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+const formatTime = (d: Date) => d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+const parseEchoParts = (text: string) => {
+  const markers = ['📡', '─────────────────────────'];
+  let splitIdx = -1;
+  for (const m of markers) {
+    const idx = text.indexOf(m);
+    if (idx !== -1 && (splitIdx === -1 || idx < splitIdx)) splitIdx = idx;
+  }
+  if (splitIdx === -1) return { content: text, dataSource: '', disclaimer: '' };
+  const content = text.slice(0, splitIdx).trim();
+  const remainder = text.slice(splitIdx);
+  const lines = remainder.split('\n');
+  const dataLine = lines.find(l => l.includes('📡')) || '';
+  const discLines = lines
+    .filter(l => { const t = l.trim(); return t && !t.includes('📡') && !/^─+$/.test(t); })
+    .join('\n').trim();
+  return { content, dataSource: dataLine, disclaimer: discLines };
+};
+
+// ✅ 말풍선 하단 뉴스 칩 — URL 숨기고 제목(20자)만 표시
+const InlineNewsChip = ({ news }: { news: NewsLink }) => (
+  <div style={{ padding: '5px 0 0 48px' }}>
+    <a
+      href={news.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        fontSize: 11, color: '#1d4ed8', background: '#eff6ff',
+        border: '1px solid #bfdbfe', borderRadius: 6,
+        padding: '3px 8px', textDecoration: 'none', fontWeight: 600,
+        maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}
+    >
+      📰 {news.title}
+    </a>
+  </div>
+);
+
+const MetaBox = ({ dataSource, disclaimer }: { dataSource: string; disclaimer: string }) => (
+  <div style={{ marginTop: 8, padding: '0 12px 0 58px' }}>
+    <div style={{ background: 'rgba(0,0,0,0.04)', borderRadius: 10, padding: '10px 14px', border: '1px solid rgba(0,0,0,0.07)' }}>
+      {dataSource && <p style={{ fontSize: 11, color: '#374151', margin: 0, fontWeight: 700, lineHeight: 1.5 }}>{dataSource}</p>}
+      <p style={{ fontSize: 10, color: '#2563eb', margin: '5px 0 0', lineHeight: 1.5, fontWeight: 600 }}>
+        💡 신뢰도 가이드: 60%+ 참고 · 70%+ 고려 · 80%+ 확신
+      </p>
+      {disclaimer && (
+        <div style={{ marginTop: 8, borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: 8 }}>
+          {disclaimer.split('\n')
+            .filter(l => { const t = l.trim(); return t && !/^─+$/.test(t); })
+            .map((line, i) => (
+              <p key={i} style={{ fontSize: 10, color: '#6b7280', margin: i > 0 ? '3px 0 0' : 0, lineHeight: 1.6 }}>{line}</p>
+            ))}
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+const PersonaBubble = ({ personaKey, text, timestamp, newsItem, echoNews }: {
+  personaKey: PersonaKey; text: string; timestamp: Date;
+  newsItem?: NewsLink | null; echoNews?: NewsLink | null;
+}) => {
+  const p = PERSONAS[personaKey];
+  const isEcho = personaKey === 'echo';
+  const { content, dataSource, disclaimer } = isEcho ? parseEchoParts(text) : { content: text, dataSource: '', disclaimer: '' };
+  if (!content?.trim()) return null;
+
+  return (
+    <div style={{ marginBottom: isEcho ? 16 : 8 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '0 12px' }}>
+        <div style={{ width: 38, height: 38, borderRadius: 12, background: p.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 5px rgba(0,0,0,0.12)' }}>
+          <span style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>{p.initial}</span>
+        </div>
+        <div style={{ flex: 1, maxWidth: '85%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <span style={{ fontSize: 13, color: '#1f2937', fontWeight: 700 }}>{p.name}</span>
+            <span style={{ fontSize: 10, color: '#6b7280', background: '#f3f4f6', padding: '1px 6px', borderRadius: 4 }}>{p.label}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
+            <div style={{
+              position: 'relative', background: p.bubbleBg,
+              borderRadius: '0 14px 14px 14px',
+              padding: isEcho ? '14px 16px' : '11px 14px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+              border: isEcho ? `2px solid #FAE100` : `1px solid ${p.bubbleBorder}`,
+            }}>
+              {isEcho && p.echoTag && (
+                <div style={{ position: 'absolute', top: -11, left: 10, background: '#FAE100', color: '#000', fontSize: 10, fontWeight: 900, padding: '2px 8px', borderRadius: 5, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                  {p.echoTag}
+                </div>
+              )}
+              <p style={{ fontSize: 14, lineHeight: 1.75, color: '#1f2937', whiteSpace: 'pre-wrap', margin: 0, fontWeight: isEcho ? 600 : 400 }}>
+                {isEcho ? content : text}
+              </p>
+            </div>
+            <span style={{ fontSize: 10, color: '#9ca3af', flexShrink: 0, paddingBottom: 2 }}>{formatTime(timestamp)}</span>
+          </div>
+          {/* ✅ 말풍선 바로 아래 뉴스 칩 (잭/루시아/레이만) */}
+          {!isEcho && newsItem && newsItem.url && (
+            <InlineNewsChip news={newsItem} />
+          )}
+        </div>
+      </div>
+      {isEcho && echoNews && echoNews.url && (
+        <EchoNewsChip news={echoNews} />
+      )}
+      {isEcho && (dataSource || disclaimer) && <MetaBox dataSource={dataSource} disclaimer={disclaimer} />}
+    </div>
+  );
+};
+
+// ✅ 에코 뉴스 칩 — 단일 (가장 중요한 뉴스 1개)
+const EchoNewsChip = ({ news }: { news: NewsLink }) => (
+  <div style={{ padding: '6px 12px 4px 58px' }}>
+    <a
+      href={news.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        fontSize: 11, color: '#92400e', background: '#fffbeb',
+        border: '1px solid #fde68a', borderRadius: 6,
+        padding: '3px 8px', textDecoration: 'none', fontWeight: 600,
+        maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}
+    >
+      📰 {news.title}
+    </a>
+  </div>
+);
+
+// ✅ 타이핑 인디케이터
+const TypingIndicator = () => (
+  <>
+    <style>{`
+      @keyframes typingDot {
+        0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+        30% { transform: translateY(-5px); opacity: 1; }
+      }
+    `}</style>
+    <div style={{ padding: '0 0 8px' }}>
+      {(['jack', 'lucia', 'ray'] as PersonaKey[]).map((key, ki) => {
+        const p = PERSONAS[key];
+        return (
+          <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '4px 12px' }}>
+            <div style={{ width: 38, height: 38, borderRadius: 12, background: p.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, opacity: 0.7 }}>
+              <span style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>{p.initial}</span>
+            </div>
+            <div style={{ paddingTop: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>{p.name}</span>
+              </div>
+              <div style={{ background: p.bubbleBg, border: `1px solid ${p.bubbleBorder}`, borderRadius: '0 12px 12px 12px', padding: '10px 14px', display: 'flex', gap: 4, alignItems: 'center' }}>
+                {[0, 1, 2].map(i => (
+                  <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: p.iconBg, animation: `typingDot 1.2s infinite`, animationDelay: `${ki * 0.15 + i * 0.2}s` }} />
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </>
+);
 
 export default function ChatWindow() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
+  const [mounted, setMounted] = useState(false);
+  const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPosition, setShowPosition] = useState(false);
-  const [pendingText, setPendingText] = useState("");
-  const [pendingKeyword, setPendingKeyword] = useState("");
-  const [stockKeywords, setStockKeywords] = useState<string[]>([]);
+  const [pendingText, setPendingText] = useState('');
+  const [pendingKeyword, setPendingKeyword] = useState('');
+
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const messagesRef = useRef<Message[]>([]);
 
   useEffect(() => {
-    setMessages([{ id: "init", role: "assistant", timestamp: new Date(), content: "[SYSTEM ONLINE]\n지휘관님, 전략 센터 가동됨. 분석할 종목을 하달하십시오." }]);
-    fetch("/api/keywords").then(r => r.json()).then(d => setStockKeywords(d.keywords || []));
+    setMounted(true);
+    const initMessages: Message[] = [{
+      id: 'init', role: 'assistant', timestamp: new Date(), isRead: true,
+      content: '[SYSTEM ONLINE]\n지휘관님, 전략 센터 가동됨. 분석할 종목을 하달하십시오.',
+    }];
+    messagesRef.current = initMessages;
+    setMessages(initMessages);
   }, []);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isLoading]);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isLoading]);
 
-  // ✅ [개선] 더욱 강력해진 화폐 판별기 (한국 주식/코인 리스트 명시)
-  const getInferCurrency = (kw: string): "KRW" | "USD" => {
-    const krwTargets = ["삼성전자", "현대차", "카카오", "네이버", "SK하이닉스", "기아", "LG에너지", "POSCO", "셀트리온", "에코프로", "알테오젠", "비트코인", "리플", "도지", "이더리움", "솔라나", "코스피", "코스닥"];
-    return krwTargets.some(target => kw.includes(target)) ? "KRW" : "USD";
-  };
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
 
   const handleSendWithPosition = useCallback(async (text: string, position: Position | null) => {
-    // 🔥 [강제 진압] 서버 통신 시작 전에 입력창부터 즉각 제거
-    setShowPosition(false); 
-    
-    const userMsg: Message = { id: `${Date.now()}`, role: "user", content: text, timestamp: new Date() };
-    setMessages(prev => [...prev, userMsg]);
+    setShowPosition(false);
+    const userMsg: Message = {
+      id: generateId(), role: 'user', content: text,
+      timestamp: new Date(), isRead: false,
+    };
+    const nextMessages = [...messagesRef.current, userMsg];
+    messagesRef.current = nextMessages;
+    setMessages(nextMessages);
     setIsLoading(true);
-    setInput("");
+    setInput('');
 
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })),
+          messages: nextMessages.map(m => ({ role: m.role, content: m.content })),
           positionContext: buildPositionContext(position),
         }),
       });
-      const data = await res.json();
-      // 백엔드에서 personas.echo 안에 뉴스 링크가 합쳐져서 옵니다.
-      setMessages(prev => [...prev, { id: `${Date.now()}-ai`, role: "assistant", timestamp: new Date(), content: data.reply, personas: data.personas }]);
+      const data = await response.json();
+      const assistantMsg: Message = {
+        id: generateId(), role: 'assistant', timestamp: new Date(),
+        content: data.reply || '',
+        personas: data.personas || null,
+        newsLinks: data.newsLinks || [],
+      };
+      const updated = [...nextMessages, assistantMsg];
+      messagesRef.current = updated;
+      setMessages(updated);
     } catch {
-      setMessages(prev => [...prev, { id: "err", role: "assistant", content: "통신 장애 발생. 기지를 재가동하십시오.", timestamp: new Date() }]);
-    } finally { 
-      setIsLoading(false); 
+      const errMsg: Message = {
+        id: generateId(), role: 'assistant',
+        content: '통신 장애 발생.', timestamp: new Date(),
+      };
+      const updated = [...nextMessages, errMsg];
+      messagesRef.current = updated;
+      setMessages(updated);
+    } finally {
+      setIsLoading(false);
     }
-  }, [messages]);
+  }, []);
 
-  const handleSend = () => {
-    const val = input.trim();
-    if (!val || isLoading) return;
-    
-    // 키워드 우선순위 감지
-    const matched = stockKeywords.find(k => val.toLowerCase().includes(k.toLowerCase()));
-    
-    if (matched) { 
-      setPendingText(val); 
-      setPendingKeyword(matched); 
-      setShowPosition(true); // 입력창 활성화
-      return; 
+  const handleSend = useCallback(() => {
+    const content = input.trim();
+    if (!content || isLoading) return;
+    const matched = detectKeyword(content);
+    if (matched) {
+      setPendingText(content);
+      setPendingKeyword(matched);
+      setShowPosition(true);
+      return;
     }
-    handleSendWithPosition(val, null);
-  };
+    handleSendWithPosition(content, null);
+  }, [input, isLoading, handleSendWithPosition]);
+
+  if (!mounted) return null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#b2c7da" }}>
-      <header style={{ background: "#b2c7da", padding: "12px 16px", display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(0,0,0,0.1)" }}>
-        <span style={{ fontWeight: 800, fontSize: 18 }}>PersonaX</span>
-        <Link href="/history" style={{ background: "#fff", padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none", color: "#000" }}>History</Link>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#b2c7da', fontFamily: 'sans-serif' }}>
+      <header style={{ background: 'rgba(178,199,218,0.95)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(0,0,0,0.06)', position: 'sticky', top: 0, zIndex: 10 }}>
+        <span style={{ fontWeight: 800, fontSize: 18, color: '#1f2937' }}>PersonaX</span>
+        <Link href="/history" style={{ background: '#fff', padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, color: '#374151', textDecoration: 'none', border: '1px solid #d1d5db' }}>
+          History
+        </Link>
       </header>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "20px 0" }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 0' }}>
         {messages.map(msg => (
-          <div key={msg.id} style={{ marginBottom: 16 }}>
-            {msg.role === "user" ? (
-              <div style={{ display: "flex", justifyContent: "flex-end", padding: "0 12px" }}>
-                <div style={{ background: "#FAE100", borderRadius: "15px 0 15px 15px", padding: "10px 15px", maxWidth: "75%", fontSize: 14 }}>{msg.content}</div>
+          <div key={msg.id}>
+            {msg.role === 'user' ? (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16, padding: '0 12px' }}>
+                <div style={{ background: '#FAE100', borderRadius: '15px 0 15px 15px', padding: '10px 15px', maxWidth: '75%', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>{msg.content}</p>
+                </div>
               </div>
             ) : (
-              <div>
+              <div style={{ marginBottom: 12 }}>
                 {msg.personas ? (
                   <>
-                    {["jack", "lucia", "ray"].map(k => (
-                      <PersonaBubble key={k} personaKey={k as any} text={(msg.personas as any)[k]} timestamp={msg.timestamp} />
-                    ))}
-                    <div style={{ textAlign: "center", margin: "10px 0", color: "#b45309", fontSize: 10, fontWeight: 700 }}>── ECHO COMMAND ──</div>
-                    <PersonaBubble personaKey="echo" text={msg.personas.echo} timestamp={msg.timestamp} personas={msg.personas} />
+                    {/* ✅ 각 페르소나에 newsItem 전달 — 말풍선 하단에 칩 표시 */}
+                    <PersonaBubble personaKey="jack"  text={msg.personas.jack}  timestamp={msg.timestamp} newsItem={msg.personas.jackNews} />
+                    <PersonaBubble personaKey="lucia" text={msg.personas.lucia} timestamp={msg.timestamp} newsItem={msg.personas.luciaNews} />
+                    <PersonaBubble personaKey="ray"   text={msg.personas.ray}   timestamp={msg.timestamp} newsItem={msg.personas.rayNews} />
+                    <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>── ECHO COMMAND ──</div>
+                    <PersonaBubble personaKey="echo"  text={msg.personas.echo}  timestamp={msg.timestamp} echoNews={msg.personas.echoNews} />
                   </>
                 ) : (
                   <PersonaBubble personaKey="jack" text={msg.content} timestamp={msg.timestamp} />
@@ -120,64 +331,41 @@ export default function ChatWindow() {
             )}
           </div>
         ))}
-        {isLoading && <div style={{ padding: "0 20px", fontSize: 12, color: "#666" }}>분석관들이 전략을 조율 중입니다...</div>}
+        {isLoading && <TypingIndicator />}
         <div ref={bottomRef} />
       </div>
 
-      {/* 🛠️ [긴급 수리] 화폐 단위 강제 고정 및 즉각 퇴각 트리거 */}
       {showPosition && (
-        <PositionInput 
-          keyword={pendingKeyword} 
-          currency={getInferCurrency(pendingKeyword)} 
-          onSubmit={pos => handleSendWithPosition(pendingText, pos)} 
-          onSkip={() => handleSendWithPosition(pendingText, null)} 
-        />
+        <div style={{ position: 'fixed', left: 0, right: 0, bottom: 60, zIndex: 100 }}>
+          <PositionInput
+            keyword={pendingKeyword}
+            currency={inferCurrency(pendingKeyword)}
+            onSubmit={pos => handleSendWithPosition(pendingText, pos)}
+            onSkip={() => handleSendWithPosition(pendingText, null)}
+          />
+        </div>
       )}
 
-      <footer style={{ background: "#fff", padding: "12px" }}>
-        <div style={{ display: "flex", gap: 10 }}>
-          <textarea 
-            value={input} 
-            onChange={e => setInput(e.target.value)} 
-            onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleSend())} 
-            placeholder="종목명 또는 키워드 입력..." 
-            style={{ flex: 1, border: "1px solid #ddd", borderRadius: 12, padding: "10px", outline: "none", resize: "none" }} 
-            rows={1} 
+      <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 10, position: 'relative' }}>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
+            placeholder="종목명 입력 (예: 비트코인, 삼성전자)"
+            style={{ flex: 1, border: '1px solid #d1d5db', borderRadius: 12, padding: '10px', resize: 'none', fontSize: 14, outline: 'none' }}
+            rows={1}
           />
-          <button onClick={handleSend} disabled={!input.trim() || isLoading} style={{ background: "#FAE100", border: "none", borderRadius: 12, padding: "0 20px", fontWeight: 800 }}>전송</button>
+          <button
+            onClick={handleSend}
+            disabled={!input.trim() || isLoading}
+            style={{ background: '#FAE100', border: 'none', borderRadius: 12, padding: '0 20px', fontWeight: 800, cursor: 'pointer' }}
+          >
+            Send
+          </button>
         </div>
       </footer>
-    </div>
-  );
-}
-
-function PersonaBubble({ personaKey, text, timestamp, personas }: { personaKey: keyof typeof PERSONAS; text: string; timestamp: Date; personas?: PersonaData | null }) {
-  const p = PERSONAS[personaKey];
-  const isEcho = personaKey === "echo";
-  if (!text) return null;
-  return (
-    <div style={{ marginBottom: 8, padding: "0 12px" }}>
-      <div style={{ display: "flex", gap: 10 }}>
-        <div style={{ width: 34, height: 34, borderRadius: 10, background: p.iconBg, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 14 }}>{p.initial}</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 2 }}>{p.name} <span style={{ fontWeight: 400, color: "#666", fontSize: 9 }}>{p.label}</span></div>
-          <div style={{ background: p.bubbleBg, border: isEcho ? "2px solid #FAE100" : "1px solid #ddd", padding: "10px", borderRadius: "0 12px 12px 12px" }}>
-            {isEcho && personas && (
-              <div style={{ marginBottom: 8, borderBottom: "1px solid #eee", paddingBottom: 4 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700, color: "#b45309" }}>
-                  <span>신뢰도 {personas.confidence}%</span>
-                  <span>{personas.breakdown}</span>
-                </div>
-                <div style={{ height: 3, background: "#eee", marginTop: 4 }}>
-                  <div style={{ height: "100%", width: `${personas.confidence}%`, background: "#b45309" }} />
-                </div>
-              </div>
-            )}
-            {/* 🔗 [뉴스 가독성] white-space: pre-wrap이 있어야 뉴스 링크가 줄바꿈되어 잘 보입니다. */}
-            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{text}</p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
