@@ -12,57 +12,34 @@ const getSupabase = () => {
 };
 
 type AssetType = 'CRYPTO' | 'KOREAN_STOCK' | 'US_STOCK';
-type Verdict = '매수 우위' | '매도 우위' | '관망';
+type Verdict   = '매수 우위' | '매도 우위' | '관망';
 
 export interface PersonaResponse {
-  jack: string;
-  lucia: string;
-  ray: string;
-  echo: string;
-  verdict: Verdict;
-  confidence: number;
-  breakdown: string;
-  positionSizing: string;
+  jack: string; lucia: string; ray: string; echo: string;
+  verdict: Verdict; confidence: number; breakdown: string; positionSizing: string;
 }
 
 interface MarketData {
-  price: string;
-  change: string;
-  high: string;
-  low: string;
-  volume: string;
-  rawPrice: number;
-  rawHigh: number;
-  rawLow: number;
-  rawVolume: number;
-  avgVolume: number;
-  currency: 'KRW' | 'USD';
-  source: string;
-  marketState?: string;
+  price: string; change: string; high: string; low: string; volume: string;
+  rawPrice: number; rawHigh: number; rawLow: number; rawVolume: number; avgVolume: number;
+  currency: 'KRW' | 'USD'; source: string; marketState?: string;
 }
 
 interface ScoreParams {
-  volScore: number;
-  change: string;
-  newsAvg: number;
-  posScore: number;
-  vitScore: number;
-  hasData: boolean;
-  newsCount: number;
-  volLabel: string;
-  posLabel: string;
-  vixLabel: string;
-  newsSentiment: string;
+  volScore: number; change: string; newsAvg: number;
+  posScore: number; vitScore: number;
+  hasData: boolean; newsCount: number;
+  volLabel: string; posLabel: string; vixLabel: string; newsSentiment: string;
 }
 
 const CRYPTO_MAP: Record<string, string> = {
-  '비트코인': 'KRW-BTC', 'BTC': 'KRW-BTC',
-  '이더리움': 'KRW-ETH', 'ETH': 'KRW-ETH',
-  '리플': 'KRW-XRP', 'XRP': 'KRW-XRP',
-  '솔라나': 'KRW-SOL', 'SOL': 'KRW-SOL',
-  '도지': 'KRW-DOGE', 'DOGE': 'KRW-DOGE',
-  '에이다': 'KRW-ADA', 'ADA': 'KRW-ADA',
-  '바이낸스': 'KRW-BNB', 'BNB': 'KRW-BNB',
+  '비트코인': 'KRW-BTC', 'BTC':  'KRW-BTC',
+  '이더리움': 'KRW-ETH', 'ETH':  'KRW-ETH',
+  '리플':     'KRW-XRP', 'XRP':  'KRW-XRP',
+  '솔라나':   'KRW-SOL', 'SOL':  'KRW-SOL',
+  '도지':    'KRW-DOGE', 'DOGE': 'KRW-DOGE',
+  '에이다':   'KRW-ADA', 'ADA':  'KRW-ADA',
+  '바이낸스': 'KRW-BNB', 'BNB':  'KRW-BNB',
 };
 
 const STOCK_MAP: Record<string, string> = {
@@ -150,12 +127,12 @@ const getVolumeInfo = (v: number, av: number, t: AssetType) => {
   }
   if (t === 'CRYPTO') {
     if (v > 1_000_000_000_000) return { label: '코인 거래대금 폭증', score: 2, isHigh: true };
-    if (v < 100_000_000_000) return { label: '코인 거래대금 저조', score: -1, isHigh: false };
+    if (v < 100_000_000_000)   return { label: '코인 거래대금 저조', score: -1, isHigh: false };
     return { label: '코인 거래대금 보통', score: 0, isHigh: false };
   }
   if (v > 50_000_000) return { label: '거래량 폭증', score: 2, isHigh: true };
   if (v > 10_000_000) return { label: '거래량 증가', score: 1, isHigh: true };
-  if (v < 1_000_000) return { label: '거래량 저조', score: -1, isHigh: false };
+  if (v < 1_000_000)  return { label: '거래량 저조', score: -1, isHigh: false };
   return { label: '거래량 보통', score: 0, isHigh: false };
 };
 
@@ -170,16 +147,16 @@ const getVolatility = (p: number, h: number, l: number) => {
 const getPricePos = (p: number, h: number, l: number) => {
   if (h === l || !p) return { label: '가격 위치 확인 불가', score: 0, ratio: 0.5 };
   const pos = (p - l) / (h - l);
-  if (pos > 0.8) return { label: `고점 근접 (${(pos * 100).toFixed(0)}%)`, score: -2, ratio: pos };
-  if (pos < 0.2) return { label: `저점 근접 (${(pos * 100).toFixed(0)}%)`, score: 2, ratio: pos };
-  return { label: `중간 구간 (${(pos * 100).toFixed(0)}%)`, score: 0, ratio: pos };
+  if (pos > 0.8) return { label: `고점 근접 (${(pos*100).toFixed(0)}%)`, score: -2, ratio: pos };
+  if (pos < 0.2) return { label: `저점 근접 (${(pos*100).toFixed(0)}%)`, score: 2,  ratio: pos };
+  return { label: `중간 구간 (${(pos*100).toFixed(0)}%)`, score: 0, ratio: pos };
 };
 
 const getNewsData = (items: Array<{ title: string; source?: string }>) => {
   if (!items.length) return { avgScore: 0, sentiment: '중립', context: '관련 뉴스 없음' };
-  const context = items.slice(0, 3).map((n, i) => `${i + 1}. ${n.title}`).join('\\n');
-  const count = Math.min(items.length, 3);
-  const score = items.slice(0, 3).reduce((acc, item) => {
+  const context = items.slice(0, 3).map((n, i) => `${i + 1}. ${n.title}`).join('\n');
+  const count   = Math.min(items.length, 3);
+  const score   = items.slice(0, 3).reduce((acc, item) => {
     if (/(상승|호재|돌파|수익|최고|급등|반등|상회|개선|수혜|강세)/.test(item.title)) return acc + 1;
     if (/(하락|악재|급락|손실|우려|위기|긴장|폭락|둔화|하회|긴축|약세)/.test(item.title)) return acc - 1;
     return acc;
@@ -194,27 +171,24 @@ const calcScores = (p: ScoreParams) => {
   const total = p.volScore + tr + ns + p.posScore + p.vitScore;
   const verdict: Verdict = total >= 3 ? '매수 우위' : total <= -3 ? '매도 우위' : '관망';
   let conf = 30;
-  if (p.hasData) conf += 30;
-  if (p.newsCount > 0) conf += 20;
+  if (p.hasData)        conf += 30;
+  if (p.newsCount > 0)  conf += 20;
   if (p.volScore !== 0) conf += 10;
   if (p.newsCount >= 3) conf += 5;
   const trendLabel = tr > 0 ? '단기 상승 추세' : tr < 0 ? '단기 하락 추세' : '추세 중립';
-  const breakdown = `${p.volLabel} / ${trendLabel} / 뉴스 ${p.newsSentiment} / ${p.posLabel} / ${p.vixLabel}`;
+  const breakdown  = `${p.volLabel} / ${trendLabel} / 뉴스 ${p.newsSentiment} / ${p.posLabel} / ${p.vixLabel}`;
   return { total, verdict, confidence: Math.min(95, conf), breakdown };
 };
 
 const getPositionSizing = (v: Verdict, total: number): string => {
-  if (v === '관망') return '현재 0% (신규 진입 금지)';
+  if (v === '관망')      return '현재 0% (신규 진입 금지)';
   if (v === '매도 우위') return '현재 0% (전량 현금화 검토)';
   return total >= 4 ? '40~50% 적극 매수' : '20~30% 분할 매수';
 };
 
 const buildEntryCondition = (
-  marketData: MarketData | null,
-  posRatio: number,
-  volIsHigh: boolean,
-  verdict: Verdict,
-  keyword: string,
+  marketData: MarketData | null, posRatio: number, volIsHigh: boolean,
+  verdict: Verdict, keyword: string,
 ): string => {
   const currency = marketData?.currency ?? inferCurrency(keyword);
   if (!marketData) return `시세 데이터 없음 — 뉴스 확인 후 판단 필요`;
@@ -225,63 +199,64 @@ const buildEntryCondition = (
     `지금 행동: 신규 매수 금지. 보유 시 손절 검토`,
     `매도 조건: ${fmtPrice(rawLow * 0.98, currency)} 이탈 시 전량 정리 (오늘 종가 기준)`,
     `시간 조건: 3일 내 반등 없으면 보유분 50% 축소`,
-  ].join('\\n');
+  ].join('\n');
   if (verdict === '매수 우위') {
     if (posRatio < 0.3) return [
       `지금 행동: 분할 매수 진입 가능 (10~20%)`,
       `추가 매수: ${fmtPrice(rawLow * 0.99, currency)} 이하 하락 시 2차 매수 (오늘~내일 기준)`,
       `돌파 조건: ${fmtPrice(rawHigh, currency)} 돌파${volNote} 시 비중 확대`,
       `시간 조건: 3일 내 반등 미확인 시 관망 전환`,
-    ].join('\\n');
+    ].join('\n');
     if (posRatio <= 0.7) return [
       `지금 행동: 소량 분할 매수 (10~15%)`,
       `매수 조건: ${fmtPrice(rawLow, currency)} 재접근 시 추가 매수 (이번 주 기준)`,
       `매도 조건: ${fmtPrice(rawLow * 0.97, currency)} 이탈 시 손절`,
       `돌파 조건: ${fmtPrice(rawHigh, currency)} 돌파${volNote} 시 비중 확대`,
-    ].join('\\n');
+    ].join('\n');
     return [
       `지금 행동: 고점 추격 자제. 눌림 대기`,
       `매수 조건: ${fmtPrice(mid, currency)} 수준 눌림 시 소량 매수 (3일 내)`,
       `매도 조건: ${fmtPrice(rawLow * 0.97, currency)} 이탈 시 손절`,
       `돌파 조건: ${fmtPrice(rawHigh * 1.01, currency)} 돌파${volNote} 시 추세 편승`,
-    ].join('\\n');
+    ].join('\n');
   }
   if (posRatio < 0.3) return [
     `지금 행동: 신규 진입 금지 (관망)`,
     `매수 조건: ${fmtPrice(rawLow * 0.98, currency)} 이하 하락 확인 후 소량 진입 (오늘~내일)`,
     `매도 조건: 보유 중이라면 ${fmtPrice(rawLow * 0.96, currency)} 이탈 시 손절`,
     `시간 조건: 3일 내 방향성 미확인 시 재분석`,
-  ].join('\\n');
+  ].join('\n');
   if (posRatio <= 0.7) return [
     `지금 행동: 신규 진입 금지 (관망)`,
     `매수 조건: ${fmtPrice(rawLow, currency)} 근접 + 반등 캔들 확인 시 진입 (이번 주)`,
     `매도 조건: ${fmtPrice(rawLow * 0.97, currency)} 이탈 시 손절`,
     `돌파 조건: ${fmtPrice(rawHigh, currency)} 돌파${volNote} 확인 후 추세 매수`,
-  ].join('\\n');
+  ].join('\n');
   return [
     `지금 행동: 신규 진입 금지 — 고점 구간 (관망)`,
     `매수 조건: ${fmtPrice(mid, currency)} 이하 눌림 확인 후 진입 (3일 내)`,
     `매도 조건: ${fmtPrice(rawLow * 0.97, currency)} 이탈 시 손절`,
     `시간 조건: 이번 주 내 눌림 미발생 시 다음 주 재분석`,
-  ].join('\\n');
+  ].join('\n');
 };
 
 const extractConditionPrices = (entryCondition: string): { buy: string; sell: string } => {
-  const lines = entryCondition.split('\\n');
-  const buyLine = lines.find(l => l.includes('매수 조건') || l.includes('추가 매수') || l.includes('돌파 조건'));
+  const lines    = entryCondition.split('\n');
+  const buyLine  = lines.find(l => l.includes('매수 조건') || l.includes('추가 매수') || l.includes('돌파 조건'));
   const sellLine = lines.find(l => l.includes('매도 조건') || l.includes('손절') || l.includes('이탈'));
-  const extract = (line?: string): string => {
+  const extract  = (line?: string): string => {
     if (!line) return '';
-    const m = line.match(/([\\d,]+(?:\\.\\d+)?\\s?(?:원|USD))/);
+    const m = line.match(/([\d,]+(?:\.\d+)?\s?(?:원|USD))/);
     return m ? m[0] : '';
   };
   return { buy: extract(buyLine), sell: extract(sellLine) };
 };
 
+// ✅ 수정본에서 추가 — 텍스트 가격을 숫자로 변환
 const parsePriceToNumber = (text: string): number | null => {
   if (!text) return null;
-  const cleaned = text.replace(/,/g, '').replace(/\\s/g, '');
-  const m = cleaned.match(/([\\d.]+)/);
+  const cleaned = text.replace(/,/g, '').replace(/\s/g, '');
+  const m = cleaned.match(/([\d.]+)/);
   if (!m) return null;
   const n = Number(m[1]);
   return Number.isFinite(n) ? n : null;
@@ -305,24 +280,22 @@ const buildDataSourceLabel = (assetType: AssetType, marketData: MarketData | nul
 
 const fetchWithTimeout = async (url: string, ms = 7000) => {
   const ctrl = new AbortController();
-  const id = setTimeout(() => ctrl.abort(), ms);
+  const id   = setTimeout(() => ctrl.abort(), ms);
   try {
     const res = await fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0' } });
     clearTimeout(id);
     return res;
-  } catch (e) {
-    clearTimeout(id);
-    throw e;
-  }
+  } catch (e) { clearTimeout(id); throw e; }
 };
 
+// ✅ Yahoo 차트 공통 fetch — range 파라미터로 1d/5d 유연하게 호출
 const fetchYahooChart = async (symbol: string, range: '1d' | '5d') => {
   const res = await fetchWithTimeout(
     `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=${range}`
   );
   if (!res.ok) return null;
   const json = await res.json();
-  if (json?.chart?.error) return null;
+  if (json?.chart?.error) { console.warn('⚠️ Yahoo API error:', json.chart.error); return null; }
   return json?.chart?.result?.[0] || null;
 };
 
@@ -336,26 +309,23 @@ const fetchMarketPrice = async (keyword: string): Promise<MarketData | null> => 
       if (!Array.isArray(json) || !json[0]) return null;
       const d = json[0];
       return {
-        price: d.trade_price.toLocaleString('ko-KR'),
-        change: (d.signed_change_rate * 100).toFixed(2),
-        high: d.high_price.toLocaleString('ko-KR'),
-        low: d.low_price.toLocaleString('ko-KR'),
+        price: d.trade_price.toLocaleString('ko-KR'), change: (d.signed_change_rate * 100).toFixed(2),
+        high: d.high_price.toLocaleString('ko-KR'), low: d.low_price.toLocaleString('ko-KR'),
         volume: `${(d.acc_trade_price_24h / 1_000_000_000).toFixed(0)}억`,
-        rawPrice: d.trade_price,
-        rawHigh: d.high_price,
-        rawLow: d.low_price,
-        rawVolume: d.acc_trade_price_24h,
-        avgVolume: 0,
-        currency: 'KRW',
-        source: 'Upbit 실시간',
-        marketState: 'REGULAR',
+        rawPrice: d.trade_price, rawHigh: d.high_price, rawLow: d.low_price,
+        rawVolume: d.acc_trade_price_24h, avgVolume: 0,
+        currency: 'KRW', source: 'Upbit 실시간', marketState: 'REGULAR',
       };
     }
 
     const symbol = STOCK_MAP[keyword] || STOCK_MAP[keyword.toUpperCase()];
     if (!symbol) return null;
 
-    const result1d = await fetchYahooChart(symbol, '1d');
+    // ✅ 1d + 5d 동시 호출 — 응답 시간 단축
+    const [result1d, result5d] = await Promise.all([
+      fetchYahooChart(symbol, '1d'),
+      fetchYahooChart(symbol, '5d'),
+    ]);
     if (!result1d) return null;
     const meta = result1d.meta;
     if (!meta?.regularMarketPrice) return null;
@@ -364,6 +334,10 @@ const fetchMarketPrice = async (keyword: string): Promise<MarketData | null> => 
     const marketState = String(meta.marketState || 'UNKNOWN').toUpperCase();
     const price = meta.regularMarketPrice;
 
+    // ✅ change 계산 우선순위
+    // 1순위: regularMarketChangePercent (Yahoo 공식 필드)
+    // 2순위: previousClose 기반 계산
+    // 3순위 (미국 장마감 후): 5d 전일 종가 비교
     let change = 0;
     if (typeof meta.regularMarketChangePercent === 'number' && Number.isFinite(meta.regularMarketChangePercent)) {
       change = meta.regularMarketChangePercent;
@@ -372,8 +346,9 @@ const fetchMarketPrice = async (keyword: string): Promise<MarketData | null> => 
       change = ((price - prev) / (prev || 1)) * 100;
     }
 
+    // 미국 장마감 후 — 5d 전일 종가 비교로 보정 (이미 동시 호출됨)
+    // 한국 주식은 marketState 무시
     if (!isKR && marketState !== 'REGULAR') {
-      const result5d = await fetchYahooChart(symbol, '5d');
       if (result5d) {
         const closes = result5d.indicators?.quote?.[0]?.close || [];
         const validCloses = closes.filter((v: unknown): v is number => typeof v === 'number' && Number.isFinite(v));
@@ -386,34 +361,28 @@ const fetchMarketPrice = async (keyword: string): Promise<MarketData | null> => 
     }
 
     const high = meta.regularMarketDayHigh || price;
-    const low = meta.regularMarketDayLow || price;
+    const low  = meta.regularMarketDayLow  || price;
 
     return {
       price: isKR ? Math.round(price).toLocaleString('ko-KR') : price.toLocaleString('en-US', { minimumFractionDigits: 2 }),
       change: change.toFixed(2),
       high: isKR ? Math.round(high).toLocaleString('ko-KR') : high.toLocaleString('en-US', { minimumFractionDigits: 2 }),
-      low: isKR ? Math.round(low).toLocaleString('ko-KR') : low.toLocaleString('en-US', { minimumFractionDigits: 2 }),
+      low:  isKR ? Math.round(low).toLocaleString('ko-KR')  : low.toLocaleString('en-US',  { minimumFractionDigits: 2 }),
       volume: `${((meta.regularMarketVolume || 0) / 1_000_000).toFixed(1)}M`,
-      rawPrice: price,
-      rawHigh: high,
-      rawLow: low,
+      rawPrice: price, rawHigh: high, rawLow: low,
       rawVolume: meta.regularMarketVolume || 0,
       avgVolume: meta.averageDailyVolume3Month || 0,
       currency: isKR ? 'KRW' : 'USD',
       marketState,
       source: isKR
         ? '한국장 (15분 지연)'
-        : marketState === 'REGULAR'
-          ? '미국장 실시간'
-          : '미국장 전일 종가 기준',
+        : marketState === 'REGULAR' ? '미국장 실시간' : '미국장 전일 종가 기준',
     };
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 };
 
 const extractKeyword = (messages: Array<{ role: string; content: string }>): string => {
-  const lastMsg = (messages.at(-1)?.content || '').toLowerCase();
+  const lastMsg = (messages.at(-1)?.content || "").toLowerCase();
   for (const t of KEYWORD_PRIORITY) {
     if (lastMsg.includes(t.toLowerCase())) return t;
   }
@@ -422,10 +391,10 @@ const extractKeyword = (messages: Array<{ role: string; content: string }>): str
 
 const parseChainedPersonas = (text: string): Partial<PersonaResponse> => {
   const tags: Record<string, string> = {
-    JACK: '(\\[JACK\\]|🔴\\s*잭|JACK[:\\s])',
+    JACK:  '(\\[JACK\\]|🔴\\s*잭|JACK[:\\s])',
     LUCIA: '(\\[LUCIA\\]|🔵\\s*루시아|LUCIA[:\\s])',
-    RAY: '(\\[RAY\\]|⚪\\s*레이|RAY[:\\s])',
-    ECHO: '(\\[ECHO\\]|🟡\\s*에코|ECHO[:\\s])',
+    RAY:   '(\\[RAY\\]|⚪\\s*레이|RAY[:\\s])',
+    ECHO:  '(\\[ECHO\\]|🟡\\s*에코|ECHO[:\\s])',
   };
   const extract = (tag: string, next: string | null): string => {
     const m = text.match(new RegExp(tags[tag], 'i'));
@@ -436,35 +405,36 @@ const parseChainedPersonas = (text: string): Partial<PersonaResponse> => {
       const nm = text.match(new RegExp(tags[next], 'i'));
       if (nm && nm.index !== undefined) end = nm.index;
     }
-    return text.slice(start, end).replace(/^[:\\s\\-—*#]+/, '').trim();
+    return text.slice(start, end).replace(/^[:\s\-—*#]+/, '').trim();
   };
   const truncate = (t: string, limit: number) => {
     if (t.length <= limit) return t;
-    const cut = t.slice(0, limit);
+    const cut  = t.slice(0, limit);
     const last = Math.max(cut.lastIndexOf('.'), cut.lastIndexOf('다'), cut.lastIndexOf('요'));
     return last > limit * 0.6 ? cut.slice(0, last + 1) : cut + '...';
   };
   return {
-    jack: truncate(extract('JACK', 'LUCIA'), 200),
-    lucia: truncate(extract('LUCIA', 'RAY'), 300),
-    ray: truncate(extract('RAY', 'ECHO'), 300),
-    echo: extract('ECHO', null),
+    jack:  truncate(extract('JACK',  'LUCIA'), 200),
+    lucia: truncate(extract('LUCIA', 'RAY'),   300),
+    ray:   truncate(extract('RAY',   'ECHO'),  300),
+    echo:  extract('ECHO', null),
   };
 };
 
+// ✅ saveHistory — 기존 컬럼 + 숫자 컬럼 + userId + ipAddress
 const saveHistory = async (params: {
-  keyword: string;
-  question: string;
-  verdict: Verdict;
-  totalScore: number;
-  assetType: string;
+  keyword:        string;
+  question:       string;
+  verdict:        Verdict;
+  totalScore:     number;
+  assetType:      string;
   entryCondition: string;
-  priceAtTime: string;
-  confidence: number;
-  rawResponse: string;
-  marketData: MarketData | null;
-  ipAddress?: string | null;
-  userId?: string | null;
+  priceAtTime:    string;
+  confidence:     number;
+  rawResponse:    string;
+  marketData:     MarketData | null;
+  ipAddress?:     string | null;
+  userId?:        string | null;
 }): Promise<void> => {
   try {
     const supabase = getSupabase();
@@ -472,64 +442,58 @@ const saveHistory = async (params: {
 
     const { buy, sell } = extractConditionPrices(params.entryCondition);
     const targetNum = parsePriceToNumber(buy);
-    const stopNum = parsePriceToNumber(sell);
+    const stopNum   = parsePriceToNumber(sell);
 
     const { error: insertError } = await supabase.from('user_analysis_history').insert({
-      keyword: params.keyword,
-      question: params.question.slice(0, 200),
-      verdict: params.verdict,
-      total_score: params.totalScore,
-      asset_type: params.assetType,
+      // 기존 컬럼 유지
+      keyword:         params.keyword,
+      question:        params.question.slice(0, 200),
+      verdict:         params.verdict,
+      total_score:     params.totalScore,
+      asset_type:      params.assetType,
       entry_condition: params.entryCondition.slice(0, 500),
-      price_at_time: params.priceAtTime,
-      confidence: params.confidence,
-      result: 'pending',
-      raw_response: params.rawResponse.slice(0, 5000),
-      clean_response: params.rawResponse.replace(/\\s+/g, ' ').slice(0, 2000),
-      created_at: new Date().toISOString(),
+      price_at_time:   params.priceAtTime,
+      confidence:      params.confidence,
+      result:          'pending',
+      raw_response:    params.rawResponse.slice(0, 5000),
+      clean_response:  params.rawResponse.replace(/\s+/g, ' ').slice(0, 2000),
+      created_at:      new Date().toISOString(),
+      // ✅ 신규 숫자 컬럼
       entry_price_num: params.marketData?.rawPrice ?? null,
       target_price_num: targetNum,
-      stop_loss_num: stopNum,
-      profit_rate: null,
-      currency: params.marketData?.currency ?? inferCurrency(params.keyword),
-      result_status: 'PENDING',
-      evaluated_at: null,
-      ip_address: params.ipAddress ?? null,
-      user_id: params.userId ?? null,
+      stop_loss_num:   stopNum,
+      profit_rate:     null,
+      currency:        params.marketData?.currency ?? inferCurrency(params.keyword),
+      result_status:   'PENDING',
+      evaluated_at:    null,
+      ip_address:      params.ipAddress ?? null,
+      user_id:         params.userId ?? null,
     });
 
     if (insertError) {
-      console.warn(
-        '⚠️ 히스토리 저장 실패:',
-        insertError.message,
-        '| code:',
-        insertError.code,
-        '| details:',
-        insertError.details
+      console.warn('⚠️ 히스토리 저장 실패:',
+        insertError.message, '| code:', insertError.code, '| details:', insertError.details
       );
     }
-  } catch (err) {
-    console.warn('⚠️ 히스토리 저장 예외:', err);
-  }
+  } catch (err) { console.warn('⚠️ 히스토리 저장 예외:', err); }
 };
 
 export async function POST(req: Request) {
   if (!process.env.GEMINI_API_KEY) {
     console.error('❌ GEMINI_API_KEY 누락');
-    return Response.json(
-      { reply: '사령부 통신 키 누락. 환경 변수를 확인하십시오.' },
-      { status: 500 }
-    );
+    return Response.json({ reply: '사령부 통신 키 누락. 환경 변수를 확인하십시오.' }, { status: 500 });
   }
 
   try {
     const { messages, positionContext } = await req.json();
-    const lastMsg = messages.at(-1)?.content || '';
-    const keyword = extractKeyword(messages);
+    const lastMsg  = messages.at(-1)?.content || "";
+    const keyword  = extractKeyword(messages);
     const currency = inferCurrency(keyword);
 
+    // ✅ IP 추출 (비로그인 제한 대비)
     const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
 
+    // ✅ 로그인 사용자 ID 추출 (비로그인이면 null)
     let userId: string | null = null;
     try {
       const supabaseServer = await createServerSupabase();
@@ -546,31 +510,23 @@ export async function POST(req: Request) {
     ]);
 
     const nasdaqDisplay = nasdaqData ? `${safeNum(nasdaqData?.change)}%` : '데이터 없음';
-    const isCrypto = !!(CRYPTO_MAP[keyword] || CRYPTO_MAP[keyword.toUpperCase()]);
+    const isCrypto  = !!(CRYPTO_MAP[keyword] || CRYPTO_MAP[keyword.toUpperCase()]);
     const assetType: AssetType = isCrypto ? 'CRYPTO' : currency === 'KRW' ? 'KOREAN_STOCK' : 'US_STOCK';
 
-    const vol = getVolumeInfo(marketData?.rawVolume || 0, marketData?.avgVolume || 0, assetType);
-    const vix = getVolatility(marketData?.rawPrice || 0, marketData?.rawHigh || 0, marketData?.rawLow || 0);
-    const pos = getPricePos(marketData?.rawPrice || 0, marketData?.rawHigh || 0, marketData?.rawLow || 0);
+    const vol   = getVolumeInfo(marketData?.rawVolume || 0, marketData?.avgVolume || 0, assetType);
+    const vix   = getVolatility(marketData?.rawPrice  || 0, marketData?.rawHigh   || 0, marketData?.rawLow || 0);
+    const pos   = getPricePos(marketData?.rawPrice    || 0, marketData?.rawHigh   || 0, marketData?.rawLow || 0);
     const nData = getNewsData(news as Array<{ title: string; source?: string }>);
 
     const { total, verdict, confidence, breakdown } = calcScores({
-      volScore: vol.score,
-      change: marketData?.change || '0',
-      newsAvg: nData.avgScore,
-      posScore: pos.score,
-      vitScore: vix.score,
-      hasData: !!marketData,
-      newsCount: news.length,
-      volLabel: vol.label,
-      posLabel: pos.label,
-      vixLabel: vix.label,
-      newsSentiment: nData.sentiment,
+      volScore: vol.score, change: marketData?.change || '0', newsAvg: nData.avgScore,
+      posScore: pos.score, vitScore: vix.score, hasData: !!marketData, newsCount: news.length,
+      volLabel: vol.label, posLabel: pos.label, vixLabel: vix.label, newsSentiment: nData.sentiment,
     });
 
-    const positionSizing = getPositionSizing(verdict, total);
+    const positionSizing  = getPositionSizing(verdict, total);
     const dataSourceLabel = buildDataSourceLabel(assetType, marketData, news.length);
-    const entryCondition = buildEntryCondition(marketData, pos.ratio, vol.isHigh, verdict, keyword);
+    const entryCondition  = buildEntryCondition(marketData, pos.ratio, vol.isHigh, verdict, keyword);
     const { buy: buyPrice, sell: sellPrice } = extractConditionPrices(entryCondition);
     const condSummary = [buyPrice && `매수(${buyPrice})`, sellPrice && `손절(${sellPrice})`]
       .filter(Boolean).join(' / ') || '시장 상황 주시';
@@ -582,29 +538,29 @@ export async function POST(req: Request) {
     ].filter(Boolean).join(' + ') || '데이터 제한적';
 
     const noDataNote = !marketData
-      ? `\\n[주의] ${keyword} 실시간 시세 미지원. 뉴스와 거시 데이터 기반으로만 분석하라.`
+      ? `\n[주의] ${keyword} 실시간 시세 미지원. 뉴스와 거시 데이터 기반으로만 분석하라.`
       : '';
 
     let profitRateNote = '';
     if (positionContext && marketData) {
-      const avgPriceMatch = positionContext.match(/(?:평단가?|매수가|취득가|평균가)[:\\s]*([\\d,.]+)/);
+      const avgPriceMatch = positionContext.match(/(?:평단가?|매수가|취득가|평균가)[:\s]*([\d,.]+)/);
       if (avgPriceMatch) {
         const avgPrice = parseFloat(avgPriceMatch[1].replace(/,/g, ''));
         if (avgPrice > 0) {
           const rate = ((marketData.rawPrice - avgPrice) / avgPrice * 100).toFixed(2);
           const sign = parseFloat(rate) >= 0 ? '+' : '';
-          profitRateNote = `\\n현재 수익률: ${sign}${rate}% (평단 ${fmtPrice(avgPrice, currency)} → 현재 ${marketData.price})`;
+          profitRateNote = `\n현재 수익률: ${sign}${rate}% (평단 ${fmtPrice(avgPrice, currency)} → 현재 ${marketData.price})`;
         }
       }
     }
 
     const positionNote = positionContext
-      ? `\\n[유저 포지션]\\n${positionContext}${profitRateNote}\\n→ 에코는 이 포지션 기준으로 손절/홀딩/추가매수 중 하나를 명확히 권고하라.`
+      ? `\n[유저 포지션]\n${positionContext}${profitRateNote}\n→ 에코는 이 포지션 기준으로 손절/홀딩/추가매수 중 하나를 명확히 권고하라.`
       : '';
 
     const currencyRule = currency === 'KRW'
-      ? '\\n[화폐 규칙] 모든 가격은 반드시 원화(원, KRW) 표기. USD 표기 절대 금지.'
-      : '\\n[화폐 규칙] 모든 가격은 USD로 표기하라.';
+      ? '\n[화폐 규칙] 모든 가격은 반드시 원화(원, KRW) 표기. USD 표기 절대 금지.'
+      : '\n[화폐 규칙] 모든 가격은 USD로 표기하라.';
 
     const rawHistory = messages.slice(-7, -1).filter((m: { role: string; content: string }) => m.role && m.content);
     const dedupedHistory = rawHistory.filter(
@@ -619,6 +575,7 @@ export async function POST(req: Request) {
 절대 금지: "근접", "가능성", "검토", "추후", "상황 지켜보기"
 ` : '';
 
+    // ✅ 기존 파일 프롬프트 그대로 유지
     const prompt = `
 [절대 규칙 — 위반 시 전체 응답 무효]
 1. 반드시 [JACK],[LUCIA],[RAY],[ECHO] 4개 태그 모두 출력. 순서 변경 금지.
@@ -688,11 +645,11 @@ ${nData.context}
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents,
-          generationConfig: { maxOutputTokens: 4500, temperature: 0.4 },
+          generationConfig: { maxOutputTokens: 5000, temperature: 0.4 },
           safetySettings: [
             { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: 'BLOCK_NONE' },
             { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
           ],
         }),
@@ -716,17 +673,29 @@ ${nData.context}
     }
     const parts = candidate?.content?.parts;
     if (!parts || !Array.isArray(parts)) throw new Error('Gemini parts 없음');
-    const aiText = parts.map((pt: { text?: string }) => pt.text || '').join('') || '';
+    const aiText = parts.map((pt: { text?: string }) => pt.text || '').join('') || "";
     const p = parseChainedPersonas(aiText);
 
     const hasCore = !!(p.jack && p.lucia && p.ray);
-    const echoLines = (p.echo || '').split('\\n').map(l => l.trim()).filter(Boolean);
+    const echoLines = (p.echo || '').split('\n').map(l => l.trim()).filter(Boolean);
     const isValidEcho = !!(p.echo &&
       ['결론:', '근거:', '지금:', '조건:', '비중:'].every(k => p.echo!.includes(k)) &&
       echoLines.length >= 5);
     const useFullFallback = !hasCore || finishReason === 'MAX_TOKENS';
 
-    const jackFallback = `${keyword} ${marketData?.price || ''} 기준, ${breakdown}. 현재 ${verdict} 구간 판단.`;
+    if (!hasCore) {
+      console.warn('⚠️ fallback: core missing', { jack: !!p.jack, lucia: !!p.lucia, ray: !!p.ray });
+      console.warn('원문 앞 300자:', aiText.slice(0, 300));
+    }
+    if (p.echo && !isValidEcho) console.warn('⚠️ fallback: echo invalid', p.echo.slice(0, 100));
+
+    console.log(
+      `✅ ${keyword}(${assetType}) | ${verdict}(${total}점) | 신뢰도:${confidence}% | ` +
+      `jack:${p.jack ? '✅' : '❌'} lucia:${p.lucia ? '✅' : '❌'} ` +
+      `ray:${p.ray ? '✅' : '❌'} echo:${p.echo ? (isValidEcho ? '✅' : 'INVALID') : '❌'}`
+    );
+
+    const jackFallback  = `${keyword} ${marketData?.price || ''} 기준, ${breakdown}. 현재 ${verdict} 구간 판단.`;
     const luciaFallback = `신뢰도 ${confidence}%(${confidenceBasis}). ${positionSizing} 기준으로 신중한 접근 권장.`;
     const correlationNote = assetType === 'CRYPTO' ? '코인은 나스닥과 독립 변수로 작용하는 경우 多'
       : assetType === 'KOREAN_STOCK' ? '외국인 수급을 통해 나스닥과 간접 연동'
@@ -734,29 +703,30 @@ ${nData.context}
     const rayFallback = [
       `나스닥 ${safeNum(nasdaqData?.change)}% — ${keyword}와 상관관계: ${correlationNote}.`,
       `신뢰도 ${confidence}% — 뉴스 ${news.length}건, 시세 ${marketData ? '수급됨' : '미수급'} 기준.`,
-    ].join('\\n');
+    ].join('\n');
 
     const echoFallback = [
       `결론: ${verdict} (신뢰도 ${confidence}% — ${confidenceBasis} 기반)`,
       `근거: ${breakdown}`,
-      `지금: ${entryCondition.split('\\n')[0]?.split(':')[1]?.trim() || '시장 주시'}`,
+      `지금: ${entryCondition.split('\n')[0]?.split(':')[1]?.trim() || '시장 주시'}`,
       `조건: ${condSummary}`,
       `비중: ${positionSizing}`,
-    ].join('\\n');
-    const echoWithMeta = `${echoFallback}\\n\\n${dataSourceLabel}${DISCLAIMER}`;
+    ].join('\n');
+    const echoWithMeta = `${echoFallback}\n\n${dataSourceLabel}${DISCLAIMER}`;
 
-    const finalJack = useFullFallback ? jackFallback : (p.jack || jackFallback);
+    const finalJack  = useFullFallback ? jackFallback  : (p.jack  || jackFallback);
     const finalLucia = useFullFallback ? luciaFallback : (p.lucia && p.lucia.length > 15 ? p.lucia : luciaFallback);
-    const finalRay = useFullFallback ? rayFallback : (p.ray && p.ray.length > 15 ? p.ray : rayFallback);
-    const finalEcho = useFullFallback ? echoWithMeta : (isValidEcho ? `${p.echo}\\n\\n${dataSourceLabel}${DISCLAIMER}` : echoWithMeta);
+    const finalRay   = useFullFallback ? rayFallback   : (p.ray   && p.ray.length   > 15 ? p.ray   : rayFallback);
+    const finalEcho  = useFullFallback ? echoWithMeta  : (isValidEcho ? `${p.echo}\n\n${dataSourceLabel}${DISCLAIMER}` : echoWithMeta);
 
-    const finalReply = [finalJack, finalLucia, finalRay, finalEcho].filter(Boolean).join('\\n\\n');
+    const finalReply = [finalJack, finalLucia, finalRay, finalEcho].filter(Boolean).join('\n\n');
 
+    // ✅ newsLinks — 감정 분석 기반 페르소나별 배정
     type NewsRaw = { title: string; link?: string; originallink?: string; url?: string };
 
     const cleanNewsItem = (n: NewsRaw) => ({
       title: (n.title || '')
-        .replace(/<[^>]*>/g, '').replace(/\\[.*?\\]/g, '')
+        .replace(/<[^>]*>/g, '').replace(/\[.*?\]/g, '')
         .replace(/&quot;/g, '"').replace(/&amp;/g, '&')
         .trim().slice(0, 20),
       url: n.originallink || n.link || n.url || '',
@@ -796,30 +766,23 @@ ${nData.context}
       return fallback;
     })();
 
-    const jackNewsItem = jackIdx !== -1 ? scoredNews[jackIdx] : null;
+    const jackNewsItem  = jackIdx  !== -1 ? scoredNews[jackIdx]  : null;
     const luciaNewsItem = luciaIdx !== -1 ? scoredNews[luciaIdx] : null;
-    const rayNewsItem = rayIdx !== -1 ? scoredNews[rayIdx] : null;
-    const echoNewsItem = scoredNews[0] || null;
+    const rayNewsItem   = rayIdx   !== -1 ? scoredNews[rayIdx]   : null;
+    const echoNewsItem  = scoredNews[0] || null;
 
-    const jackNews = jackNewsItem ? cleanNewsItem(jackNewsItem) : null;
+    const jackNews  = jackNewsItem  ? cleanNewsItem(jackNewsItem)  : null;
     const luciaNews = luciaNewsItem ? cleanNewsItem(luciaNewsItem) : null;
-    const rayNews = rayNewsItem ? cleanNewsItem(rayNewsItem) : null;
-    const echoNews = echoNewsItem ? cleanNewsItem(echoNewsItem) : null;
+    const rayNews   = rayNewsItem   ? cleanNewsItem(rayNewsItem)   : null;
+    const echoNews  = echoNewsItem  ? cleanNewsItem(echoNewsItem)  : null;
+
+    console.log('newsLinks scored:', scoredNews.length, '/ raw:', (news as NewsRaw[]).length);
 
     void Promise.race([
       saveHistory({
-        keyword,
-        question: lastMsg,
-        verdict,
-        totalScore: total,
-        assetType,
-        entryCondition,
-        priceAtTime: marketData?.price || '미수급',
-        confidence,
-        rawResponse: aiText,
-        marketData,
-        ipAddress,
-        userId,
+        keyword, question: lastMsg, verdict, totalScore: total, assetType, entryCondition,
+        priceAtTime: marketData?.price || '미수급', confidence, rawResponse: aiText,
+        marketData, ipAddress, userId,
       }),
       new Promise(r => setTimeout(r, 1000)),
     ]);
@@ -827,25 +790,15 @@ ${nData.context}
     return Response.json({
       reply: finalReply,
       personas: {
-        jack: finalJack,
-        lucia: finalLucia,
-        ray: finalRay,
-        echo: finalEcho,
-        verdict,
-        confidence,
-        breakdown,
-        positionSizing,
-        jackNews,
-        luciaNews,
-        rayNews,
-        echoNews,
+        jack: finalJack, lucia: finalLucia, ray: finalRay, echo: finalEcho,
+        verdict, confidence, breakdown, positionSizing,
+        jackNews, luciaNews, rayNews, echoNews,
       },
+      // newsLinks는 personas 내부 jackNews/luciaNews/rayNews/echoNews로 통합
     });
+
   } catch (e) {
-    console.error('❌ 사령부 에러:', e);
-    return Response.json(
-      { reply: '사령부 시스템 일시 지연. 잠시 후 재시도하십시오.' },
-      { status: 500 }
-    );
+    console.error("❌ 사령부 에러:", e);
+    return Response.json({ reply: "사령부 시스템 일시 지연. 잠시 후 재시도하십시오." });
   }
 }
