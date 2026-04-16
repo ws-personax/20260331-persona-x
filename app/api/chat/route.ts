@@ -778,14 +778,17 @@ ${nData.context}
 
     console.log('newsLinks scored:', scoredNews.length, '/ raw:', (news as NewsRaw[]).length);
 
-    void Promise.race([
-      saveHistory({
-        keyword, question: lastMsg, verdict, totalScore: total, assetType, entryCondition,
-        priceAtTime: marketData?.price || '미수급', confidence, rawResponse: aiText,
-        marketData, ipAddress, userId,
-      }),
-      new Promise(r => setTimeout(r, 1000)),
-    ]);
+    // ✅ 로그인 사용자만 저장 (RLS 정책과 일치)
+    if (userId) {
+      void Promise.race([
+        saveHistory({
+          keyword, question: lastMsg, verdict, totalScore: total, assetType, entryCondition,
+          priceAtTime: marketData?.price || '미수급', confidence, rawResponse: aiText,
+          marketData, ipAddress, userId,
+        }),
+        new Promise(r => setTimeout(r, 1000)),
+      ]);
+    }
 
     return Response.json({
       reply: finalReply,

@@ -128,7 +128,7 @@ export default function HistoryPage() {
     let alive = true;
     const fetchPrices = async () => {
       const results: Record<number, CurrentPrice> = {};
-      const uniqueKeywords = Array.from(new Set(items.map((i) => i.keyword).filter(Boolean)));
+      const uniqueKeywords = [...new Set(items.map((i) => i.keyword).filter(Boolean))];
       await Promise.all(
         uniqueKeywords.map(async (keyword) => {
           try {
