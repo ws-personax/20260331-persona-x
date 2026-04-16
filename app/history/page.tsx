@@ -133,15 +133,20 @@ export default function HistoryPage() {
         uniqueKeywords.map(async (keyword) => {
           try {
             const res = await fetch(`/api/price?keyword=${encodeURIComponent(keyword)}`);
-            if (!res.ok) return;
             const data = await res.json();
+            // ✅ 실패 시에도 null로 명시 초기화 (이전 값 오염 방지)
             items.filter((i) => i.keyword === keyword).forEach((i) => {
               results[i.id] = {
-                price: typeof data.rawPrice === 'number' ? data.rawPrice : null,
-                change: typeof data.change === 'string' ? data.change : null,
+                price: (res.ok && typeof data.rawPrice === 'number') ? data.rawPrice : null,
+                change: (res.ok && typeof data.change === 'string') ? data.change : null,
               };
             });
-          } catch { /* 조용히 실패 */ }
+          } catch {
+            // 실패 시 null로 초기화
+            items.filter((i) => i.keyword === keyword).forEach((i) => {
+              results[i.id] = { price: null, change: null };
+            });
+          }
         })
       );
       if (alive) setCurrentPrices(results);
