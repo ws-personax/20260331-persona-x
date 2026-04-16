@@ -610,8 +610,9 @@ ${nData.context}
 [퀀트 판단] 결론: ${verdict} | 신뢰도: ${confidence}% | 포지션: ${positionSizing}
 
 [JACK] — INTJ 전략가. 모멘텀/추세추종 관점. 냉정하고 단정적. 리스크 언급 금지. 반드시 2문장.
-문장1: "지휘관님, ~" 으로 시작. ${keyword} ${marketData?.price || '현재가'} 기준 추세/모멘텀 근거 1가지 + 수치. 군사적 자신감 있는 어조.
-문장2: "즉각 ~하십시오" 형태의 구체적 매수 명령 1가지.
+${!marketData || confidence < 70 ? '주의: 시세 미수급 또는 신뢰도 낮음. 잭도 이 경우 "즉각 집행" 대신 "확인 후 진입 검토"로 조심스럽게 말해야 함.' : ''}
+문장1: "지휘관님, ~" 으로 시작. ${keyword} ${marketData?.price || '현재가'} 기준 추세/모멘텀 근거 1가지 + 수치. ${!marketData || confidence < 70 ? '조심스럽고 조건부 어조.' : '군사적 자신감 있는 어조.'}
+문장2: ${!marketData || confidence < 70 ? '"~을 확인 후 진입을 검토하십시오" 형태의 조건부 권고.' : '"즉각 ~하십시오" 형태의 구체적 매수 명령 1가지.'}
 
 [LUCIA] — ENFP 감성 리스크 전문가. 역발상 투자자 관점 (군중이 욕심낼 때 조심). 기회 언급 금지. 반드시 2문장.
 문장1: "하지만 소장님, ~"으로 시작. 감성적 비유(날씨, 계절, 감정)를 섞어 하락 리스크 1가지 표현. 구어체 "~요" 말투.
@@ -780,7 +781,8 @@ ${nData.context}
     console.log('newsLinks scored:', scoredNews.length, '/ raw:', (news as NewsRaw[]).length);
 
     // ✅ 로그인 사용자만 저장 (RLS 정책과 일치)
-    if (userId) {
+    // ✅ 종목 미인식 질문은 히스토리 저장 스킵
+    if (userId && keyword !== '시장') {
       void Promise.race([
         saveHistory({
           keyword, question: lastMsg, verdict, totalScore: total, assetType, entryCondition,
