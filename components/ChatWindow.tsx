@@ -723,11 +723,23 @@ export default function ChatWindow() {
         </div>
       )}
 
-      {/* ✅ 추천 질문 탭 패널 */}
+      {/* ✅ 추천 질문 탭 패널 — footer 바로 위에 고정 */}
       {showQuickQ && (
-        <div style={{ background: '#fff', borderTop: '1px solid #e5e7eb' }}>
+        <div style={{
+          background: '#fff',
+          borderTop: '1px solid #e5e7eb',
+          position: 'fixed',
+          bottom: 68,              // footer 높이(약 68px)만큼 띄움
+          left: 0,
+          right: 0,
+          zIndex: 40,              // footer(50)보다 낮게 두어 혹시 겹쳐도 footer가 위에
+          boxShadow: '0 -4px 12px rgba(0,0,0,0.08)',
+          maxHeight: '60vh',
+          display: 'flex',
+          flexDirection: 'column',
+        }}>
           {/* 탭 헤더 */}
-          <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
+          <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
             {(['추천', '고급', '뉴스'] as const).map(tab => (
               <button
                 key={tab}
@@ -754,57 +766,81 @@ export default function ChatWindow() {
           </div>
 
           {/* 탭 콘텐츠 */}
-          <div style={{ maxHeight: 240, overflowY: 'auto', padding: '8px 12px' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px 16px 12px' }}>
             {activeTab === '추천' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {/* 레벨 범례 */}
-                <div style={{ display: 'flex', gap: 10, fontSize: 11, marginBottom: 2 }}>
-                  <span style={{ color: '#16a34a', fontWeight: 700 }}>● 시장</span>
-                  <span style={{ color: '#d97706', fontWeight: 700 }}>● 분석</span>
-                  <span style={{ color: '#dc2626', fontWeight: 700 }}>● 전략</span>
-                </div>
-                {QUICK_QUESTIONS.map((q, i) => (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      setInput(q.text);
-                      setShowQuickQ(false);
-                      setTimeout(() => {
-                        handleSendWithPosition(q.text, null);
-                        setInput('');
-                      }, 50);
-                    }}
-                    disabled={isLoading}
-                    style={{
-                      background: q.bg,
-                      border: `1px solid ${q.color}22`,
-                      borderRadius: 10,
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      fontSize: 13,
-                      fontWeight: 500,
-                      color: '#111827',
-                      cursor: isLoading ? 'not-allowed' : 'pointer',
-                      opacity: isLoading ? 0.5 : 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                    }}
-                  >
-                    <span style={{
-                      fontSize: 10,
-                      fontWeight: 800,
-                      color: q.color,
-                      background: '#fff',
-                      border: `1px solid ${q.color}`,
-                      borderRadius: 4,
-                      padding: '1px 5px',
-                      minWidth: 24,
-                      textAlign: 'center',
-                    }}>{q.level}</span>
-                    {q.text}
-                  </button>
-                ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {(['시장', '분석', '전략'] as const).map(section => {
+                  const items = QUICK_QUESTIONS.filter(q => q.level === section);
+                  if (items.length === 0) return null;
+                  const sectionColor = section === '시장' ? '#16a34a' : section === '분석' ? '#d97706' : '#dc2626';
+                  return (
+                    <div key={section} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {/* 섹션 헤더 */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontSize: 11,
+                        fontWeight: 800,
+                        color: sectionColor,
+                        paddingTop: 4,
+                      }}>
+                        <span style={{
+                          display: 'inline-block',
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: sectionColor,
+                        }} />
+                        {section} ({items.length})
+                        <span style={{ flex: 1, height: 1, background: `${sectionColor}22`, marginLeft: 4 }} />
+                      </div>
+                      {/* 섹션 내 질문들 */}
+                      {items.map((q, i) => (
+                        <button
+                          key={`${section}-${i}`}
+                          onClick={() => {
+                            setInput(q.text);
+                            setShowQuickQ(false);
+                            setTimeout(() => {
+                              handleSendWithPosition(q.text, null);
+                              setInput('');
+                            }, 50);
+                          }}
+                          disabled={isLoading}
+                          style={{
+                            background: q.bg,
+                            border: `1px solid ${q.color}22`,
+                            borderRadius: 10,
+                            padding: '8px 12px',
+                            textAlign: 'left',
+                            fontSize: 13,
+                            fontWeight: 500,
+                            color: '#111827',
+                            cursor: isLoading ? 'not-allowed' : 'pointer',
+                            opacity: isLoading ? 0.5 : 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                          }}
+                        >
+                          <span style={{
+                            fontSize: 10,
+                            fontWeight: 800,
+                            color: q.color,
+                            background: '#fff',
+                            border: `1px solid ${q.color}`,
+                            borderRadius: 4,
+                            padding: '1px 5px',
+                            minWidth: 24,
+                            textAlign: 'center',
+                          }}>{q.level}</span>
+                          {q.text}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
