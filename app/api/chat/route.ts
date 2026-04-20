@@ -144,6 +144,36 @@ export async function POST(req: Request) {
     const isDecoupling = (lastMsg.includes('나스닥') && lastMsg.includes('코스피') && lastMsg.includes('따로')) || lastMsg.includes('디커플링');
     const isStopLoss = lastMsg.includes('손절 어디야') || (lastMsg.includes('손절') && lastMsg.includes('들어가면'));
     const isNextDayStrategy = lastMsg.includes('내일 전략') || lastMsg.includes('장 결과') || lastMsg.includes('어제 장') || (lastMsg.includes('오늘') && lastMsg.includes('결과'));
+    const isOpeningVolume = lastMsg.includes('장 초반') || lastMsg.includes('초반 30분') || (lastMsg.includes('개장') && lastMsg.includes('거래량'));
+    const isFirstStock = lastMsg.includes('첫 번째로 봐야') || lastMsg.includes('장 열리면') || (lastMsg.includes('개장') && lastMsg.includes('종목'));
+
+    // ── 개장 초반 30분 거래량 ──
+    if (isOpeningVolume && (!keyword || keyword === '시장')) {
+      const usData = await fetchMarketPrice('나스닥').catch(() => null);
+      const usChange = parseFloat(usData?.change || '0');
+      const usTrend = usChange > 0.5 ? '상승' : usChange < -0.5 ? '하락' : '보합';
+      const jack = `지휘관님, 개장 초반 30분 거래량 판단 기준입니다.\n\n✅ 매수 신호: 전일 대비 거래량 +30% 이상 + 가격 상승 동반\n⚠️ 주의 신호: 거래량 증가인데 가격 제자리 (교착 구간)\n❌ 회피 신호: 거래량 감소 + 갭하락 동시 출현\n\n나스닥 어제 ${usTrend} 마감(${usChange >= 0 ? '+' : ''}${usChange.toFixed(2)}%) 기준, 오늘 개장 초반 ${usTrend === '상승' ? '매수세 유입 가능성이 높습니다' : usTrend === '하락' ? '매도세 주의가 필요합니다' : '방향성 확인이 필요합니다'}.`;
+      const lucia = `소장님, 개장 초반 30분은 그날 장의 분위기를 결정해요. 거래량이 평소보다 많으면서 가격도 올라가면 좋은 신호예요. 반대로 거래량만 많고 가격이 안 움직이면 세력이 물량 소화 중일 수 있어요. 서두르지 말고 15~30분 지켜본 후 진입하세요.`;
+      const ray = `개장 초반 거래량 판단 기준 데이터입니다.\n\n✅ 강한 신호: 거래량 전일 대비 +30% + 가격 +0.5% 이상 동반\n⚠️ 약한 신호: 거래량 +10~30% + 가격 횡보\n❌ 페이크: 거래량 급증 + 가격 변동 없음\n\n나스닥 전일 ${usChange >= 0 ? '+' : ''}${usChange.toFixed(2)}% 기준 오늘 한국장 연동 가능성 ${usTrend === '상승' ? '높음' : usTrend === '하락' ? '하락 주의' : '중립'}입니다.`;
+      const echo = `결론: 개장 초반 30분 거래량 판단 기준 제공 완료\n\n핵심 공식: 거래량 +30% 이상 + 가격 동반 상승 = 진입 신호\n나스닥 전일 ${usTrend} 마감 → 오늘 개장 초반 ${usTrend === '상승' ? '상승 모멘텀 유지 여부 확인 권고' : usTrend === '하락' ? '갭하락 주의 및 관망 권고' : '방향성 확인 후 진입 권고'}\n\n조건: 분석할 종목명을 입력하시면 개별 거래량 신호를 즉각 판단합니다.\n\n📡 데이터 출처 — 나스닥 전일 종가 기준\n\n${DISCLAIMER}`;
+      return Response.json({ reply: [ray, jack, lucia, echo].join('\n\n'), personas: { jack, lucia, ray, echo, verdict: '관망' as Verdict, confidence: 78, breakdown: '개장 초반 거래량', positionSizing: '0%', jackNews: null, luciaNews: null, rayNews: null, echoNews: null } });
+    }
+
+    // ── 개장 첫 번째 종목 ──
+    if (isFirstStock && (!keyword || keyword === '시장')) {
+      const [usData, krData] = await Promise.all([
+        fetchMarketPrice('나스닥').catch(() => null),
+        fetchMarketPrice('코스피').catch(() => null),
+      ]);
+      const usChange = parseFloat(usData?.change || '0');
+      const krChange = parseFloat(krData?.change || '0');
+      const overallTrend = (usChange + krChange) > 0.5 ? '상승' : (usChange + krChange) < -0.5 ? '하락' : '보합';
+      const jack = `지휘관님, 오늘 개장 첫 번째 종목 선택 기준입니다.\n\n나스닥 ${usChange >= 0 ? '+' : ''}${usChange.toFixed(2)}% / 코스피 ${krChange >= 0 ? '+' : ''}${krChange.toFixed(2)}% 기준\n\n${overallTrend === '상승' ? '✅ 상승 장세 — 전일 강했던 섹터(IT·반도체) 첫 번째 확인 권고' : overallTrend === '하락' ? '⚠️ 하락 장세 — 방어적 접근. 첫 종목 진입보다 시장 확인 우선' : '🟡 보합 장세 — 거래량 터진 종목 위주로 선별 접근'}\n\n종목명을 입력하시면 즉각 개별 분석을 개시합니다.`;
+      const lucia = `소장님, 장 열리자마자 바로 들어가는 건 위험해요. 첫 15분은 '관찰 시간'이에요. ${overallTrend === '상승' ? '오늘은 분위기가 좋으니 거래량 터지는 종목을 찾아보세요.' : overallTrend === '하락' ? '오늘은 조심하는 날이에요. 급하게 들어가지 말고 반등 신호 확인 후 움직이세요.' : '오늘은 방향이 불확실해요. 확실한 신호 나올 때까지 기다리는 게 맞아요.'}`;
+      const ray = `시장 데이터 기준입니다.\n나스닥: ${usData?.price || '-'} (${usChange >= 0 ? '+' : ''}${usChange.toFixed(2)}%)\n코스피: ${krData?.price || '-'} (${krChange >= 0 ? '+' : ''}${krChange.toFixed(2)}%)\n\n종합 추세: ${overallTrend === '상승' ? '상승 — IT·반도체 섹터 우선 확인 권고' : overallTrend === '하락' ? '하락 — 방어적 접근, 관망 비중 확대 권고' : '보합 — 거래량 신호 확인 후 선별 진입 권고'}\n\n분석할 종목명을 입력하시면 즉각 데이터를 제공합니다.`;
+      const echo = `결론: 오늘 개장 첫 종목 전략 제공 완료\n\n시장 추세: ${overallTrend === '상승' ? '🟢 상승 — IT·반도체 섹터 우선' : overallTrend === '하락' ? '🔴 하락 — 관망 우선, 반등 신호 대기' : '🟡 보합 — 거래량 신호 확인 후 진입'}\n나스닥 ${usChange >= 0 ? '+' : ''}${usChange.toFixed(2)}% / 코스피 ${krChange >= 0 ? '+' : ''}${krChange.toFixed(2)}%\n\n조건: 종목명을 입력하시면 즉각 개별 분석을 개시합니다.\n비중: 시장 방향 확인 전 0% 유지하십시오.\n\n📡 데이터 출처 — 전일 종가 기준\n\n${DISCLAIMER}`;
+      return Response.json({ reply: [ray, jack, lucia, echo].join('\n\n'), personas: { jack, lucia, ray, echo, verdict: '관망' as Verdict, confidence: 75, breakdown: '개장 첫 종목', positionSizing: '0%', jackNews: null, luciaNews: null, rayNews: null, echoNews: null } });
+    }
 
     // ── 어제/오늘 장 결과 + 내일/오늘 전략 ──
     if (isNextDayStrategy && (!keyword || keyword === '시장')) {
@@ -183,8 +213,8 @@ export async function POST(req: Request) {
       const lucia = isBeforeOpen2
         ? `소장님, ${dayLabel} 흐름을 보면 ${krChange >= 0 ? '코스피가 버텨줬어요. 오늘 개장 초반을 잘 지켜봐요.' : '코스피가 좀 흔들렸네요. 오늘 개장 초반 반등 신호가 있는지 확인하세요.'} 무리하지 말고 신호 확인 후 움직이세요.`
         : `소장님, 오늘 하루 수고하셨어요. ${krChange >= 0 ? '오늘 코스피가 버텨줬네요. 내일도 이 흐름이 이어질지 개장 초반을 지켜봐요.' : '오늘 좀 힘들었죠. 하지만 하락도 내일의 기회가 될 수 있어요.'} 무리하지 말고 신호 확인 후 움직이세요.`;
-      const ray = `${dayLabel} 종가 기준:\n코스피: ${krData?.price || '-'} (${krChange >= 0 ? '+' : ''}${krChange.toFixed(2)}%)\n나스닥: ${usData?.price || '-'} (${usChange >= 0 ? '+' : ''}${usChange.toFixed(2)}%)\n\n${nextLabel} 핵심 지표: 개장 초 30분 거래량 + 외국인 수급 방향.`;
-      const echo = `결론: ${dayLabel} 장 결과 분석 완료\n코스피 ${krResult} / 나스닥 ${usResult}\n\n${nextLabel} 전략: ${nextSignal}\n조건: 개장 후 거래량 +30% 이상 확인 시 방향성 신뢰 가능\n\n📡 데이터 출처 — 시세: 전일 종가 기준\n\n${DISCLAIMER}`;
+      const ray = `${dayLabel} 종가 기준 데이터입니다.\n코스피: ${krData?.price || '-'} (${krChange >= 0 ? '+' : ''}${krChange.toFixed(2)}%) — ${descChange(krChange)}\n나스닥: ${usData?.price || '-'} (${usChange >= 0 ? '+' : ''}${usChange.toFixed(2)}%) — ${descChange(usChange)}\n\n${nextLabel} 핵심 지표: 개장 초 30분 거래량 + 외국인 수급 방향을 확인하십시오.`;
+      const echo = `결론: ${dayLabel} 장 분석 완료 — ${nextSignal}\n\n📊 ${dayLabel} 장 요약:\n코스피: ${krData?.price || '-'} ${krResult}\n나스닥: ${usData?.price || '-'} ${usResult}\n\n${nextLabel} 전략: ${nextSignal}\n조건: 개장 초 거래량 +30% 이상 확인 시 방향성 신뢰 가능\n비중: 신호 확인 전 0% 유지하십시오.\n\n📡 데이터 출처 — 시세: 전일 종가 기준\n\n${DISCLAIMER}`;
       return Response.json({ reply: [ray, jack, lucia, echo].join('\n\n'), personas: { jack, lucia, ray, echo, verdict: '관망' as Verdict, confidence: 75, breakdown: '장 결과 분석', positionSizing: '0%', jackNews: null, luciaNews: null, rayNews: null, echoNews: null } });
     }
 

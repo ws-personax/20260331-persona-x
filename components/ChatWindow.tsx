@@ -884,7 +884,7 @@ export default function ChatWindow() {
               border: 'none',
               borderRadius: 12,
               padding: '6px 12px',
-              minHeight: 44,
+              minHeight: 56,
               fontSize: 12,
               fontWeight: 700,
               cursor: 'pointer',
@@ -916,7 +916,7 @@ export default function ChatWindow() {
               resize: 'none',
               fontSize: 14,
               outline: 'none',
-              minHeight: 44,
+              minHeight: 56,
               maxHeight: 160,
               overflowY: 'hidden',
             }}
