@@ -155,7 +155,7 @@ export async function POST(req: Request) {
       const jack = `지휘관님, 개장 초반 30분 거래량 판단 기준입니다.\n\n✅ 매수 신호: 전일 대비 거래량 +30% 이상 + 가격 상승 동반\n⚠️ 주의 신호: 거래량 증가인데 가격 제자리 (교착 구간)\n❌ 회피 신호: 거래량 감소 + 갭하락 동시 출현\n\n나스닥 어제 ${usTrend} 마감(${usChange >= 0 ? '+' : ''}${usChange.toFixed(2)}%) 기준, 오늘 개장 초반 ${usTrend === '상승' ? '매수세 유입 가능성이 높습니다' : usTrend === '하락' ? '매도세 주의가 필요합니다' : '방향성 확인이 필요합니다'}.`;
       const lucia = `소장님, 개장 초반 30분은 그날 장의 분위기를 결정해요. 거래량이 평소보다 많으면서 가격도 올라가면 좋은 신호예요. 반대로 거래량만 많고 가격이 안 움직이면 세력이 물량 소화 중일 수 있어요. 서두르지 말고 15~30분 지켜본 후 진입하세요.`;
       const ray = `개장 초반 거래량 판단 기준 데이터입니다.\n\n✅ 강한 신호: 거래량 전일 대비 +30% + 가격 +0.5% 이상 동반\n⚠️ 약한 신호: 거래량 +10~30% + 가격 횡보\n❌ 페이크: 거래량 급증 + 가격 변동 없음\n\n나스닥 전일 ${usChange >= 0 ? '+' : ''}${usChange.toFixed(2)}% 기준 오늘 한국장 연동 가능성 ${usTrend === '상승' ? '높음' : usTrend === '하락' ? '하락 주의' : '중립'}입니다.`;
-      const echo = `결론: 개장 초반 30분 거래량 판단 기준 제공 완료\n\n핵심 공식: 거래량 +30% 이상 + 가격 동반 상승 = 진입 신호\n나스닥 전일 ${usTrend} 마감 → 오늘 개장 초반 ${usTrend === '상승' ? '상승 모멘텀 유지 여부 확인 권고' : usTrend === '하락' ? '갭하락 주의 및 관망 권고' : '방향성 확인 후 진입 권고'}\n\n조건: 분석할 종목명을 입력하시면 개별 거래량 신호를 즉각 판단합니다.\n\n📡 데이터 출처 — 나스닥 전일 종가 기준\n\n${DISCLAIMER}`;
+      const echo = `결론: 개장 초반 30분 거래량 판단 기준 제공 완료\n\n핵심 공식: 거래량 +30% 이상 + 가격 동반 상승 = 진입 신호\n나스닥 전일 ${usTrend} 마감 → 오늘 개장 초반 ${usTrend === '상승' ? '상승 모멘텀 유지 여부를 확인하십시오' : usTrend === '하락' ? '갭하락 주의 — 관망을 권고합니다' : '방향성 확인 후 진입하십시오'}\n\n조건: 분석할 종목명을 입력하시면 개별 거래량 신호를 즉각 판단합니다.\n\n📡 데이터 출처 — 나스닥 전일 종가 기준\n\n${DISCLAIMER}`;
       return Response.json({ reply: [ray, jack, lucia, echo].join('\n\n'), personas: { jack, lucia, ray, echo, verdict: '관망' as Verdict, confidence: 78, breakdown: '개장 초반 거래량', positionSizing: '0%', jackNews: null, luciaNews: null, rayNews: null, echoNews: null } });
     }
 
@@ -420,7 +420,7 @@ ${DISCLAIMER}`;
       const jack = `지휘관님, 외국인 수급 기준 주목 종목 브리핑입니다.\n\n${stocksWithData}\n\n수급 유입 확인된 종목부터 개별 분석을 시작하십시오.`;
       const lucia = `소장님, 외국인이 사는 종목을 따라가는 건 좋은 전략이에요. 하지만 외국인도 틀릴 수 있어요. 수급 유입 + 거래량 증가가 동시에 확인될 때만 따라가세요.`;
       const ray = `외국인 수급 기준 브리핑:\n${stocksWithData}\n외국인 순매수 TOP 데이터는 실시간 지원 예정입니다.`;
-      const echo = `결론: 외국인 수급 브리핑 완료\n${stocksWithData}\n종목명 입력 시 즉각 상세 분석을 개시합니다.\n\n📡 데이터 출처 — 실시간 수급 데이터\n\n${DISCLAIMER}`;
+      const echo = `결론: 외국인 수급 브리핑 완료\n${stocksWithData}\n종목명을 입력하시면 즉각 상세 분석을 개시합니다.\n\n📡 데이터 출처 — 실시간 수급 데이터\n\n${DISCLAIMER}`;
       return Response.json({ reply: [ray, jack, lucia, echo].join('\n\n'), personas: { jack, lucia, ray, echo, verdict: '관망' as Verdict, confidence: 75, breakdown: '외국인 수급', positionSizing: '0%', jackNews: null, luciaNews: null, rayNews: null, echoNews: null } });
     }
 
@@ -440,7 +440,7 @@ ${DISCLAIMER}`;
       const jack = `지휘관님, 현재 가장 강한 섹터는 ${picks2.sector}입니다.\n\n${briefings2}\n\n진입 검토 종목부터 분석을 시작하십시오.`;
       const lucia = `소장님, 강한 섹터라도 모든 종목이 좋은 건 아니에요. 🟢 신호가 뜬 종목만 진입 검토하세요.`;
       const ray = `강한 섹터: ${picks2.sector}\n\n${briefings2}\n개별 종목 분석 요청 시 상세 수치를 제공합니다.`;
-      const echo = `결론: 강한 섹터 브리핑 완료 — ${picks2.sector}\n\n${briefings2}\n종목명 입력 시 즉각 상세 분석을 개시합니다.\n\n📡 데이터 출처 — 실시간 추세 기반\n\n${DISCLAIMER}`;
+      const echo = `결론: 강한 섹터 브리핑 완료 — ${picks2.sector}\n\n${briefings2}\n종목명을 입력하시면 즉각 상세 분석을 개시합니다.\n\n📡 데이터 출처 — 실시간 추세 기반\n\n${DISCLAIMER}`;
       return Response.json({ reply: [ray, jack, lucia, echo].join('\n\n'), personas: { jack, lucia, ray, echo, verdict: '관망' as Verdict, confidence: 78, breakdown: '섹터 분석', positionSizing: '0%', jackNews: null, luciaNews: null, rayNews: null, echoNews: null } });
     }
 
@@ -449,7 +449,7 @@ ${DISCLAIMER}`;
       const jack = `지휘관님, 거래량 급증의 진짜 신호 vs 페이크 구분 기준입니다.\n\n✅ 진짜 신호: 거래량 증가 + 가격 동반 상승 + 이평선 돌파\n❌ 페이크: 거래량 증가인데 가격 제자리 (교착 구간) / 거래량 폭증 후 가격 급락 (패닉 셀)\n\n분석 원하는 종목명을 입력하시면 즉각 판단합니다.`;
       const lucia = `소장님, 거래량이 터졌다고 무조건 올라타면 안 돼요. 가격이 같이 올라가고 있는지 꼭 확인하세요. 거래량만 많고 가격이 안 움직이면 세력이 물량 소화 중일 수 있어요.`;
       const ray = `거래량 급증 판단 기준:\n✅ 진짜: 거래량 +30% 이상 + 가격 +1% 이상 동반\n❌ 페이크: 거래량 +30% 이상이지만 가격 ±0.5% 이내\n분석할 종목명을 입력하시면 실제 데이터로 판단합니다.`;
-      const echo = `결론: 거래량 급증 판단 기준 제공 완료\n진짜 신호 = 거래량 +30% + 가격 +1% 동반\n페이크 = 거래량만 급증, 가격 정체\n종목명 입력 시 즉각 판단을 개시합니다.`;
+      const echo = `결론: 거래량 급증 판단 기준 제공 완료\n진짜 신호 = 거래량 +30% + 가격 +1% 동반\n페이크 = 거래량만 급증, 가격 정체\n\n조건: 종목명을 입력하시면 즉각 판단을 개시합니다.\n\n📡 데이터 출처 — 실시간 거래량 기준\n\n${DISCLAIMER}`;
       return Response.json({ reply: [ray, jack, lucia, echo].join('\n\n'), personas: { jack, lucia, ray, echo, verdict: '관망' as Verdict, confidence: 80, breakdown: '거래량 분석', positionSizing: '0%', jackNews: null, luciaNews: null, rayNews: null, echoNews: null } });
     }
 

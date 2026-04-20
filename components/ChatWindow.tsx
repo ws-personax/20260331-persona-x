@@ -729,7 +729,7 @@ export default function ChatWindow() {
           background: '#fff',
           borderTop: '1px solid #e5e7eb',
           position: 'fixed',
-          bottom: 68,              // footer 높이(약 68px)만큼 띄움
+          bottom: 80,              // footer 높이(버튼 56px + 여백) 맞춤
           left: 0,
           right: 0,
           zIndex: 40,              // footer(50)보다 낮게 두어 혹시 겹쳐도 footer가 위에
@@ -766,7 +766,7 @@ export default function ChatWindow() {
           </div>
 
           {/* 탭 콘텐츠 */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px 24px 12px' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px 32px 12px' }}>
             {activeTab === '추천' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {(['시장', '분석', '전략'] as const).map(section => {
