@@ -345,11 +345,13 @@ export const fetchMarketPrice = async (keyword: string): Promise<MarketData | nu
     const result1mo = null; // 더 이상 사용 안 함
     if (!result1d) return null;
     const meta = result1d.meta;
-    if (!meta?.regularMarketPrice) return null;
-
+    // ✅ 장 개장 전 fallback: regularMarketPrice 없으면 previousClose 사용
     const isKR = symbol.endsWith('.KS') || symbol.endsWith('.KQ') || symbol.startsWith('^KS') || symbol.startsWith('^KQ');
     const marketState = String(meta.marketState || 'UNKNOWN').toUpperCase();
-    const price = meta.regularMarketPrice;
+    const fallbackPrice = meta.previousClose || meta.regularMarketPreviousClose || meta.chartPreviousClose || 0;
+    const rawMarketPrice = meta.regularMarketPrice || (isKR && fallbackPrice > 0 ? fallbackPrice : null);
+    if (!rawMarketPrice) return null;
+    const price = rawMarketPrice;
 
     let change = 0;
     if (typeof meta.regularMarketChangePercent === 'number' && Number.isFinite(meta.regularMarketChangePercent)) {
@@ -404,7 +406,7 @@ export const fetchMarketPrice = async (keyword: string): Promise<MarketData | nu
       currency: isKR ? 'KRW' : 'USD',
       marketState,
       source: isKR
-        ? '한국장 (15분 지연)'
+        ? (meta.regularMarketPrice ? '한국장 (15분 지연)' : '한국장 전일 종가 기준')
         : marketState === 'REGULAR' ? '미국장 실시간' : '미국장 전일 종가 기준',
       // ✅ 추세 데이터
       trend,
