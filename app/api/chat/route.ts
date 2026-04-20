@@ -145,22 +145,46 @@ export async function POST(req: Request) {
     const isStopLoss = lastMsg.includes('손절 어디야') || (lastMsg.includes('손절') && lastMsg.includes('들어가면'));
     const isNextDayStrategy = lastMsg.includes('내일 전략') || lastMsg.includes('장 결과') || lastMsg.includes('어제 장') || (lastMsg.includes('오늘') && lastMsg.includes('결과'));
 
-    // ── 오늘 장 결과 + 내일 전략 ──
+    // ── 어제/오늘 장 결과 + 내일/오늘 전략 ──
     if (isNextDayStrategy && (!keyword || keyword === '시장')) {
+      const nowKST2 = new Date(Date.now() + 9 * 60 * 60 * 1000);
+      const hourKST = nowKST2.getUTCHours();
+      const minKST = nowKST2.getUTCMinutes();
+      const timeKST2 = hourKST * 100 + minKST;
+      const isBeforeOpen2 = timeKST2 < 900;
+      // 개장 전이면 "어제 장 / 오늘 전략", 마감 후면 "오늘 장 / 내일 전략"
+      const dayLabel = isBeforeOpen2 ? '어제' : '오늘';
+      const nextLabel = isBeforeOpen2 ? '오늘' : '내일';
+
       const [krData, usData] = await Promise.all([
         fetchMarketPrice('코스피').catch(() => null),
         fetchMarketPrice('나스닥').catch(() => null),
       ]);
       const krChange = parseFloat(krData?.change || '0');
       const usChange = parseFloat(usData?.change || '0');
-      const krResult = krChange > 0.5 ? `상승 마감 (+${krChange.toFixed(2)}%)` : krChange < -0.5 ? `하락 마감 (${krChange.toFixed(2)}%)` : `보합 마감 (${krChange.toFixed(2)}%)`;
-      const usResult = usChange > 0.5 ? `상승 마감 (+${usChange.toFixed(2)}%)` : usChange < -0.5 ? `하락 마감 (${usChange.toFixed(2)}%)` : `보합 마감 (${usChange.toFixed(2)}%)`;
-      const tomorrowSignal = (krChange + usChange) > 1 ? '내일 상승 모멘텀 유지 가능성 높음' : (krChange + usChange) < -1 ? '내일 하락 압력 주의 필요' : '내일 방향성 불확실 — 거래량 확인 필요';
+      // ✅ 보합 기준 ±0.1% 이내, 그 외 소폭/중폭/강폭 구분
+      const descChange = (ch: number) => {
+        if (ch > 1.5) return `강세 마감 (+${ch.toFixed(2)}%)`;
+        if (ch > 0.3) return `상승 마감 (+${ch.toFixed(2)}%)`;
+        if (ch >= -0.1 && ch <= 0.1) return `보합 마감 (${ch.toFixed(2)}%)`;
+        if (ch >= -0.3) return `약보합 마감 (${ch.toFixed(2)}%)`;
+        if (ch >= -1.5) return `하락 마감 (${ch.toFixed(2)}%)`;
+        return `급락 마감 (${ch.toFixed(2)}%)`;
+      };
+      const krResult = descChange(krChange);
+      const usResult = descChange(usChange);
+      const nextSignal = (krChange + usChange) > 1
+        ? `${nextLabel} 상승 모멘텀 유지 가능성 높음`
+        : (krChange + usChange) < -1
+        ? `${nextLabel} 하락 압력 주의 필요`
+        : `${nextLabel} 방향성 불확실 — 개장 초 거래량 확인 필요`;
 
-      const jack = `지휘관님, 오늘 장 결과 브리핑입니다.\n\n코스피: ${krData?.price || '-'} ${krResult}\n나스닥: ${usData?.price || '-'} ${usResult}\n\n내일 전략: ${tomorrowSignal}. 개장 초 30분 거래량이 핵심 신호입니다.`;
-      const lucia = `소장님, 오늘 하루 수고하셨어요. ${krChange >= 0 ? '오늘 코스피가 버텨줬네요. 내일도 이 흐름이 이어질지 개장 초반을 지켜봐요.' : '오늘 좀 힘들었죠. 하지만 하락도 내일의 기회가 될 수 있어요.'} 무리하지 말고 신호 확인 후 움직이세요.`;
-      const ray = `오늘 종가 기준:\n코스피: ${krData?.price || '-'} (${krChange >= 0 ? '+' : ''}${krChange.toFixed(2)}%)\n나스닥: ${usData?.price || '-'} (${usChange >= 0 ? '+' : ''}${usChange.toFixed(2)}%)\n\n내일 핵심 지표: 개장 초 30분 거래량 + 외국인 수급 방향.`;
-      const echo = `결론: 오늘 장 결과 분석 완료\n코스피 ${krResult} / 나스닥 ${usResult}\n\n내일 전략: ${tomorrowSignal}\n조건: 개장 후 거래량 +30% 이상 확인 시 방향성 신뢰 가능\n\n📡 데이터 출처 — 시세: 전일 종가 기준\n\n${DISCLAIMER}`;
+      const jack = `지휘관님, ${dayLabel} 장 결과 브리핑입니다.\n\n코스피: ${krData?.price || '-'} ${krResult}\n나스닥: ${usData?.price || '-'} ${usResult}\n\n${nextLabel} 전략: ${nextSignal}. 개장 초 30분 거래량이 핵심 신호입니다.`;
+      const lucia = isBeforeOpen2
+        ? `소장님, ${dayLabel} 흐름을 보면 ${krChange >= 0 ? '코스피가 버텨줬어요. 오늘 개장 초반을 잘 지켜봐요.' : '코스피가 좀 흔들렸네요. 오늘 개장 초반 반등 신호가 있는지 확인하세요.'} 무리하지 말고 신호 확인 후 움직이세요.`
+        : `소장님, 오늘 하루 수고하셨어요. ${krChange >= 0 ? '오늘 코스피가 버텨줬네요. 내일도 이 흐름이 이어질지 개장 초반을 지켜봐요.' : '오늘 좀 힘들었죠. 하지만 하락도 내일의 기회가 될 수 있어요.'} 무리하지 말고 신호 확인 후 움직이세요.`;
+      const ray = `${dayLabel} 종가 기준:\n코스피: ${krData?.price || '-'} (${krChange >= 0 ? '+' : ''}${krChange.toFixed(2)}%)\n나스닥: ${usData?.price || '-'} (${usChange >= 0 ? '+' : ''}${usChange.toFixed(2)}%)\n\n${nextLabel} 핵심 지표: 개장 초 30분 거래량 + 외국인 수급 방향.`;
+      const echo = `결론: ${dayLabel} 장 결과 분석 완료\n코스피 ${krResult} / 나스닥 ${usResult}\n\n${nextLabel} 전략: ${nextSignal}\n조건: 개장 후 거래량 +30% 이상 확인 시 방향성 신뢰 가능\n\n📡 데이터 출처 — 시세: 전일 종가 기준\n\n${DISCLAIMER}`;
       return Response.json({ reply: [ray, jack, lucia, echo].join('\n\n'), personas: { jack, lucia, ray, echo, verdict: '관망' as Verdict, confidence: 75, breakdown: '장 결과 분석', positionSizing: '0%', jackNews: null, luciaNews: null, rayNews: null, echoNews: null } });
     }
 
