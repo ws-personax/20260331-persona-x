@@ -417,103 +417,106 @@ export default function ChatWindow() {
   const [showQuickQ, setShowQuickQ] = useState(false);
 
   // ✅ 시장 상황 + 시간대 기반 동적 추천 질문
+  // ✅ 탭 타입 정의
+  const [activeTab, setActiveTab] = useState<'추천'|'고급'|'뉴스'>('추천');
+
   const QUICK_QUESTIONS = useMemo(() => {
     const nowKST = new Date(Date.now() + 9 * 60 * 60 * 1000);
     const hour = nowKST.getUTCHours();
     const minute = nowKST.getUTCMinutes();
     const timeKST = hour * 100 + minute;
-    const day = nowKST.getUTCDay(); // 0=일, 6=토
+    const day = nowKST.getUTCDay();
     const isWeekend = day === 0 || day === 6;
     const isKROpen = !isWeekend && timeKST >= 900 && timeKST < 1530;
     const isKRBeforeOpen = !isWeekend && timeKST < 900;
     const isUSOpen = !isWeekend && (timeKST >= 2330 || timeKST < 600);
 
-    type Q = { level: '하' | '중' | '상'; color: string; bg: string; text: string };
+    type Q = { level: '시장' | '분석' | '전략'; color: string; bg: string; text: string };
     const G = '#16a34a'; const GB = '#dcfce7';
     const Y = '#d97706'; const YB = '#fef9c3';
     const R = '#dc2626'; const RB = '#fee2e2';
 
     // ── 공통 질문 풀 ──
     const BASE: Q[] = [
-      { level: '하', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
-      { level: '하', color: G, bg: GB, text: '코인 지금 매수 vs 관망, 결론만' },
-      { level: '중', color: Y, bg: YB, text: '외국인이 사는 종목 중 따라가도 되는 게 있어?' },
-      { level: '중', color: Y, bg: YB, text: '지금 100만원이면 비중 어떻게 나눠?' },
-      { level: '상', color: R, bg: RB, text: '나스닥과 코스피 지금 따로 움직이고 있어?' },
-      { level: '상', color: R, bg: RB, text: '지금 들어가면 손절 어디야?' },
+      { level: '시장', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
+      { level: '시장', color: G, bg: GB, text: '코인 지금 매수 vs 관망, 결론만' },
+      { level: '분석', color: Y, bg: YB, text: '외국인이 사는 종목 중 따라가도 되는 게 있어?' },
+      { level: '분석', color: Y, bg: YB, text: '지금 100만원이면 비중 어떻게 나눠?' },
+      { level: '전략', color: R, bg: RB, text: '나스닥과 코스피 지금 따로 움직이고 있어?' },
+      { level: '전략', color: R, bg: RB, text: '지금 들어가면 손절 어디야?' },
     ];
 
     // ── 시간대별 추가 질문 ──
     if (isWeekend) {
       return [
-        { level: '하', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
-        { level: '하', color: G, bg: GB, text: '코인 지금 매수 vs 관망, 결론만' },
-        { level: '하', color: G, bg: GB, text: '지금 들어가도 되는 종목 1개만' },
-        { level: '중', color: Y, bg: YB, text: '다음 주 주목할 섹터는 어디야?' },
-        { level: '중', color: Y, bg: YB, text: '외국인이 사는 종목 중 따라가도 되는 게 있어?' },
-        { level: '중', color: Y, bg: YB, text: '지금 100만원이면 비중 어떻게 나눠?' },
-        { level: '중', color: Y, bg: YB, text: '거래량 갑자기 터진 종목, 진짜야 페이크야?' },
-        { level: '상', color: R, bg: RB, text: '지금 장에서 추세추종 vs 역추세 중 뭐가 유리해?' },
-        { level: '상', color: R, bg: RB, text: '나스닥과 코스피 지금 따로 움직이고 있어?' },
-        { level: '상', color: R, bg: RB, text: '지금 들어가면 손절 어디야?' },
+        { level: '시장', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
+        { level: '시장', color: G, bg: GB, text: '코인 지금 매수 vs 관망, 결론만' },
+        { level: '시장', color: G, bg: GB, text: '지금 들어가도 되는 종목 1개만' },
+        { level: '분석', color: Y, bg: YB, text: '다음 주 주목할 섹터는 어디야?' },
+        { level: '분석', color: Y, bg: YB, text: '외국인이 사는 종목 중 따라가도 되는 게 있어?' },
+        { level: '분석', color: Y, bg: YB, text: '지금 100만원이면 비중 어떻게 나눠?' },
+        { level: '분석', color: Y, bg: YB, text: '거래량 갑자기 터진 종목, 진짜야 페이크야?' },
+        { level: '전략', color: R, bg: RB, text: '지금 장에서 추세추종 vs 역추세 중 뭐가 유리해?' },
+        { level: '전략', color: R, bg: RB, text: '나스닥과 코스피 지금 따로 움직이고 있어?' },
+        { level: '전략', color: R, bg: RB, text: '지금 들어가면 손절 어디야?' },
       ] as Q[];
     }
 
     if (isKRBeforeOpen) {
       // 개장 전 — 오늘 전략 준비 질문
       return [
-        { level: '하', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
-        { level: '하', color: G, bg: GB, text: '오늘 장 열리면 첫 번째로 봐야 할 종목은?' },
-        { level: '하', color: G, bg: GB, text: '코인 지금 매수 vs 관망, 결론만' },
-        { level: '중', color: Y, bg: YB, text: '오늘 장 초반 30분 거래량 기준 뭘 봐야 해?' },
-        { level: '중', color: Y, bg: YB, text: '외국인이 사는 종목 중 따라가도 되는 게 있어?' },
-        { level: '중', color: Y, bg: YB, text: '지금 가장 강한 섹터에서 타이밍 맞는 종목은?' },
-        { level: '중', color: Y, bg: YB, text: '지금 100만원이면 비중 어떻게 나눠?' },
-        { level: '상', color: R, bg: RB, text: '지금 장에서 추세추종 vs 역추세 중 뭐가 유리해?' },
-        { level: '상', color: R, bg: RB, text: '나스닥과 코스피 지금 따로 움직이고 있어?' },
-        { level: '상', color: R, bg: RB, text: '지금 들어가면 손절 어디야?' },
+        { level: '시장', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
+        { level: '시장', color: G, bg: GB, text: '오늘 장 열리면 첫 번째로 봐야 할 종목은?' },
+        { level: '시장', color: G, bg: GB, text: '코인 지금 매수 vs 관망, 결론만' },
+        { level: '분석', color: Y, bg: YB, text: '오늘 장 초반 30분 거래량 기준 뭘 봐야 해?' },
+        { level: '분석', color: Y, bg: YB, text: '외국인이 사는 종목 중 따라가도 되는 게 있어?' },
+        { level: '분석', color: Y, bg: YB, text: '지금 가장 강한 섹터에서 타이밍 맞는 종목은?' },
+        { level: '분석', color: Y, bg: YB, text: '지금 100만원이면 비중 어떻게 나눠?' },
+        { level: '전략', color: R, bg: RB, text: '지금 장에서 추세추종 vs 역추세 중 뭐가 유리해?' },
+        { level: '전략', color: R, bg: RB, text: '나스닥과 코스피 지금 따로 움직이고 있어?' },
+        { level: '전략', color: R, bg: RB, text: '지금 들어가면 손절 어디야?' },
       ] as Q[];
     }
 
     if (isKROpen) {
       // 장 중 — 실시간 판단 질문
       return [
-        { level: '하', color: G, bg: GB, text: '지금 들어가도 되는 종목 1개만' },
-        { level: '하', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
-        { level: '하', color: G, bg: GB, text: '코인 지금 매수 vs 관망, 결론만' },
-        { level: '중', color: Y, bg: YB, text: '거래량 갑자기 터진 종목, 진짜야 페이크야?' },
-        { level: '중', color: Y, bg: YB, text: '지금 가장 강한 섹터에서 타이밍 맞는 종목은?' },
-        { level: '중', color: Y, bg: YB, text: '외국인이 사는 종목 중 따라가도 되는 게 있어?' },
-        { level: '중', color: Y, bg: YB, text: '지금 100만원이면 비중 어떻게 나눠?' },
-        { level: '상', color: R, bg: RB, text: '지금 들어가면 손절 어디야?' },
-        { level: '상', color: R, bg: RB, text: '지금 장에서 추세추종 vs 역추세 중 뭐가 유리해?' },
-        { level: '상', color: R, bg: RB, text: '나스닥과 코스피 지금 따로 움직이고 있어?' },
+        { level: '시장', color: G, bg: GB, text: '지금 들어가도 되는 종목 1개만' },
+        { level: '시장', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
+        { level: '시장', color: G, bg: GB, text: '코인 지금 매수 vs 관망, 결론만' },
+        { level: '분석', color: Y, bg: YB, text: '거래량 갑자기 터진 종목, 진짜야 페이크야?' },
+        { level: '분석', color: Y, bg: YB, text: '지금 가장 강한 섹터에서 타이밍 맞는 종목은?' },
+        { level: '분석', color: Y, bg: YB, text: '외국인이 사는 종목 중 따라가도 되는 게 있어?' },
+        { level: '분석', color: Y, bg: YB, text: '지금 100만원이면 비중 어떻게 나눠?' },
+        { level: '전략', color: R, bg: RB, text: '지금 들어가면 손절 어디야?' },
+        { level: '전략', color: R, bg: RB, text: '지금 장에서 추세추종 vs 역추세 중 뭐가 유리해?' },
+        { level: '전략', color: R, bg: RB, text: '나스닥과 코스피 지금 따로 움직이고 있어?' },
       ] as Q[];
     }
 
     if (isUSOpen) {
       // 미국장 시간 — 미국 중심 질문
       return [
-        { level: '하', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
-        { level: '하', color: G, bg: GB, text: '지금 들어가도 되는 종목 1개만' },
-        { level: '하', color: G, bg: GB, text: '코인 지금 매수 vs 관망, 결론만' },
-        { level: '중', color: Y, bg: YB, text: '거래량 갑자기 터진 종목, 진짜야 페이크야?' },
-        { level: '중', color: Y, bg: YB, text: '지금 가장 강한 섹터에서 타이밍 맞는 종목은?' },
-        { level: '중', color: Y, bg: YB, text: '외국인이 사는 종목 중 따라가도 되는 게 있어?' },
-        { level: '중', color: Y, bg: YB, text: '지금 100만원이면 비중 어떻게 나눠?' },
-        { level: '상', color: R, bg: RB, text: '나스닥과 코스피 지금 따로 움직이고 있어?' },
-        { level: '상', color: R, bg: RB, text: '지금 장에서 추세추종 vs 역추세 중 뭐가 유리해?' },
-        { level: '상', color: R, bg: RB, text: '지금 들어가면 손절 어디야?' },
+        { level: '시장', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
+        { level: '시장', color: G, bg: GB, text: '지금 들어가도 되는 종목 1개만' },
+        { level: '시장', color: G, bg: GB, text: '코인 지금 매수 vs 관망, 결론만' },
+        { level: '분석', color: Y, bg: YB, text: '거래량 갑자기 터진 종목, 진짜야 페이크야?' },
+        { level: '분석', color: Y, bg: YB, text: '지금 가장 강한 섹터에서 타이밍 맞는 종목은?' },
+        { level: '분석', color: Y, bg: YB, text: '외국인이 사는 종목 중 따라가도 되는 게 있어?' },
+        { level: '분석', color: Y, bg: YB, text: '지금 100만원이면 비중 어떻게 나눠?' },
+        { level: '전략', color: R, bg: RB, text: '나스닥과 코스피 지금 따로 움직이고 있어?' },
+        { level: '전략', color: R, bg: RB, text: '지금 장에서 추세추종 vs 역추세 중 뭐가 유리해?' },
+        { level: '전략', color: R, bg: RB, text: '지금 들어가면 손절 어디야?' },
       ] as Q[];
     }
 
     // 기본 (장 마감 후)
     return [
       ...BASE,
-      { level: '중', color: Y, bg: YB, text: '지금 가장 강한 섹터에서 타이밍 맞는 종목은?' },
-      { level: '중', color: Y, bg: YB, text: '거래량 갑자기 터진 종목, 진짜야 페이크야?' },
-      { level: '상', color: R, bg: RB, text: '지금 장에서 추세추종 vs 역추세 중 뭐가 유리해?' },
-      { level: '중', color: Y, bg: YB, text: '오늘 장 결과 — 내일 전략은?' },
+      { level: '분석', color: Y, bg: YB, text: '지금 가장 강한 섹터에서 타이밍 맞는 종목은?' },
+      { level: '분석', color: Y, bg: YB, text: '거래량 갑자기 터진 종목, 진짜야 페이크야?' },
+      { level: '전략', color: R, bg: RB, text: '지금 장에서 추세추종 vs 역추세 중 뭐가 유리해?' },
+      { level: '분석', color: Y, bg: YB, text: '오늘 장 결과 — 내일 전략은?' },
     ] as Q[];
   }, []);
   const [isLoading, setIsLoading] = useState(false);
@@ -720,66 +723,116 @@ export default function ChatWindow() {
         </div>
       )}
 
-      {/* ✅ 사전 질문 패널 */}
+      {/* ✅ 추천 질문 탭 패널 */}
       {showQuickQ && (
-        <div style={{
-          background: '#fff',
-          borderTop: '1px solid #e5e7eb',
-          padding: '10px 12px',
-          maxHeight: 260,
-          overflowY: 'auto',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>💡 사전 질문</span>
-            <div style={{ display: 'flex', gap: 8, fontSize: 11 }}>
-              <span style={{ color: '#16a34a', fontWeight: 700 }}>● 하</span>
-              <span style={{ color: '#d97706', fontWeight: 700 }}>● 중</span>
-              <span style={{ color: '#dc2626', fontWeight: 700 }}>● 상</span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {QUICK_QUESTIONS.map((q, i) => (
+        <div style={{ background: '#fff', borderTop: '1px solid #e5e7eb' }}>
+          {/* 탭 헤더 */}
+          <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
+            {(['추천', '고급', '뉴스'] as const).map(tab => (
               <button
-                key={i}
-                onClick={() => {
-                  setInput(q.text);
-                  setShowQuickQ(false);
-                  setTimeout(() => {
-                    handleSendWithPosition(q.text, null);
-                    setInput('');
-                  }, 50);
-                }}
-                disabled={isLoading}
+                key={tab}
+                onClick={() => setActiveTab(tab)}
                 style={{
-                  background: q.bg,
-                  border: `1px solid ${q.color}22`,
-                  borderRadius: 10,
-                  padding: '8px 12px',
-                  textAlign: 'left',
+                  flex: 1,
+                  padding: '8px 0',
                   fontSize: 13,
-                  fontWeight: 500,
-                  color: '#111827',
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
-                  opacity: isLoading ? 0.5 : 1,
+                  fontWeight: activeTab === tab ? 800 : 500,
+                  color: activeTab === tab ? '#111827' : '#9ca3af',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: activeTab === tab ? '2px solid #FAE100' : '2px solid transparent',
+                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 8,
+                  justifyContent: 'center',
+                  gap: 4,
                 }}
               >
-                <span style={{
-                  fontSize: 10,
-                  fontWeight: 800,
-                  color: q.color,
-                  background: '#fff',
-                  border: `1px solid ${q.color}`,
-                  borderRadius: 4,
-                  padding: '1px 5px',
-                  minWidth: 18,
-                  textAlign: 'center',
-                }}>{q.level}</span>
-                {q.text}
+                {tab === '추천' ? '💡 추천' : tab === '고급' ? '🔒 고급' : '📰 뉴스'}
               </button>
             ))}
+          </div>
+
+          {/* 탭 콘텐츠 */}
+          <div style={{ maxHeight: 240, overflowY: 'auto', padding: '8px 12px' }}>
+            {activeTab === '추천' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {/* 레벨 범례 */}
+                <div style={{ display: 'flex', gap: 10, fontSize: 11, marginBottom: 2 }}>
+                  <span style={{ color: '#16a34a', fontWeight: 700 }}>● 시장</span>
+                  <span style={{ color: '#d97706', fontWeight: 700 }}>● 분석</span>
+                  <span style={{ color: '#dc2626', fontWeight: 700 }}>● 전략</span>
+                </div>
+                {QUICK_QUESTIONS.map((q, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setInput(q.text);
+                      setShowQuickQ(false);
+                      setTimeout(() => {
+                        handleSendWithPosition(q.text, null);
+                        setInput('');
+                      }, 50);
+                    }}
+                    disabled={isLoading}
+                    style={{
+                      background: q.bg,
+                      border: `1px solid ${q.color}22`,
+                      borderRadius: 10,
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: '#111827',
+                      cursor: isLoading ? 'not-allowed' : 'pointer',
+                      opacity: isLoading ? 0.5 : 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <span style={{
+                      fontSize: 10,
+                      fontWeight: 800,
+                      color: q.color,
+                      background: '#fff',
+                      border: `1px solid ${q.color}`,
+                      borderRadius: 4,
+                      padding: '1px 5px',
+                      minWidth: 24,
+                      textAlign: 'center',
+                    }}>{q.level}</span>
+                    {q.text}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {activeTab === '고급' && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 0', gap: 8 }}>
+                <span style={{ fontSize: 28 }}>🔒</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#374151' }}>고급 질문은 유료 회원 전용입니다</span>
+                <span style={{ fontSize: 12, color: '#6b7280' }}>기관급 수급 분석 · 옵션 만기 전략 · 매크로 심화 분석</span>
+                <button style={{
+                  marginTop: 8,
+                  background: '#FAE100',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '8px 20px',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}>업그레이드</button>
+              </div>
+            )}
+
+            {activeTab === '뉴스' && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 0', gap: 8 }}>
+                <span style={{ fontSize: 28 }}>📰</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#374151' }}>오늘의 주요 경제 뉴스</span>
+                <span style={{ fontSize: 12, color: '#6b7280' }}>페르소나 토론 기능 — 준비 중</span>
+              </div>
+            )}
           </div>
         </div>
       )}

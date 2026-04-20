@@ -18,6 +18,17 @@ export const CRYPTO_MAP: Record<string, string> = {
 };
 
 export const STOCK_MAP: Record<string, string> = {
+  // 미국 ETF
+  'QQQ': 'QQQ',
+  'TQQQ': 'TQQQ',
+  'SQQQ': 'SQQQ',
+  'SPY': 'SPY',
+  'KODEX 200': '069500.KS',
+  'KODEX200': '069500.KS',
+  'KODEX 레버리지': '122630.KS',
+  'KODEX레버리지': '122630.KS',
+  '069500': '069500.KS',
+  '122630': '122630.KS',
   // 미국 지수
   '나스닥': '^IXIC',
   'NASDAQ': '^IXIC',
