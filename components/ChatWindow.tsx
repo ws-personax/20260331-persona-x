@@ -875,29 +875,32 @@ export default function ChatWindow() {
 
       <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-          {/* 사전 질문 토글 버튼 */}
+          {/* 사전 질문 토글 버튼 — 2줄 라벨 */}
           <button
             onClick={() => setShowQuickQ(prev => !prev)}
-            title="자주 묻는 질문"
+            title="추천 질문 / 주요 뉴스"
             style={{
               background: showQuickQ ? '#FAE100' : '#f3f4f6',
               border: 'none',
               borderRadius: 12,
-              padding: '0 12px',
-              height: 44,
-              fontSize: 13,
+              padding: '6px 12px',
+              minHeight: 44,
+              fontSize: 12,
               fontWeight: 700,
               cursor: 'pointer',
               flexShrink: 0,
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 4,
+              gap: 2,
               whiteSpace: 'nowrap',
               color: '#374151',
+              lineHeight: 1.2,
             }}
           >
-            💡 추천 질문
+            <span>💡 추천 질문</span>
+            <span>📰 주요 뉴스</span>
           </button>
           <textarea
             ref={textareaRef}
