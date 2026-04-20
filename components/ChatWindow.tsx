@@ -354,7 +354,7 @@ const TypingIndicator = () => (
       }
     `}</style>
     <div style={{ padding: '0 0 8px' }}>
-      {(['jack', 'lucia', 'ray'] as PersonaKey[]).map((key, ki) => {
+      {(['ray', 'jack', 'lucia'] as PersonaKey[]).map((key, ki) => {
         const p = PERSONAS[key];
         return (
           <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '4px 12px' }}>
@@ -472,7 +472,7 @@ export default function ChatWindow() {
         { level: '분석', color: Y, bg: YB, text: '외국인이 사는 종목 중 따라가도 되는 게 있어?' },
         { level: '분석', color: Y, bg: YB, text: '지금 가장 강한 섹터에서 타이밍 맞는 종목은?' },
         { level: '분석', color: Y, bg: YB, text: '지금 100만원이면 비중 어떻게 나눠?' },
-        { level: '전략', color: R, bg: RB, text: '지금 장에서 추세추종 vs 역추세 중 뭐가 유리해?' },
+        { level: '전략', color: R, bg: RB, text: '어제 장 결과 — 오늘 전략은?' },
         { level: '전략', color: R, bg: RB, text: '나스닥과 코스피 지금 따로 움직이고 있어?' },
         { level: '전략', color: R, bg: RB, text: '지금 들어가면 손절 어디야?' },
       ] as Q[];
@@ -516,7 +516,7 @@ export default function ChatWindow() {
       { level: '분석', color: Y, bg: YB, text: '지금 가장 강한 섹터에서 타이밍 맞는 종목은?' },
       { level: '분석', color: Y, bg: YB, text: '거래량 갑자기 터진 종목, 진짜야 페이크야?' },
       { level: '전략', color: R, bg: RB, text: '지금 장에서 추세추종 vs 역추세 중 뭐가 유리해?' },
-      { level: '분석', color: Y, bg: YB, text: '오늘 장 결과 — 내일 전략은?' },
+      { level: '전략', color: R, bg: RB, text: '오늘 장 결과 — 내일 전략은?' },
     ] as Q[];
   }, []);
   const [isLoading, setIsLoading] = useState(false);

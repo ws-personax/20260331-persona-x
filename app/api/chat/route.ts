@@ -143,7 +143,7 @@ export async function POST(req: Request) {
     const isTrendStrategy = lastMsg.includes('추세추종') || lastMsg.includes('역추세');
     const isDecoupling = (lastMsg.includes('나스닥') && lastMsg.includes('코스피') && lastMsg.includes('따로')) || lastMsg.includes('디커플링');
     const isStopLoss = lastMsg.includes('손절 어디야') || (lastMsg.includes('손절') && lastMsg.includes('들어가면'));
-    const isNextDayStrategy = lastMsg.includes('내일 전략') || lastMsg.includes('장 결과') || (lastMsg.includes('오늘') && lastMsg.includes('결과'));
+    const isNextDayStrategy = lastMsg.includes('내일 전략') || lastMsg.includes('장 결과') || lastMsg.includes('어제 장') || (lastMsg.includes('오늘') && lastMsg.includes('결과'));
 
     // ── 오늘 장 결과 + 내일 전략 ──
     if (isNextDayStrategy && (!keyword || keyword === '시장')) {
