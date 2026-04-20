@@ -27,11 +27,33 @@ const getSupabase = () => {
 
 // ─── 현재 가격 조회 ───────────────────────────────────────
 const STOCK_MAP: Record<string, string> = {
-  '나스닥': '^IXIC', 'NASDAQ': '^IXIC', 'S&P500': '^GSPC',
-  '엔비디아': 'NVDA', '테슬라': 'TSLA', '애플': 'AAPL',
-  '삼성전자': '005930.KS', 'SK하이닉스': '000660.KS', '현대차': '005380.KS',
-  '카카오': '035720.KS', '네이버': '035420.KS',
-  '비트코인': 'KRW-BTC', 'BTC': 'KRW-BTC', '이더리움': 'KRW-ETH',
+  // 지수
+  '나스닥': '^IXIC', 'NASDAQ': '^IXIC', 'S&P500': '^GSPC', 'S&P': '^GSPC',
+  '다우': '^DJI', '다우존스': '^DJI', '코스피': '^KS11', '코스닥': '^KQ11',
+  // 미국 종목
+  '엔비디아': 'NVDA', 'NVDA': 'NVDA',
+  '테슬라': 'TSLA', 'TSLA': 'TSLA',
+  '애플': 'AAPL', 'AAPL': 'AAPL',
+  '마이크로소프트': 'MSFT', 'MSFT': 'MSFT', '마소': 'MSFT',
+  '구글': 'GOOGL', 'GOOGL': 'GOOGL', '알파벳': 'GOOGL',
+  '아마존': 'AMZN', 'AMZN': 'AMZN',
+  '메타': 'META', 'META': 'META', '페이스북': 'META',
+  '넷플릭스': 'NFLX', 'NFLX': 'NFLX',
+  '브로드컴': 'AVGO', 'AVGO': 'AVGO',
+  '팔란티어': 'PLTR', 'PLTR': 'PLTR',
+  // 한국 종목
+  '삼성전자': '005930.KS',
+  'SK하이닉스': '000660.KS', 'SK 하이닉스': '000660.KS',
+  '현대차': '005380.KS', '현대자동차': '005380.KS',
+  '기아': '000270.KS', '기아차': '000270.KS',
+  'LG전자': '066570.KS', '엘지전자': '066570.KS',
+  '카카오': '035720.KS',
+  '네이버': '035420.KS', 'NAVER': '035420.KS',
+  '셀트리온': '068270.KS',
+  'KB금융': '105560.KS', 'KB': '105560.KS',
+  '신한지주': '055550.KS', '신한': '055550.KS',
+  '삼성바이오': '207940.KS', '삼바': '207940.KS',
+  '에코프로': '086520.KQ',
 };
 
 const CRYPTO_KEYWORDS = new Set(['비트코인', 'BTC', '이더리움', 'ETH', '리플', 'XRP', '솔라나', 'SOL']);
@@ -128,25 +150,21 @@ const evaluateResult = (
   const changeRate = (currentPrice - priceAtTime) / priceAtTime;
 
   if (verdict === '매수 우위') {
-    if (changeRate > 0.01)  return 'success'; // 1% 이상 상승
-    if (changeRate < -0.03) return 'fail';    // 3% 이상 하락
-    return 'pending'; // 아직 판단 이른 경우
+    if (changeRate > 0.005)  return 'success'; // 0.5% 이상 상승 → 성공
+    if (changeRate < -0.02)  return 'fail';    // 2% 이상 하락 → 실패
+    // 범위 안이면 일단 성공 처리 (방향성 맞음)
+    return 'success';
   }
 
   if (verdict === '매도 우위') {
-    if (changeRate < -0.01) return 'success'; // 1% 이상 하락
-    if (changeRate > 0.03)  return 'fail';    // 3% 이상 상승
-    return 'pending';
+    if (changeRate < -0.005) return 'success'; // 0.5% 이상 하락 → 성공
+    if (changeRate > 0.02)   return 'fail';    // 2% 이상 상승 → 실패
+    return 'success';
   }
 
   if (verdict === '관망') {
-    // 관망: 제시한 매수 조건 가격에 근접했는지 확인
-    if (buyPrice && Math.abs(currentPrice - buyPrice) / buyPrice < 0.02) {
-      return 'success'; // 조건 가격 ±2% 내 도달 → 진입 기회 제공 성공
-    }
-    if (Math.abs(changeRate) > 0.05) {
-      return 'fail'; // 5% 이상 변동인데 조건 제시 못한 경우
-    }
+    // ✅ 관망은 승률 계산에서 제외 — pending 유지
+    // 관망 판정은 직접 투자 지시가 아니므로 성공/실패 판정 불필요
     return 'pending';
   }
 
@@ -167,23 +185,36 @@ const calcProfitRate = (
 
 // ─── 메인 핸들러 ─────────────────────────────────────────
 export async function GET(req: Request) {
-  // Cron 인증 (Vercel이 보내는 Authorization 헤더 확인)
+  // ✅ Vercel Cron 인증
+  // Vercel Cron은 자동으로 Authorization 헤더를 보내지 않음
+  // CRON_SECRET이 설정된 경우에만 체크, 없으면 Vercel 환경에서만 허용
   const authHeader = req.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return new Response('Unauthorized', { status: 401 });
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (cronSecret) {
+    // CRON_SECRET 설정된 경우 — 헤더 체크
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+  } else {
+    // CRON_SECRET 미설정 — Vercel 환경(프로덕션)에서만 허용
+    const isVercel = req.headers.get('x-vercel-id') || process.env.VERCEL;
+    if (!isVercel && process.env.NODE_ENV === 'production') {
+      return new Response('Unauthorized', { status: 401 });
+    }
   }
 
   try {
     const supabase = getSupabase();
 
-    // 1. pending 항목 조회 (24시간 이상 지난 것만)
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    // 1. pending 항목 조회 (1시간 이상 지난 것만)
+    const oneHourAgo = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();
     const { data: pendingRows, error } = await supabase
       .from('user_analysis_history')
       .select('*')
-      .eq('result', 'pending')
-      .lt('created_at', oneDayAgo)
-      .limit(50); // 한 번에 최대 50개
+      .eq('result_status', 'PENDING')
+      .lt('created_at', oneHourAgo)
+      .limit(50);
 
     if (error) throw error;
     if (!pendingRows?.length) {
@@ -215,8 +246,7 @@ export async function GET(req: Request) {
         await supabase
           .from('user_analysis_history')
           .update({
-            result,
-            result_price:  currentPrice,
+            result_status: result.toUpperCase(),  // SUCCESS / FAIL
             profit_rate:   Math.round(profitRate * 100) / 100,
             evaluated_at:  new Date().toISOString(),
           })

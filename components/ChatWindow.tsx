@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import Link from 'next/link';
 import AuthButton from '@/components/AuthButton';
 import { PositionInput, buildPositionContext } from './PositionInput';
 import type { Position } from './PositionInput';
-import { inferCurrency, detectKeyword } from '@/lib/maps';
+import { inferCurrency, detectKeyword, shouldShowPosition } from '@/lib/maps';
 
 interface NewsLink {
   title: string;
@@ -96,6 +96,10 @@ const formatTime = (d: Date) =>
   d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 
 const parseEchoParts = (text: string) => {
+  // ✅ Gemini가 \n을 리터럴로 반환하는 경우 정규화
+  const normalized = text.replace(/\\n/g, '\n');
+  text = normalized;
+
   const markers = ['📡', '─────────────────────────'];
   let splitIdx = -1;
 
@@ -224,7 +228,7 @@ const MetaBox = ({ dataSource, disclaimer }: { dataSource: string; disclaimer: s
   </div>
 );
 
-const PersonaBubble = ({
+const PersonaBubble = memo(function PersonaBubble({
   personaKey,
   text,
   timestamp,
@@ -236,12 +240,16 @@ const PersonaBubble = ({
   timestamp: Date;
   newsItem?: NewsLink | null;
   echoNews?: NewsLink | null;
-}) => {
+}) {
   const p = PERSONAS[personaKey];
   const isEcho = personaKey === 'echo';
-  const { content, dataSource, disclaimer } = isEcho
-    ? parseEchoParts(text)
-    : { content: text, dataSource: '', disclaimer: '' };
+  // ✅ Gemini 리터럴 \n 정규화 + useMemo로 파싱 캐싱
+  const { content, dataSource, disclaimer } = useMemo(() => {
+    const normalizedText = text.replace(/\\n/g, '\n');
+    return isEcho
+      ? parseEchoParts(normalizedText)
+      : { content: normalizedText, dataSource: '', disclaimer: '' };
+  }, [text, isEcho]);
 
   if (!content?.trim()) return null;
 
@@ -335,7 +343,7 @@ const PersonaBubble = ({
       {isEcho && (dataSource || disclaimer) && <MetaBox dataSource={dataSource} disclaimer={disclaimer} />}
     </div>
   );
-};
+});
 
 const TypingIndicator = () => (
   <>
@@ -406,6 +414,108 @@ export default function ChatWindow() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [mounted, setMounted] = useState(false);
   const [input, setInput] = useState('');
+  const [showQuickQ, setShowQuickQ] = useState(false);
+
+  // ✅ 시장 상황 + 시간대 기반 동적 추천 질문
+  const QUICK_QUESTIONS = useMemo(() => {
+    const nowKST = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    const hour = nowKST.getUTCHours();
+    const minute = nowKST.getUTCMinutes();
+    const timeKST = hour * 100 + minute;
+    const day = nowKST.getUTCDay(); // 0=일, 6=토
+    const isWeekend = day === 0 || day === 6;
+    const isKROpen = !isWeekend && timeKST >= 900 && timeKST < 1530;
+    const isKRBeforeOpen = !isWeekend && timeKST < 900;
+    const isUSOpen = !isWeekend && (timeKST >= 2330 || timeKST < 600);
+
+    type Q = { level: '하' | '중' | '상'; color: string; bg: string; text: string };
+    const G = '#16a34a'; const GB = '#dcfce7';
+    const Y = '#d97706'; const YB = '#fef9c3';
+    const R = '#dc2626'; const RB = '#fee2e2';
+
+    // ── 공통 질문 풀 ──
+    const BASE: Q[] = [
+      { level: '하', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
+      { level: '하', color: G, bg: GB, text: '코인 지금 매수 vs 관망, 결론만' },
+      { level: '중', color: Y, bg: YB, text: '외국인이 사는 종목 중 따라가도 되는 게 있어?' },
+      { level: '중', color: Y, bg: YB, text: '지금 100만원이면 비중 어떻게 나눠?' },
+      { level: '상', color: R, bg: RB, text: '나스닥과 코스피 지금 따로 움직이고 있어?' },
+      { level: '상', color: R, bg: RB, text: '지금 들어가면 손절 어디야?' },
+    ];
+
+    // ── 시간대별 추가 질문 ──
+    if (isWeekend) {
+      return [
+        { level: '하', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
+        { level: '하', color: G, bg: GB, text: '코인 지금 매수 vs 관망, 결론만' },
+        { level: '하', color: G, bg: GB, text: '지금 들어가도 되는 종목 1개만' },
+        { level: '중', color: Y, bg: YB, text: '다음 주 주목할 섹터는 어디야?' },
+        { level: '중', color: Y, bg: YB, text: '외국인이 사는 종목 중 따라가도 되는 게 있어?' },
+        { level: '중', color: Y, bg: YB, text: '지금 100만원이면 비중 어떻게 나눠?' },
+        { level: '중', color: Y, bg: YB, text: '거래량 갑자기 터진 종목, 진짜야 페이크야?' },
+        { level: '상', color: R, bg: RB, text: '지금 장에서 추세추종 vs 역추세 중 뭐가 유리해?' },
+        { level: '상', color: R, bg: RB, text: '나스닥과 코스피 지금 따로 움직이고 있어?' },
+        { level: '상', color: R, bg: RB, text: '지금 들어가면 손절 어디야?' },
+      ] as Q[];
+    }
+
+    if (isKRBeforeOpen) {
+      // 개장 전 — 오늘 전략 준비 질문
+      return [
+        { level: '하', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
+        { level: '하', color: G, bg: GB, text: '오늘 장 열리면 첫 번째로 봐야 할 종목은?' },
+        { level: '하', color: G, bg: GB, text: '코인 지금 매수 vs 관망, 결론만' },
+        { level: '중', color: Y, bg: YB, text: '오늘 장 초반 30분 거래량 기준 뭘 봐야 해?' },
+        { level: '중', color: Y, bg: YB, text: '외국인이 사는 종목 중 따라가도 되는 게 있어?' },
+        { level: '중', color: Y, bg: YB, text: '지금 가장 강한 섹터에서 타이밍 맞는 종목은?' },
+        { level: '중', color: Y, bg: YB, text: '지금 100만원이면 비중 어떻게 나눠?' },
+        { level: '상', color: R, bg: RB, text: '지금 장에서 추세추종 vs 역추세 중 뭐가 유리해?' },
+        { level: '상', color: R, bg: RB, text: '나스닥과 코스피 지금 따로 움직이고 있어?' },
+        { level: '상', color: R, bg: RB, text: '지금 들어가면 손절 어디야?' },
+      ] as Q[];
+    }
+
+    if (isKROpen) {
+      // 장 중 — 실시간 판단 질문
+      return [
+        { level: '하', color: G, bg: GB, text: '지금 들어가도 되는 종목 1개만' },
+        { level: '하', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
+        { level: '하', color: G, bg: GB, text: '코인 지금 매수 vs 관망, 결론만' },
+        { level: '중', color: Y, bg: YB, text: '거래량 갑자기 터진 종목, 진짜야 페이크야?' },
+        { level: '중', color: Y, bg: YB, text: '지금 가장 강한 섹터에서 타이밍 맞는 종목은?' },
+        { level: '중', color: Y, bg: YB, text: '외국인이 사는 종목 중 따라가도 되는 게 있어?' },
+        { level: '중', color: Y, bg: YB, text: '지금 100만원이면 비중 어떻게 나눠?' },
+        { level: '상', color: R, bg: RB, text: '지금 들어가면 손절 어디야?' },
+        { level: '상', color: R, bg: RB, text: '지금 장에서 추세추종 vs 역추세 중 뭐가 유리해?' },
+        { level: '상', color: R, bg: RB, text: '나스닥과 코스피 지금 따로 움직이고 있어?' },
+      ] as Q[];
+    }
+
+    if (isUSOpen) {
+      // 미국장 시간 — 미국 중심 질문
+      return [
+        { level: '하', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
+        { level: '하', color: G, bg: GB, text: '지금 들어가도 되는 종목 1개만' },
+        { level: '하', color: G, bg: GB, text: '코인 지금 매수 vs 관망, 결론만' },
+        { level: '중', color: Y, bg: YB, text: '거래량 갑자기 터진 종목, 진짜야 페이크야?' },
+        { level: '중', color: Y, bg: YB, text: '지금 가장 강한 섹터에서 타이밍 맞는 종목은?' },
+        { level: '중', color: Y, bg: YB, text: '외국인이 사는 종목 중 따라가도 되는 게 있어?' },
+        { level: '중', color: Y, bg: YB, text: '지금 100만원이면 비중 어떻게 나눠?' },
+        { level: '상', color: R, bg: RB, text: '나스닥과 코스피 지금 따로 움직이고 있어?' },
+        { level: '상', color: R, bg: RB, text: '지금 장에서 추세추종 vs 역추세 중 뭐가 유리해?' },
+        { level: '상', color: R, bg: RB, text: '지금 들어가면 손절 어디야?' },
+      ] as Q[];
+    }
+
+    // 기본 (장 마감 후)
+    return [
+      ...BASE,
+      { level: '중', color: Y, bg: YB, text: '지금 가장 강한 섹터에서 타이밍 맞는 종목은?' },
+      { level: '중', color: Y, bg: YB, text: '거래량 갑자기 터진 종목, 진짜야 페이크야?' },
+      { level: '상', color: R, bg: RB, text: '지금 장에서 추세추종 vs 역추세 중 뭐가 유리해?' },
+      { level: '중', color: Y, bg: YB, text: '오늘 장 결과 — 내일 전략은?' },
+    ] as Q[];
+  }, []);
   const [isLoading, setIsLoading] = useState(false);
   const [showPosition, setShowPosition] = useState(false);
   const [pendingText, setPendingText] = useState('');
@@ -423,7 +533,7 @@ export default function ChatWindow() {
         role: 'assistant',
         timestamp: new Date(),
         isRead: true,
-        content: '[SYSTEM ONLINE]\n지휘관님, 전략 센터 가동됨. 분석할 종목을 하달하십시오.\n⏱ 분석에는 10~20초가 소요됩니다.',
+        content: '[SYSTEM ONLINE]\n지휘관님, 전략 센터 가동됨. 분석할 종목을 하달하십시오.\n⏱ 분석에는 약 10초가 소요됩니다.',
       },
     ];
     messagesRef.current = initMessages;
@@ -432,7 +542,7 @@ export default function ChatWindow() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+  }, [messages]);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -469,7 +579,7 @@ export default function ChatWindow() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: nextMessages.map(m => ({ role: m.role, content: m.content })),
+          messages: nextMessages.slice(-10).map(m => ({ role: m.role, content: m.content })),
           positionContext: buildPositionContext(position),
         }),
       });
@@ -508,7 +618,8 @@ export default function ChatWindow() {
     if (!content || isLoading) return;
 
     const matched = detectKeyword(content);
-    if (matched) {
+    // ✅ 지수/시장 질문이면 포지션 입력창 스킵
+    if (matched && shouldShowPosition(content, matched)) {
       setPendingText(content);
       setPendingKeyword(matched);
       setShowPosition(true);
@@ -558,13 +669,21 @@ export default function ChatWindow() {
         </div>
       </header>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 0' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 0', paddingBottom: '140px' }}>
         {messages.map(msg => (
           <div key={msg.id}>
             {msg.role === 'user' ? (
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16, padding: '0 12px' }}>
                 <div style={{ background: '#FAE100', borderRadius: '15px 0 15px 15px', padding: '10px 15px', maxWidth: '75%', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                  <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>{msg.content}</p>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>
+                    {msg.content.includes('약 10초') ? (
+                      <>
+                        {msg.content.split('약 10초')[0]}
+                        <span style={{ fontWeight: 900, fontSize: 16 }}>약 10초</span>
+                        {msg.content.split('약 10초')[1]}
+                      </>
+                    ) : msg.content}
+                  </p>
                 </div>
               </div>
             ) : (
@@ -601,8 +720,96 @@ export default function ChatWindow() {
         </div>
       )}
 
-      <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 10, position: 'relative' }}>
-        <div style={{ display: 'flex', gap: 10 }}>
+      {/* ✅ 사전 질문 패널 */}
+      {showQuickQ && (
+        <div style={{
+          background: '#fff',
+          borderTop: '1px solid #e5e7eb',
+          padding: '10px 12px',
+          maxHeight: 260,
+          overflowY: 'auto',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>💡 사전 질문</span>
+            <div style={{ display: 'flex', gap: 8, fontSize: 11 }}>
+              <span style={{ color: '#16a34a', fontWeight: 700 }}>● 하</span>
+              <span style={{ color: '#d97706', fontWeight: 700 }}>● 중</span>
+              <span style={{ color: '#dc2626', fontWeight: 700 }}>● 상</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {QUICK_QUESTIONS.map((q, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  setInput(q.text);
+                  setShowQuickQ(false);
+                  setTimeout(() => {
+                    handleSendWithPosition(q.text, null);
+                    setInput('');
+                  }, 50);
+                }}
+                disabled={isLoading}
+                style={{
+                  background: q.bg,
+                  border: `1px solid ${q.color}22`,
+                  borderRadius: 10,
+                  padding: '8px 12px',
+                  textAlign: 'left',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#111827',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  opacity: isLoading ? 0.5 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <span style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  color: q.color,
+                  background: '#fff',
+                  border: `1px solid ${q.color}`,
+                  borderRadius: 4,
+                  padding: '1px 5px',
+                  minWidth: 18,
+                  textAlign: 'center',
+                }}>{q.level}</span>
+                {q.text}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+          {/* 사전 질문 토글 버튼 */}
+          <button
+            onClick={() => setShowQuickQ(prev => !prev)}
+            title="자주 묻는 질문"
+            style={{
+              background: showQuickQ ? '#FAE100' : '#f3f4f6',
+              border: 'none',
+              borderRadius: 12,
+              padding: '0 12px',
+              height: 44,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4,
+              whiteSpace: 'nowrap',
+              color: '#374151',
+            }}
+          >
+            💡 추천 질문
+          </button>
           <textarea
             ref={textareaRef}
             value={input}

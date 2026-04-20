@@ -51,6 +51,8 @@ export const STOCK_MAP: Record<string, string> = {
   '네이버': '035420.KS',
   'NAVER': '035420.KS',
   '카카오': '035720.KS',
+  'LG전자': '066570.KS',
+  '엘지전자': '066570.KS',
   'LG에너지솔루션': '373220.KS',
   'LG에너지': '373220.KS',
   'LG화학': '051910.KS',
@@ -89,17 +91,6 @@ export const STOCK_MAP: Record<string, string> = {
   'META': 'META',
   '넷플릭스': 'NFLX',
   'NFLX': 'NFLX',
-  // 추가 미국 종목
-  '브로드컴': 'AVGO',
-  'AVGO': 'AVGO',
-  'Broadcom': 'AVGO',
-  '팔란티어': 'PLTR',
-  'PLTR': 'PLTR',
-  '인텔': 'INTC',
-  'INTC': 'INTC',
-  'AMD': 'AMD',
-  '오라클': 'ORCL',
-  'ORCL': 'ORCL',
 };
 
 export const KEYWORD_PRIORITY: string[] = [
@@ -109,6 +100,7 @@ export const KEYWORD_PRIORITY: string[] = [
   // 한국 종목 (긴 이름 먼저)
   'SK이노베이션', 'SK에너지', 'SK이노', 'SK하이닉스', 'SK 하이닉스',
   'LG에너지솔루션', 'LG에너지', 'LG화학',
+  'LG전자', '엘지전자',
   '삼성바이오', '삼바', '삼성전자',
   '현대자동차', '현대모비스', '현대차',
   '신한지주', '신한', 'KB금융', 'KB',
@@ -126,10 +118,6 @@ export const KEYWORD_PRIORITY: string[] = [
   '아마존', 'AMZN',
   '페이스북', '메타', 'META',
   '넷플릭스', 'NFLX',
-  '브로드컴', 'AVGO', 'Broadcom',
-  '팔란티어', 'PLTR',
-  '인텔', 'INTC', 'AMD',
-  '오라클', 'ORCL',
   // 지수
   '한국 주식 시장', '한국주식시장', '한국 주식', '한국주식', '코스피 지수',
   '한국 증시', '한국증시', '코스피', '코스닥',
@@ -144,8 +132,6 @@ export const INDEX_KEYWORDS: string[] = [
   '코스피', '코스닥', '나스닥', 'NASDAQ', 'S&P500', 'SP500', 'S&P', '다우', '다우존스',
   '한국 증시', '한국증시', '한국 주식 시장', '한국주식시장', '한국 주식', '한국주식',
   '코스피 지수', '미국 시장', '미국 증시', '시장 상황', '시장 전망',
-  '미국 주식 상황', '미국주식상황', '미장', '뉴욕 증시', '뉴욕증시',
-  '한국 주식 상황', '한국주식상황', '국내 증시', '국내증시',
 ];
 
 export const detectKeyword = (
