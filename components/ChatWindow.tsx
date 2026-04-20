@@ -693,9 +693,9 @@ export default function ChatWindow() {
               <div style={{ marginBottom: 12 }}>
                 {msg.personas ? (
                   <>
+                    <PersonaBubble personaKey="ray" text={msg.personas.ray} timestamp={msg.timestamp} newsItem={msg.personas.rayNews} />
                     <PersonaBubble personaKey="jack" text={msg.personas.jack} timestamp={msg.timestamp} newsItem={msg.personas.jackNews} />
                     <PersonaBubble personaKey="lucia" text={msg.personas.lucia} timestamp={msg.timestamp} newsItem={msg.personas.luciaNews} />
-                    <PersonaBubble personaKey="ray" text={msg.personas.ray} timestamp={msg.timestamp} newsItem={msg.personas.rayNews} />
                     <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>
                       ── ECHO COMMAND ──
                     </div>
