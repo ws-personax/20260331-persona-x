@@ -535,9 +535,13 @@ export const buildEchoText = (p: EchoParams): string => {
     if (p.watchLevel === 'strong') {
       insightTemplate = `지금은 진입하면 안 됩니다. ${p.trendSummary ? p.trendSummary + '. ' : ''}${p.sellPrice} 아래로 내려가면 손실이 커집니다. 현금을 지키는 것이 최선입니다.`;
     } else if (p.watchLevel === 'weak') {
+      // ✅ 미국 주식은 즉각 진입 불가 — 다음 날 종가 확인 후 검토
+      const entryClause = p.assetType === 'US_STOCK'
+        ? '다음 날 미국장 종가 확인 후 진입을 검토하십시오'
+        : '즉각 10% 진입하십시오';
       // ✅ 다양한 표현으로 반복 방지 — 키워드 해시 기반 선택
       const weakPhrases = [
-        `신호가 거의 만들어지고 있습니다. {buy} 돌파 확인 시 투자금의 10%만 먼저 진입하십시오. 매수 조건 동시 충족 시 즉각 10% 진입하십시오.`,
+        `신호가 거의 만들어지고 있습니다. {buy} 돌파 확인 시 투자금의 10%만 먼저 진입하십시오. 매수 조건 동시 충족 시 ${entryClause}.`,
         `조금만 더 기다리십시오. {buy} 위로 올라서면서 거래량이 늘어날 때가 진입 시점입니다. 투자금의 10%만 먼저 매수하십시오.`,
         `진입 조건이 가까워지고 있습니다. {buy} 돌파 + 거래량 증가 동시 확인 시 투자금의 10%로 시작하십시오.`,
         `준비 구간입니다. {buy}을 오늘 종가에서 돌파하면 투자금의 10%만 선취매하십시오. 서두르지 마십시오.`,
@@ -699,7 +703,7 @@ export const buildEchoText = (p: EchoParams): string => {
   } else if (p.watchLevel === 'weak') {
     const buy1 = p.buyPrice || '매수 조건';
     const sell1 = p.sellPrice || '손절가';
-    line5 = `비중: 아직 0%이지만 준비하십시오. ${buy1} 돌파 + ${volThresholdLabel} 동시 확인 시 → 10% 진입. 3거래일 유지 확인 시 → 추가 10%. ${sell1} 이탈 시 → 전량 정리.`;
+    line5 = `비중: 아직 0%이지만 준비하십시오. ${buy1} 돌파 + ${volThresholdLabel} 동시 확인 시 → 10% 진입하십시오. 3거래일 유지 확인 시 → 추가 10% 진입하십시오. ${sell1} 이탈 시 → 전량 정리하십시오.`;
   } else if (p.watchLevel === 'strong') {
     line5 = `비중: 현재 0%를 유지하십시오. 지금 진입하면 손실 위험이 큽니다. 시장이 안정될 때까지 현금을 지키는 것이 최선입니다.`;
   } else {

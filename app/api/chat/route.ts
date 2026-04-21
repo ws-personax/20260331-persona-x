@@ -663,6 +663,22 @@ ${DISCLAIMER}`;
     // ✅ 추세 맥락 분석 (5일/20일 이평선)
     const trendCtx = analyzeTrendContext(marketData?.trend);
 
+    // ✅ LUCIA용 trendSummary — ma5/ma20 수치를 이평선 언급 뒤에 괄호로 추가
+    const luciaMa5 = marketData?.trend?.ma5 ?? null;
+    const luciaMa20 = marketData?.trend?.ma20 ?? null;
+    const luciaMaFmt = (n: number) =>
+      currency === 'KRW'
+        ? `${Math.round(n).toLocaleString('ko-KR')}원`
+        : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const luciaMaNote = (luciaMa5 && luciaMa20)
+      ? ` (MA5: ${luciaMaFmt(luciaMa5)} / MA20: ${luciaMaFmt(luciaMa20)})`
+      : '';
+    const luciaTrendSummary = trendCtx.trendSummary
+      ? (trendCtx.trendSummary.includes('이평선')
+          ? trendCtx.trendSummary + luciaMaNote
+          : trendCtx.trendSummary)
+      : null;
+
     // ✅ 신뢰도 분해 — 4버킷 (이평선 35 / 거래량 30 / 뉴스 25 / 시세 안정 10)
     //    각 버킷의 최대 점수 대비 조건별 비율을 곱한 뒤, 합이 confidence와 같도록 스케일
     const trendStrengthRatio = (() => {
@@ -780,7 +796,7 @@ ${DISCLAIMER}`;
             return prevKeyword;
           })(),
           situation,
-          trendSummary: trendCtx.trendSummary || null,
+          trendSummary: luciaTrendSummary,
           trendStrength: trendCtx.trendStrength,
           conflict,
           jackVerdict: verdict,
@@ -905,7 +921,18 @@ ${DISCLAIMER}`;
         ? `${rayVolLabel}이기 때문에 수급 유입이 ${vol.isHigh ? '확대되고 있으며' : '제한적이며'}, ${vix.label} 구간이므로 가격 탄력이 ${vix.label.includes('고변동') ? '높아 급등락에 주의가 필요합니다' : vix.label.includes('중변동') ? '보통 수준입니다' : '낮아 추세 형성이 제한적입니다'}. ${correlationNote}.`
         : '시세 미수급 — 뉴스 및 외부 신호 기반으로 판단이 제한됩니다.';
 
-      const line3 = situationNote[situation] + ` 진입 적합도: ${rayAdaptability}입니다.`;
+      // ✅ MA5/MA20 수치 — 통화 단위 맞춤
+      const rayMa5 = marketData?.trend?.ma5 ?? null;
+      const rayMa20 = marketData?.trend?.ma20 ?? null;
+      const rayMaFmt = (n: number) =>
+        currency === 'KRW'
+          ? `${Math.round(n).toLocaleString('ko-KR')}원`
+          : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const rayMaNote = (rayMa5 && rayMa20)
+        ? ` (MA5: ${rayMaFmt(rayMa5)} / MA20: ${rayMaFmt(rayMa20)})`
+        : '';
+
+      const line3 = situationNote[situation] + rayMaNote + ` 진입 적합도: ${rayAdaptability}입니다.`;
 
       return [line1, line2, line3].join('\n');
     })();
