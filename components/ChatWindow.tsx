@@ -729,7 +729,7 @@ export default function ChatWindow() {
           background: '#fff',
           borderTop: '1px solid #e5e7eb',
           position: 'fixed',
-          bottom: 80,              // footer 높이(버튼 56px + 여백) 맞춤
+          bottom: 92,              // footer 높이(버튼 56px + 여백) 맞춤
           left: 0,
           right: 0,
           zIndex: 40,              // footer(50)보다 낮게 두어 혹시 겹쳐도 footer가 위에
@@ -930,6 +930,7 @@ export default function ChatWindow() {
               border: 'none',
               borderRadius: 12,
               padding: '0 20px',
+              minHeight: 56,
               fontWeight: 800,
               cursor: !input.trim() || isLoading ? 'not-allowed' : 'pointer',
               opacity: !input.trim() || isLoading ? 0.5 : 1,

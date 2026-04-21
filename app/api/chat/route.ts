@@ -878,8 +878,8 @@ ${DISCLAIMER}`;
         if (isKRIndex) {
           // 코스피 ETF
           const [k200, klev] = await Promise.all([
-            fetchMarketPrice('069500').catch(() => null), // KODEX 200
-            fetchMarketPrice('122630').catch(() => null), // KODEX 레버리지
+            fetchMarketPrice('KODEX 200').catch(() => null),
+            fetchMarketPrice('KODEX 레버리지').catch(() => null),
           ]);
           const k200ch = parseFloat(k200?.change || '0');
           const klevch = parseFloat(klev?.change || '0');
