@@ -96,6 +96,8 @@ interface JackParams {
   // ✅ 지지/돌파 가격 (bearMode 역발상 진입 조건용)
   supportPrice?: string | null;
   breakoutPrice?: string | null;
+  // ✅ raw price (bearMode 지지/돌파 레벨 직접 계산용)
+  rawPrice?: number | null;
 }
 
 // ✅ JACK 매수 표현 로테이션 — 5개
@@ -229,8 +231,19 @@ export const buildJackText = (p: JackParams): string => {
     if (flags?.volDown) negatives.push('거래량 감소');
     if (flags?.priceDown) negatives.push('시세 하락');
     const negText = negatives.join(' + ') || '하락 지표 우세';
-    const supportLabel = p.supportPrice || '지지선';
-    const breakoutLabel = p.breakoutPrice || '반등 기준가';
+
+    // ✅ 현재가 기준 지지선(-5%) / 돌파 기준가(+2%) 실시간 계산
+    const fmtBear = (n: number): string =>
+      p.currency === 'USD'
+        ? `약 $${Math.round(n).toLocaleString('en-US')}`
+        : `${Math.round(n).toLocaleString('ko-KR')}원`;
+    const supportLabel = p.rawPrice && p.rawPrice > 0
+      ? fmtBear(p.rawPrice * 0.95)
+      : (p.supportPrice || '지지선');
+    const breakoutLabel = p.rawPrice && p.rawPrice > 0
+      ? fmtBear(p.rawPrice * 1.02)
+      : (p.breakoutPrice || '반등 기준가');
+
     const bearL1 = `지휘관님, ${negText} 기준으로 조정 구간입니다.`;
     const bearL2 = `단, ${supportLabel} 지지 확인 시 소량 역발상 진입을 검토하십시오.`;
     const bearL3 = `반등 신호: ${breakoutLabel} 돌파 + 거래량 증가.`;

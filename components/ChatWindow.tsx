@@ -418,6 +418,9 @@ const EchoDetailsToggle = memo(function EchoDetailsToggle({
   const [open, setOpen] = useState(false);
   return (
     <>
+      <div style={{ textAlign: 'center', fontSize: 11, color: '#9ca3af', padding: '6px 12px 0' }}>
+        ⚠️ AI 생성 참고 자료 · 투자 권유 아님
+      </div>
       <div style={{ padding: '4px 12px 0 58px', marginBottom: open ? 6 : 8 }}>
         <button
           type="button"

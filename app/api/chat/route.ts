@@ -834,6 +834,7 @@ ${DISCLAIMER}`;
           flags,
           supportPrice: sellPrice || null,
           breakoutPrice: buyPrice || null,
+          rawPrice: marketData?.rawPrice ?? null,
         })
       : `지휘관님, ${keyword} 시세 미수급으로 추세 판단이 제한됩니다. 뉴스 확인 후 신호 포착 시 진입을 검토하십시오.`;
 
