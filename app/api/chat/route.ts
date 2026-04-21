@@ -18,6 +18,7 @@ import {
   extractTwoKeywords, getSector,
 } from '@/lib/personax/market';
 import { buildJackText, buildLuciaText, buildEchoText } from '@/lib/personax/templates';
+import type { DiscussMode, IndicatorFlags, PrevContext } from '@/lib/personax/templates';
 
 export const maxDuration = 60;
 
@@ -746,6 +747,41 @@ ${DISCLAIMER}`;
       verdict,
     });
 
+    // ✅ 지표 카운트로 토론 모드 결정 (bull/bear/conflict)
+    const changeMode = safeNum(marketData?.change || '0');
+    const rawVolMode = marketData?.rawVolume && marketData.rawVolume > 0 ? marketData.rawVolume : 0;
+    const avgVolMode = marketData?.avgVolume && marketData.avgVolume > 0 ? marketData.avgVolume : 0;
+    const flags: IndicatorFlags = {
+      trendUp:   trendCtx.trendStrength === 'strong_up'   || trendCtx.trendStrength === 'weak_up',
+      trendDown: trendCtx.trendStrength === 'strong_down' || trendCtx.trendStrength === 'weak_down',
+      volUp:     rawVolMode > 0 && avgVolMode > 0 && rawVolMode > avgVolMode * 1.1,
+      volDown:   rawVolMode > 0 && avgVolMode > 0 && rawVolMode < avgVolMode * 0.9,
+      newsPos:   nData.sentiment === '긍정',
+      newsNeg:   nData.sentiment === '부정',
+      priceUp:   changeMode > 0.5,
+      priceDown: changeMode < -0.5,
+      vixHigh:   vix.label.includes('고변동성'),
+    };
+    const bullCount = [flags.trendUp, flags.volUp, flags.newsPos, flags.priceUp].filter(Boolean).length;
+    const bearCount = [flags.trendDown, flags.volDown, flags.newsNeg, flags.priceDown].filter(Boolean).length;
+    const discussMode: DiscussMode =
+      bullCount >= 3 ? 'bull' :
+      bearCount >= 3 ? 'bear' :
+      'conflict';
+
+    // ✅ 이전 종목 맥락 (섹터/자산군 비교용) — LUCIA 커넥터 생성 시 사용
+    const prevIsCryptoKeyword = (k: string) =>
+      ['비트코인','이더리움','리플','솔라나','도지','에이다','바이낸스','BTC','ETH','XRP','SOL','DOGE','ADA','BNB'].includes(k);
+    const prevCtx: PrevContext | undefined = prevKeyword && prevKeyword !== '시장' && prevKeyword !== keyword
+      ? {
+          prevKeyword,
+          prevSector: getSector(prevKeyword) ?? null,
+          currSector: getSector(keyword) ?? null,
+          prevIsCrypto: prevIsCryptoKeyword(prevKeyword),
+          currIsCrypto: assetType === 'CRYPTO',
+        }
+      : undefined;
+
     // ✅ 주말일 때 volLabel에 휴장 안내 추가
     const volLabelWithWeekend = isKRClosed && assetType === 'KOREAN_STOCK'
       ? vol.label + (isWeekend
@@ -794,6 +830,8 @@ ${DISCLAIMER}`;
           avgVolume: marketData?.avgVolume ?? null,
           rawVolume: marketData?.rawVolume ?? null,
           currency,
+          mode: discussMode,
+          flags,
         })
       : `지휘관님, ${keyword} 시세 미수급으로 추세 판단이 제한됩니다. 뉴스 확인 후 신호 포착 시 진입을 검토하십시오.`;
 
@@ -829,6 +867,9 @@ ${DISCLAIMER}`;
           avgVolume: marketData?.avgVolume ?? null,
           rawVolume: marketData?.rawVolume ?? null,
           changeRaw: marketData?.change ?? null,
+          mode: discussMode,
+          flags,
+          prevCtx,
         })
       : `하지만 소장님, 데이터조차 없는 지금은 마치 재료 없이 요리하는 것과 같아요. 충분한 정보가 확인될 때까지 기다리는 것이 맞습니다.`;
     let profitRateNote = '';
@@ -888,27 +929,37 @@ ${DISCLAIMER}`;
           : `${marketData.price}${currency === 'KRW' ? '원' : ''}`)
       : '미지원';
 
+    // ✅ RAY — 중립 팩트 3줄 (시세 / 거래량 / 변동성). 이평선·뉴스는 언급하지 않음.
     const finalRay = (() => {
       const closedNote = rayTimeNote ? rayTimeNote : '';
+      const rayChangeNum = safeNum(marketData?.change);
+      const changeStr = marketData?.change
+        ? ` (${rayChangeNum >= 0 ? '+' : ''}${rayChangeNum.toFixed(2)}%)`
+        : '';
+
+      // 거래량 라인 (숫자 포함). 코인은 24시간 거래량.
+      const rayFmtVol = (v: number): string => {
+        if (v >= 100000000) return `${(v / 100000000).toFixed(1)}억주`;
+        if (v >= 10000) return `${Math.round(v / 10000).toLocaleString()}만주`;
+        return `${v.toLocaleString()}주`;
+      };
       const rayRawVol = marketData?.rawVolume && marketData.rawVolume > 0 ? marketData.rawVolume : null;
       const rayAvgVol = marketData?.avgVolume && marketData.avgVolume > 0 ? marketData.avgVolume : null;
-      // ✅ 거래량 라벨 — rawVolume vs avgVolume 실제 숫자 비교로 판단
-      const rayVolLabel = (rayRawVol && rayAvgVol)
-        ? (rayRawVol > rayAvgVol * 1.1
-            ? '거래량 증가'
-            : rayRawVol < rayAvgVol * 0.9
-              ? '거래량 감소'
-              : '거래량 보통')
-        : vol.label;
+      let volLine: string;
+      if (assetType === 'CRYPTO') {
+        volLine = marketData?.volume ? `24시간 거래량 ${marketData.volume}` : '24시간 거래량 미수급';
+      } else if (rayRawVol && rayAvgVol) {
+        const delta = rayRawVol > rayAvgVol * 1.1 ? '증가' : rayRawVol < rayAvgVol * 0.9 ? '감소' : '보통';
+        volLine = `거래량 ${rayFmtVol(rayRawVol)} (5일 평균 ${rayFmtVol(rayAvgVol)}, ${delta})`;
+      } else {
+        volLine = vol.label;
+      }
 
-      // ✅ 1줄 — 시세 / 거래량 / 변동성 핵심
-      const line1 = `${keyword} ${rayPriceDisplay} (${safeNum(marketData?.change)}%) / ${vix.label} / ${rayVolLabel}${closedNote}`;
+      const line1 = `${keyword} ${rayPriceDisplay}${changeStr}${closedNote}`;
+      const line2 = volLine;
+      const line3 = vix.label;
 
-      // ✅ 2줄 — 이평선 + 진입 적합도 (괄호 설명 제거)
-      const trendLine = trendCtx.trendSummary || '추세 방향 불확정';
-      const line2 = `${trendLine} — 진입 적합도: ${rayAdaptability}`;
-
-      return [line1, line2].join('\n');
+      return [line1, line2, line3].join('\n');
     })();
 
     // ─── ✅ Gemini 완전 제거 — 에코 템플릿 직접 사용 ───
@@ -1002,6 +1053,9 @@ ${DISCLAIMER}`;
         // ✅ Confluence Score용 (이평선/거래량/뉴스/시세 일치 판단)
         volIsHigh: vol.isHigh,
         hasMarketData: !!marketData,
+        // ✅ 토론 모드 + 지표 플래그 (ECHO 질문용)
+        mode: discussMode,
+        flags,
       });
       // ✅ ECHO 1 (summary): 즉시 표시 — 결론/조건/행동 3줄
       // ✅ ECHO 2 (details): 별도 버블 — confluence + 근거 + 지금 + 조건 + 비중 + dataSource + disclaimer

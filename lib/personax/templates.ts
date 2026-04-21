@@ -27,6 +27,40 @@ type MarketSituation =
   | 'accumulation' | 'trending' | 'stalemate'
   | 'drain' | 'panic' | 'exhaustion' | 'normal';
 
+// ✅ 토론 모드 — 긍정/부정 지표 카운트로 결정
+export type DiscussMode = 'bull' | 'bear' | 'conflict';
+
+// ✅ 지표 플래그 (route.ts에서 계산)
+export interface IndicatorFlags {
+  trendUp: boolean;
+  trendDown: boolean;
+  volUp: boolean;
+  volDown: boolean;
+  newsPos: boolean;
+  newsNeg: boolean;
+  priceUp: boolean;
+  priceDown: boolean;
+  vixHigh: boolean;
+}
+
+// ✅ 이전 종목 맥락 (같은 섹터 / 다른 섹터 / 자산군 전환 판단용)
+export interface PrevContext {
+  prevKeyword: string | null;
+  prevSector: string | null;
+  currSector: string | null;
+  prevIsCrypto: boolean;
+  currIsCrypto: boolean;
+}
+
+// ✅ 과/와 조사 — 받침 있으면 "과", 없으면 "와"
+const withParticle = (label: string): string => {
+  if (!label) return '와';
+  const last = label[label.length - 1];
+  const code = last.charCodeAt(0);
+  if (code < 0xAC00 || code > 0xD7A3) return '와';
+  return (code - 0xAC00) % 28 === 0 ? '와' : '과';
+};
+
 interface JackParams {
   keyword: string;
   volLabel: string;
@@ -56,7 +90,19 @@ interface JackParams {
   avgVolume?: number | null;   // 5일 평균 거래량
   rawVolume?: number | null;   // 오늘(당일) 누적 거래량
   currency?: string;           // KRW / USD
+  // ✅ 토론 모드 + 지표 플래그
+  mode?: DiscussMode;
+  flags?: IndicatorFlags;
 }
+
+// ✅ JACK 매수 표현 로테이션 — 5개
+const JACK_BUY_PHRASES = [
+  '즉각 진입하십시오',
+  '기회의 창이 열렸습니다',
+  '지금이 마지막 저점일 수 있습니다',
+  '신호가 명확합니다. 행동하십시오',
+  '추세가 확인됐습니다. 올라타십시오',
+];
 
 export const buildJackText = (p: JackParams): string => {
   // ✅ 충돌 시 JACK이 LUCIA에게 반박 — 장중/장 마감 모두 공통으로 뒤에 부착
@@ -114,55 +160,50 @@ export const buildJackText = (p: JackParams): string => {
     return `지휘관님, ${p.keyword}${topicParticle(p.keyword)} 현재 ${statusLabel} — ${p.verdict}.\n${condAction}${jackRebuttal}`;
   }
 
-  const contextNote = (p.prevKeyword && p.prevKeyword !== p.keyword)
-    ? `앞서 ${p.prevKeyword}에서 ${p.prevVolIsHigh ? '수급 유입' : '수급 제한'}을 확인했으며, `
-    : '';
+  // ✅ 긍정 데이터만 선별 (JACK은 긍정 지표 챔피언)
+  const flags = p.flags;
+  const positives: string[] = [];
+  if (flags?.trendUp) positives.push('5일·20일 이평선 상승');
+  if (flags?.newsPos) positives.push('뉴스 긍정');
+  if (p.assetType === 'KOREAN_STOCK' && flags?.volUp) positives.push('외국인 수급 유입');
+  else if (flags?.volUp) positives.push('거래량 증가');
+  if (flags?.priceUp) positives.push('시세 상승');
+  const positiveText = positives.length > 0 ? positives.join(' + ') : '신호 포착 중';
 
-  const changeStr = (p.changeRaw && p.changeRaw !== '0.00')
-    ? ` (${parseFloat(p.changeRaw) >= 0 ? '+' : ''}${p.changeRaw}%)`
-    : '';
-  const volRatioStr = p.volRatio && p.volRatio > 0
-    ? ` (평균의 ${p.volRatio.toFixed(1)}배)`
-    : '';
-  const volSuffix = p.volIsHigh
-    ? `${changeStr} 수급 유입이 확대되고 있습니다${volRatioStr}`
-    : `${changeStr} 수급 유입이 제한적입니다`;
-
-  const trend = p.change > 0.5 ? '단기 상승 모멘텀' : p.change < -0.5 ? '단기 하락 추세' : '추세 중립';
-
-  // ✅ 거래량 수치 헬퍼 — 장 중에도 avgVolume 수치 사용
+  // ✅ 거래량 기준 진입 조건 (숫자 포함)
   const jackFormatVol = (v: number): string => {
     if (v >= 100000000) return `${(v / 100000000).toFixed(1)}억주`;
     if (v >= 10000) return `${Math.round(v / 10000).toLocaleString()}만주`;
     return `${v.toLocaleString()}주`;
   };
   const jackAvgVol = p.avgVolume && p.avgVolume > 0 ? p.avgVolume : null;
-  const jackVolSignal = jackAvgVol
-    ? `(신호 = 가격이 2% 이상 상승하거나 거래량이 ${jackFormatVol(Math.round(jackAvgVol * 1.3))} 이상 증가할 때 — 평소 ${jackFormatVol(jackAvgVol)} 대비 30%)`
-    : `(신호 = 가격이 2% 이상 상승하거나 거래량이 평소 대비 30% 이상 증가할 때)`;
-  const jackBreakthroughSignal = jackAvgVol
-    ? `(돌파 신호 = 가격이 오늘 고점을 넘으면서 거래량이 ${jackFormatVol(Math.round(jackAvgVol * 1.2))} 이상 늘어날 때 — 평소 ${jackFormatVol(jackAvgVol)} 대비 20%)`
-    : `(돌파 신호 = 가격이 오늘 고점을 넘으면서 거래량이 평소보다 20% 이상 늘어날 때)`;
+  const volCondition = jackAvgVol
+    ? `거래량 ${jackFormatVol(Math.round(jackAvgVol * 1.3))} 이상 돌파 확인 시`
+    : '거래량이 평소 대비 30% 이상 증가할 때';
 
-  // ✅ 매수/매도 우위에도 avgVolume 기반 거래량 신호 추가
-  const jackBuySellVolNote = jackAvgVol
-    ? ` 신호 기준: 거래량 ${jackFormatVol(Math.round(jackAvgVol * 1.3))} 이상(5일 평균 ${jackFormatVol(jackAvgVol)} 대비 30%).`
-    : '';
-  let action = '';
-  if (p.verdict === '매수 우위') {
-    action = (p.volIsHigh ? `즉각 분할 매수를 검토하십시오.` : `수급 신호 확인 후 진입을 검토하십시오.`) + jackBuySellVolNote;
-  } else if (p.verdict === '매도 우위') {
-    action = `포지션 축소를 검토하십시오.${jackBuySellVolNote}`;
+  // ✅ JACK 매수 표현 로테이션
+  const phraseIdx = Math.floor(Date.now() / 1000) % JACK_BUY_PHRASES.length;
+  const buyPhrase = JACK_BUY_PHRASES[phraseIdx];
+
+  const mode: DiscussMode = p.mode ?? 'conflict';
+  let line1: string;
+  let line2: string;
+
+  if (mode === 'bull') {
+    // 긍정 3개 이상 — 강한 매수 권고
+    line1 = `지휘관님, ${p.keyword}${topicParticle(p.keyword)} ${positiveText} — 명백한 매수 우위입니다.`;
+    line2 = `${buyPhrase}. ${volCondition} 단계 진입.`;
+  } else if (mode === 'conflict') {
+    // 갈등 — 긍정 데이터 강조하며 진입 주장
+    line1 = `지휘관님, ${p.keyword}${topicParticle(p.keyword)} ${positiveText}. 이 신호만으로도 진입은 정당화됩니다.`;
+    line2 = `${volCondition} 1차 진입 검토. ${buyPhrase}.`;
   } else {
-    if (p.volIsHigh) {
-      action = `돌파 신호 확인 후 진입하십시오. ${jackBreakthroughSignal}`;
-    } else {
-      action = `추세 신호 확인 전까지 관망하십시오. ${jackVolSignal}`;
-    }
+    // bear — 일시적 조정 역발상 (짧게)
+    line1 = `지휘관님, ${p.keyword}${topicParticle(p.keyword)} 지금 하락 지표 우세이나, 이건 일시적 조정입니다.`;
+    line2 = `바닥 확인 후 반등 진입 준비 — 지금은 데이터 추적 모드.`;
   }
 
-  // ✅ 2줄 압축: 1줄 핵심 판단, 2줄 진입 조건
-  return `지휘관님, ${contextNote}${p.keyword}${topicParticle(p.keyword)} ${p.volLabel}${particle(p.volLabel)} ${volSuffix} — ${trend} 구간.\n${action}${jackRebuttal}`;
+  return `${line1}\n${line2}${jackRebuttal}`;
 };
 
 // ─────────────────────────────────────────────
@@ -191,7 +232,29 @@ interface LuciaParams {
   trendStrength?: string | null;
   conflict?: string | null;
   jackVerdict?: string | null;  // 잭의 판단 (핑퐁용)
+  // ✅ 토론 모드 + 지표 + 이전 종목 맥락
+  mode?: DiscussMode;
+  flags?: IndicatorFlags;
+  prevCtx?: PrevContext;
 }
+
+// ✅ 거래량 저조 비유 — 5개 로테이션
+const LUCIA_LOW_VOL_METAPHORS = [
+  '거래량 없는 상승은 신기루일 수 있어요',
+  '손님 없는 식당처럼 겉만 화려해요',
+  '박수 소리 없는 공연이에요',
+  '바람만 가득한 풍선 같아요',
+  '뼈대 없이 올라가는 건물 같아요',
+];
+
+// ✅ 변동성 위험 비유 — 5개 로테이션 (코인 포함)
+const LUCIA_VOLATILITY_METAPHORS = [
+  '롤러코스터에 올라타기 전 안전벨트 확인하세요',
+  '태풍 속 항해는 전문가도 조심해요',
+  '파도가 높을수록 서핑 실력이 필요해요',
+  '흔들리는 사다리 위에서는 천천히 올라가야 해요',
+  '번개 칠 때 우산 쓰는 건 위험해요',
+];
 
 // 비유 풀 — 상황별 (비슷한 표현 반복 방지)
 // ✅ 비유 풀 확장 — 7개 이상으로 반복 방지
@@ -258,37 +321,61 @@ export const buildLuciaText = (p: LuciaParams): string => {
   }
 
 
-  const contextNote = (p.prevKeyword && p.prevKeyword !== p.keyword)
-    ? `아까 ${p.prevKeyword}도 비슷했는데, `
-    : '';
+  // ✅ 이전 종목 맥락 커넥터
+  let connector = '';
+  if (p.prevCtx && p.prevCtx.prevKeyword && p.prevCtx.prevKeyword !== p.keyword) {
+    const ctx = p.prevCtx;
+    if (ctx.prevIsCrypto && !ctx.currIsCrypto) {
+      connector = '코인과 달리 주식은, ';
+    } else if (!ctx.prevIsCrypto && ctx.currIsCrypto) {
+      connector = '주식과 달리 코인은 변동성이 훨씬 커요. ';
+    } else if (ctx.prevSector && ctx.currSector && ctx.prevSector === ctx.currSector) {
+      connector = `${ctx.prevKeyword}${withParticle(ctx.prevKeyword)} 마찬가지로, `;
+    } else {
+      connector = `${ctx.prevKeyword}${withParticle(ctx.prevKeyword)} 달리, `;
+    }
+  }
 
-  // 비유 선택
-  let metaphorKey: keyof typeof LUCIA_METAPHORS;
-  if (p.volIsHigh && p.verdict === '매수 우위') metaphorKey = 'highVol_bull';
-  else if (p.volIsHigh && p.verdict === '매도 우위') metaphorKey = 'highVol_bear';
-  else if (p.vixLabel.includes('중변동성')) metaphorKey = 'midVol';
-  else metaphorKey = 'lowVol_neutral';
+  // ✅ 부정 데이터만 선별 (LUCIA는 부정 지표 챔피언)
+  const flags = p.flags;
+  const negatives: string[] = [];
+  if (flags?.volDown) negatives.push('거래량 저조');
+  if (flags?.vixHigh) negatives.push('변동성 위험');
+  if (flags?.trendDown) negatives.push('이평선 하락');
+  if (flags?.newsNeg) negatives.push('뉴스 부정');
 
-  const metaphor = pickMetaphor(metaphorKey, p.keyword);
+  // ✅ 비유 선택 — 거래량 저조 / 변동성 위험 / 기본
+  const useVolatility = flags?.vixHigh || p.assetType === 'CRYPTO';
+  const useLowVol = flags?.volDown && !useVolatility;
+  const pool = useLowVol
+    ? LUCIA_LOW_VOL_METAPHORS
+    : useVolatility
+      ? LUCIA_VOLATILITY_METAPHORS
+      : LUCIA_METAPHORS.lowVol_neutral;
+  const metaphorIdx = Math.floor(Date.now() / 1000) % pool.length;
+  const metaphor = pool[metaphorIdx];
 
-  // ✅ 상황별 짧은 리스크/심리 한 줄 — 이평선/거래량 수치 제거
-  const SHORT_RISK: Partial<Record<MarketSituation, string>> = {
-    accumulation: '방향이 확인될 때까지 서두르지 마세요.',
-    trending:     'FOMO에 휩쓸리지 말고 냉정하게 판단하세요.',
-    stalemate:    '돌파 방향이 정해진 뒤에 움직이세요.',
-    drain:        '거래량이 돌아올 때까지 현금을 지키는 게 맞아요.',
-    panic:        '떨어지는 칼날은 잡지 마세요. 바닥 확인 후 접근하세요.',
-    exhaustion:   '상승 동력이 소진된 구간이에요. 신규 진입은 위험해요.',
-    normal:       '군중이 안심할 때가 오히려 위험해요. 신중하게 접근하세요.',
-  };
-  let risk = (p.situation && SHORT_RISK[p.situation]) || '신중하게 접근하는 게 맞아요.';
-  if (p.verdict === '매도 우위') risk = '공포가 번질 때는 손실 확대를 막는 게 우선이에요.';
-  else if (p.sentiment === '부정' && !p.situation) risk = '뉴스까지 부정적이니 신중하게 접근하세요.';
+  const mode: DiscussMode = p.mode ?? 'conflict';
+  let line1: string;
+  let line2: string;
 
-  const luciaOpener = contextNote ? `소장님, ${contextNote}` : `소장님, `;
+  if (mode === 'bear') {
+    // 부정 3개 이상 — 강한 관망 권고
+    const negText = negatives.length > 0 ? `${negatives.join(' + ')} — ` : '';
+    line1 = `소장님, ${connector}마치 ${metaphor}.`;
+    line2 = `${negText}지금은 관망이 맞아요. 손실을 막는 게 우선이에요.`;
+  } else if (mode === 'conflict') {
+    // 갈등 — 부정 데이터 강조하며 신중론
+    const negText = negatives.length > 0 ? `${negatives.join(' + ')} 때문에 ` : '';
+    line1 = `소장님, ${connector}마치 ${metaphor}.`;
+    line2 = `${negText}겉은 좋아 보여도 속은 아직 확인이 필요해요.`;
+  } else {
+    // bull — FOMO 경고 (짧게)
+    line1 = `소장님, ${connector}${p.keyword}${topicParticle(p.keyword)} 지금 많은 신호가 긍정적이지만,`;
+    line2 = `FOMO(나만 뒤처진다는 두려움)에 빠지지 마세요. 과열 구간에서는 더 신중해야 해요.`;
+  }
 
-  // ✅ 2줄 압축: 1줄 감성 해석(비유), 2줄 리스크 경고
-  return `${luciaOpener}마치 ${metaphor}.\n${risk}${luciaRebuttal}`;
+  return `${line1}\n${line2}${luciaRebuttal}`;
 };
 
 // ─────────────────────────────────────────────
@@ -325,6 +412,9 @@ interface EchoParams {
   volIsHigh?: boolean;
   hasMarketData?: boolean;
   rawVolume?: number | null;
+  // ✅ 토론 모드 + 지표 플래그 (conflict 시 ECHO 질문용)
+  mode?: DiscussMode;
+  flags?: IndicatorFlags;
 }
 
 // ✅ ECHO — 하워드 막스(Howard Marks) 스타일
@@ -623,34 +713,38 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
     ? `거래량 ${line5FmtVol(Math.round(line5BaseVol * 0.5))} 이상`
     : '거래량 증가';
 
-  // ✅ 에코 line5 — 단계별 행동 경로 (구체적 수치 포함)
+  // ✅ 에코 line5 — 단계별 행동 경로 (코인은 비중 절반, 손절 -7% 명시)
+  const isCryptoLine5 = p.assetType === 'CRYPTO';
+  const firstEntryPct = isCryptoLine5 ? 5 : 10;
+  const aggressiveEntryPct = isCryptoLine5 ? 10 : 20;
+  const addEntryPct = isCryptoLine5 ? 3 : 10;
+  const cryptoStopNote = isCryptoLine5 ? ' (코인 권장 손절 -7% 기준)' : '';
+
   let line5 = '';
   if (p.verdict === '매수 우위') {
     const buy1 = p.buyPrice || '매수 조건';
     const sell1 = p.sellPrice || '손절가';
-    // 강한 모멘텀이면 더 적극적 비중
     if ((p.trendStrength === 'strong_up') && p.volScore >= 2) {
-      line5 = `비중: 지금 바로 투자금의 20%를 먼저 매수하십시오. 3거래일 후 ${buy1} 유지 확인 시 추가 10% 매수하십시오. ${sell1} 이탈 시 전량 정리하십시오.`;
+      line5 = `비중: 지금 바로 투자금의 ${aggressiveEntryPct}%를 먼저 매수하십시오. 3거래일 후 ${buy1} 유지 확인 시 추가 ${addEntryPct}% 매수하십시오. ${sell1} 이탈 시 전량 정리하십시오.${cryptoStopNote}`;
     } else {
-      line5 = `비중: 지금 바로 투자금의 10%만 먼저 매수하십시오(예: 100만원이면 10만원). 3거래일 후 ${buy1} 유지 확인 시 추가 10% 매수하십시오. ${sell1} 이탈 시 전량 정리하십시오.`;
+      line5 = `비중: 지금 바로 투자금의 ${firstEntryPct}%만 먼저 매수하십시오. 3거래일 후 ${buy1} 유지 확인 시 추가 ${addEntryPct}% 매수하십시오. ${sell1} 이탈 시 전량 정리하십시오.${cryptoStopNote}`;
     }
   } else if (p.verdict === '매도 우위') {
     const sell1 = p.sellPrice || '손절가';
-    line5 = `비중: 보유 중이라면 지금 즉시 50% 정리하십시오. ${sell1} 이탈 확인 시 나머지 전량 정리하십시오. 신규 매수는 절대 금지입니다.`;
+    line5 = `비중: 보유 중이라면 지금 즉시 50% 정리하십시오. ${sell1} 이탈 확인 시 나머지 전량 정리하십시오. 신규 매수는 절대 금지입니다.${cryptoStopNote}`;
   } else if (p.watchLevel === 'weak') {
     const buy1 = p.buyPrice || '매수 조건';
     const sell1 = p.sellPrice || '손절가';
-    line5 = `비중: 아직 0%이지만 준비하십시오. ${buy1} 돌파 + ${volThresholdLabel} 동시 확인 시 → 10% 진입하십시오. 3거래일 유지 확인 시 → 추가 10% 진입하십시오. ${sell1} 이탈 시 → 전량 정리하십시오.`;
+    line5 = `비중: 아직 0%이지만 준비하십시오. ${buy1} 돌파 + ${volThresholdLabel} 동시 확인 시 → ${firstEntryPct}% 진입하십시오. 3거래일 유지 확인 시 → 추가 ${addEntryPct}% 진입하십시오. ${sell1} 이탈 시 → 전량 정리하십시오.${cryptoStopNote}`;
   } else if (p.watchLevel === 'strong') {
     line5 = `비중: 현재 0%를 유지하십시오. 지금 진입하면 손실 위험이 큽니다. 시장이 안정될 때까지 현금을 지키는 것이 최선입니다.`;
   } else {
-    // neutral 관망
     const buy1 = p.buyPrice || '매수 조건';
-    line5 = `비중: 현재 0%입니다. ${buy1} 돌파 + ${volThresholdLabel}을 동시에 확인한 후 10%씩 단계적으로 진입하십시오.`;
+    line5 = `비중: 현재 0%입니다. ${buy1} 돌파 + ${volThresholdLabel}을 동시에 확인한 후 ${firstEntryPct}%씩 단계적으로 진입하십시오.${cryptoStopNote}`;
   }
 
   // ✅ 2단 분리
-  //    summary: 3줄(결론/조건/행동) — 즉시 표시
+  //    summary: 모드별 결론(conflict 시 ECHO 질문 포함) — 즉시 표시
   //    details: 기존 Confluence + 근거 + 지금 + 조건 + 비중 — 별도 버블
 
   // 📍 조건 — 검증된 진입/정리 트리거 한 줄
@@ -658,25 +752,68 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
     ? `${p.sellPrice || '손절가'} 이탈 시 정리`
     : `${p.buyPrice || '매수 조건'} 돌파 + 거래량 증가`;
 
-  // 📍 행동 — 한 줄
+  // 📍 행동 — 한 줄 (코인은 더 보수적 비중)
+  const isCrypto = p.assetType === 'CRYPTO';
   const actionShort =
     p.verdict === '매수 우위'
-      ? ((p.trendStrength === 'strong_up' || p.trendStrength === 'weak_up') && p.volScore >= 2)
-        ? '투자금의 20% 선진입, 유지 확인 시 추가 10%.'
-        : '투자금의 10% 선진입, 유지 확인 시 추가 10%.'
+      ? isCrypto
+        ? '투자금의 5~10%만 진입 (코인 변동성). 손절 -7%.'
+        : ((p.trendStrength === 'strong_up' || p.trendStrength === 'weak_up') && p.volScore >= 2)
+          ? '투자금의 20% 선진입, 유지 확인 시 추가 10%.'
+          : '투자금의 10% 선진입, 유지 확인 시 추가 10%.'
       : p.verdict === '매도 우위'
         ? '보유분 50% 즉시 정리, 손절 이탈 시 전량.'
         : p.watchLevel === 'strong'
           ? '현금 유지. 지금 진입하면 손실 위험이 큽니다.'
           : p.watchLevel === 'weak'
-            ? '조건 충족 시 10% 선진입 준비.'
-            : '신호 확인 후 10%씩 단계 진입.';
+            ? isCrypto ? '조건 충족 시 5% 선진입 준비.' : '조건 충족 시 10% 선진입 준비.'
+            : isCrypto ? '신호 확인 후 5%씩 단계 진입.' : '신호 확인 후 10%씩 단계 진입.';
 
-  const summary = [
-    `📍 결론: ${verdictEmoji} ${verdictShort}`,
-    `📍 조건: ${trigger}`,
-    `📍 행동: ${actionShort}`,
-  ].join('\n');
+  // ✅ 모드별 결론 결정
+  const mode: DiscussMode = p.mode ?? 'conflict';
+  let modeEmoji: string;
+  let modeVerdict: string;
+  if (mode === 'bull') {
+    modeEmoji = '🟢'; modeVerdict = '진입';
+  } else if (mode === 'bear') {
+    modeEmoji = '🔴'; modeVerdict = '관망';
+  } else {
+    modeEmoji = '🟡'; modeVerdict = '조건부';
+  }
+
+  // ✅ ECHO 질문 (conflict 모드일 때만) — 어느 지표가 긍정/부정인지 기반
+  let echoQuestion = '';
+  if (mode === 'conflict' && p.flags) {
+    const f = p.flags;
+    if (f.trendUp && f.newsPos && f.volDown) {
+      echoQuestion = [
+        '⚔️ 잭은 이평선+뉴스를, 루시아는 거래량을 근거로 합니다.',
+        '거래량 저조에도 진입할 가치가 있습니까?',
+      ].join('\n');
+    } else if (f.volUp && f.priceUp && !f.trendUp) {
+      echoQuestion = [
+        '⚔️ 잭은 거래량+시세를, 루시아는 이평선 위치를 근거로 합니다.',
+        '추세 미확인 상태에서 진입해야 합니까?',
+      ].join('\n');
+    } else if (f.newsPos && f.priceUp && f.trendDown) {
+      echoQuestion = [
+        '⚔️ 잭은 뉴스+시세를, 루시아는 이평선 하락을 근거로 합니다.',
+        '추세 역행 구간에서 뉴스에만 의존해도 됩니까?',
+      ].join('\n');
+    } else {
+      echoQuestion = [
+        '⚔️ 잭과 루시아의 신호가 충돌합니다.',
+        '어느 쪽을 우선해야 합니까?',
+      ].join('\n');
+    }
+  }
+
+  const summaryParts: string[] = [];
+  if (echoQuestion) summaryParts.push(echoQuestion);
+  summaryParts.push(`📍 결론: ${modeEmoji} ${modeVerdict} (${verdictShort})`);
+  summaryParts.push(`📍 조건: ${trigger}`);
+  summaryParts.push(`📍 행동: ${actionShort}`);
+  const summary = summaryParts.join('\n');
 
   // ✅ details는 상세 맥락을 보존 (verdictText 원문 + confluence + 근거/지금/조건/비중)
   const detailHeader = `결론: ${verdictEmoji} ${verdictText}`;
