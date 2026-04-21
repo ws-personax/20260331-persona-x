@@ -356,12 +356,28 @@ export const fetchMarketPrice = async (keyword: string): Promise<MarketData | nu
     if (!rawMarketPrice) return null;
     const price = rawMarketPrice;
 
+    // ✅ change 계산 — Yahoo가 0%로 주는 경우 대비 previousClose 직접 계산 fallback
     let change = 0;
-    if (typeof meta.regularMarketChangePercent === 'number' && Number.isFinite(meta.regularMarketChangePercent)) {
-      change = meta.regularMarketChangePercent;
-    } else {
-      const prev = meta.previousClose || meta.regularMarketPreviousClose || price;
-      change = ((price - prev) / (prev || 1)) * 100;
+    const rawChangePct = meta.regularMarketChangePercent;
+    if (typeof rawChangePct === 'number' && Number.isFinite(rawChangePct) && rawChangePct !== 0) {
+      change = rawChangePct;
+    }
+
+    const prevCloseForChange =
+      meta.previousClose ||
+      meta.regularMarketPreviousClose ||
+      meta.chartPreviousClose ||
+      0;
+
+    // change가 0이거나 없으면 price/prevClose 직접 계산
+    if (change === 0 && meta.regularMarketPrice && prevCloseForChange) {
+      change = ((meta.regularMarketPrice - prevCloseForChange) / prevCloseForChange) * 100;
+    }
+
+    // ✅ 한국장 마감 후 — Yahoo가 0%로 내려주는 경우가 잦아 직접 계산 우선
+    if (isKR && marketState !== 'REGULAR' && meta.regularMarketPrice && prevCloseForChange) {
+      const computed = ((meta.regularMarketPrice - prevCloseForChange) / prevCloseForChange) * 100;
+      if (computed !== 0) change = computed;
     }
 
     if (!isKR && marketState !== 'REGULAR' && result5d) {
@@ -419,7 +435,7 @@ export const fetchMarketPrice = async (keyword: string): Promise<MarketData | nu
       currency: isKR ? 'KRW' : 'USD',
       marketState,
       source: isKR
-        ? (meta.regularMarketPrice ? '한국장 (15분 지연)' : '한국장 전일 종가 기준')
+        ? (change !== 0 ? '한국장 (15분 지연)' : '한국장 전일 종가 기준')
         : marketState === 'REGULAR' ? '미국장 실시간' : '미국장 전일 종가 기준',
       // ✅ 추세 데이터
       trend,
