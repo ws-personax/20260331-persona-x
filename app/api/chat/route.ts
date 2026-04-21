@@ -15,6 +15,7 @@ import {
   CRYPTO_MAP, STOCK_MAP, KEYWORD_PRIORITY,
   MARKET_KEYWORD_MAP, inferCurrency, extractKeyword, fetchMarketPrice,
   TREND_PICKS, RECOMMEND_PATTERNS, detectAssetClass,
+  extractTwoKeywords, getSector,
 } from '@/lib/personax/market';
 import { buildJackText, buildLuciaText, buildEchoText } from '@/lib/personax/templates';
 
@@ -146,6 +147,65 @@ export async function POST(req: Request) {
     const isNextDayStrategy = lastMsg.includes('내일 전략') || lastMsg.includes('장 결과') || lastMsg.includes('어제 장') || (lastMsg.includes('오늘') && lastMsg.includes('결과'));
     const isOpeningVolume = lastMsg.includes('장 초반') || lastMsg.includes('초반 30분') || (lastMsg.includes('개장') && lastMsg.includes('거래량'));
     const isFirstStock = lastMsg.includes('첫 번째로 봐야') || lastMsg.includes('장 열리면') || (lastMsg.includes('개장') && lastMsg.includes('종목'));
+
+    // ── 같은 섹터 비교 (Step 1: 같은 섹터만 처리, 다른 섹터/자산군은 기존 단일 분석으로 fallback) ──
+    const comparePair = extractTwoKeywords(lastMsg);
+    if (comparePair) {
+      const sector1 = getSector(comparePair.first);
+      const sector2 = getSector(comparePair.second);
+      if (sector1 && sector2 && sector1 === sector2) {
+        const [a, b] = await Promise.all([
+          fetchMarketPrice(comparePair.first).catch(() => null),
+          fetchMarketPrice(comparePair.second).catch(() => null),
+        ]);
+        const chA = parseFloat(a?.change || '0');
+        const chB = parseFloat(b?.change || '0');
+        const strong = chA > chB ? comparePair.first : comparePair.second;
+        const weak   = chA > chB ? comparePair.second : comparePair.first;
+        const strongCh = chA > chB ? chA : chB;
+        const weakCh   = chA > chB ? chB : chA;
+        const gap = Math.abs(chA - chB);
+        const isDivergent = gap >= 1.0;  // 1%p 이상 차이 — 종목 선별 필요
+        const sign = (n: number) => (n >= 0 ? '+' : '') + n.toFixed(2);
+
+        const verdict: Verdict = '관망';
+        const conclusion = isDivergent
+          ? `같은 ${sector1}인데 ${strong}은 강세, ${weak}는 약세 — 종목 선별이 중요한 구간입니다`
+          : `같은 ${sector1} — ${comparePair.first}/${comparePair.second} 동조화 흐름, 섹터 공통 요인 중심으로 판단하십시오`;
+
+        const ray = `같은 섹터 비교 — ${sector1}
+${comparePair.first}: ${a?.price || '-'} (${sign(chA)}%)
+${comparePair.second}: ${b?.price || '-'} (${sign(chB)}%)
+격차: ${gap.toFixed(2)}%p → ${isDivergent ? '종목 분산(디버전스) — 개별 이슈 가능성' : '섹터 동조화 — 공통 모멘텀'}`;
+
+        const jack = `지휘관님, ${sector1} 섹터 내 ${comparePair.first} vs ${comparePair.second} 비교 분석입니다.
+${strong} ${sign(strongCh)}% / ${weak} ${sign(weakCh)}% — 격차 ${gap.toFixed(2)}%p.
+${isDivergent
+  ? `${strong} 쪽으로 수급이 쏠리는 구간입니다. 섹터 전체가 아닌 개별 종목 선별이 성과를 좌우합니다.`
+  : `두 종목이 함께 ${chA > 0 && chB > 0 ? '상승' : chA < 0 && chB < 0 ? '하락' : '횡보'}하고 있어 섹터 공통 이슈가 지배적입니다. 어느 한 종목만 고집할 필요는 없습니다.`}`;
+
+        const lucia = `소장님, ${sector1} 업종에서 같은 날 ${comparePair.first}는 ${sign(chA)}%, ${comparePair.second}는 ${sign(chB)}% 움직였어요. ${isDivergent
+          ? `같은 업종인데 한 종목이 눈에 띄게 강하다면 섹터 이슈가 아니라 개별 회사 이슈예요. 강한 쪽(${strong})을 따라가되 과열 아닌지 꼭 확인하세요.`
+          : `두 종목이 비슷하게 움직이면 섹터 공통 뉴스나 업황 변화를 먼저 살펴봐야 해요. 개별 선택보다 섹터 비중 결정이 먼저입니다.`}`;
+
+        const echo = `결론: 🟡 ${conclusion}
+컨플루언스 신호 강도: ${isDivergent ? '보통 (종목 선별)' : '낮음 (동조화)'}
+${sign(chA) === sign(chB) && chA * chB > 0 ? '✅' : '⚠️'} 섹터 동조 여부: ${chA * chB > 0 ? '동조' : '분화'}
+⚠️ 격차: ${gap.toFixed(2)}%p
+조건: ${isDivergent ? `${strong} 중심으로 10% 선진입 검토 — ${weak} 반등 전까지 비중 분리` : `섹터 비중 결정 후 두 종목 동일 비중 분산`}
+비중: 신규 진입 시 투자금의 10%로 시작하십시오.
+
+📡 데이터 출처 — 실시간 시장 데이터
+
+${DISCLAIMER}`;
+
+        return Response.json({
+          reply: [ray, jack, lucia, echo].join('\n\n'),
+          personas: { jack, lucia, ray, echo, verdict, confidence: 80, breakdown: `같은 섹터 비교(${sector1})`, positionSizing: '0%', jackNews: null, luciaNews: null, rayNews: null, echoNews: null },
+        });
+      }
+      // 다른 섹터 또는 자산군 — Step 2/3에서 구현, 지금은 fallback
+    }
 
     // ── 개장 초반 30분 거래량 ──
     if (isOpeningVolume && (!keyword || keyword === '시장')) {

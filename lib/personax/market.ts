@@ -85,6 +85,82 @@ export const STOCK_MAP: Record<string, string> = {
   '루시드': 'LCID', 'LCID': 'LCID',
 };
 
+// ✅ 종목별 섹터 매핑 — 같은 섹터 비교 분석용 (Step 1)
+// 한글·영문 키워드 모두 등록해 extractKeyword가 리턴하는 정규 키워드와 일치시킴
+export const STOCK_SECTOR_MAP: Record<string, string> = {
+  // 한국 반도체
+  '삼성전자': '반도체',
+  'SK하이닉스': '반도체', 'SK 하이닉스': '반도체',
+  // 한국 자동차
+  '현대차': '자동차', '현대자동차': '자동차',
+  '현대모비스': '자동차',
+  '기아': '자동차', '기아차': '자동차',
+  // 한국 배터리·소재
+  'LG에너지': '배터리', 'LG에너지솔루션': '배터리',
+  'LG화학': '배터리',
+  '에코프로': '배터리',
+  'POSCO': '소재', '포스코': '소재',
+  // 한국 IT·플랫폼
+  '카카오': '인터넷 플랫폼',
+  '네이버': '인터넷 플랫폼', 'NAVER': '인터넷 플랫폼',
+  'LG전자': '가전·전자', '엘지전자': '가전·전자',
+  // 한국 바이오
+  '셀트리온': '바이오',
+  '알테오젠': '바이오',
+  '삼성바이오': '바이오', '삼바': '바이오',
+  // 한국 금융
+  'KB금융': '금융', 'KB': '금융',
+  '신한지주': '금융', '신한': '금융',
+  // 한국 에너지
+  'SK이노베이션': '정유·에너지', 'SK이노': '정유·에너지', 'SK에너지': '정유·에너지',
+  'S오일': '정유·에너지', 'S-Oil': '정유·에너지', '에쓰오일': '정유·에너지',
+
+  // 미국 반도체
+  '엔비디아': '반도체', 'NVDA': '반도체',
+  '브로드컴': '반도체', 'AVGO': '반도체', 'Broadcom': '반도체',
+  '인텔': '반도체', 'INTC': '반도체',
+  'AMD': '반도체',
+  // 미국 빅테크·소프트웨어
+  '애플': '빅테크', 'AAPL': '빅테크',
+  '마이크로소프트': '빅테크', 'MSFT': '빅테크', '마소': '빅테크',
+  '구글': '빅테크', 'GOOGL': '빅테크', '알파벳': '빅테크',
+  '아마존': '빅테크', 'AMZN': '빅테크',
+  '메타': '빅테크', 'META': '빅테크', '페이스북': '빅테크',
+  '오라클': '빅테크', 'ORCL': '빅테크',
+  '팔란티어': '빅테크', 'PLTR': '빅테크',
+  '넷플릭스': '스트리밍', 'NFLX': '스트리밍',
+  // 미국 자동차·모빌리티
+  '테슬라': '자동차', 'TSLA': '자동차',
+  '리비안': '자동차', 'RIVN': '자동차',
+  '루시드': '자동차', 'LCID': '자동차',
+  '우버': '모빌리티', 'UBER': '모빌리티',
+  // 미국 결제
+  '비자': '결제', 'V': '결제', 'VISA': '결제',
+  '마스터카드': '결제', 'MA': '결제',
+  // 미국 금융
+  'JP모건': '금융', 'JPM': '금융',
+  '골드만삭스': '금융', 'GS': '금융',
+  '뱅크오브아메리카': '금융', 'BAC': '금융',
+  '버크셔해서웨이': '금융', 'BRK': '금융',
+  // 미국 바이오·제약
+  '화이자': '바이오', 'PFE': '바이오',
+  '모더나': '바이오', 'MRNA': '바이오',
+  '존슨앤존슨': '바이오', 'JNJ': '바이오',
+  // 미국 소비재
+  '코카콜라': '소비재', 'KO': '소비재',
+  '맥도날드': '소비재', 'MCD': '소비재',
+  '나이키': '소비재', 'NKE': '소비재',
+  '스타벅스': '소비재', 'SBUX': '소비재',
+  '월마트': '소비재', 'WMT': '소비재',
+  '쿠팡': '소비재', 'CPNG': '소비재',
+  // 미국 에너지
+  '엑손모빌': '정유·에너지', '엑손': '정유·에너지', '엑손모바일': '정유·에너지', 'XOM': '정유·에너지',
+};
+
+export const getSector = (keyword: string): string | null => {
+  return STOCK_SECTOR_MAP[keyword] || STOCK_SECTOR_MAP[keyword.toUpperCase()] || null;
+};
+
 export const KEYWORD_PRIORITY: string[] = [
   '비트코인', 'BTC', '이더리움', 'ETH', '리플', 'XRP',
   '솔라나', 'SOL', '도지', 'DOGE', '에이다', 'ADA', '바이낸스', 'BNB',
@@ -172,6 +248,46 @@ export const inferCurrency = (keyword: string): 'KRW' | 'USD' => {
   const sym = STOCK_MAP[keyword] || STOCK_MAP[keyword.toUpperCase()] || '';
   if (sym.endsWith('.KS') || sym.endsWith('.KQ') || sym.startsWith('^KS') || sym.startsWith('^KQ')) return 'KRW';
   return 'USD';
+};
+
+// ✅ 비교 질문에서 두 종목 추출 — "vs/와/과/대비/비교" 패턴 + KEYWORD_PRIORITY 2개 매칭
+export const extractTwoKeywords = (message: string): { first: string; second: string } | null => {
+  if (!message) return null;
+  const lower = message.toLowerCase();
+  const compact = lower.replace(/\s+/g, '');
+
+  // 비교 의도 트리거 (하나라도 포함되어야 함)
+  const hasComparisonTrigger =
+    /\bvs\b/i.test(message) ||
+    /\b대\s?비\b/.test(message) ||
+    /비교/.test(message) ||
+    /어느\s?(게|것|쪽)/.test(message) ||
+    /와\s/.test(message) || /과\s/.test(message);
+  if (!hasComparisonTrigger) return null;
+
+  const matches: Array<{ keyword: string; index: number }> = [];
+  for (const t of KEYWORD_PRIORITY) {
+    const tLower = t.toLowerCase();
+    const tCompact = tLower.replace(/\s+/g, '');
+    const idx = lower.indexOf(tLower);
+    if (idx !== -1) {
+      // 이미 포함되는 키워드는 스킵 (긴 이름 우선 규칙 유지)
+      if (matches.some(m => m.keyword.toLowerCase().includes(tLower) || tLower.includes(m.keyword.toLowerCase()))) continue;
+      matches.push({ keyword: t, index: idx });
+      if (matches.length >= 2) break;
+      continue;
+    }
+    const cIdx = compact.indexOf(tCompact);
+    if (cIdx !== -1) {
+      if (matches.some(m => m.keyword.toLowerCase().includes(tLower) || tLower.includes(m.keyword.toLowerCase()))) continue;
+      matches.push({ keyword: t, index: cIdx });
+      if (matches.length >= 2) break;
+    }
+  }
+
+  if (matches.length < 2) return null;
+  matches.sort((a, b) => a.index - b.index);
+  return { first: matches[0].keyword, second: matches[1].keyword };
 };
 
 export const extractKeyword = (messages: Array<{ role: string; content: string }>): string => {
