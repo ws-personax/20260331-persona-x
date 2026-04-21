@@ -59,6 +59,14 @@ export function PositionInput({ keyword, currency, initial, onSubmit, onSkip }: 
     });
   };
 
+  // ✅ Enter 제출 / Shift+Enter 줄바꿈 유지
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey && canSubmit) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
   return (
     <div
       style={{
@@ -100,6 +108,7 @@ export function PositionInput({ keyword, currency, initial, onSubmit, onSkip }: 
           <input
             value={avgPrice}
             onChange={e => setAvgPrice(sanitizePrice(e.target.value))}
+            onKeyDown={handleKeyDown}
             placeholder={`평단가 (${currency})`}
             inputMode="decimal"
             style={{
@@ -113,6 +122,7 @@ export function PositionInput({ keyword, currency, initial, onSubmit, onSkip }: 
           <input
             value={quantity}
             onChange={e => setQuantity(sanitizeQuantity(e.target.value))}
+            onKeyDown={handleKeyDown}
             placeholder="수량 또는 비중(%)"
             inputMode="decimal"
             style={{
@@ -126,6 +136,7 @@ export function PositionInput({ keyword, currency, initial, onSubmit, onSkip }: 
           <input
             value={buyPrice}
             onChange={e => setBuyPrice(sanitizePrice(e.target.value))}
+            onKeyDown={handleKeyDown}
             placeholder={`매수가 (${currency})`}
             inputMode="decimal"
             style={{
@@ -139,6 +150,7 @@ export function PositionInput({ keyword, currency, initial, onSubmit, onSkip }: 
           <input
             value={note}
             onChange={e => setNote(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="메모"
             style={{
               border: '1px solid #d1d5db',
