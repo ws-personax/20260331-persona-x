@@ -909,7 +909,7 @@ export default function ChatWindow() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
-            placeholder="종목명 입력 (예: 비트코인, 삼성전자)"
+            placeholder="종목명 입력 (예: 삼성전자)"
             style={{
               flex: 1,
               border: '1px solid #d1d5db',
@@ -919,6 +919,7 @@ export default function ChatWindow() {
               fontSize: 14,
               outline: 'none',
               minHeight: 56,
+              height: 56,
               maxHeight: 160,
               overflowY: 'hidden',
             }}
