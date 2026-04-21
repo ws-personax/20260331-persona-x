@@ -194,19 +194,19 @@ export const buildJackText = (p: JackParams): string => {
   // ✅ 추세 맥락 — volSuffix 뒤에 마침표를 붙이고 추세 문장은 별도로
   const trendSentence = p.trendSummary ? ` ${p.trendSummary}.` : '';
 
-  // ✅ 충돌 상황 JACK 역반박 — 양방향 핑퐁
-  const conflictNote = p.conflict === 'conflict_jack_buy'
-    ? ' 루시아의 신중론을 이해하지만, 지금은 기회를 놓치는 것이 더 큰 리스크입니다. 모멘텀 데이터가 명확합니다.'
+  // ✅ 충돌 시 JACK이 LUCIA에게 반박 — 응답 마지막에 별도 블록으로
+  const jackRebuttal = p.conflict === 'conflict_jack_buy'
+    ? '\n↳ 루시아의 신중론을 이해하지만, 지금은 기회를 놓치는 것이 더 큰 리스크입니다. 모멘텀 데이터가 명확합니다.'
     : p.conflict === 'conflict_lucia_buy'
-      ? ' 루시아의 역발상을 이해하지만, 떨어지는 칼날을 잡으면 다칩니다. 바닥 확인이 먼저입니다.'
+      ? '\n↳ 루시아의 역발상을 이해하지만, 떨어지는 칼날을 잡으면 다칩니다. 바닥 확인이 먼저입니다.'
       : '';
 
   if (interpretation && interpretation !== JACK_INTERPRETATIONS.normal) {
-    return `지휘관님, ${contextNote}${p.keyword}${topicParticle(p.keyword)} ${p.volLabel}${particle(p.volLabel)} ${volSuffix}.${trendSentence} ${interpretation}${conflictNote} ${trend} 구간으로 ${action}`;
+    return `지휘관님, ${contextNote}${p.keyword}${topicParticle(p.keyword)} ${p.volLabel}${particle(p.volLabel)} ${volSuffix}.${trendSentence} ${interpretation} ${trend} 구간으로 ${action}${jackRebuttal}`;
   }
 
   // ✅ volSuffix 뒤 마침표 → 추세 문장 → vixNote → 구간 판단
-  return `지휘관님, ${contextNote}${p.keyword}${topicParticle(p.keyword)} ${p.volLabel}${particle(p.volLabel)} ${volSuffix}.${trendSentence}${vixNote ? ' ' + vixNote + '.' : ''} ${conflictNote}${trend} 구간으로 ${action}`;
+  return `지휘관님, ${contextNote}${p.keyword}${topicParticle(p.keyword)} ${p.volLabel}${particle(p.volLabel)} ${volSuffix}.${trendSentence}${vixNote ? ' ' + vixNote + '.' : ''} ${trend} 구간으로 ${action}${jackRebuttal}`;
 };
 
 // ─────────────────────────────────────────────
@@ -433,13 +433,12 @@ const LUCIA_THEORIES: Partial<Record<MarketSituation, string>> = {
     ? ` 참고로 ${p.trendSummary}.`
     : '';
 
-  // ✅ 핑퐁 구조 — 잭의 판단을 언급하며 반론
-  let pingpong = '';
-  if (p.conflict === 'conflict_jack_buy' && p.jackVerdict) {
-    pingpong = ` 소장님(잭)은 모멘텀을 보고 있지만, 제 눈엔 지금 시장이 너무 달궈진 것 같아요.`;
-  } else if (p.conflict === 'conflict_lucia_buy') {
-    pingpong = ` 소장님(잭)은 조심하자고 하시지만, 공포가 극단일 때가 오히려 역발상 기회일 수 있어요.`;
-  }
+  // ✅ LUCIA가 JACK에게 반박 — 응답 마지막에 별도 블록
+  const luciaRebuttal = p.conflict === 'conflict_jack_buy'
+    ? '\n↳ 잭 소장님, 거래량이 말해주고 있어요. 숫자가 아직 확신을 주지 않아요. 서두르면 꼭 물려요.'
+    : p.conflict === 'conflict_lucia_buy'
+      ? '\n↳ 잭 소장님의 신중함을 이해해요. 하지만 공포가 최고의 매수 기회였던 역사를 잊지 마세요.'
+      : '';
 
   // ✅ "하지만" 제거 — 루시아 고유 시작 방식
   // 추세 중복 제거 — 루시아는 심리/역발상만, 추세는 잭/레이가 담당
@@ -447,7 +446,7 @@ const LUCIA_THEORIES: Partial<Record<MarketSituation, string>> = {
     ? `소장님, ${contextNote}`
     : `소장님, `;
 
-  return `${luciaOpener}${dataNote} 마치 ${metaphor}.${pingpong} ${theory}`;
+  return `${luciaOpener}${dataNote} 마치 ${metaphor}. ${theory}${luciaRebuttal}`;
 };
 
 // ─────────────────────────────────────────────
@@ -583,17 +582,10 @@ export const buildEchoText = (p: EchoParams): string => {
     conflictNote = ' 잭은 하락을 경고하고 루시아는 역발상 기회를 말합니다. 두 신호 충돌 시 절반만 진입하고 나머지는 확인 후 결정하십시오.';
   }
 
-  // ✅ ⚔️ 참모진 토론 블록 — 충돌 시에만 표시
-  //    JACK/LUCIA 각자 한 줄 요약 + ECHO의 채택 판단
+  // ✅ ⚔️ 참모진 토론 블록 — 충돌 시에만 표시 (JACK/LUCIA 발언은 각자 말풍선에서)
+  //    ECHO는 충돌 감지 사실과 판단만 제시
   let debateBlock = '';
   if (p.conflict === 'conflict_jack_buy' || p.conflict === 'conflict_lucia_buy') {
-    const jackLine = p.conflict === 'conflict_jack_buy'
-      ? '모멘텀 확인됨 — 추세 추종 진입이 통계적으로 옳다'
-      : '하락 추세 — 떨어지는 칼날 금지, 바닥 확인 우선';
-    const luciaLine = p.conflict === 'conflict_jack_buy'
-      ? '과열 구간 — 군중 낙관은 되돌림 신호, 역발상 경계'
-      : '패닉 극단 — 공포에 탐욕을, 바닥 역발상 기회';
-    // ECHO 판단 — verdict와 충돌 유형 조합으로 어느 쪽 채택했는지
     let echoJudgement: string;
     if (p.verdict === '매수 우위') {
       echoJudgement = p.conflict === 'conflict_jack_buy'
@@ -607,9 +599,7 @@ export const buildEchoText = (p: EchoParams): string => {
       echoJudgement = '중재 — 양 신호 충돌 구간, 신규 진입 보류 후 방향 확정 대기';
     }
     debateBlock = [
-      `⚔️ 참모진 의견 충돌:`,
-      `  JACK: ${jackLine}`,
-      `  LUCIA: ${luciaLine}`,
+      `⚔️ 참모진 의견 충돌 감지`,
       `  → ECHO 판단: ${echoJudgement}`,
     ].join('\n');
   }
