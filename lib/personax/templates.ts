@@ -214,6 +214,7 @@ interface LuciaParams {
   assetType?: string;
   avgVolume?: number | null;
   rawVolume?: number | null;
+  changeRaw?: string | null;   // ✅ 등락률
   sentiment: string;
   verdict: Verdict;
   assetType: AssetType;
@@ -312,10 +313,6 @@ export const buildLuciaText = (p: LuciaParams): string => {
       ? `오늘 거래량(${formatVol(baseVol)})의 절반인 ${formatVol(halfVol)} 이상`
       : '평소 거래량 대비 50% 이상';
 
-    const statusLabel = p.isWeekend ? '주말이에요'
-      : p.isBeforeOpen ? '장이 열리기 전이에요'
-      : '오늘 장이 끝났어요';
-
     // ✅ 미국장은 개장 후 3시간(한국 시간 새벽 02:30), 한국장은 12시 30분 기준
     const luciaCheckpoint = isKR ? '12시 30분에 한 번' : '개장 후 3시간(한국 시간 새벽 02:30)에 한 번';
     const openAdvice = p.verdict === '매수 우위'
@@ -324,7 +321,18 @@ export const buildLuciaText = (p: LuciaParams): string => {
         ? `${nextSession} 장 열리면 ${luciaCheckpoint} 확인해 주세요. ${halfLabel}에 못 미치면 반등이 약한 상태예요. 신중하게 접근하세요.`
         : `${nextSession} 장 열리면 ${luciaCheckpoint} 확인해 주세요. ${halfLabel}인지 꼭 보세요. 그게 오늘 방향을 결정합니다.`;
 
-    return `소장님, 지금은 ${statusLabel}. ${timeLabel} 흐름을 보면 ${p.keyword}는 ${trendFeeling}. ${openAdvice}`;
+    // ✅ 장 마감 후 오프너 — 오늘 등락률 + 이평선 흐름 포함
+    const luciaChangeRaw = p.changeRaw && p.changeRaw !== '0.00'
+      ? `${parseFloat(p.changeRaw) >= 0 ? '+' : ''}${p.changeRaw}%`
+      : '';
+    const trendFlow = p.trendSummary
+      ? `${p.trendSummary} 흐름이 유지되고 있어요`
+      : '추세 방향은 아직 확정되지 않았어요';
+    const closingOpener = luciaChangeRaw
+      ? `${timeLabel} ${p.keyword}은 ${luciaChangeRaw}로 마감했어요. ${trendFlow}.`
+      : `${timeLabel} ${p.keyword} 흐름을 보면 ${trendFeeling}.`;
+
+    return `소장님, ${closingOpener} ${openAdvice}`;
   }
 
 
@@ -460,10 +468,12 @@ interface EchoParams {
   rawPrice?: number | null;
   avgVolume?: number | null;
   currency?: 'KRW' | 'USD';
-  // ✅ 신뢰도 근거 분해 (시세/뉴스/거래량 기여 점수)
-  confPriceScore?: number | null;
-  confNewsScore?: number | null;
+  // ✅ 신뢰도 근거 분해 (이평선/거래량/뉴스/시세 안정 기여 점수)
+  confTrendScore?: number | null;
   confVolumeScore?: number | null;
+  confNewsScore?: number | null;
+  confPriceScore?: number | null;
+  rawVolume?: number | null;
 }
 
 // ✅ ECHO — 하워드 막스(Howard Marks) 스타일
@@ -647,17 +657,31 @@ export const buildEchoText = (p: EchoParams): string => {
   }
 
   const line1 = `결론: ${verdictEmoji} ${verdictText} (신뢰도 ${p.confidence}%)`;
-  // ✅ 신뢰도 근거 한 줄 — 시세/뉴스/거래량 점수 합산
+  // ✅ 신뢰도 근거 한 줄 — 이평선/거래량/뉴스/시세 안정 4개 점수 합산
   const confBreakdown = (
-    typeof p.confPriceScore === 'number' &&
+    typeof p.confTrendScore === 'number' &&
+    typeof p.confVolumeScore === 'number' &&
     typeof p.confNewsScore === 'number' &&
-    typeof p.confVolumeScore === 'number'
+    typeof p.confPriceScore === 'number'
   )
-    ? `신뢰도 ${p.confidence}% = 시세 ${p.confPriceScore}점 + 뉴스 ${p.sentiment} ${p.confNewsScore}점 + 거래량 ${p.confVolumeScore}점 (${p.confidenceBasis})`
+    ? `신뢰도 ${p.confidence}% = 이평선 ${p.confTrendScore}점 + 거래량 ${p.confVolumeScore}점 + 뉴스 ${p.sentiment} ${p.confNewsScore}점 + 시세 안정 ${p.confPriceScore}점`
     : `신뢰도 근거: ${p.confidenceBasis}`;
   const line2 = `근거: ${p.trendSummary ? p.trendSummary + ' / ' : ''}${p.volLabel} / 뉴스 ${p.sentiment} 신호 종합${conflictNote}`;
   const line3 = `지금: ${insight}${timeNote}`;
   const line4 = `조건: ${p.condSummary}`;
+  // ✅ 거래량 기준 숫자 — 오늘 rawVolume의 절반 또는 5일 평균의 절반 (있을 때만)
+  const line5FmtVol = (v: number): string => {
+    if (v >= 100000000) return `${(v / 100000000).toFixed(1)}억주`;
+    if (v >= 10000) return `${Math.round(v / 10000).toLocaleString()}만주`;
+    return `${v.toLocaleString()}주`;
+  };
+  const line5BaseVol = (p.rawVolume && p.rawVolume > 0)
+    ? p.rawVolume
+    : (p.avgVolume && p.avgVolume > 0 ? p.avgVolume : 0);
+  const volThresholdLabel = line5BaseVol > 0
+    ? `거래량 ${line5FmtVol(Math.round(line5BaseVol * 0.5))} 이상`
+    : '거래량 증가';
+
   // ✅ 에코 line5 — 단계별 행동 경로 (구체적 수치 포함)
   let line5 = '';
   if (p.verdict === '매수 우위') {
@@ -675,13 +699,13 @@ export const buildEchoText = (p: EchoParams): string => {
   } else if (p.watchLevel === 'weak') {
     const buy1 = p.buyPrice || '매수 조건';
     const sell1 = p.sellPrice || '손절가';
-    line5 = `비중: 아직 0%이지만 준비하십시오. ${buy1} 돌파 + 거래량 증가 동시 확인 시 → 10% 진입. 3거래일 유지 확인 시 → 추가 10%. ${sell1} 이탈 시 → 전량 정리.`;
+    line5 = `비중: 아직 0%이지만 준비하십시오. ${buy1} 돌파 + ${volThresholdLabel} 동시 확인 시 → 10% 진입. 3거래일 유지 확인 시 → 추가 10%. ${sell1} 이탈 시 → 전량 정리.`;
   } else if (p.watchLevel === 'strong') {
     line5 = `비중: 현재 0%를 유지하십시오. 지금 진입하면 손실 위험이 큽니다. 시장이 안정될 때까지 현금을 지키는 것이 최선입니다.`;
   } else {
     // neutral 관망
     const buy1 = p.buyPrice || '매수 조건';
-    line5 = `비중: 현재 0%입니다. ${buy1} 돌파 + 거래량 증가를 동시에 확인한 후 10%씩 단계적으로 진입하십시오.`;
+    line5 = `비중: 현재 0%입니다. ${buy1} 돌파 + ${volThresholdLabel}을 동시에 확인한 후 10%씩 단계적으로 진입하십시오.`;
   }
 
   return [line1, confBreakdown, line2, line3, line4, line5].join('\n');
