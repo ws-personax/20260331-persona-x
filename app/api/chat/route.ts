@@ -643,6 +643,18 @@ ${DISCLAIMER}`;
       vol.isHigh ? '거래량 신호' : null,
     ].filter(Boolean).join(' + ') || '데이터 제한적';
 
+    // ✅ 신뢰도 분해 — 시세/뉴스/거래량 기여 점수가 confidence에 합산되도록 스케일
+    const confChangeNum = safeNum(marketData?.change || '0');
+    const confAligned = !!(marketData && nData.avgScore > 0 && confChangeNum > 0);
+    const rawConfPrice = 55 + (marketData ? 15 : 0) + (confAligned ? 3 : 0);
+    const rawConfNews  = (news.length > 0 ? 10 : 0) + (news.length >= 5 ? 5 : 0);
+    const rawConfVol   = (vol.score > 0 ? 5 : 0) + (vol.score >= 2 ? 5 : 0);
+    const rawConfSum   = rawConfPrice + rawConfNews + rawConfVol;
+    const confScale    = rawConfSum > 0 ? confidence / rawConfSum : 1;
+    const confPriceScore  = Math.round(rawConfPrice * confScale);
+    const confNewsScore   = Math.round(rawConfNews  * confScale);
+    const confVolumeScore = Math.max(0, confidence - confPriceScore - confNewsScore);
+
     // ─── 이전 종목 맥락 추출 ───
     const prevUserMsg = messages.slice(-3, -1).find((m: { role: string }) => m.role === 'user')?.content || '';
     const prevKeyword = prevUserMsg ? extractKeyword([{ role: 'user', content: prevUserMsg }]) : null;
@@ -956,6 +968,10 @@ ${DISCLAIMER}`;
         rawPrice: marketData?.rawPrice ?? null,
         avgVolume: marketData?.avgVolume ?? null,
         currency,
+        // ✅ 신뢰도 근거 분해
+        confPriceScore,
+        confNewsScore,
+        confVolumeScore,
       });
       finalEcho = `${echoFallback}\n\n${dataSourceLabel}${marketClosedNote}${DISCLAIMER}`;
     }

@@ -101,9 +101,11 @@ export const buildJackText = (p: JackParams): string => {
     // rawVolume 우선, 없으면 avgVolume
     const baseVol = rawVol && rawVol > 0 ? rawVol : (avgVol && avgVol > 0 ? avgVol : 0);
     const halfVol = Math.round(baseVol * 0.5);
+    // ✅ 미국장은 개장 후 3시간(한국 시간 새벽 02:30), 한국장은 12시 30분 기준
+    const halfCheckpoint = isKR ? '12시 30분까지' : '개장 후 3시간(한국 시간 새벽 02:30)까지';
     const halfLabel = baseVol > 0
-      ? `12시 30분까지 거래량이 오늘 전체(${formatVol(baseVol)})의 절반인 ${formatVol(halfVol)} 이상`
-      : `12시 30분까지 거래량이 평소 대비 50% 이상`;
+      ? `${halfCheckpoint} 거래량이 오늘 전체(${formatVol(baseVol)})의 절반인 ${formatVol(halfVol)} 이상`
+      : `${halfCheckpoint} 거래량이 평소 대비 50% 이상`;
 
     const condAction = p.verdict === '매수 우위'
       ? `${nextSession} ${openTime} 개장 후 ${halfLabel}이면 강한 매수 신호입니다. 그때 진입을 검토하십시오.`
@@ -314,11 +316,13 @@ export const buildLuciaText = (p: LuciaParams): string => {
       : p.isBeforeOpen ? '장이 열리기 전이에요'
       : '오늘 장이 끝났어요';
 
+    // ✅ 미국장은 개장 후 3시간(한국 시간 새벽 02:30), 한국장은 12시 30분 기준
+    const luciaCheckpoint = isKR ? '12시 30분에 한 번' : '개장 후 3시간(한국 시간 새벽 02:30)에 한 번';
     const openAdvice = p.verdict === '매수 우위'
-      ? `${nextSession} 장 열리면 12시 30분에 한 번 확인해 주세요. ${halfLabel}이면 시장이 살아있다는 신호예요.`
+      ? `${nextSession} 장 열리면 ${luciaCheckpoint} 확인해 주세요. ${halfLabel}이면 시장이 살아있다는 신호예요.`
       : p.verdict === '매도 우위'
-        ? `${nextSession} 장 열리면 12시 30분에 한 번 확인해 주세요. ${halfLabel}에 못 미치면 반등이 약한 상태예요. 신중하게 접근하세요.`
-        : `${nextSession} 장 열리면 12시 30분에 한 번 확인해 주세요. ${halfLabel}인지 꼭 보세요. 그게 오늘 방향을 결정합니다.`;
+        ? `${nextSession} 장 열리면 ${luciaCheckpoint} 확인해 주세요. ${halfLabel}에 못 미치면 반등이 약한 상태예요. 신중하게 접근하세요.`
+        : `${nextSession} 장 열리면 ${luciaCheckpoint} 확인해 주세요. ${halfLabel}인지 꼭 보세요. 그게 오늘 방향을 결정합니다.`;
 
     return `소장님, 지금은 ${statusLabel}. ${timeLabel} 흐름을 보면 ${p.keyword}는 ${trendFeeling}. ${openAdvice}`;
   }
@@ -456,6 +460,10 @@ interface EchoParams {
   rawPrice?: number | null;
   avgVolume?: number | null;
   currency?: 'KRW' | 'USD';
+  // ✅ 신뢰도 근거 분해 (시세/뉴스/거래량 기여 점수)
+  confPriceScore?: number | null;
+  confNewsScore?: number | null;
+  confVolumeScore?: number | null;
 }
 
 // ✅ ECHO — 하워드 막스(Howard Marks) 스타일
@@ -519,7 +527,7 @@ export const buildEchoText = (p: EchoParams): string => {
     } else if (p.watchLevel === 'weak') {
       // ✅ 다양한 표현으로 반복 방지 — 키워드 해시 기반 선택
       const weakPhrases = [
-        `신호가 거의 만들어지고 있습니다. {buy} 돌파 확인 시 투자금의 10%만 먼저 진입하십시오. 오늘 종가 기준으로 확인 후 결정하십시오.`,
+        `신호가 거의 만들어지고 있습니다. {buy} 돌파 확인 시 투자금의 10%만 먼저 진입하십시오. 매수 조건 동시 충족 시 즉각 10% 진입하십시오.`,
         `조금만 더 기다리십시오. {buy} 위로 올라서면서 거래량이 늘어날 때가 진입 시점입니다. 투자금의 10%만 먼저 매수하십시오.`,
         `진입 조건이 가까워지고 있습니다. {buy} 돌파 + 거래량 증가 동시 확인 시 투자금의 10%로 시작하십시오.`,
         `준비 구간입니다. {buy}을 오늘 종가에서 돌파하면 투자금의 10%만 선취매하십시오. 서두르지 마십시오.`,
@@ -638,7 +646,15 @@ export const buildEchoText = (p: EchoParams): string => {
     }
   }
 
-  const line1 = `결론: ${verdictEmoji} ${verdictText} (신뢰도 ${p.confidence}% — ${p.confidenceBasis})`;
+  const line1 = `결론: ${verdictEmoji} ${verdictText} (신뢰도 ${p.confidence}%)`;
+  // ✅ 신뢰도 근거 한 줄 — 시세/뉴스/거래량 점수 합산
+  const confBreakdown = (
+    typeof p.confPriceScore === 'number' &&
+    typeof p.confNewsScore === 'number' &&
+    typeof p.confVolumeScore === 'number'
+  )
+    ? `신뢰도 ${p.confidence}% = 시세 ${p.confPriceScore}점 + 뉴스 ${p.sentiment} ${p.confNewsScore}점 + 거래량 ${p.confVolumeScore}점 (${p.confidenceBasis})`
+    : `신뢰도 근거: ${p.confidenceBasis}`;
   const line2 = `근거: ${p.trendSummary ? p.trendSummary + ' / ' : ''}${p.volLabel} / 뉴스 ${p.sentiment} 신호 종합${conflictNote}`;
   const line3 = `지금: ${insight}${timeNote}`;
   const line4 = `조건: ${p.condSummary}`;
@@ -668,5 +684,5 @@ export const buildEchoText = (p: EchoParams): string => {
     line5 = `비중: 현재 0%입니다. ${buy1} 돌파 + 거래량 증가를 동시에 확인한 후 10%씩 단계적으로 진입하십시오.`;
   }
 
-  return [line1, line2, line3, line4, line5].join('\n');
+  return [line1, confBreakdown, line2, line3, line4, line5].join('\n');
 };
