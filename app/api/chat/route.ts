@@ -1044,7 +1044,34 @@ ${DISCLAIMER}`;
 
     console.log(`✅ ${keyword}(${assetType}) | ${verdict}(${total}점) | 신뢰도:${confidence}% | 에코:템플릿`);
 
-    const finalReply = [finalRay, finalJack, finalLucia, finalEcho].filter(Boolean).join('\n\n');
+    // ✅ MBTI 강화 문구 — 시간 기반 로테이션 (Vercel 서버리스 호환)
+    // 각 페르소나 스타일을 매 요청마다 다른 시그니처 문구로 보강
+    const rotIdx = Math.floor(Date.now() / 1000) % 3;
+
+    // JACK (INTJ · 전략가 / 댄 아이브스 스타일) — 모멘텀·구조적 확신
+    const jackMbtiPhrases = [
+      '이건 사이클이 아닙니다 — 구조적 변화입니다.',
+      '데이터가 말하는 방향으로 움직이십시오. 감정은 개입시키지 마십시오.',
+      '추세에 올라타는 것이 통계적으로 옳습니다.',
+    ];
+    // LUCIA (ENFP · 리스크·역발상 / 캐시 우드 스타일) — 심리·장기 시야
+    const luciaMbtiPhrases = [
+      '시장이 틀렸을 수 있어요. 5년 후를 보세요.',
+      '군중이 낙관할 때가 가장 위험하고, 공포에 휩싸일 때가 오히려 기회예요.',
+      '감정을 걸러내야 비로소 기회가 보여요.',
+    ];
+    // RAY (INTP · 데이터 분석) — 확률·지표 기반
+    const rayMbtiPhrases = [
+      '데이터는 거짓말하지 않습니다. 해석이 거짓말할 뿐.',
+      '가설은 많습니다 — 확률로 승부합니다.',
+      '신호와 소음을 구분하는 것이 핵심입니다.',
+    ];
+
+    const finalJackOut  = finalJack  + '\n— ' + jackMbtiPhrases[rotIdx];
+    const finalLuciaOut = finalLucia + '\n— ' + luciaMbtiPhrases[rotIdx];
+    const finalRayOut   = finalRay   + '\n— ' + rayMbtiPhrases[rotIdx];
+
+    const finalReply = [finalRayOut, finalJackOut, finalLuciaOut, finalEcho].filter(Boolean).join('\n\n');
 
     // ─── 뉴스 배정 ───
     type NewsRaw = { title: string; link?: string; originallink?: string; url?: string };
@@ -1103,7 +1130,7 @@ ${DISCLAIMER}`;
     return Response.json({
       reply: finalReply,
       personas: {
-        jack: finalJack, lucia: finalLucia, ray: finalRay, echo: finalEcho,
+        jack: finalJackOut, lucia: finalLuciaOut, ray: finalRayOut, echo: finalEcho,
         verdict, confidence, breakdown, positionSizing,
         jackNews, luciaNews, rayNews, echoNews,
       },

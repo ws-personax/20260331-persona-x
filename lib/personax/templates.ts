@@ -266,10 +266,10 @@ const LUCIA_METAPHORS = {
   ],
 };
 
-const pickMetaphor = (key: keyof typeof LUCIA_METAPHORS, keyword: string): string => {
+const pickMetaphor = (key: keyof typeof LUCIA_METAPHORS, _keyword: string): string => {
   const pool = LUCIA_METAPHORS[key];
-  // 키워드 해시로 인덱스 선택 → 같은 종목은 항상 같은 비유 (일관성)
-  const idx = keyword.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % pool.length;
+  // ✅ 시간 기반 로테이션 — Vercel 서버리스에서도 매 요청마다 다른 문구 유지
+  const idx = Math.floor(Date.now() / 1000) % pool.length;
   return pool[idx];
 };
 
@@ -397,7 +397,8 @@ const LUCIA_THEORIES: Partial<Record<MarketSituation, string>> = {
       '지금은 시장이 숨을 고르는 구간이에요. 거래량이 회복되기 전까지는 진입을 서두르지 않는 것이 맞습니다.',
       '관심 없는 종목이 오히려 기회인 경우가 많아요. 하지만 지금은 그 신호가 아직 오지 않았어요. 거래량이 늘어날 때 다시 살펴보는 것이 맞습니다.',
     ];
-    const idx = p.keyword.split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0) % drainPhrases.length;
+    // ✅ 시간 기반 로테이션 — 같은 종목이라도 요청 시점마다 다른 문구
+    const idx = Math.floor(Date.now() / 1000) % drainPhrases.length;
     // ✅ 수치 추가
     const luciaFmtVol = (v: number): string => {
       if (v >= 100000000) return `${(v / 100000000).toFixed(1)}억주`;
@@ -553,7 +554,8 @@ export const buildEchoText = (p: EchoParams): string => {
         `진입 조건이 가까워지고 있습니다. {buy} 돌파 + 거래량 증가 동시 확인 시 투자금의 10%로 시작하십시오.`,
         `준비 구간입니다. {buy}을 오늘 종가에서 돌파하면 투자금의 10%만 선취매하십시오. 서두르지 마십시오.`,
       ];
-      const phraseIdx = p.keyword.split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0) % weakPhrases.length;
+      // ✅ 시간 기반 로테이션 — 서버리스 요청마다 다른 문구
+      const phraseIdx = Math.floor(Date.now() / 1000) % weakPhrases.length;
       insightTemplate = `${p.trendSummary ? p.trendSummary + '. ' : ''}${weakPhrases[phraseIdx]}`;
     } else {
       // neutral
