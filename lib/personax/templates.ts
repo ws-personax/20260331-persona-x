@@ -194,10 +194,12 @@ export const buildJackText = (p: JackParams): string => {
   // ✅ 추세 맥락 — volSuffix 뒤에 마침표를 붙이고 추세 문장은 별도로
   const trendSentence = p.trendSummary ? ` ${p.trendSummary}.` : '';
 
-  // 충돌 상황 처리
+  // ✅ 충돌 상황 JACK 역반박 — 양방향 핑퐁
   const conflictNote = p.conflict === 'conflict_jack_buy'
-    ? ' 루시아는 과열을 경고하겠지만, 모멘텀 관점에서는 추세를 따르는 것이 맞습니다.'
-    : '';
+    ? ' 루시아의 신중론을 이해하지만, 지금은 기회를 놓치는 것이 더 큰 리스크입니다. 모멘텀 데이터가 명확합니다.'
+    : p.conflict === 'conflict_lucia_buy'
+      ? ' 루시아의 역발상을 이해하지만, 떨어지는 칼날을 잡으면 다칩니다. 바닥 확인이 먼저입니다.'
+      : '';
 
   if (interpretation && interpretation !== JACK_INTERPRETATIONS.normal) {
     return `지휘관님, ${contextNote}${p.keyword}${topicParticle(p.keyword)} ${p.volLabel}${particle(p.volLabel)} ${volSuffix}.${trendSentence} ${interpretation}${conflictNote} ${trend} 구간으로 ${action}`;
@@ -573,12 +575,43 @@ export const buildEchoText = (p: EchoParams): string => {
     .replace(/{keyword}/g, p.keyword)
     .replace(/{days}/g, days);
 
-  // ✅ 충돌 상황 에코 처리
+  // ✅ 충돌 상황 에코 처리 — 기존 line2 꼬리말 (Confluence 뒤 토론 블록과 분리)
   let conflictNote = '';
   if (p.conflict === 'conflict_jack_buy') {
     conflictNote = ' 잭은 모멘텀을, 루시아는 과열을 경고합니다. 두 신호가 충돌할 때는 포지션을 줄이는 것이 포트폴리오 이론의 정석입니다(리스크를 분산해 손실을 줄이는 원칙).';
   } else if (p.conflict === 'conflict_lucia_buy') {
     conflictNote = ' 잭은 하락을 경고하고 루시아는 역발상 기회를 말합니다. 두 신호 충돌 시 절반만 진입하고 나머지는 확인 후 결정하십시오.';
+  }
+
+  // ✅ ⚔️ 참모진 토론 블록 — 충돌 시에만 표시
+  //    JACK/LUCIA 각자 한 줄 요약 + ECHO의 채택 판단
+  let debateBlock = '';
+  if (p.conflict === 'conflict_jack_buy' || p.conflict === 'conflict_lucia_buy') {
+    const jackLine = p.conflict === 'conflict_jack_buy'
+      ? '모멘텀 확인됨 — 추세 추종 진입이 통계적으로 옳다'
+      : '하락 추세 — 떨어지는 칼날 금지, 바닥 확인 우선';
+    const luciaLine = p.conflict === 'conflict_jack_buy'
+      ? '과열 구간 — 군중 낙관은 되돌림 신호, 역발상 경계'
+      : '패닉 극단 — 공포에 탐욕을, 바닥 역발상 기회';
+    // ECHO 판단 — verdict와 충돌 유형 조합으로 어느 쪽 채택했는지
+    let echoJudgement: string;
+    if (p.verdict === '매수 우위') {
+      echoJudgement = p.conflict === 'conflict_jack_buy'
+        ? 'JACK 채택 — 모멘텀 신호 강세, 단 LUCIA 경고 반영해 분할 진입'
+        : 'LUCIA 채택 — 역발상 기회, 단 바닥 확인 후 소량 선진입';
+    } else if (p.verdict === '매도 우위') {
+      echoJudgement = p.conflict === 'conflict_jack_buy'
+        ? 'LUCIA 채택 — 과열 경고 우선, 포지션 축소 권고'
+        : 'JACK 채택 — 하락 신호 우선, 손절 라인 확인 권고';
+    } else {
+      echoJudgement = '중재 — 양 신호 충돌 구간, 신규 진입 보류 후 방향 확정 대기';
+    }
+    debateBlock = [
+      `⚔️ 참모진 의견 충돌:`,
+      `  JACK: ${jackLine}`,
+      `  LUCIA: ${luciaLine}`,
+      `  → ECHO 판단: ${echoJudgement}`,
+    ].join('\n');
   }
 
   // ✅ 시간 개념 추가 — 매수 우위일 때
@@ -767,5 +800,9 @@ export const buildEchoText = (p: EchoParams): string => {
     line5 = `비중: 현재 0%입니다. ${buy1} 돌파 + ${volThresholdLabel}을 동시에 확인한 후 10%씩 단계적으로 진입하십시오.`;
   }
 
-  return [line1, confluenceBlock, line2, line3, line4, line5].join('\n');
+  // ✅ debateBlock은 충돌 시에만 삽입 (Confluence 블록 뒤)
+  const parts = [line1, confluenceBlock];
+  if (debateBlock) parts.push(debateBlock);
+  parts.push(line2, line3, line4, line5);
+  return parts.join('\n');
 };
