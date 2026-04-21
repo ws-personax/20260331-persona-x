@@ -243,12 +243,27 @@ const PersonaBubble = memo(function PersonaBubble({
 }) {
   const p = PERSONAS[personaKey];
   const isEcho = personaKey === 'echo';
-  // ✅ Gemini 리터럴 \n 정규화 + useMemo로 파싱 캐싱
-  const { content, dataSource, disclaimer } = useMemo(() => {
+  // ✅ \n↳ 기준으로 본문과 반박 분리 + ECHO 메타 파싱
+  const { content, rebuttal, dataSource, disclaimer } = useMemo(() => {
     const normalizedText = text.replace(/\\n/g, '\n');
-    return isEcho
+    const parsed = isEcho
       ? parseEchoParts(normalizedText)
       : { content: normalizedText, dataSource: '', disclaimer: '' };
+    const splitIdx = parsed.content.indexOf('\n↳ ');
+    if (splitIdx !== -1) {
+      return {
+        content: parsed.content.slice(0, splitIdx).trim(),
+        rebuttal: parsed.content.slice(splitIdx + 1).trim(), // "↳ " 포함
+        dataSource: parsed.dataSource,
+        disclaimer: parsed.disclaimer,
+      };
+    }
+    return {
+      content: parsed.content,
+      rebuttal: '',
+      dataSource: parsed.dataSource,
+      disclaimer: parsed.disclaimer,
+    };
   }, [text, isEcho]);
 
   if (!content?.trim()) return null;
@@ -334,6 +349,36 @@ const PersonaBubble = memo(function PersonaBubble({
               {formatTime(timestamp)}
             </span>
           </div>
+
+          {/* ✅ 반박 말풍선 — 같은 페르소나 색상, 점선 테두리 + 들여쓰기 */}
+          {rebuttal && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginTop: 6, paddingLeft: 16 }}>
+              <div
+                style={{
+                  background: p.bubbleBg,
+                  opacity: 0.9,
+                  borderRadius: '0 12px 12px 12px',
+                  padding: '8px 12px',
+                  border: `1px dashed ${p.bubbleBorder}`,
+                  maxWidth: '100%',
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 13,
+                    lineHeight: 1.65,
+                    color: p.textColor,
+                    whiteSpace: 'pre-wrap',
+                    margin: 0,
+                    fontStyle: 'italic',
+                    fontWeight: 500,
+                  }}
+                >
+                  {rebuttal}
+                </p>
+              </div>
+            </div>
+          )}
 
           {!isEcho && newsItem?.url && <InlineNewsChip news={newsItem} />}
         </div>
