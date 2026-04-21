@@ -468,11 +468,9 @@ interface EchoParams {
   rawPrice?: number | null;
   avgVolume?: number | null;
   currency?: 'KRW' | 'USD';
-  // ✅ 신뢰도 근거 분해 (이평선/거래량/뉴스/시세 안정 기여 점수)
-  confTrendScore?: number | null;
-  confVolumeScore?: number | null;
-  confNewsScore?: number | null;
-  confPriceScore?: number | null;
+  // ✅ Confluence Score — 4지표 일치 여부 (이평선/거래량/뉴스/시세)
+  volIsHigh?: boolean;
+  hasMarketData?: boolean;
   rawVolume?: number | null;
 }
 
@@ -660,16 +658,39 @@ export const buildEchoText = (p: EchoParams): string => {
     }
   }
 
-  const line1 = `결론: ${verdictEmoji} ${verdictText} (신뢰도 ${p.confidence}%)`;
-  // ✅ 신뢰도 근거 한 줄 — 이평선/거래량/뉴스/시세 안정 4개 점수 합산
-  const confBreakdown = (
-    typeof p.confTrendScore === 'number' &&
-    typeof p.confVolumeScore === 'number' &&
-    typeof p.confNewsScore === 'number' &&
-    typeof p.confPriceScore === 'number'
-  )
-    ? `신뢰도 ${p.confidence}% = 이평선 ${p.confTrendScore}점 + 거래량 ${p.confVolumeScore}점 + 뉴스 ${p.sentiment} ${p.confNewsScore}점 + 시세 안정 ${p.confPriceScore}점`
-    : `신뢰도 근거: ${p.confidenceBasis}`;
+  const line1 = `결론: ${verdictEmoji} ${verdictText}`;
+
+  // ✅ Confluence Score — 4지표 일치 체크
+  const trendPass  = p.trendStrength === 'strong_up' || p.trendStrength === 'weak_up';
+  const volumePass = !!p.volIsHigh;
+  const newsPass   = p.sentiment === '긍정';
+  const newsWarn   = p.sentiment === '중립';
+  const pricePass  = !!p.hasMarketData;
+
+  const trendIcon  = trendPass ? '✅' : '⚠️';
+  const volumeIcon = volumePass ? '✅' : '⚠️';
+  const newsIcon   = newsPass ? '✅' : newsWarn ? '⚠️' : '❌';
+  const priceIcon  = pricePass ? '✅' : '⚠️';
+
+  const passCount = [trendPass, volumePass, newsPass, pricePass].filter(Boolean).length;
+  const strengthLabel = passCount >= 4 ? '높음' : passCount === 3 ? '보통' : '낮음';
+
+  const trendText = trendPass
+    ? '이평선 상승 추세'
+    : p.trendStrength === 'strong_down' || p.trendStrength === 'weak_down'
+      ? '이평선 하락 추세'
+      : '이평선 방향 불확정';
+  const volumeText = volumePass ? '거래량 증가' : '거래량 평이';
+  const newsText   = `뉴스 ${p.sentiment}`;
+  const priceText  = pricePass ? '시세 안정' : '시세 미수급';
+
+  const confluenceBlock = [
+    `컨플루언스 신호 강도: ${strengthLabel} (${passCount}/4 지표 일치)`,
+    `${trendIcon} ${trendText}`,
+    `${volumeIcon} ${volumeText}`,
+    `${newsIcon} ${newsText}`,
+    `${priceIcon} ${priceText}`,
+  ].join('\n');
   const line2 = `근거: ${p.trendSummary ? p.trendSummary + ' / ' : ''}${p.volLabel} / 뉴스 ${p.sentiment} 신호 종합${conflictNote}`;
   const line3 = `지금: ${insight}${timeNote}`;
   const line4 = `조건: ${p.condSummary}`;
@@ -712,5 +733,5 @@ export const buildEchoText = (p: EchoParams): string => {
     line5 = `비중: 현재 0%입니다. ${buy1} 돌파 + ${volThresholdLabel}을 동시에 확인한 후 10%씩 단계적으로 진입하십시오.`;
   }
 
-  return [line1, confBreakdown, line2, line3, line4, line5].join('\n');
+  return [line1, confluenceBlock, line2, line3, line4, line5].join('\n');
 };

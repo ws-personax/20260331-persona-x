@@ -199,7 +199,7 @@ const MetaBox = ({ dataSource, disclaimer }: { dataSource: string; disclaimer: s
         </p>
       )}
       <p style={{ fontSize: 10, color: '#2563eb', margin: '5px 0 0', lineHeight: 1.5, fontWeight: 600 }}>
-        💡 신뢰도 가이드: 60%+ 참고 · 70%+ 고려 · 80%+ 확신
+        💡 컨플루언스 가이드: 낮음 → 참고 · 보통 → 고려 · 높음 → 확신
       </p>
       {disclaimer && (
         <div style={{ marginTop: 8, borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: 8 }}>
