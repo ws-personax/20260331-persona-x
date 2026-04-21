@@ -809,10 +809,18 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   //    summary: 모드별 결론(conflict 시 ECHO 질문 포함) — 즉시 표시
   //    details: 기존 Confluence + 근거 + 지금 + 조건 + 비중 — 별도 버블
 
-  // 📍 조건 — 검증된 진입/정리 트리거 한 줄
+  // 📍 조건 — 검증된 진입/정리 트리거 한 줄 (거래량 수치 명시 — 중복 방지)
+  const triggerFmtVol = (v: number): string => {
+    if (v >= 100000000) return `${(v / 100000000).toFixed(1)}억주`;
+    if (v >= 10000) return `${Math.round(v / 10000).toLocaleString()}만주`;
+    return `${v.toLocaleString()}주`;
+  };
+  const volNumberLabel = p.avgVolume && p.avgVolume > 0
+    ? `거래량 ${triggerFmtVol(Math.round(p.avgVolume * 1.3))} 이상`
+    : '거래량 평소 대비 30% 이상';
   const trigger = (p.verdict === '매도 우위')
     ? `${p.sellPrice || '손절가'} 이탈 시 정리`
-    : `${p.buyPrice || '매수 조건'} 돌파 + 거래량 증가`;
+    : `${p.buyPrice || '매수 조건'} 돌파 + ${volNumberLabel}`;
 
   // 📍 행동 — 한 줄 (코인은 더 보수적 비중)
   const isCrypto = p.assetType === 'CRYPTO';
@@ -879,8 +887,8 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
     const openTime = isKR ? '09:00' : '23:30';
     const halfCheckpoint = isKR ? '12시 30분까지' : '개장 후 3시간(02:30)까지';
     const forecastCondition = p.isBeforeOpen
-      ? `${openTime} 개장 후 ${halfCheckpoint} 거래량 ${trigger}`
-      : `내일 ${halfCheckpoint} 거래량 ${trigger}`;
+      ? `${openTime} 개장 후 ${halfCheckpoint} ${trigger}`
+      : `내일 ${halfCheckpoint} ${trigger}`;
     const forecastAction = mode === 'bull'
       ? '조건 충족 시 10% 진입 → 잭의 상승 전망 + 루시아의 거래량 조건 채택'
       : mode === 'bear'

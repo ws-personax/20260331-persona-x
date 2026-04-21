@@ -1068,31 +1068,60 @@ ${DISCLAIMER}`;
 
     console.log(`✅ ${keyword}(${assetType}) | ${verdict}(${total}점) | 신뢰도:${confidence}% | 에코:템플릿`);
 
-    // ✅ MBTI 강화 문구 — 시간 기반 로테이션 (Vercel 서버리스 호환)
-    // 각 페르소나 스타일을 매 요청마다 다른 시그니처 문구로 보강
+    // ✅ MBTI 강화 문구 — 모드별 분기 + 시간 기반 로테이션
     const rotIdx = Math.floor(Date.now() / 1000) % 3;
 
-    // JACK (INTJ · 전략가 / 댄 아이브스 스타일) — 모멘텀·구조적 확신
-    const jackMbtiPhrases = [
+    // JACK (INTJ · 전략가) — 모드별 문구
+    const JACK_MBTI_BULL = [
       '이건 사이클이 아닙니다 — 구조적 변화입니다.',
       '데이터가 말하는 방향으로 움직이십시오. 감정은 개입시키지 마십시오.',
       '추세에 올라타는 것이 통계적으로 옳습니다.',
     ];
-    // LUCIA (ENFP · 리스크·역발상 / 캐시 우드 스타일) — 심리·장기 시야
-    const luciaMbtiPhrases = [
-      '시장이 틀렸을 수 있어요. 5년 후를 보세요.',
-      '군중이 낙관할 때가 가장 위험하고, 공포에 휩싸일 때가 오히려 기회예요.',
-      '감정을 걸러내야 비로소 기회가 보여요.',
+    const JACK_MBTI_BEAR = [
+      '데이터가 경고하고 있습니다. 따르십시오.',
+      '지금은 현금이 전략입니다.',
+      '후퇴도 전략입니다. 재진입 기회를 기다리십시오.',
     ];
-    // RAY (INTP · 데이터 분석) — 확률·지표 기반
+    const JACK_MBTI_CONFLICT = [
+      '신호 확인 후 행동하십시오.',
+      '준비된 자만이 기회를 잡습니다.',
+      '데이터가 확정되기 전엔 움직이지 마십시오.',
+    ];
+    const jackMbtiPool =
+      discussMode === 'bull' ? JACK_MBTI_BULL
+      : discussMode === 'bear' ? JACK_MBTI_BEAR
+      : JACK_MBTI_CONFLICT;
+
+    // LUCIA (ENFP · 리스크·역발상) — 모드별 문구
+    const LUCIA_MBTI_BULL = [
+      '군중이 낙관할 때가 가장 위험해요. 과열은 늘 되돌림이 있어요.',
+      'FOMO에 빠지지 마세요. 남들이 탐욕스러울 때 냉정해지세요.',
+      '시장이 틀렸을 수 있어요. 5년 후를 보세요.',
+    ];
+    const LUCIA_MBTI_BEAR = [
+      '손실을 막는 게 수익을 내는 것보다 먼저예요.',
+      '현금도 포지션이에요. 기다릴 줄 아는 게 실력이에요.',
+      '공포가 지나간 자리에 기회가 남아요. 바닥 확인 후 접근하세요.',
+    ];
+    const LUCIA_MBTI_CONFLICT = [
+      '신호가 엇갈릴 때는 한 발 물러서는 게 맞아요.',
+      '감정을 걸러내야 비로소 기회가 보여요.',
+      '확신이 들 때까지 기다리는 것도 전략이에요.',
+    ];
+    const luciaMbtiPool =
+      discussMode === 'bull' ? LUCIA_MBTI_BULL
+      : discussMode === 'bear' ? LUCIA_MBTI_BEAR
+      : LUCIA_MBTI_CONFLICT;
+
+    // RAY (INTP · 데이터 분석) — 중립 유지
     const rayMbtiPhrases = [
       '데이터는 거짓말하지 않습니다. 해석이 거짓말할 뿐.',
       '가설은 많습니다 — 확률로 승부합니다.',
       '신호와 소음을 구분하는 것이 핵심입니다.',
     ];
 
-    const finalJackOut  = finalJack  + '\n— ' + jackMbtiPhrases[rotIdx];
-    const finalLuciaOut = finalLucia + '\n— ' + luciaMbtiPhrases[rotIdx];
+    const finalJackOut  = finalJack  + '\n— ' + jackMbtiPool[rotIdx];
+    const finalLuciaOut = finalLucia + '\n— ' + luciaMbtiPool[rotIdx];
     const finalRayOut   = finalRay   + '\n— ' + rayMbtiPhrases[rotIdx];
 
     const finalReply = [finalRayOut, finalJackOut, finalLuciaOut, finalEcho].filter(Boolean).join('\n\n');
