@@ -93,6 +93,9 @@ interface JackParams {
   // ✅ 토론 모드 + 지표 플래그
   mode?: DiscussMode;
   flags?: IndicatorFlags;
+  // ✅ 지지/돌파 가격 (bearMode 역발상 진입 조건용)
+  supportPrice?: string | null;
+  breakoutPrice?: string | null;
 }
 
 // ✅ JACK 매수 표현 로테이션 — 5개
@@ -219,15 +222,19 @@ export const buildJackText = (p: JackParams): string => {
     line1 = `지휘관님, ${p.keyword}${topicParticle(p.keyword)} ${positiveText}. 이 신호만으로도 진입은 정당화됩니다.`;
     line2 = `${volCondition} 1차 진입 검토. ${buyPhrase}.`;
   } else {
-    // bear — 하락의 "데이터 근거" 중심 관망 (수치/패턴 기반)
+    // bear — 역발상 강세론자 (조정 속 기회 탐색, 3줄)
     const negatives: string[] = [];
     if (flags?.trendDown) negatives.push('이평선 하락');
     if (flags?.newsNeg) negatives.push('뉴스 부정');
     if (flags?.volDown) negatives.push('거래량 감소');
     if (flags?.priceDown) negatives.push('시세 하락');
     const negText = negatives.join(' + ') || '하락 지표 우세';
-    line1 = `지휘관님, ${p.keyword}${topicParticle(p.keyword)} ${negText} 기준으로 ${p.price || '지지선'} 지지 확인 전까지 대기하십시오.`;
-    line2 = `역사적으로 이 패턴은 추가 하락으로 이어졌습니다.`;
+    const supportLabel = p.supportPrice || '지지선';
+    const breakoutLabel = p.breakoutPrice || '반등 기준가';
+    const bearL1 = `지휘관님, ${negText} 기준으로 조정 구간입니다.`;
+    const bearL2 = `단, ${supportLabel} 지지 확인 시 소량 역발상 진입을 검토하십시오.`;
+    const bearL3 = `반등 신호: ${breakoutLabel} 돌파 + 거래량 증가.`;
+    return `${bearL1}\n${bearL2}\n${bearL3}${jackRebuttal}`;
   }
 
   return `${line1}\n${line2}${jackRebuttal}`;
@@ -355,13 +362,21 @@ export const buildLuciaText = (p: LuciaParams): string => {
 
     let line1: string;
     let line2: string;
+    // ✅ 최근 흐름(어제 거래량) 인지 문장 — isBeforeOpen 대기 안내 전용
+    const hasPrevVolData = !!(p.rawVolume && p.rawVolume > 0);
+    const isKRForecast = p.assetType === 'KOREAN_STOCK';
+    const volCheckLabel = isKRForecast ? '12시 30분까지' : '개장 후 3시간(02:30)까지';
+    const historyAwareLine = hasPrevVolData
+      ? '어제도 거래량이 저조했어요. 오늘 개장 후 첫 캔들 방향이 중요해요.'
+      : `개장 후 거래량이 살아나는지 ${volCheckLabel} 확인해보세요.`;
+
     if (mode === 'bear') {
       const head = negText ? `${negText} 기준으로` : '부정 신호 누적으로';
       line1 = p.isBeforeOpen
         ? `소장님, ${head} 마치 ${metaphor}.`
         : `소장님, 오늘 흐름도 약했어요 — 마치 ${metaphor}.`;
       line2 = p.isBeforeOpen
-        ? `개장 후 첫 30분은 지켜보는 게 맞아요.`
+        ? historyAwareLine
         : `내일 개장 후 반등 확인 전까지 진입은 미루세요.`;
     } else if (mode === 'bull') {
       // 흐름은 좋아 보여도 FOMO 경고
@@ -377,7 +392,7 @@ export const buildLuciaText = (p: LuciaParams): string => {
         ? `소장님, ${head} 마치 ${metaphor}.`
         : `소장님, 오늘 마감 후에도 ${head.replace(/이 있어요\.|가 있어요\.$/, '')}. 마치 ${metaphor}.`;
       line2 = p.isBeforeOpen
-        ? `개장 후 첫 30분을 지켜본 뒤 결정하세요.`
+        ? historyAwareLine
         : `내일 방향이 확인되기 전까지 신규 진입은 보류하세요.`;
     }
 

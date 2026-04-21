@@ -832,6 +832,8 @@ ${DISCLAIMER}`;
           currency,
           mode: discussMode,
           flags,
+          supportPrice: sellPrice || null,
+          breakoutPrice: buyPrice || null,
         })
       : `지휘관님, ${keyword} 시세 미수급으로 추세 판단이 제한됩니다. 뉴스 확인 후 신호 포착 시 진입을 검토하십시오.`;
 
@@ -1068,53 +1070,65 @@ ${DISCLAIMER}`;
 
     console.log(`✅ ${keyword}(${assetType}) | ${verdict}(${total}점) | 신뢰도:${confidence}% | 에코:템플릿`);
 
-    // ✅ MBTI 강화 문구 — 모드별 분기 + 시간 기반 로테이션
-    const rotIdx = Math.floor(Date.now() / 1000) % 3;
+    // ✅ MBTI 강화 문구 — 상승/하락 풀로 분리 (각 10개)
 
-    // JACK (INTJ · 전략가) — 모드별 문구
-    const JACK_MBTI_BULL = [
+    // JACK (INTJ · 전략가) — 상승/하락
+    const JACK_BULLISH = [
       '이건 사이클이 아닙니다 — 구조적 변화입니다.',
+      '강세장은 비관 속에서 태어납니다.',
+      '추세는 친구입니다. 따르십시오.',
+      '모멘텀이 있을 때 올라타십시오.',
+      '기회는 준비된 자에게만 옵니다.',
+      '지금이 마지막 저점일 수 있습니다.',
+      '시장은 용기 있는 자의 편입니다.',
       '데이터가 말하는 방향으로 움직이십시오. 감정은 개입시키지 마십시오.',
+      '망설임이 가장 큰 리스크입니다.',
       '추세에 올라타는 것이 통계적으로 옳습니다.',
     ];
-    const JACK_MBTI_BEAR = [
+    const JACK_BEARISH = [
       '데이터가 경고하고 있습니다. 따르십시오.',
-      '지금은 현금이 전략입니다.',
-      '후퇴도 전략입니다. 재진입 기회를 기다리십시오.',
+      '후퇴도 전략입니다. 재진입 기회는 반드시 옵니다.',
+      '현금도 포지션입니다.',
+      '살아남아야 다음 기회가 있습니다.',
+      '손실을 줄이는 것이 첫 번째 임무입니다.',
+      '시장에 맞서지 마십시오.',
+      '바닥 확인이 먼저입니다.',
+      '떨어지는 칼날을 잡지 마십시오.',
+      '지지선을 확인하십시오.',
+      '재진입 기회는 반드시 옵니다.',
     ];
-    const JACK_MBTI_CONFLICT = [
-      '신호 확인 후 행동하십시오.',
-      '준비된 자만이 기회를 잡습니다.',
-      '데이터가 확정되기 전엔 움직이지 마십시오.',
-    ];
-    const jackMbtiPool =
-      discussMode === 'bull' ? JACK_MBTI_BULL
-      : discussMode === 'bear' ? JACK_MBTI_BEAR
-      : JACK_MBTI_CONFLICT;
+    // JACK: bear → 하락, else(bull/conflict) → 상승
+    const jackMbtiPool = discussMode === 'bear' ? JACK_BEARISH : JACK_BULLISH;
 
-    // LUCIA (ENFP · 리스크·역발상) — 모드별 문구
-    // bullMode 본문에 이미 FOMO 문구가 있으므로 MBTI에는 FOMO 단어 재사용 금지
-    const LUCIA_MBTI_BULL = [
+    // LUCIA (ENFP · 리스크·역발상) — 상승/하락
+    const LUCIA_BULLISH = [
+      '시장이 틀렸을 수 있어요. 5년 후를 보세요.',
+      'FOMO에 휩쓸리지 마세요.',
       '남들이 탐욕스러울 때 냉정해지세요.',
       '검증된 신호만 따라가세요.',
       '서두름이 가장 큰 적이에요.',
-    ];
-    const LUCIA_MBTI_BEAR = [
-      '손실을 막는 게 수익을 내는 것보다 먼저예요.',
-      '현금도 포지션이에요. 기다릴 줄 아는 게 실력이에요.',
-      '공포가 지나간 자리에 기회가 남아요. 바닥 확인 후 접근하세요.',
-    ];
-    const LUCIA_MBTI_CONFLICT = [
-      '신호가 엇갈릴 때는 한 발 물러서는 게 맞아요.',
       '감정을 걸러내야 비로소 기회가 보여요.',
-      '확신이 들 때까지 기다리는 것도 전략이에요.',
+      '좋은 흐름일수록 더 신중해야 해요.',
+      '군중이 낙관할 때가 가장 위험해요.',
+      '확인 후 진입이 항상 맞아요.',
+      '오를 때 리스크가 더 커요.',
     ];
-    const luciaMbtiPool =
-      discussMode === 'bull' ? LUCIA_MBTI_BULL
-      : discussMode === 'bear' ? LUCIA_MBTI_BEAR
-      : LUCIA_MBTI_CONFLICT;
+    const LUCIA_BEARISH = [
+      '손실을 막는 게 수익을 내는 것보다 먼저예요.',
+      '지금은 지키는 게 맞아요.',
+      '공포가 최고의 매수 기회였던 역사를 잊지 마세요.',
+      '모두가 팔 때가 오히려 기회일 수 있어요.',
+      '현금이 최고의 포지션이에요.',
+      '용감한 투자자도 때론 쉬어야 해요.',
+      '손실을 줄이는 것도 수익이에요.',
+      '한 발 물러서는 것도 전략이에요.',
+      '무서울 때일수록 데이터를 보세요.',
+      '내일 더 좋은 기회가 올 수 있어요.',
+    ];
+    // LUCIA: bull → 상승(경고), else(bear/conflict) → 하락(지지/역발상)
+    const luciaMbtiPool = discussMode === 'bull' ? LUCIA_BULLISH : LUCIA_BEARISH;
 
-    // RAY (INTP · 데이터 분석) — 명언 8개로 확장
+    // RAY (INTP · 데이터 분석) — 중립 명언 8개
     const rayMbtiPhrases = [
       '데이터는 거짓말하지 않습니다. 해석이 거짓말할 뿐.',
       '가설은 많습니다 — 확률로 승부합니다.',
@@ -1125,10 +1139,13 @@ ${DISCLAIMER}`;
       '감정이 아닌 확률로 판단하십시오.',
       '시장은 단기적으로 투표기계, 장기적으로 저울입니다.',
     ];
+
+    // ✅ 10개 풀에 맞춘 로테이션
+    const mbtiIdx   = Math.floor(Date.now() / 1000) % 10;
     const rayRotIdx = Math.floor(Date.now() / 1000) % rayMbtiPhrases.length;
 
-    const finalJackOut  = finalJack  + '\n— ' + jackMbtiPool[rotIdx];
-    const finalLuciaOut = finalLucia + '\n— ' + luciaMbtiPool[rotIdx];
+    const finalJackOut  = finalJack  + '\n— ' + jackMbtiPool[mbtiIdx];
+    const finalLuciaOut = finalLucia + '\n— ' + luciaMbtiPool[mbtiIdx];
     const finalRayOut   = finalRay   + '\n— ' + rayMbtiPhrases[rayRotIdx];
 
     const finalReply = [finalRayOut, finalJackOut, finalLuciaOut, finalEcho].filter(Boolean).join('\n\n');
