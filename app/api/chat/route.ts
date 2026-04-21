@@ -876,56 +876,22 @@ ${DISCLAIMER}`;
     // ✅ 히스토리 — 이전 종목 맥락 연결용으로만 사용
 
     // ─── ✅ 레이: 완전 템플릿화 (Gemini 배제) ───
-    // ✅ 레이 나스닥 연동 설명 — 초보자용 괄호 설명 추가
-    const correlationNote = assetType === 'CRYPTO'
-      ? '코인 시장은 나스닥과 독립적으로 움직이는 경우가 많습니다(나스닥이 올라도 코인이 따로 움직일 수 있다는 뜻입니다)'
-      : assetType === 'KOREAN_STOCK' ? '외국인 수급을 통해 나스닥과 간접 연동됩니다(나스닥이 오르면 외국인이 한국 주식도 함께 사는 경향이 있다는 뜻입니다)'
-      : '나스닥과 직접 연동되며 동조화 경향이 높습니다(나스닥이 오르면 이 종목도 함께 오르는 경향이 강하다는 뜻입니다)';
-
-    // ✅ 레이 상황별 통계적 해석 — 수치 기반
-    // ✅ 이평선 설명: RAY 첫 언급 시 괄호로 한 번만 설명
-    const trendSummaryWithExplain = trendCtx.trendSummary
-      ? trendCtx.trendSummary.replace(
-          '5일·20일 이평선',
-          '5일·20일 이평선(5일, 20일 동안의 평균 주가를 연결한 선, 추세 방향 지표)'
-        )
-      : '';
-    const trendPrefix = trendSummaryWithExplain
-      ? `${trendSummaryWithExplain}. `
-      : '';
-
-    // ✅ 레이 거래량 수치 헬퍼
-    const rayFmtVol = (v: number): string => {
-      if (v >= 100000000) return `${(v / 100000000).toFixed(1)}억주`;
-      if (v >= 10000) return `${Math.round(v / 10000).toLocaleString()}만주`;
-      return `${v.toLocaleString()}주`;
-    };
-    const rayAvgVol = marketData?.avgVolume && marketData.avgVolume > 0 ? marketData.avgVolume : null;
-    const rayVolNote = rayAvgVol
-      ? ` 신호 기준: 거래량 ${rayFmtVol(Math.round(rayAvgVol * 1.3))} 이상(5일 평균 ${rayFmtVol(rayAvgVol)} 대비 30%)`
-      : '';
     // ✅ 장 미개장 시 레이도 기준 날짜 표시
     const rayTimeNote = (isKRClosed && assetType === 'KOREAN_STOCK') || (isUSClosed && assetType === 'US_STOCK')
       ? ` (${isWeekend ? '지난 금요일' : isKRBeforeOpen ? '전일' : '오늘'} 종가 기준)`
       : '';
 
-    const situationNote: Record<string, string> = {
-      accumulation: `${trendPrefix}수급 유입 대비 가격 미반응 — 매집 초기 패턴으로 방향성 확정 시 빠른 움직임 예상됩니다${rayVolNote}`,
-      trending:     `${trendPrefix}수급·가격 동반 상승 — 정배열 구간(5일·20일 이평선이 나란히 우상향하는 구조, 상승 추세가 지속될 가능성이 높은 상태)으로 추세 추종 전략이 통계적으로 유효합니다${rayVolNote}`,
-      stalemate:    `${trendPrefix}거래량 증가 대비 가격 정체 — 매수·매도 균형 교착 구간으로 돌파 방향이 다음 추세를 결정합니다${rayVolNote}`,
-      drain:        `${trendPrefix}수급 이탈 구간 — 거래량 없는 가격 움직임은 신뢰도가 낮습니다${rayVolNote}`,
-      panic:        `${trendPrefix}패닉 셀 구간 — 거래량 폭증+급락 동시 발생, 감정적 투매 가능성이 높습니다${rayVolNote}`,
-      exhaustion:   `${trendPrefix}고점 근접+거래량 둔화 — 상승 에너지 소진 신호로 신규 진입 위험 구간입니다${rayVolNote}`,
-      normal:       `${trendPrefix}특이 신호 없음 — 일반적 시장 흐름입니다${rayVolNote}`,
-    };
+    // ✅ USD 가격 간소화 표기 — "380.56" → "약 $381"
+    const rayPriceDisplay = marketData
+      ? (currency === 'USD' && marketData.rawPrice
+          ? `약 $${Math.round(marketData.rawPrice).toLocaleString('en-US')}`
+          : `${marketData.price}${currency === 'KRW' ? '원' : ''}`)
+      : '미지원';
 
     const finalRay = (() => {
       const closedNote = rayTimeNote ? rayTimeNote : '';
-      // ✅ 오늘 거래량/5일 평균 구체 숫자 — 둘 다 있을 때만 표시
       const rayRawVol = marketData?.rawVolume && marketData.rawVolume > 0 ? marketData.rawVolume : null;
-      const rayVolDetail = (rayRawVol && rayAvgVol)
-        ? ` (오늘 ${rayFmtVol(rayRawVol)} / 5일 평균 ${rayFmtVol(rayAvgVol)})`
-        : '';
+      const rayAvgVol = marketData?.avgVolume && marketData.avgVolume > 0 ? marketData.avgVolume : null;
       // ✅ 거래량 라벨 — rawVolume vs avgVolume 실제 숫자 비교로 판단
       const rayVolLabel = (rayRawVol && rayAvgVol)
         ? (rayRawVol > rayAvgVol * 1.1
@@ -934,19 +900,15 @@ ${DISCLAIMER}`;
               ? '거래량 감소'
               : '거래량 보통')
         : vol.label;
-      const line1 = assetType === 'KOREAN_STOCK'
-        ? `외국인 수급 기준${closedNote} / ${keyword} ${marketData?.price || '미지원'} (${safeNum(marketData?.change)}%) / ${vix.label} / ${rayVolLabel}${rayVolDetail}입니다.`
-        : `나스닥 ${safeNum(nasdaqData?.change)}% / ${keyword} ${marketData?.price || '미지원'} (${safeNum(marketData?.change)}%) / ${vix.label} / ${rayVolLabel}${rayVolDetail}${closedNote}입니다.`;
 
-      // ✅ rayVolLabel 기준으로 수급 상태 판정 — "증가"일 때만 "확대", 그 외(보통/감소)는 "제한적"
-      const rayVolIsIncreasing = rayVolLabel.includes('증가');
-      const line2 = marketData
-        ? `${rayVolLabel}이기 때문에 수급 유입이 ${rayVolIsIncreasing ? '확대되고 있으며' : '제한적이며'}, ${vix.label} 구간이므로 가격 탄력이 ${vix.label.includes('고변동') ? '높아 급등락에 주의가 필요합니다' : vix.label.includes('중변동') ? '보통 수준입니다' : '낮아 추세 형성이 제한적입니다'}. ${correlationNote}.`
-        : '시세 미수급 — 뉴스 및 외부 신호 기반으로 판단이 제한됩니다.';
+      // ✅ 1줄 — 시세 / 거래량 / 변동성 핵심
+      const line1 = `${keyword} ${rayPriceDisplay} (${safeNum(marketData?.change)}%) / ${vix.label} / ${rayVolLabel}${closedNote}`;
 
-      const line3 = situationNote[situation] + ` 진입 적합도: ${rayAdaptability}입니다.`;
+      // ✅ 2줄 — 이평선 + 진입 적합도 (괄호 설명 제거)
+      const trendLine = trendCtx.trendSummary || '추세 방향 불확정';
+      const line2 = `${trendLine} — 진입 적합도: ${rayAdaptability}`;
 
-      return [line1, line2, line3].join('\n');
+      return [line1, line2].join('\n');
     })();
 
     // ─── ✅ Gemini 완전 제거 — 에코 템플릿 직접 사용 ───
@@ -954,6 +916,7 @@ ${DISCLAIMER}`;
     const isMarketIndex = MARKET_INDEX_SET.has(keyword);
 
     let finalEcho: string;
+    let finalEchoDetails: string | null = null;
 
     if (isMarketIndex) {
       const marketTrendDesc = trendCtx.trendSummary
@@ -1009,7 +972,7 @@ ${DISCLAIMER}`;
       finalEcho = `${indexEcho}\n\n${dataSourceLabel}${DISCLAIMER}`;
 
     } else {
-      const echoFallback = buildEchoText({
+      const echoBuilt = buildEchoText({
         keyword,
         situation,
         verdict,
@@ -1040,7 +1003,10 @@ ${DISCLAIMER}`;
         volIsHigh: vol.isHigh,
         hasMarketData: !!marketData,
       });
-      finalEcho = `${echoFallback}\n\n${dataSourceLabel}${marketClosedNote}${DISCLAIMER}`;
+      // ✅ ECHO 1 (summary): 즉시 표시 — 결론/조건/행동 3줄
+      // ✅ ECHO 2 (details): 별도 버블 — confluence + 근거 + 지금 + 조건 + 비중 + dataSource + disclaimer
+      finalEcho = echoBuilt.summary;
+      finalEchoDetails = `${echoBuilt.details}\n\n${dataSourceLabel}${marketClosedNote}${DISCLAIMER}`;
     }
 
     console.log(`✅ ${keyword}(${assetType}) | ${verdict}(${total}점) | 신뢰도:${confidence}% | 에코:템플릿`);
@@ -1132,6 +1098,7 @@ ${DISCLAIMER}`;
       reply: finalReply,
       personas: {
         jack: finalJackOut, lucia: finalLuciaOut, ray: finalRayOut, echo: finalEcho,
+        echoDetails: finalEchoDetails,
         verdict, confidence, breakdown, positionSizing,
         jackNews, luciaNews, rayNews, echoNews,
       },

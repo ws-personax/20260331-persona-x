@@ -17,6 +17,7 @@ interface PersonaData {
   lucia: string;
   ray: string;
   echo: string;
+  echoDetails?: string | null;
   verdict: string;
   confidence: number;
   breakdown: string;
@@ -800,7 +801,10 @@ export default function ChatWindow() {
                         <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>
                           ── ECHO COMMAND ──
                         </div>
-                        <PersonaBubble personaKey="echo" text={msg.personas.echo} timestamp={msg.timestamp} echoNews={msg.personas.echoNews} />
+                        <PersonaBubble personaKey="echo" text={msg.personas.echo} timestamp={msg.timestamp} />
+                        {msg.personas.echoDetails && (
+                          <PersonaBubble personaKey="echo" text={msg.personas.echoDetails} timestamp={msg.timestamp} echoNews={msg.personas.echoNews} />
+                        )}
                       </>
                     );
                   }
@@ -813,7 +817,10 @@ export default function ChatWindow() {
                       <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>
                         ── ECHO COMMAND ──
                       </div>
-                      <PersonaBubble personaKey="echo" text={msg.personas.echo} timestamp={msg.timestamp} echoNews={msg.personas.echoNews} />
+                      <PersonaBubble personaKey="echo" text={msg.personas.echo} timestamp={msg.timestamp} />
+                      {msg.personas.echoDetails && (
+                        <PersonaBubble personaKey="echo" text={msg.personas.echoDetails} timestamp={msg.timestamp} echoNews={msg.personas.echoNews} />
+                      )}
                     </>
                   );
                 })() : (

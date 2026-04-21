@@ -8,7 +8,7 @@ export const safeNum = (val: unknown): number => {
 export const fmtPrice = (n: number, currency: 'KRW' | 'USD'): string =>
   currency === 'KRW'
     ? Math.round(n).toLocaleString('ko-KR') + '원'
-    : n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USD';
+    : '약 $' + Math.round(n).toLocaleString('en-US');
 
 export const DISCLAIMER = `
 ─────────────────────────
