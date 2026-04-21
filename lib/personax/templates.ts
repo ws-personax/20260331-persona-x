@@ -158,11 +158,15 @@ export const buildJackText = (p: JackParams): string => {
     ? `(돌파 신호 = 가격이 오늘 고점을 넘으면서 거래량이 ${jackFormatVol(Math.round(jackAvgVol * 1.2))} 이상 늘어날 때 — 평소 ${jackFormatVol(jackAvgVol)} 대비 20%)`
     : `(돌파 신호 = 가격이 오늘 고점을 넘으면서 거래량이 평소보다 20% 이상 늘어날 때)`;
 
+  // ✅ 매수/매도 우위에도 avgVolume 기반 거래량 신호 추가
+  const jackBuySellVolNote = jackAvgVol
+    ? ` 신호 기준: 거래량 ${jackFormatVol(Math.round(jackAvgVol * 1.3))} 이상(5일 평균 ${jackFormatVol(jackAvgVol)} 대비 30%).`
+    : '';
   let action = '';
   if (p.verdict === '매수 우위') {
-    action = p.volIsHigh ? `즉각 분할 매수를 검토하십시오.` : `수급 신호 확인 후 진입을 검토하십시오.`;
+    action = (p.volIsHigh ? `즉각 분할 매수를 검토하십시오.` : `수급 신호 확인 후 진입을 검토하십시오.`) + jackBuySellVolNote;
   } else if (p.verdict === '매도 우위') {
-    action = `포지션 축소를 검토하십시오.`;
+    action = `포지션 축소를 검토하십시오.${jackBuySellVolNote}`;
   } else {
     if (p.volIsHigh) {
       action = `돌파 신호 확인 후 진입하십시오. ${jackBreakthroughSignal}`;
@@ -344,6 +348,17 @@ const LUCIA_THEORIES: Partial<Record<MarketSituation, string>> = {
     exhaustion:   '고점 근처에서 거래량이 줄어드는 건 상승 동력이 소진됐다는 신호예요. 모두가 낙관적일 때가 가장 위험한 순간이라는 걸 기억하세요.',
   };
 
+  // ✅ 비-drain 상황에도 avgVolume 기반 거래량 수치 추가
+  const luciaTheoryFmtVol = (v: number): string => {
+    if (v >= 100000000) return `${(v / 100000000).toFixed(1)}억주`;
+    if (v >= 10000) return `${Math.round(v / 10000).toLocaleString()}만주`;
+    return `${v.toLocaleString()}주`;
+  };
+  const luciaTheoryAvg = p.avgVolume && p.avgVolume > 0 ? p.avgVolume : null;
+  const luciaTheoryVolNote = luciaTheoryAvg
+    ? ` 거래량이 ${luciaTheoryFmtVol(Math.round(luciaTheoryAvg * 1.3))}을 넘는지 꼭 확인하세요(평소 ${luciaTheoryFmtVol(luciaTheoryAvg)} 대비 30%).`
+    : '';
+
   let theory = '';
   if (p.situation && p.situation === 'drain') {
     // ✅ drain 상황 — 소외 효과 반복 방지 (키워드별 다른 표현)
@@ -365,17 +380,19 @@ const LUCIA_THEORIES: Partial<Record<MarketSituation, string>> = {
       : ' 거래량이 평소 대비 30% 이상 늘어나면 그게 신호입니다.';
     theory = drainPhrases[idx] + luciaVolSignalNote;
   } else if (p.situation && LUCIA_THEORIES[p.situation]) {
-    theory = LUCIA_THEORIES[p.situation]!;
+    theory = LUCIA_THEORIES[p.situation]! + luciaTheoryVolNote;
   } else if (p.volIsHigh && p.verdict === '매수 우위') {
-    theory = p.sentiment === '긍정'
+    theory = (p.sentiment === '긍정'
       ? '군중이 낙관할 때가 가장 위험한 법이에요. 이런 패턴은 단기 급등 후 되돌림이 잦으니 신중하게 접근하는 것이 맞습니다.'
-      : '과열 구간에서는 역발상이 필요해요. 신중하게 접근하는 것이 맞습니다.';
+      : '과열 구간에서는 역발상이 필요해요. 신중하게 접근하는 것이 맞습니다.') + luciaTheoryVolNote;
   } else if (p.verdict === '매도 우위') {
-    theory = '공포가 번질 때는 손실 확대를 막는 것이 우선이에요. 포지션 정리를 검토하는 것이 맞습니다.';
+    theory = '공포가 번질 때는 손실 확대를 막는 것이 우선이에요. 포지션 정리를 검토하는 것이 맞습니다.' + luciaTheoryVolNote;
   } else if (p.sentiment === '부정') {
-    theory = '뉴스까지 부정적이니 이중 경계 구간이에요. 군중이 두려워할 때가 오히려 기회일 수 있지만, 지금은 신중하게 접근하는 것이 맞습니다.';
+    theory = '뉴스까지 부정적이니 이중 경계 구간이에요. 군중이 두려워할 때가 오히려 기회일 수 있지만, 지금은 신중하게 접근하는 것이 맞습니다.' + luciaTheoryVolNote;
   } else {
-    theory = '군중이 안심할 때가 오히려 위험하니 신중하게 접근하는 것이 맞습니다. 방향이 확인되려면 가격이 1% 이상 움직이거나 거래량이 평소보다 크게 늘어나야 합니다.';
+    theory = luciaTheoryAvg
+      ? `군중이 안심할 때가 오히려 위험하니 신중하게 접근하는 것이 맞습니다. 방향이 확인되려면 가격이 1% 이상 움직이거나 거래량이 ${luciaTheoryFmtVol(Math.round(luciaTheoryAvg * 1.3))} 이상으로 늘어나야 합니다(평소 ${luciaTheoryFmtVol(luciaTheoryAvg)} 대비 30%).`
+      : '군중이 안심할 때가 오히려 위험하니 신중하게 접근하는 것이 맞습니다. 방향이 확인되려면 가격이 1% 이상 움직이거나 거래량이 평소보다 크게 늘어나야 합니다.';
   }
 
   // ✅ 추세 맥락 반영

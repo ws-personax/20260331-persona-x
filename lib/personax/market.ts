@@ -397,6 +397,16 @@ export const fetchMarketPrice = async (keyword: string): Promise<MarketData | nu
     }
     const trend = calcTrend(allCloses);
 
+    // ✅ avgVolume fallback — Yahoo meta가 없으면(특히 한국 종목) 5d 거래량 평균으로 대체
+    let avgVolFinal = meta.averageDailyVolume3Month || 0;
+    if (avgVolFinal === 0 && result5d) {
+      const volArr = result5d.indicators?.quote?.[0]?.volume || [];
+      const validVols = volArr.filter((v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
+      if (validVols.length > 0) {
+        avgVolFinal = Math.round(validVols.reduce((s: number, v: number) => s + v, 0) / validVols.length);
+      }
+    }
+
     return {
       price: isKR ? Math.round(price).toLocaleString('ko-KR') : price.toLocaleString('en-US', { minimumFractionDigits: 2 }),
       change: change.toFixed(2),
@@ -405,7 +415,7 @@ export const fetchMarketPrice = async (keyword: string): Promise<MarketData | nu
       volume: `${((meta.regularMarketVolume || 0) / 1_000_000).toFixed(1)}M`,
       rawPrice: price, rawHigh: high, rawLow: low,
       rawVolume: meta.regularMarketVolume || 0,
-      avgVolume: meta.averageDailyVolume3Month || 0,
+      avgVolume: avgVolFinal,
       currency: isKR ? 'KRW' : 'USD',
       marketState,
       source: isKR
