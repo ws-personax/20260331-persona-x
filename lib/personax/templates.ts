@@ -426,6 +426,10 @@ interface EchoParams {
   trendSummary?: string;     // 추세 요약
   conflict?: string;         // 페르소나 충돌
   consecutiveDays?: number;  // 연속 상승/하락 일수
+  // ✅ 진입 조건 구체화용
+  rawPrice?: number | null;
+  avgVolume?: number | null;
+  currency?: 'KRW' | 'USD';
 }
 
 // ✅ ECHO — 하워드 막스(Howard Marks) 스타일
@@ -558,15 +562,36 @@ export const buildEchoText = (p: EchoParams): string => {
       verdictText = '신규 진입을 금지합니다 — 하락 리스크 구간';
       verdictEmoji = '🔴';
     } else if (p.watchLevel === 'weak') {
+      // ✅ 진입 조건 구체화 — 현재가/매수가/거래량 수치 명시
+      const echoFmtVol = (v: number): string => {
+        if (v >= 100000000) return `${(v / 100000000).toFixed(1)}억주`;
+        if (v >= 10000) return `${Math.round(v / 10000).toLocaleString()}만주`;
+        return `${v.toLocaleString()}주`;
+      };
+      const echoCur = p.currency || 'KRW';
+      const echoFmtPrice = (n: number): string =>
+        echoCur === 'KRW'
+          ? `${Math.round(n).toLocaleString('ko-KR')}원`
+          : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const buyTrigger = p.rawPrice && p.rawPrice > 0
+        ? echoFmtPrice(p.rawPrice * 1.02)
+        : (p.buyPrice || '매수 조건');
+      const volTrigger = p.avgVolume && p.avgVolume > 0
+        ? `${echoFmtVol(Math.round(p.avgVolume * 1.3))} 이상(평균 ${echoFmtVol(p.avgVolume)} 대비 30%)`
+        : '평소 대비 30% 이상';
+      const concreteCondition = p.rawPrice && p.rawPrice > 0
+        ? ` — 현재가 ${echoFmtPrice(p.rawPrice)} 기준 매수 조건: ${buyTrigger}(+2%) 돌파 + 거래량 ${volTrigger} 동시 확인`
+        : '';
+
       // 약한 관망도 상황별로 다르게
       if (p.situation === 'accumulation') {
-        verdictText = '매집 초기 감지 — 소량 선진입 검토 가능합니다';
+        verdictText = `매집 초기 감지 — 소량 선진입 검토 가능합니다${concreteCondition}`;
         verdictEmoji = '🟡';
       } else if (p.trendStrength === 'strong_up' || p.trendStrength === 'weak_up') {
-        verdictText = '진입 조건 임박 — 신호 포착 즉시 대응하십시오';
+        verdictText = `진입 조건 임박 — 신호 포착 즉시 대응하십시오${concreteCondition}`;
         verdictEmoji = '🟡';
       } else {
-        verdictText = '준비 구간 — 조건 충족 시 진입 준비하십시오';
+        verdictText = `준비 구간 — 조건 충족 시 진입 준비하십시오${concreteCondition}`;
         verdictEmoji = '🟡';
       }
     } else {

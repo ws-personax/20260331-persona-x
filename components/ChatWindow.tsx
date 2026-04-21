@@ -523,6 +523,7 @@ export default function ChatWindow() {
   const [showPosition, setShowPosition] = useState(false);
   const [pendingText, setPendingText] = useState('');
   const [pendingKeyword, setPendingKeyword] = useState('');
+  const [pendingInitialPosition, setPendingInitialPosition] = useState<Partial<Position> | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -621,10 +622,34 @@ export default function ChatWindow() {
     if (!content || isLoading) return;
 
     const matched = detectKeyword(content);
-    // ✅ 지수/시장 질문이면 포지션 입력창 스킵
-    if (matched && shouldShowPosition(content, matched)) {
+
+    // ✅ 평단가/매수가/평균가/취득가 인라인 파싱 — "21만원", "210,000", "$150" 등
+    const parseInlineValue = (m: RegExpMatchArray | null): string => {
+      if (!m) return '';
+      const numStr = m[1].replace(/,/g, '');
+      const unit = m[2] || '';
+      let value = parseFloat(numStr);
+      if (!Number.isFinite(value)) return '';
+      if (unit === '만원' || unit === '만') value *= 10000;
+      if (unit === '억원' || unit === '억') value *= 100000000;
+      return String(value);
+    };
+    const avgMatch = content.match(/(?:평단가?|평균가)[:\s]*([\d,.]+)\s*(만원|만|억원|억|원|USD|달러)?/);
+    const buyMatch = content.match(/(?:매수가|취득가)[:\s]*([\d,.]+)\s*(만원|만|억원|억|원|USD|달러)?/);
+    const qtyMatch = content.match(/(?:수량|보유)[:\s]*([\d,.]+)/);
+    const inlineAvg = parseInlineValue(avgMatch);
+    const inlineBuy = parseInlineValue(buyMatch);
+    const inlineQty = qtyMatch ? qtyMatch[1].replace(/,/g, '') : '';
+    const hasInlinePosition = !!(inlineAvg || inlineBuy || inlineQty);
+
+    // ✅ 평단가 등이 인라인으로 있으면 종목명 매칭 + 모달 표시 강제 (트리거 강화)
+    const showModal = matched && (hasInlinePosition || shouldShowPosition(content, matched));
+    if (showModal) {
       setPendingText(content);
       setPendingKeyword(matched);
+      setPendingInitialPosition(hasInlinePosition
+        ? { avgPrice: inlineAvg, buyPrice: inlineBuy, quantity: inlineQty, note: '' }
+        : null);
       setShowPosition(true);
       return;
     }
@@ -717,6 +742,7 @@ export default function ChatWindow() {
           <PositionInput
             keyword={pendingKeyword}
             currency={inferCurrency(pendingKeyword)}
+            initial={pendingInitialPosition || undefined}
             onSubmit={pos => handleSendWithPosition(pendingText, pos)}
             onSkip={() => handleSendWithPosition(pendingText, null)}
           />

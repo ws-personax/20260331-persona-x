@@ -229,6 +229,7 @@ export async function POST(req: Request) {
       const dayMood = nowMood.getUTCDay();
       const timeMood = nowMood.getUTCHours() * 100 + nowMood.getUTCMinutes();
       const isWknd = dayMood === 0 || dayMood === 6;
+      // ✅ 한국장 09:00~15:30 (15:30 정각부터 마감)
       const krOpen = !isWknd && timeMood >= 900 && timeMood < 1530;
       const krBefore = !isWknd && timeMood < 900;
       const usOpen = !isWknd && (timeMood >= 2330 || timeMood < 600);
@@ -597,10 +598,13 @@ ${DISCLAIMER}`;
     const minuteKST = nowKST.getUTCMinutes();
     const timeKST = hourKST * 100 + minuteKST; // 예: 0815 = 오전 8시 15분
 
-    // 한국장: 평일 09:00~15:30, 주말 휴장
+    // 한국장: 평일 09:00~15:30 (KST), 주말 휴장
+    // ✅ 마감 시간 명시: 1530 = 15시 30분. 15:29:59까지 장중, 15:30:00부터 마감
+    const KR_OPEN  = 900;
+    const KR_CLOSE = 1530;
     const isWeekend = (assetType !== 'CRYPTO') && (dayKST === 0 || dayKST === 6);
-    const isKRBeforeOpen = assetType === 'KOREAN_STOCK' && !isWeekend && timeKST < 900;
-    const isKRAfterClose = assetType === 'KOREAN_STOCK' && !isWeekend && timeKST >= 1530;
+    const isKRBeforeOpen = assetType === 'KOREAN_STOCK' && !isWeekend && timeKST < KR_OPEN;
+    const isKRAfterClose = assetType === 'KOREAN_STOCK' && !isWeekend && timeKST >= KR_CLOSE;
     const isKRClosed = isWeekend || isKRBeforeOpen || isKRAfterClose;
 
     // 미국장: 평일 23:30~06:00 KST (서머타임 기준)
@@ -835,12 +839,12 @@ ${DISCLAIMER}`;
       : '';
 
     const situationNote: Record<string, string> = {
-      accumulation: `${trendPrefix}수급 유입 대비 가격 미반응 — 매집 초기 패턴으로 방향성 확정 시 빠른 움직임 예상됩니다`,
-      trending:     `${trendPrefix}수급·가격 동반 상승 — 정배열 구간(5일·20일 이평선이 나란히 우상향하는 구조, 상승 추세가 지속될 가능성이 높은 상태)으로 추세 추종 전략이 통계적으로 유효합니다`,
-      stalemate:    `${trendPrefix}거래량 증가 대비 가격 정체 — 매수·매도 균형 교착 구간으로 돌파 방향이 다음 추세를 결정합니다`,
+      accumulation: `${trendPrefix}수급 유입 대비 가격 미반응 — 매집 초기 패턴으로 방향성 확정 시 빠른 움직임 예상됩니다${rayVolNote}`,
+      trending:     `${trendPrefix}수급·가격 동반 상승 — 정배열 구간(5일·20일 이평선이 나란히 우상향하는 구조, 상승 추세가 지속될 가능성이 높은 상태)으로 추세 추종 전략이 통계적으로 유효합니다${rayVolNote}`,
+      stalemate:    `${trendPrefix}거래량 증가 대비 가격 정체 — 매수·매도 균형 교착 구간으로 돌파 방향이 다음 추세를 결정합니다${rayVolNote}`,
       drain:        `${trendPrefix}수급 이탈 구간 — 거래량 없는 가격 움직임은 신뢰도가 낮습니다${rayVolNote}`,
-      panic:        `${trendPrefix}패닉 셀 구간 — 거래량 폭증+급락 동시 발생, 감정적 투매 가능성이 높습니다`,
-      exhaustion:   `${trendPrefix}고점 근접+거래량 둔화 — 상승 에너지 소진 신호로 신규 진입 위험 구간입니다`,
+      panic:        `${trendPrefix}패닉 셀 구간 — 거래량 폭증+급락 동시 발생, 감정적 투매 가능성이 높습니다${rayVolNote}`,
+      exhaustion:   `${trendPrefix}고점 근접+거래량 둔화 — 상승 에너지 소진 신호로 신규 진입 위험 구간입니다${rayVolNote}`,
       normal:       `${trendPrefix}특이 신호 없음 — 일반적 시장 흐름입니다${rayVolNote}`,
     };
 
@@ -941,6 +945,10 @@ ${DISCLAIMER}`;
         trendSummary: trendCtx.trendSummary || undefined,
         conflict,
         consecutiveDays: trendCtx.consecutiveDays,
+        // ✅ 진입 조건 구체화용 데이터
+        rawPrice: marketData?.rawPrice ?? null,
+        avgVolume: marketData?.avgVolume ?? null,
+        currency,
       });
       finalEcho = `${echoFallback}\n\n${dataSourceLabel}${marketClosedNote}${DISCLAIMER}`;
     }

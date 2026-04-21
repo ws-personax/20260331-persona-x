@@ -35,15 +35,16 @@ export const buildPositionContext = (pos: Position | null): string => {
 type Props = {
   keyword: string;
   currency: 'KRW' | 'USD';
+  initial?: Partial<Position>;
   onSubmit: (pos: Position) => void;
   onSkip: () => void;
 };
 
-export function PositionInput({ keyword, currency, onSubmit, onSkip }: Props) {
-  const [avgPrice, setAvgPrice] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [buyPrice, setBuyPrice] = useState('');
-  const [note, setNote] = useState('');
+export function PositionInput({ keyword, currency, initial, onSubmit, onSkip }: Props) {
+  const [avgPrice, setAvgPrice] = useState(initial?.avgPrice ?? '');
+  const [quantity, setQuantity] = useState(initial?.quantity ?? '');
+  const [buyPrice, setBuyPrice] = useState(initial?.buyPrice ?? '');
+  const [note, setNote] = useState(initial?.note ?? '');
 
   const canSubmit = useMemo(() => {
     return avgPrice.trim() || quantity.trim() || buyPrice.trim() || note.trim();
