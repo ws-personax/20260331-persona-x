@@ -737,12 +737,13 @@ ${DISCLAIMER}`;
       volScore: vol.score,
     }) : undefined;
 
-    // ✅ 페르소나 충돌 감지
+    // ✅ 페르소나 충돌 감지 — verdict도 전달해 조건 확대
     const conflict = detectPersonaConflict({
       trendStrength: trendCtx.trendStrength,
       sentiment: nData.sentiment,
       volScore: vol.score,
       situation,
+      verdict,
     });
 
     // ✅ 주말일 때 volLabel에 휴장 안내 추가

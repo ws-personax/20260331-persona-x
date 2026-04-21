@@ -292,19 +292,37 @@ export const detectPersonaConflict = (params: {
   sentiment: string;
   volScore: number;
   situation: MarketSituation;
+  verdict?: Verdict;
 }): PersonaConflict => {
-  const { trendStrength, sentiment, volScore, situation } = params;
+  const { trendStrength, sentiment, volScore, situation, verdict } = params;
 
-  // 잭(모멘텀): 추세+거래량 기반 판단
-  const jackBullish = (trendStrength === 'strong_up' || trendStrength === 'weak_up') && volScore >= 1;
-  const jackBearish = trendStrength === 'strong_down' || trendStrength === 'weak_down';
+  const trendUp   = trendStrength === 'strong_up' || trendStrength === 'weak_up';
+  const trendDown = trendStrength === 'strong_down' || trendStrength === 'weak_down';
 
-  // 루시아(역발상): 뉴스+심리 기반 판단
-  const luciaBullish = sentiment === '부정' && situation === 'panic'; // 역발상 매수
-  const luciaBearish = sentiment === '긍정' && (situation === 'exhaustion' || situation === 'trending');
+  // ✅ 잭(모멘텀) — 추세만 맞으면 bullish (거래량 확인은 LUCIA 불일치 조건으로 이동)
+  const jackBullish = trendUp;
+  const jackBearish = trendDown;
 
-  if (jackBullish && luciaBearish) return 'conflict_jack_buy';   // 잭 매수 vs 루시아 경계
-  if (jackBearish && luciaBullish) return 'conflict_lucia_buy';  // 잭 매도 vs 루시아 역발상
+  // ✅ 루시아(역발상·신중론)
+  //    bullish(역발상 매수): 기존 패닉 역발상 + verdict가 관망인데 추세는 상승인 경우도 포함
+  const luciaBullishOriginal = sentiment === '부정' && situation === 'panic';
+  const luciaBullishContrarian = verdict === '관망' && trendUp; // 시장은 주춤하지만 추세는 살아있음
+  const luciaBullish = luciaBullishOriginal || luciaBullishContrarian;
+
+  //    bearish(신중론·경계): 거래량이 약하거나 뉴스가 확인되지 않으면 LUCIA는 신중
+  //    - 기존: 긍정 sentiment + exhaustion/trending (과열 경계)
+  //    - 확장: 거래량 보통/감소(volScore < 1) 또는 뉴스 중립/부정일 때 경계
+  const luciaBearishOverheat = sentiment === '긍정' && (situation === 'exhaustion' || situation === 'trending');
+  const luciaBearishUnconfirmed = volScore < 1 || sentiment !== '긍정';
+  const luciaBearish = luciaBearishOverheat || luciaBearishUnconfirmed;
+
+  // ✅ 충돌 우선순위
+  //    conflict_jack_buy: JACK은 추세로 진입하려 하고 LUCIA는 확인 신호 부족으로 신중
+  //    conflict_lucia_buy: JACK 하락 경계 + LUCIA 역발상, 또는 관망 verdict + 상승 추세
+  if (jackBullish && luciaBearish) return 'conflict_jack_buy';
+  if (jackBearish && luciaBullishOriginal) return 'conflict_lucia_buy';
+  if (verdict === '관망' && trendUp && !jackBearish) return 'conflict_lucia_buy'; // 추세 상승인데 관망 → LUCIA 역발상 기회
+
   if (jackBullish && !luciaBearish) return 'agree_buy';
   if (jackBearish && !luciaBullish) return 'agree_sell';
   return 'mixed';
