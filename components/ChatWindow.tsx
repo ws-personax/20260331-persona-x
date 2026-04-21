@@ -234,21 +234,32 @@ const PersonaBubble = memo(function PersonaBubble({
   timestamp,
   newsItem,
   echoNews,
+  isRebuttal = false,
 }: {
   personaKey: PersonaKey;
   text: string;
   timestamp: Date;
   newsItem?: NewsLink | null;
   echoNews?: NewsLink | null;
+  isRebuttal?: boolean;
 }) {
   const p = PERSONAS[personaKey];
   const isEcho = personaKey === 'echo';
   // ✅ \n↳ 기준으로 본문과 반박 분리 + ECHO 메타 파싱
+  //    isRebuttal=true면 split 로직 건너뛰고 전체 텍스트를 반박 스타일 단일 버블로
   const { content, rebuttal, dataSource, disclaimer } = useMemo(() => {
     const normalizedText = text.replace(/\\n/g, '\n');
     const parsed = isEcho
       ? parseEchoParts(normalizedText)
       : { content: normalizedText, dataSource: '', disclaimer: '' };
+    if (isRebuttal) {
+      return {
+        content: parsed.content,
+        rebuttal: '',
+        dataSource: parsed.dataSource,
+        disclaimer: parsed.disclaimer,
+      };
+    }
     const splitIdx = parsed.content.indexOf('\n↳ ');
     if (splitIdx !== -1) {
       return {
@@ -264,7 +275,7 @@ const PersonaBubble = memo(function PersonaBubble({
       dataSource: parsed.dataSource,
       disclaimer: parsed.disclaimer,
     };
-  }, [text, isEcho]);
+  }, [text, isEcho, isRebuttal]);
 
   if (!content?.trim()) return null;
 
@@ -308,10 +319,15 @@ const PersonaBubble = memo(function PersonaBubble({
               style={{
                 position: 'relative',
                 background: p.bubbleBg,
+                opacity: isRebuttal ? 0.92 : 1,
                 borderRadius: '0 14px 14px 14px',
                 padding: isEcho ? '14px 16px' : '11px 14px',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                border: isEcho ? `2px solid ${p.bubbleBorder}` : `1px solid ${p.bubbleBorder}`,
+                border: isEcho
+                  ? `2px solid ${p.bubbleBorder}`
+                  : isRebuttal
+                    ? `1px dashed ${p.bubbleBorder}`
+                    : `1px solid ${p.bubbleBorder}`,
               }}
             >
               {isEcho && p.echoTag && (
@@ -340,6 +356,7 @@ const PersonaBubble = memo(function PersonaBubble({
                   whiteSpace: 'pre-wrap',
                   margin: 0,
                   fontWeight: isEcho ? 600 : 400,
+                  fontStyle: isRebuttal ? 'italic' : 'normal',
                 }}
               >
                 {content}
@@ -761,17 +778,47 @@ export default function ChatWindow() {
               </div>
             ) : (
               <div style={{ marginBottom: 12 }}>
-                {msg.personas ? (
-                  <>
-                    <PersonaBubble personaKey="ray" text={msg.personas.ray} timestamp={msg.timestamp} newsItem={msg.personas.rayNews} />
-                    <PersonaBubble personaKey="jack" text={msg.personas.jack} timestamp={msg.timestamp} newsItem={msg.personas.jackNews} />
-                    <PersonaBubble personaKey="lucia" text={msg.personas.lucia} timestamp={msg.timestamp} newsItem={msg.personas.luciaNews} />
-                    <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>
-                      ── ECHO COMMAND ──
-                    </div>
-                    <PersonaBubble personaKey="echo" text={msg.personas.echo} timestamp={msg.timestamp} echoNews={msg.personas.echoNews} />
-                  </>
-                ) : (
+                {msg.personas ? (() => {
+                  // ✅ 갈등 감지 — JACK 텍스트에 "\n↳ " 포함 시 토론 순서로 재배치
+                  //    RAY → JACK(주장) → LUCIA(반박) → JACK(재반박) → ECHO
+                  //    LUCIA의 ↳ 뒤 반박은 표시하지 않음 (JACK이 마지막 발언)
+                  const jackText = msg.personas.jack;
+                  const luciaText = msg.personas.lucia;
+                  const jackSplitIdx = jackText.indexOf('\n↳ ');
+                  const hasConflict = jackSplitIdx !== -1;
+
+                  if (hasConflict) {
+                    const jackMain = jackText.slice(0, jackSplitIdx).trim();
+                    const jackRebuttalText = jackText.slice(jackSplitIdx + 1).trim(); // "↳ " 포함
+                    const luciaSplitIdx = luciaText.indexOf('\n↳ ');
+                    const luciaMain = luciaSplitIdx !== -1 ? luciaText.slice(0, luciaSplitIdx).trim() : luciaText;
+
+                    return (
+                      <>
+                        <PersonaBubble personaKey="ray" text={msg.personas.ray} timestamp={msg.timestamp} newsItem={msg.personas.rayNews} />
+                        <PersonaBubble personaKey="jack" text={jackMain} timestamp={msg.timestamp} newsItem={msg.personas.jackNews} />
+                        <PersonaBubble personaKey="lucia" text={luciaMain} timestamp={msg.timestamp} newsItem={msg.personas.luciaNews} />
+                        <PersonaBubble personaKey="jack" text={jackRebuttalText} timestamp={msg.timestamp} isRebuttal />
+                        <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>
+                          ── ECHO COMMAND ──
+                        </div>
+                        <PersonaBubble personaKey="echo" text={msg.personas.echo} timestamp={msg.timestamp} echoNews={msg.personas.echoNews} />
+                      </>
+                    );
+                  }
+
+                  return (
+                    <>
+                      <PersonaBubble personaKey="ray" text={msg.personas.ray} timestamp={msg.timestamp} newsItem={msg.personas.rayNews} />
+                      <PersonaBubble personaKey="jack" text={jackText} timestamp={msg.timestamp} newsItem={msg.personas.jackNews} />
+                      <PersonaBubble personaKey="lucia" text={luciaText} timestamp={msg.timestamp} newsItem={msg.personas.luciaNews} />
+                      <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>
+                        ── ECHO COMMAND ──
+                      </div>
+                      <PersonaBubble personaKey="echo" text={msg.personas.echo} timestamp={msg.timestamp} echoNews={msg.personas.echoNews} />
+                    </>
+                  );
+                })() : (
                   <PersonaBubble personaKey="jack" text={msg.content} timestamp={msg.timestamp} />
                 )}
               </div>
