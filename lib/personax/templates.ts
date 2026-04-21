@@ -73,6 +73,12 @@ const JACK_INTERPRETATIONS: Record<MarketSituation, string> = {
 };
 
 export const buildJackText = (p: JackParams): string => {
+  // ✅ 충돌 시 JACK이 LUCIA에게 반박 — 장중/장 마감 모두 공통으로 뒤에 부착
+  const jackRebuttal = p.conflict === 'conflict_jack_buy'
+    ? '\n↳ 루시아의 신중론을 이해하지만, 지금은 기회를 놓치는 것이 더 큰 리스크입니다. 모멘텀 데이터가 명확합니다.'
+    : p.conflict === 'conflict_lucia_buy'
+      ? '\n↳ 루시아의 역발상을 이해하지만, 떨어지는 칼날을 잡으면 다칩니다. 바닥 확인이 먼저입니다.'
+      : '';
 
   // ✅ 장 미개장/마감 시 — 전일 기준 평가 + 다음 개장 시 구체적 수치 조건 제시
   const isKRClosed = p.isMarketClosed;
@@ -122,7 +128,7 @@ export const buildJackText = (p: JackParams): string => {
         ? `${nextSession} ${openTime} 개장 후 ${halfLabel}에 못 미치면 반등 동력이 약합니다. 포지션 축소를 검토하십시오.`
         : `${nextSession} ${openTime} 개장 후 ${halfLabel}인지 확인한 후 진입 여부를 결정하십시오.`;
     const statusLabel = p.isWeekend ? '주말 휴장 중입니다' : p.isBeforeOpen ? `장 개장 전(${openTime} 개장)입니다` : '장 마감 후입니다';
-    return `지휘관님, ${p.keyword}${topicParticle(p.keyword)} 현재 ${statusLabel}. ${timeLabel} 기준 — ${trendEval}. ${condAction}`;
+    return `지휘관님, ${p.keyword}${topicParticle(p.keyword)} 현재 ${statusLabel}. ${timeLabel} 기준 — ${trendEval}. ${condAction}${jackRebuttal}`;
   }
 
   const contextNote = (p.prevKeyword && p.prevKeyword !== p.keyword)
@@ -193,13 +199,6 @@ export const buildJackText = (p: JackParams): string => {
 
   // ✅ 추세 맥락 — volSuffix 뒤에 마침표를 붙이고 추세 문장은 별도로
   const trendSentence = p.trendSummary ? ` ${p.trendSummary}.` : '';
-
-  // ✅ 충돌 시 JACK이 LUCIA에게 반박 — 응답 마지막에 별도 블록으로
-  const jackRebuttal = p.conflict === 'conflict_jack_buy'
-    ? '\n↳ 루시아의 신중론을 이해하지만, 지금은 기회를 놓치는 것이 더 큰 리스크입니다. 모멘텀 데이터가 명확합니다.'
-    : p.conflict === 'conflict_lucia_buy'
-      ? '\n↳ 루시아의 역발상을 이해하지만, 떨어지는 칼날을 잡으면 다칩니다. 바닥 확인이 먼저입니다.'
-      : '';
 
   if (interpretation && interpretation !== JACK_INTERPRETATIONS.normal) {
     return `지휘관님, ${contextNote}${p.keyword}${topicParticle(p.keyword)} ${p.volLabel}${particle(p.volLabel)} ${volSuffix}.${trendSentence} ${interpretation} ${trend} 구간으로 ${action}${jackRebuttal}`;
@@ -276,6 +275,12 @@ const pickMetaphor = (key: keyof typeof LUCIA_METAPHORS, _keyword: string): stri
 };
 
 export const buildLuciaText = (p: LuciaParams): string => {
+  // ✅ LUCIA가 JACK에게 반박 — 장중/장 마감 모두 공통으로 뒤에 부착
+  const luciaRebuttal = p.conflict === 'conflict_jack_buy'
+    ? '\n↳ 잭 소장님, 거래량이 말해주고 있어요. 숫자가 아직 확신을 주지 않아요. 서두르면 꼭 물려요.'
+    : p.conflict === 'conflict_lucia_buy'
+      ? '\n↳ 잭 소장님의 신중함을 이해해요. 하지만 공포가 최고의 매수 기회였던 역사를 잊지 마세요.'
+      : '';
 
   // ✅ 장 미개장/마감 시 — 전일 흐름 + 근거 + 구체적 수치 제시
   if (p.isMarketClosed || p.isUSClosed) {
@@ -343,7 +348,7 @@ export const buildLuciaText = (p: LuciaParams): string => {
       ? `${timeLabel} ${p.keyword}${topicParticle(p.keyword)} ${luciaChangeRaw} 마감했어요. ${trendFlow}.`
       : `${timeLabel} ${p.keyword} 흐름을 보면 ${trendFeeling}.`;
 
-    return `소장님, ${closingOpener} ${openAdvice}`;
+    return `소장님, ${closingOpener} ${openAdvice}${luciaRebuttal}`;
   }
 
 
@@ -432,13 +437,6 @@ const LUCIA_THEORIES: Partial<Record<MarketSituation, string>> = {
   const trendNote = p.trendSummary
     ? ` 참고로 ${p.trendSummary}.`
     : '';
-
-  // ✅ LUCIA가 JACK에게 반박 — 응답 마지막에 별도 블록
-  const luciaRebuttal = p.conflict === 'conflict_jack_buy'
-    ? '\n↳ 잭 소장님, 거래량이 말해주고 있어요. 숫자가 아직 확신을 주지 않아요. 서두르면 꼭 물려요.'
-    : p.conflict === 'conflict_lucia_buy'
-      ? '\n↳ 잭 소장님의 신중함을 이해해요. 하지만 공포가 최고의 매수 기회였던 역사를 잊지 마세요.'
-      : '';
 
   // ✅ "하지만" 제거 — 루시아 고유 시작 방식
   // 추세 중복 제거 — 루시아는 심리/역발상만, 추세는 잭/레이가 담당
