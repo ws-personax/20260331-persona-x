@@ -874,7 +874,7 @@ export default function ChatWindow() {
       )}
 
       <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {/* 사전 질문 토글 버튼 — 2줄 라벨 */}
           <button
             onClick={() => setShowQuickQ(prev => !prev)}
@@ -885,6 +885,7 @@ export default function ChatWindow() {
               borderRadius: 12,
               padding: '6px 12px',
               minHeight: 56,
+              height: 56,
               fontSize: 12,
               fontWeight: 700,
               cursor: 'pointer',
@@ -931,6 +932,7 @@ export default function ChatWindow() {
               borderRadius: 12,
               padding: '0 20px',
               minHeight: 56,
+              height: 56,
               fontWeight: 800,
               cursor: !input.trim() || isLoading ? 'not-allowed' : 'pointer',
               opacity: !input.trim() || isLoading ? 0.5 : 1,
