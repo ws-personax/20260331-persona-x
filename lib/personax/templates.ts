@@ -219,9 +219,15 @@ export const buildJackText = (p: JackParams): string => {
     line1 = `지휘관님, ${p.keyword}${topicParticle(p.keyword)} ${positiveText}. 이 신호만으로도 진입은 정당화됩니다.`;
     line2 = `${volCondition} 1차 진입 검토. ${buyPhrase}.`;
   } else {
-    // bear — 일시적 조정 역발상 (짧게)
-    line1 = `지휘관님, ${p.keyword}${topicParticle(p.keyword)} 지금 하락 지표 우세이나, 이건 일시적 조정입니다.`;
-    line2 = `바닥 확인 후 반등 진입 준비 — 지금은 데이터 추적 모드.`;
+    // bear — 하락의 "데이터 근거" 중심 관망 (수치/패턴 기반)
+    const negatives: string[] = [];
+    if (flags?.trendDown) negatives.push('이평선 하락');
+    if (flags?.newsNeg) negatives.push('뉴스 부정');
+    if (flags?.volDown) negatives.push('거래량 감소');
+    if (flags?.priceDown) negatives.push('시세 하락');
+    const negText = negatives.join(' + ') || '하락 지표 우세';
+    line1 = `지휘관님, ${p.keyword}${topicParticle(p.keyword)} ${negText} 기준으로 ${p.price || '지지선'} 지지 확인 전까지 대기하십시오.`;
+    line2 = `역사적으로 이 패턴은 추가 하락으로 이어졌습니다.`;
   }
 
   return `${line1}\n${line2}${jackRebuttal}`;
@@ -259,22 +265,22 @@ interface LuciaParams {
   prevCtx?: PrevContext;
 }
 
-// ✅ 거래량 저조 비유 — 5개 로테이션
+// ✅ 거래량 저조 비유 — 5개 로테이션 ("마치 X" 형태로 자연스럽게 붙도록)
 const LUCIA_LOW_VOL_METAPHORS = [
-  '거래량 없는 상승은 신기루일 수 있어요',
-  '손님 없는 식당처럼 겉만 화려해요',
-  '박수 소리 없는 공연이에요',
+  '손님 없는 식당처럼 겉만 화려한 상태예요',
+  '박수 소리 없는 공연 같아요',
   '바람만 가득한 풍선 같아요',
   '뼈대 없이 올라가는 건물 같아요',
+  '관중 없는 경기장처럼 흥이 안 올라요',
 ];
 
-// ✅ 변동성 위험 비유 — 5개 로테이션 (코인 포함)
+// ✅ 변동성 위험 비유 — 5개 로테이션 (코인 포함, "마치 X" 형태)
 const LUCIA_VOLATILITY_METAPHORS = [
-  '롤러코스터에 올라타기 전 안전벨트 확인하세요',
-  '태풍 속 항해는 전문가도 조심해요',
-  '파도가 높을수록 서핑 실력이 필요해요',
-  '흔들리는 사다리 위에서는 천천히 올라가야 해요',
-  '번개 칠 때 우산 쓰는 건 위험해요',
+  '안전벨트 없이 탄 롤러코스터 같아요',
+  '태풍 속으로 나선 항해 같아요',
+  '높은 파도 위에 선 서퍼 같아요',
+  '흔들리는 사다리 꼭대기에 있는 것 같아요',
+  '번개 치는 하늘 아래 우산 하나 든 모습 같아요',
 ];
 
 // 비유 풀 — 상황별 (비슷한 표현 반복 방지)
@@ -419,10 +425,9 @@ export const buildLuciaText = (p: LuciaParams): string => {
   let line2: string;
 
   if (mode === 'bear') {
-    // 부정 3개 이상 — 강한 관망 권고
-    const negText = negatives.length > 0 ? `${negatives.join(' + ')} — ` : '';
-    line1 = `소장님, ${connector}마치 ${metaphor}.`;
-    line2 = `${negText}지금은 관망이 맞아요. 손실을 막는 게 우선이에요.`;
+    // 부정 3개 이상 — 감정/리스크 중심 경고 (데이터는 JACK 담당)
+    line1 = `소장님, ${connector}지금 들어가면 떨어지는 칼날을 잡는 거예요.`;
+    line2 = `마치 ${metaphor}. 손실이 눈덩이처럼 커지기 전에 한 발 물러서세요.`;
   } else if (mode === 'conflict') {
     // 갈등 — 부정 데이터 강조하며 신중론
     const negText = negatives.length > 0 ? `${negatives.join(' + ')} 때문에 ` : '';
