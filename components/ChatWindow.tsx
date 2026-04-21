@@ -406,6 +406,43 @@ const PersonaBubble = memo(function PersonaBubble({
   );
 });
 
+const EchoDetailsToggle = memo(function EchoDetailsToggle({
+  text,
+  timestamp,
+  echoNews,
+}: {
+  text: string;
+  timestamp: Date;
+  echoNews?: NewsLink | null;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <div style={{ padding: '4px 12px 0 58px', marginBottom: open ? 6 : 8 }}>
+        <button
+          type="button"
+          onClick={() => setOpen(v => !v)}
+          style={{
+            background: '#fff8d6',
+            color: '#92400e',
+            border: '1px solid #d4a017',
+            borderRadius: 6,
+            padding: '4px 10px',
+            fontSize: 11,
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          {open ? '접기 ▲' : '자세히 보기 ▼'}
+        </button>
+      </div>
+      {open && (
+        <PersonaBubble personaKey="echo" text={text} timestamp={timestamp} echoNews={echoNews} />
+      )}
+    </>
+  );
+});
+
 const TypingIndicator = () => (
   <>
     <style>{`
@@ -803,7 +840,7 @@ export default function ChatWindow() {
                         </div>
                         <PersonaBubble personaKey="echo" text={msg.personas.echo} timestamp={msg.timestamp} />
                         {msg.personas.echoDetails && (
-                          <PersonaBubble personaKey="echo" text={msg.personas.echoDetails} timestamp={msg.timestamp} echoNews={msg.personas.echoNews} />
+                          <EchoDetailsToggle text={msg.personas.echoDetails} timestamp={msg.timestamp} echoNews={msg.personas.echoNews} />
                         )}
                       </>
                     );
@@ -819,7 +856,7 @@ export default function ChatWindow() {
                       </div>
                       <PersonaBubble personaKey="echo" text={msg.personas.echo} timestamp={msg.timestamp} />
                       {msg.personas.echoDetails && (
-                        <PersonaBubble personaKey="echo" text={msg.personas.echoDetails} timestamp={msg.timestamp} echoNews={msg.personas.echoNews} />
+                        <EchoDetailsToggle text={msg.personas.echoDetails} timestamp={msg.timestamp} echoNews={msg.personas.echoNews} />
                       )}
                     </>
                   );
