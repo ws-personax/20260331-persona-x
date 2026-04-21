@@ -883,7 +883,7 @@ ${DISCLAIMER}`;
           ]);
           const k200ch = parseFloat(k200?.change || '0');
           const klevch = parseFloat(klev?.change || '0');
-          etfLine = `\n\n📊 코스피 ETF 현황:\nKODEX 200: ${k200?.price || '-'}원 (${k200ch >= 0 ? '+' : ''}${k200ch.toFixed(2)}%) ${k200ch > 0 ? '🟢' : k200ch < 0 ? '🔴' : '🟡'}\nKODEX 레버리지: ${klev?.price || '-'}원 (${klevch >= 0 ? '+' : ''}${klevch.toFixed(2)}%) ${klevch > 0 ? '🟢' : klevch < 0 ? '🔴' : '🟡'} ⚠️ 2배 레버리지`;
+          etfLine = `📊 코스피 ETF 현황:\nKODEX 200: ${k200?.price || '-'}원 (${k200ch >= 0 ? '+' : ''}${k200ch.toFixed(2)}%) ${k200ch > 0 ? '🟢' : k200ch < 0 ? '🔴' : '🟡'}\nKODEX 레버리지: ${klev?.price || '-'}원 (${klevch >= 0 ? '+' : ''}${klevch.toFixed(2)}%) ${klevch > 0 ? '🟢' : klevch < 0 ? '🔴' : '🟡'} ⚠️ 2배 레버리지`;
         } else {
           // 나스닥 ETF
           const [qqq, tqqq, sqqq] = await Promise.all([
@@ -894,7 +894,7 @@ ${DISCLAIMER}`;
           const qqqch = parseFloat(qqq?.change || '0');
           const tqqqch = parseFloat(tqqq?.change || '0');
           const sqqqch = parseFloat(sqqq?.change || '0');
-          etfLine = `\n\n📊 나스닥 ETF 현황 (ETF로 직접 투자 가능):\nQQQ (나스닥100): $${qqq?.price || '-'} (${qqqch >= 0 ? '+' : ''}${qqqch.toFixed(2)}%) ${qqqch > 0 ? '🟢' : qqqch < 0 ? '🔴' : '🟡'}\nTQQQ (3배 레버리지): $${tqqq?.price || '-'} (${tqqqch >= 0 ? '+' : ''}${tqqqch.toFixed(2)}%) ${tqqqch > 0 ? '🟢' : tqqqch < 0 ? '🔴' : '🟡'} ⚠️ 고위험\nSQQQ (인버스 3배): $${sqqq?.price || '-'} (${sqqqch >= 0 ? '+' : ''}${sqqqch.toFixed(2)}%) ${sqqqch > 0 ? '🟢' : sqqqch < 0 ? '🔴' : '🟡'} ⚠️ 하락 베팅`;
+          etfLine = `📊 나스닥 ETF 현황 (ETF로 직접 투자 가능):\nQQQ (나스닥100): $${qqq?.price || '-'} (${qqqch >= 0 ? '+' : ''}${qqqch.toFixed(2)}%) ${qqqch > 0 ? '🟢' : qqqch < 0 ? '🔴' : '🟡'}\nTQQQ (3배 레버리지): $${tqqq?.price || '-'} (${tqqqch >= 0 ? '+' : ''}${tqqqch.toFixed(2)}%) ${tqqqch > 0 ? '🟢' : tqqqch < 0 ? '🔴' : '🟡'} ⚠️ 고위험\nSQQQ (인버스 3배): $${sqqq?.price || '-'} (${sqqqch >= 0 ? '+' : ''}${sqqqch.toFixed(2)}%) ${sqqqch > 0 ? '🟢' : sqqqch < 0 ? '🔴' : '🟡'} ⚠️ 하락 베팅`;
         }
       } catch { etfLine = ''; }
 
@@ -911,7 +911,7 @@ ${DISCLAIMER}`;
       const indexEcho = [
         `결론: ${verdictLabel} (신뢰도 ${confidence}%)`,
         `근거: ${marketTrendDesc} / ${vol.label} / 뉴스 ${nData.sentiment}`,
-        `지금: ${etfLine}`,
+        `지금: ${etfLine.trim()}`,
         `섹터: ${sectorHint}`,
         `조건: ETF 투자 또는 종목명을 입력하시면 개별 분석을 즉시 개시합니다.`,
       ].join('\n');
