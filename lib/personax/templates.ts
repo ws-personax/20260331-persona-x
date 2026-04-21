@@ -425,9 +425,9 @@ export const buildLuciaText = (p: LuciaParams): string => {
   let line2: string;
 
   if (mode === 'bear') {
-    // 부정 3개 이상 — 감정/리스크 중심 경고 (데이터는 JACK 담당)
-    line1 = `소장님, ${connector}지금 들어가면 떨어지는 칼날을 잡는 거예요.`;
-    line2 = `마치 ${metaphor}. 손실이 눈덩이처럼 커지기 전에 한 발 물러서세요.`;
+    // 부정 3개 이상 — 감정 경고 + 역발상 힌트 (JACK의 냉정한 데이터와 온도 차이)
+    line1 = `소장님, ${connector}마치 ${metaphor}. 지금은 현금이 맞아요.`;
+    line2 = `하지만 모두가 포기할 때가 오히려 기회일 수 있어요. 조금만 더 지켜봐요.`;
   } else if (mode === 'conflict') {
     // 갈등 — 부정 데이터 강조하며 신중론
     const negText = negatives.length > 0 ? `${negatives.join(' + ')} 때문에 ` : '';

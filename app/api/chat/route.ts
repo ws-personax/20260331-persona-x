@@ -1093,10 +1093,11 @@ ${DISCLAIMER}`;
       : JACK_MBTI_CONFLICT;
 
     // LUCIA (ENFP · 리스크·역발상) — 모드별 문구
+    // bullMode 본문에 이미 FOMO 문구가 있으므로 MBTI에는 FOMO 단어 재사용 금지
     const LUCIA_MBTI_BULL = [
-      '군중이 낙관할 때가 가장 위험해요. 과열은 늘 되돌림이 있어요.',
-      'FOMO에 빠지지 마세요. 남들이 탐욕스러울 때 냉정해지세요.',
-      '시장이 틀렸을 수 있어요. 5년 후를 보세요.',
+      '남들이 탐욕스러울 때 냉정해지세요.',
+      '검증된 신호만 따라가세요.',
+      '서두름이 가장 큰 적이에요.',
     ];
     const LUCIA_MBTI_BEAR = [
       '손실을 막는 게 수익을 내는 것보다 먼저예요.',
@@ -1113,16 +1114,22 @@ ${DISCLAIMER}`;
       : discussMode === 'bear' ? LUCIA_MBTI_BEAR
       : LUCIA_MBTI_CONFLICT;
 
-    // RAY (INTP · 데이터 분석) — 중립 유지
+    // RAY (INTP · 데이터 분석) — 명언 8개로 확장
     const rayMbtiPhrases = [
       '데이터는 거짓말하지 않습니다. 해석이 거짓말할 뿐.',
       '가설은 많습니다 — 확률로 승부합니다.',
       '신호와 소음을 구분하는 것이 핵심입니다.',
+      '역사는 반복됩니다. 패턴을 보십시오.',
+      '분산이 유일한 무료 점심입니다.',
+      '과거 데이터가 미래를 완벽히 예측하지는 않지만, 무시하면 더 위험합니다.',
+      '감정이 아닌 확률로 판단하십시오.',
+      '시장은 단기적으로 투표기계, 장기적으로 저울입니다.',
     ];
+    const rayRotIdx = Math.floor(Date.now() / 1000) % rayMbtiPhrases.length;
 
     const finalJackOut  = finalJack  + '\n— ' + jackMbtiPool[rotIdx];
     const finalLuciaOut = finalLucia + '\n— ' + luciaMbtiPool[rotIdx];
-    const finalRayOut   = finalRay   + '\n— ' + rayMbtiPhrases[rotIdx];
+    const finalRayOut   = finalRay   + '\n— ' + rayMbtiPhrases[rayRotIdx];
 
     const finalReply = [finalRayOut, finalJackOut, finalLuciaOut, finalEcho].filter(Boolean).join('\n\n');
 
