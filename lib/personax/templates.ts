@@ -112,52 +112,73 @@ export const buildJackText = (p: JackParams): string => {
       ? '\n↳ 루시아의 역발상을 이해하지만, 떨어지는 칼날을 잡으면 다칩니다. 바닥 확인이 먼저입니다.'
       : '';
 
-  // ✅ 장 미개장/마감 시 — 전일 기준 평가 + 다음 개장 시 구체적 수치 조건 제시
+  // ✅ 장 미개장/마감 시 — forecastMode (재반박 비활성화, 전망 전용)
   const isKRClosed = p.isMarketClosed;
   const isUSClosed = p.isUSClosed;
   if (isKRClosed || isUSClosed) {
     const isKR = p.assetType === 'KOREAN_STOCK';
     const openTime = isKR ? '09:00' : '23:30';
-    // ✅ nextSession — 마감 후 당일 밤 미국장 있으면 "오늘 밤"
-    const _nowJack = new Date(Date.now() + 9 * 60 * 60 * 1000);
-    const _tKST = _nowJack.getUTCHours() * 100 + _nowJack.getUTCMinutes();
-    const usOpensTonightJack = !isKR && !p.isBeforeOpen && _tKST < 2330;
-    const nextSession = p.isBeforeOpen
-      ? (isKR ? '오늘' : '오늘 밤')
-      : (isKR ? '내일' : usOpensTonightJack ? '오늘 밤' : '내일 밤');
-    // ✅ 요일 정확화 — 월요일 개장 전 = 지난 금요일
-    const now = new Date(Date.now() + 9 * 60 * 60 * 1000);
-    const dayKST = now.getUTCDay(); // 0=일, 1=월
-    const isMondayBeforeOpen = isKR && p.isBeforeOpen && dayKST === 1;
-    const timeLabel = p.isWeekend
-      ? '지난 금요일'
-      : isMondayBeforeOpen ? '지난 금요일'
-      : p.isBeforeOpen ? '어제' : '오늘';
 
-    // ✅ 거래량 수치 구체화 — 당일 전체 거래량의 절반을 기준 시각까지 달성하면 신호
-    const avgVol = p.avgVolume;
-    const rawVol = p.rawVolume;
+    // 거래량 기준치 (1.3배 증가)
     const formatVol = (v: number) => {
       if (v >= 100000000) return `${(v / 100000000).toFixed(1)}억주`;
       if (v >= 10000) return `${Math.round(v / 10000).toLocaleString()}만주`;
       return `${v.toLocaleString()}주`;
     };
-    const baseVol = rawVol && rawVol > 0 ? rawVol : (avgVol && avgVol > 0 ? avgVol : 0);
-    const halfVol = Math.round(baseVol * 0.5);
+    const avgVol = p.avgVolume && p.avgVolume > 0 ? p.avgVolume : 0;
+    const volTrigger = avgVol > 0 ? `${formatVol(Math.round(avgVol * 1.3))} 이상` : '평소 대비 30% 이상';
     const halfCheckpoint = isKR ? '12시 30분까지' : '개장 후 3시간까지';
-    const halfLabel = baseVol > 0
-      ? `${halfCheckpoint} ${formatVol(halfVol)} 이상`
-      : `${halfCheckpoint} 평소 대비 50% 이상`;
 
-    const condAction = p.verdict === '매수 우위'
-      ? `${nextSession} 개장 후 거래량 ${halfLabel}이면 분할 매수 검토.`
-      : p.verdict === '매도 우위'
-        ? `${nextSession} 개장 후 거래량 ${halfLabel}에 못 미치면 포지션 축소.`
-        : `${nextSession} 개장 후 거래량 ${halfLabel}인지 확인 후 진입 결정.`;
-    const statusLabel = p.isWeekend ? '주말 휴장' : p.isBeforeOpen ? '장 개장 전' : '장 마감 후';
-    // ✅ timeLabel 사용 제거됨 (RAY가 기준 시점 표시)
-    void timeLabel;
-    return `지휘관님, ${p.keyword}${topicParticle(p.keyword)} 현재 ${statusLabel} — ${p.verdict}.\n${condAction}${jackRebuttal}`;
+    // 긍정/부정 지표 정리 — JACK은 긍정 편향
+    const f = p.flags;
+    const positives: string[] = [];
+    if (f?.trendUp) positives.push('이평선 상승 추세');
+    if (f?.newsPos) positives.push('뉴스 긍정');
+    if (f?.priceUp) positives.push('시세 상승');
+    if (isKR && f?.volUp) positives.push('외국인 수급 유입');
+    const negatives: string[] = [];
+    if (f?.trendDown) negatives.push('이평선 하락');
+    if (f?.newsNeg) negatives.push('뉴스 부정');
+    if (f?.priceDown) negatives.push('시세 하락');
+    const posText = positives.join(' + ') || '긍정 신호 확인 중';
+    const negText = negatives.join(' + ') || '부정 신호 혼재';
+
+    const mode: DiscussMode = p.mode ?? 'conflict';
+
+    let line1: string;
+    let line2: string;
+    if (mode === 'bull') {
+      if (p.isBeforeOpen) {
+        line1 = `지휘관님, ${posText} 기준으로 오늘 상승 출발 가능성이 높습니다.`;
+        line2 = `${openTime} 개장 후 거래량 ${volTrigger}이면 즉각 진입하십시오.`;
+      } else {
+        const changePct = p.changeRaw && p.changeRaw !== '0.00'
+          ? `${parseFloat(p.changeRaw) >= 0 ? '+' : ''}${p.changeRaw}%`
+          : '';
+        line1 = `지휘관님, 오늘 ${changePct} 마감 기준 ${posText}로 내일 상승 가능성이 높습니다.`;
+        line2 = `내일 ${halfCheckpoint} 거래량 ${volTrigger} 확인 후 진입하십시오.`;
+      }
+    } else if (mode === 'bear') {
+      if (p.isBeforeOpen) {
+        line1 = `지휘관님, ${negText} 기준으로 단기 조정 가능성이 있습니다.`;
+        line2 = `${openTime} 개장 후 신호 확인 전까지 대기하십시오.`;
+      } else {
+        line1 = `지휘관님, ${negText} 기준으로 내일도 조정 지속 가능성이 있습니다.`;
+        line2 = `반등 신호 확인 전까지 신규 진입을 보류하십시오.`;
+      }
+    } else {
+      // conflict / 혼재 — JACK은 여전히 긍정에 무게
+      if (p.isBeforeOpen) {
+        line1 = `지휘관님, ${posText} 신호는 살아있으나 지표 혼재입니다.`;
+        line2 = `${openTime} 개장 후 거래량 ${volTrigger} 확인 시 진입을 검토하십시오.`;
+      } else {
+        line1 = `지휘관님, 오늘 지표 혼재 — 긍정 ${positives.length}/부정 ${negatives.length}입니다.`;
+        line2 = `내일 ${halfCheckpoint} 거래량 ${volTrigger} 확인 후 판단하십시오.`;
+      }
+    }
+
+    // ✅ 재반박 비활성화 — forecastMode
+    return `${line1}\n${line2}`;
   }
 
   // ✅ 긍정 데이터만 선별 (JACK은 긍정 지표 챔피언)
@@ -301,23 +322,61 @@ export const buildLuciaText = (p: LuciaParams): string => {
       ? '\n↳ 잭 소장님의 신중함을 이해해요. 하지만 공포가 최고의 매수 기회였던 역사를 잊지 마세요.'
       : '';
 
-  // ✅ 장 미개장/마감 시 — 감성적 해석 1줄 + 리스크 경고 1줄
+  // ✅ 장 미개장/마감 시 — forecastMode (재반박 비활성화)
   if (p.isMarketClosed || p.isUSClosed) {
     const isKR = p.assetType === 'KOREAN_STOCK';
-    const now2 = new Date(Date.now() + 9 * 60 * 60 * 1000);
-    const timeKST2 = now2.getUTCHours() * 100 + now2.getUTCMinutes();
-    const usOpensSameDay = !isKR && !p.isBeforeOpen && timeKST2 < 2330;
-    const nextSession = p.isBeforeOpen
-      ? (isKR ? '오늘' : '오늘 밤')
-      : (isKR ? '내일' : usOpensSameDay ? '오늘 밤' : '내일 밤');
+    const openTime = isKR ? '09:00' : '23:30';
 
-    const riskAdvice = p.verdict === '매수 우위'
-      ? `${nextSession} 개장 초반 거래량 회복 신호를 꼭 확인하세요.`
-      : p.verdict === '매도 우위'
-        ? `${nextSession} 반등 동력이 약할 수 있어요. 무리한 진입은 피하세요.`
-        : `${nextSession} 방향이 정해질 때까지 기다리는 게 맞아요.`;
+    const f = p.flags;
+    const useVolatility = f?.vixHigh || p.assetType === 'CRYPTO';
+    const useLowVol = f?.volDown && !useVolatility;
+    const pool = useLowVol
+      ? LUCIA_LOW_VOL_METAPHORS
+      : useVolatility
+        ? LUCIA_VOLATILITY_METAPHORS
+        : LUCIA_METAPHORS.lowVol_neutral;
+    const mIdx = Math.floor(Date.now() / 1000) % pool.length;
+    const metaphor = pool[mIdx];
 
-    return `소장님, 지금은 장이 쉬는 시간이에요.\n${riskAdvice}${luciaRebuttal}`;
+    const negatives: string[] = [];
+    if (f?.volDown) negatives.push('거래량 저조');
+    if (f?.vixHigh) negatives.push('변동성 위험');
+    if (f?.trendDown) negatives.push('이평선 하락');
+    if (f?.newsNeg) negatives.push('뉴스 부정');
+    const negText = negatives.join(' + ');
+
+    const mode: DiscussMode = p.mode ?? 'conflict';
+
+    let line1: string;
+    let line2: string;
+    if (mode === 'bear') {
+      const head = negText ? `${negText} 기준으로` : '부정 신호 누적으로';
+      line1 = p.isBeforeOpen
+        ? `소장님, ${head} 마치 ${metaphor}.`
+        : `소장님, 오늘 흐름도 약했어요 — 마치 ${metaphor}.`;
+      line2 = p.isBeforeOpen
+        ? `개장 후 첫 30분은 지켜보는 게 맞아요.`
+        : `내일 개장 후 반등 확인 전까지 진입은 미루세요.`;
+    } else if (mode === 'bull') {
+      // 흐름은 좋아 보여도 FOMO 경고
+      line1 = p.isBeforeOpen
+        ? `소장님, 지표는 긍정적이에요. 하지만 FOMO에 휩쓸리지 마세요.`
+        : `소장님, 오늘 흐름은 좋았어요. 하지만 과열 구간은 늘 되돌림이 있어요.`;
+      line2 = p.isBeforeOpen
+        ? `${openTime} 개장 후 거래량 확인 후 진입하세요.`
+        : `내일 개장 후 거래량이 따라주는지 확인한 뒤 움직이세요.`;
+    } else {
+      const head = negText ? `${negText}가 있어요.` : `방향이 아직 확정되지 않았어요.`;
+      line1 = p.isBeforeOpen
+        ? `소장님, ${head} 마치 ${metaphor}.`
+        : `소장님, 오늘 마감 후에도 ${head.replace(/이 있어요\.|가 있어요\.$/, '')}. 마치 ${metaphor}.`;
+      line2 = p.isBeforeOpen
+        ? `개장 후 첫 30분을 지켜본 뒤 결정하세요.`
+        : `내일 방향이 확인되기 전까지 신규 진입은 보류하세요.`;
+    }
+
+    // ✅ 재반박 비활성화 — forecastMode
+    return `${line1}\n${line2}`;
   }
 
 
@@ -415,6 +474,9 @@ interface EchoParams {
   // ✅ 토론 모드 + 지표 플래그 (conflict 시 ECHO 질문용)
   mode?: DiscussMode;
   flags?: IndicatorFlags;
+  // ✅ 시간대 (forecastMode 분기용)
+  isForecast?: boolean;
+  isBeforeOpen?: boolean;
 }
 
 // ✅ ECHO — 하워드 막스(Howard Marks) 스타일
@@ -781,9 +843,9 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
     modeEmoji = '🟡'; modeVerdict = '조건부';
   }
 
-  // ✅ ECHO 질문 (conflict 모드일 때만) — 어느 지표가 긍정/부정인지 기반
+  // ✅ ECHO 질문 (conflict 모드 + 장 중일 때만) — forecastMode에서는 비활성화
   let echoQuestion = '';
-  if (mode === 'conflict' && p.flags) {
+  if (mode === 'conflict' && p.flags && !p.isForecast) {
     const f = p.flags;
     if (f.trendUp && f.newsPos && f.volDown) {
       echoQuestion = [
@@ -810,9 +872,28 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
 
   const summaryParts: string[] = [];
   if (echoQuestion) summaryParts.push(echoQuestion);
-  summaryParts.push(`📍 결론: ${modeEmoji} ${modeVerdict} (${verdictShort})`);
-  summaryParts.push(`📍 조건: ${trigger}`);
-  summaryParts.push(`📍 행동: ${actionShort}`);
+
+  if (p.isForecast) {
+    // ✅ forecastMode — 시간 조건 명시 + 잭/루시아 종합 요약
+    const isKR = p.assetType === 'KOREAN_STOCK';
+    const openTime = isKR ? '09:00' : '23:30';
+    const halfCheckpoint = isKR ? '12시 30분까지' : '개장 후 3시간(02:30)까지';
+    const forecastCondition = p.isBeforeOpen
+      ? `${openTime} 개장 후 ${halfCheckpoint} 거래량 ${trigger}`
+      : `내일 ${halfCheckpoint} 거래량 ${trigger}`;
+    const forecastAction = mode === 'bull'
+      ? '조건 충족 시 10% 진입 → 잭의 상승 전망 + 루시아의 거래량 조건 채택'
+      : mode === 'bear'
+        ? '신규 진입 보류 → 잭의 하락 전망 + 루시아의 리스크 경고 채택'
+        : '조건 충족 시 10% 진입 → 잭의 긍정 신호 + 루시아의 거래량 조건 동시 확인';
+    summaryParts.push(`📍 결론: ${modeEmoji} ${modeVerdict} (${verdictShort})`);
+    summaryParts.push(`📍 조건: ${forecastCondition}`);
+    summaryParts.push(`📍 행동: ${forecastAction}`);
+  } else {
+    summaryParts.push(`📍 결론: ${modeEmoji} ${modeVerdict} (${verdictShort})`);
+    summaryParts.push(`📍 조건: ${trigger}`);
+    summaryParts.push(`📍 행동: ${actionShort}`);
+  }
   const summary = summaryParts.join('\n');
 
   // ✅ details는 상세 맥락을 보존 (verdictText 원문 + confluence + 근거/지금/조건/비중)

@@ -1056,6 +1056,9 @@ ${DISCLAIMER}`;
         // ✅ 토론 모드 + 지표 플래그 (ECHO 질문용)
         mode: discussMode,
         flags,
+        // ✅ 시간대 — forecastMode 분기
+        isForecast: (isKRClosed && assetType === 'KOREAN_STOCK') || (isUSClosed && assetType === 'US_STOCK'),
+        isBeforeOpen: isKRBeforeOpen || (assetType === 'US_STOCK' && !isWeekend && timeKST < 2330 && timeKST >= 600),
       });
       // ✅ ECHO 1 (summary): 즉시 표시 — 결론/조건/행동 3줄
       // ✅ ECHO 2 (details): 별도 버블 — confluence + 근거 + 지금 + 조건 + 비중 + dataSource + disclaimer
