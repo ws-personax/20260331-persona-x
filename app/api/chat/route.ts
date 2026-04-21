@@ -643,6 +643,26 @@ ${DISCLAIMER}`;
       vol.isHigh ? '거래량 신호' : null,
     ].filter(Boolean).join(' + ') || '데이터 제한적';
 
+    // ─── 이전 종목 맥락 추출 ───
+    const prevUserMsg = messages.slice(-3, -1).find((m: { role: string }) => m.role === 'user')?.content || '';
+    const prevKeyword = prevUserMsg ? extractKeyword([{ role: 'user', content: prevUserMsg }]) : null;
+    const prevVolIsHigh = vol.isHigh; // 이전 종목의 vol은 현재 세션에서 알 수 없으므로 현재 기준 사용
+
+    // ─── B안: 잭/루시아 코드 직접 조립 ───
+    const vixAvailable = !vix.label.includes('없음') && !vix.label.includes('불가') && !vix.label.includes('집계');
+
+    // ✅ 시장 상황 감지
+    const situation = detectMarketSituation({
+      volScore: vol.score,
+      volIsHigh: vol.isHigh,
+      vixLabel: vix.label,
+      change: safeNum(marketData?.change || '0'),
+      posLabel: pos.label,
+    });
+
+    // ✅ 추세 맥락 분석 (5일/20일 이평선)
+    const trendCtx = analyzeTrendContext(marketData?.trend);
+
     // ✅ 신뢰도 분해 — 4버킷 (이평선 35 / 거래량 30 / 뉴스 25 / 시세 안정 10)
     //    각 버킷의 최대 점수 대비 조건별 비율을 곱한 뒤, 합이 confidence와 같도록 스케일
     const trendStrengthRatio = (() => {
@@ -673,26 +693,6 @@ ${DISCLAIMER}`;
     const confVolumeScore  = Math.round(rawVolBucket * confScale);
     const confNewsScore    = Math.round(rawNewsBucket * confScale);
     const confPriceScore   = Math.max(0, confidence - confTrendScore - confVolumeScore - confNewsScore);
-
-    // ─── 이전 종목 맥락 추출 ───
-    const prevUserMsg = messages.slice(-3, -1).find((m: { role: string }) => m.role === 'user')?.content || '';
-    const prevKeyword = prevUserMsg ? extractKeyword([{ role: 'user', content: prevUserMsg }]) : null;
-    const prevVolIsHigh = vol.isHigh; // 이전 종목의 vol은 현재 세션에서 알 수 없으므로 현재 기준 사용
-
-    // ─── B안: 잭/루시아 코드 직접 조립 ───
-    const vixAvailable = !vix.label.includes('없음') && !vix.label.includes('불가') && !vix.label.includes('집계');
-
-    // ✅ 시장 상황 감지
-    const situation = detectMarketSituation({
-      volScore: vol.score,
-      volIsHigh: vol.isHigh,
-      vixLabel: vix.label,
-      change: safeNum(marketData?.change || '0'),
-      posLabel: pos.label,
-    });
-
-    // ✅ 추세 맥락 분석 (5일/20일 이평선)
-    const trendCtx = analyzeTrendContext(marketData?.trend);
 
     // ✅ 관망 세분화
     const watchLevel = verdict === '관망' ? determineWatchLevel({
