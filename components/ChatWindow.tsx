@@ -356,7 +356,6 @@ const PersonaBubble = memo(function PersonaBubble({
                   whiteSpace: 'pre-wrap',
                   margin: 0,
                   fontWeight: isEcho ? 600 : 400,
-                  fontStyle: isRebuttal ? 'italic' : 'normal',
                 }}
               >
                 {content}
@@ -387,7 +386,6 @@ const PersonaBubble = memo(function PersonaBubble({
                     color: p.textColor,
                     whiteSpace: 'pre-wrap',
                     margin: 0,
-                    fontStyle: 'italic',
                     fontWeight: 500,
                   }}
                 >
