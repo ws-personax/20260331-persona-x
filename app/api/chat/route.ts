@@ -725,6 +725,7 @@ ${DISCLAIMER}`;
           isUSClosed: isUSClosed && assetType === 'US_STOCK',
           assetType,
           avgVolume: marketData?.avgVolume ?? null,
+          rawVolume: marketData?.rawVolume ?? null,
           currency,
         })
       : `지휘관님, ${keyword} 시세 미수급으로 추세 판단이 제한됩니다. 뉴스 확인 후 신호 포착 시 진입을 검토하십시오.`;
@@ -758,6 +759,7 @@ ${DISCLAIMER}`;
           isWeekend,
           isUSClosed: isUSClosed && assetType === 'US_STOCK',
           avgVolume: marketData?.avgVolume ?? null,
+          rawVolume: marketData?.rawVolume ?? null,
         })
       : `하지만 소장님, 데이터조차 없는 지금은 마치 재료 없이 요리하는 것과 같아요. 충분한 정보가 확인될 때까지 기다리는 것이 맞습니다.`;
     let profitRateNote = '';
@@ -850,9 +852,14 @@ ${DISCLAIMER}`;
 
     const finalRay = (() => {
       const closedNote = rayTimeNote ? rayTimeNote : '';
+      // ✅ 오늘 거래량/5일 평균 구체 숫자 — 둘 다 있을 때만 표시
+      const rayRawVol = marketData?.rawVolume && marketData.rawVolume > 0 ? marketData.rawVolume : null;
+      const rayVolDetail = (rayRawVol && rayAvgVol)
+        ? ` (오늘 ${rayFmtVol(rayRawVol)} / 5일 평균 ${rayFmtVol(rayAvgVol)})`
+        : '';
       const line1 = assetType === 'KOREAN_STOCK'
-        ? `외국인 수급 기준${closedNote} / ${keyword} ${marketData?.price || '미지원'} (${safeNum(marketData?.change)}%) / ${vix.label} / ${vol.label}입니다.`
-        : `나스닥 ${safeNum(nasdaqData?.change)}% / ${keyword} ${marketData?.price || '미지원'} (${safeNum(marketData?.change)}%) / ${vix.label} / ${vol.label}${closedNote}입니다.`;
+        ? `외국인 수급 기준${closedNote} / ${keyword} ${marketData?.price || '미지원'} (${safeNum(marketData?.change)}%) / ${vix.label} / ${vol.label}${rayVolDetail}입니다.`
+        : `나스닥 ${safeNum(nasdaqData?.change)}% / ${keyword} ${marketData?.price || '미지원'} (${safeNum(marketData?.change)}%) / ${vix.label} / ${vol.label}${rayVolDetail}${closedNote}입니다.`;
 
       const line2 = marketData
         ? `${vol.label}이기 때문에 수급 유입이 ${vol.isHigh ? '확대되고 있으며' : '제한적이며'}, ${vix.label} 구간이므로 가격 탄력이 ${vix.label.includes('고변동') ? '높아 급등락에 주의가 필요합니다' : vix.label.includes('중변동') ? '보통 수준입니다' : '낮아 추세 형성이 제한적입니다'}. ${correlationNote}.`

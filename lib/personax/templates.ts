@@ -45,6 +45,7 @@ interface JackParams {
   assetType?: string;
   // ✅ 거래량 수치
   avgVolume?: number | null;   // 5일 평균 거래량
+  rawVolume?: number | null;   // 오늘(당일) 누적 거래량
   currency?: string;           // KRW / USD
 }
 
@@ -88,23 +89,27 @@ export const buildJackText = (p: JackParams): string => {
 
     const trendEval = p.trendSummary || '추세 중립 — 방향성 미확정';
 
-    // ✅ 거래량 수치 구체화
+    // ✅ 거래량 수치 구체화 — 당일 전체 거래량의 절반을 12:30까지 달성하면 신호
     const avgVol = p.avgVolume;
+    const rawVol = p.rawVolume;
     const volUnit = isKR ? '주' : '주';
     const formatVol = (v: number) => {
       if (v >= 100000000) return `${(v / 100000000).toFixed(1)}억${volUnit}`;
       if (v >= 10000) return `${Math.round(v / 10000).toLocaleString()}만${volUnit}`;
       return `${v.toLocaleString()}${volUnit}`;
     };
-    const volCondition = avgVol && avgVol > 0
-      ? `거래량 ${formatVol(Math.round(avgVol * 1.3))} 이상(5일 평균 ${formatVol(avgVol)} 대비 30% 이상)`
-      : '거래량 평소 대비 30% 이상 증가';
+    // rawVolume 우선, 없으면 avgVolume
+    const baseVol = rawVol && rawVol > 0 ? rawVol : (avgVol && avgVol > 0 ? avgVol : 0);
+    const halfVol = Math.round(baseVol * 0.5);
+    const halfLabel = baseVol > 0
+      ? `12시 30분까지 거래량이 오늘 전체(${formatVol(baseVol)})의 절반인 ${formatVol(halfVol)} 이상`
+      : `12시 30분까지 거래량이 평소 대비 50% 이상`;
 
     const condAction = p.verdict === '매수 우위'
-      ? `${nextSession} ${openTime} 개장 후 가격 상승 + ${volCondition} 동시 확인 시 즉각 진입하십시오.`
+      ? `${nextSession} ${openTime} 개장 후 ${halfLabel}이면 강한 매수 신호입니다. 그때 진입을 검토하십시오.`
       : p.verdict === '매도 우위'
-        ? `${nextSession} ${openTime} 개장 후 추가 하락 + ${volCondition} 감소 확인 시 포지션 축소를 검토하십시오.`
-        : `${nextSession} ${openTime} 개장 후 가격 +2% 이상 + ${volCondition} 동시 확인할 때까지 대기하십시오.`;
+        ? `${nextSession} ${openTime} 개장 후 ${halfLabel}에 못 미치면 반등 동력이 약합니다. 포지션 축소를 검토하십시오.`
+        : `${nextSession} ${openTime} 개장 후 ${halfLabel}인지 확인한 후 진입 여부를 결정하십시오.`;
     const statusLabel = p.isWeekend ? '주말 휴장 중입니다' : p.isBeforeOpen ? `장 개장 전(${openTime} 개장)입니다` : '장 마감 후입니다';
     return `지휘관님, ${p.keyword}는 현재 ${statusLabel}. ${timeLabel} 기준 — ${trendEval}. ${condAction}`;
   }
@@ -206,6 +211,7 @@ interface LuciaParams {
   isUSClosed?: boolean;
   assetType?: string;
   avgVolume?: number | null;
+  rawVolume?: number | null;
   sentiment: string;
   verdict: Verdict;
   assetType: AssetType;
@@ -290,26 +296,29 @@ export const buildLuciaText = (p: LuciaParams): string => {
         : `아직 방향이 확정되지 않았어요 ${trendBasis}`
       : '아직 방향이 확정되지 않았어요';
 
-    // ✅ 거래량 수치 구체화
+    // ✅ 거래량 수치 구체화 — 당일 전체 거래량의 절반을 12:30까지 달성하면 신호
     const avgVol = p.avgVolume;
+    const rawVol = p.rawVolume;
     const formatVol = (v: number) => {
       if (v >= 100000000) return `${(v / 100000000).toFixed(1)}억주`;
       if (v >= 10000) return `${Math.round(v / 10000).toLocaleString()}만주`;
       return `${v.toLocaleString()}주`;
     };
-    const volThresholdStr = avgVol && avgVol > 0
-      ? `약 ${formatVol(Math.round(avgVol * 1.3))}(평소 ${formatVol(avgVol)} 대비 30% 이상)`
-      : '평소 대비 30% 이상';
+    const baseVol = rawVol && rawVol > 0 ? rawVol : (avgVol && avgVol > 0 ? avgVol : 0);
+    const halfVol = Math.round(baseVol * 0.5);
+    const halfLabel = baseVol > 0
+      ? `오늘 거래량(${formatVol(baseVol)})의 절반인 ${formatVol(halfVol)} 이상`
+      : '평소 거래량 대비 50% 이상';
 
     const statusLabel = p.isWeekend ? '주말이에요'
       : p.isBeforeOpen ? '장이 열리기 전이에요'
       : '오늘 장이 끝났어요';
 
     const openAdvice = p.verdict === '매수 우위'
-      ? `${nextSession} ${openTime} 개장 후 첫 30분 거래량이 ${volThresholdStr}을 넘어서면 상승 신호예요. 그 전까지는 기다리는 게 맞습니다.`
+      ? `${nextSession} 장 열리면 12시 30분에 한 번 확인해 주세요. ${halfLabel}이면 시장이 살아있다는 신호예요.`
       : p.verdict === '매도 우위'
-        ? `${nextSession} ${openTime} 개장 후 반등이 나오더라도 거래량이 ${volThresholdStr}에 못 미치면 속임수일 수 있어요. 신중하게 접근하세요.`
-        : `${nextSession} ${openTime} 개장 후 첫 30분 거래량이 ${volThresholdStr}을 넘는지 꼭 확인해 주세요. 그게 오늘 방향을 결정합니다.`;
+        ? `${nextSession} 장 열리면 12시 30분에 한 번 확인해 주세요. ${halfLabel}에 못 미치면 반등이 약한 상태예요. 신중하게 접근하세요.`
+        : `${nextSession} 장 열리면 12시 30분에 한 번 확인해 주세요. ${halfLabel}인지 꼭 보세요. 그게 오늘 방향을 결정합니다.`;
 
     return `소장님, 지금은 ${statusLabel}. ${timeLabel} 흐름을 보면 ${p.keyword}는 ${trendFeeling}. ${openAdvice}`;
   }
