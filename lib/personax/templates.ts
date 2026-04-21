@@ -671,13 +671,37 @@ export const buildEchoText = (p: EchoParams): string => {
 
   // ✅ Confluence Score — 4지표 일치 체크
   const trendPass  = p.trendStrength === 'strong_up' || p.trendStrength === 'weak_up';
-  const volumePass = !!p.volIsHigh;
   const newsPass   = p.sentiment === '긍정';
   const newsWarn   = p.sentiment === '중립';
   const pricePass  = !!p.hasMarketData;
 
+  // ✅ 거래량 판정 — RAY와 동일 기준: rawVolume vs avgVolume 직접 비교
+  //    있을 때: >1.1배 증가, 0.9~1.1배 보통, <0.9배 감소
+  //    없을 때: vol.isHigh fallback
+  let volumePass: boolean;
+  let volumeIcon: string;
+  let volumeText: string;
+  if (p.rawVolume && p.rawVolume > 0 && p.avgVolume && p.avgVolume > 0) {
+    if (p.rawVolume > p.avgVolume * 1.1) {
+      volumePass = true;
+      volumeIcon = '✅';
+      volumeText = '거래량 증가';
+    } else if (p.rawVolume >= p.avgVolume * 0.9) {
+      volumePass = false;
+      volumeIcon = '⚠️';
+      volumeText = '거래량 보통';
+    } else {
+      volumePass = false;
+      volumeIcon = '⚠️';
+      volumeText = '거래량 감소';
+    }
+  } else {
+    volumePass = !!p.volIsHigh;
+    volumeIcon = volumePass ? '✅' : '⚠️';
+    volumeText = volumePass ? '거래량 증가' : '거래량 평이';
+  }
+
   const trendIcon  = trendPass ? '✅' : '⚠️';
-  const volumeIcon = volumePass ? '✅' : '⚠️';
   const newsIcon   = newsPass ? '✅' : newsWarn ? '⚠️' : '❌';
   const priceIcon  = pricePass ? '✅' : '⚠️';
 
@@ -689,7 +713,6 @@ export const buildEchoText = (p: EchoParams): string => {
     : p.trendStrength === 'strong_down' || p.trendStrength === 'weak_down'
       ? '이평선 하락 추세'
       : '이평선 방향 불확정';
-  const volumeText = volumePass ? '거래량 증가' : '거래량 평이';
   const newsText   = `뉴스 ${p.sentiment}`;
   const priceText  = pricePass ? '시세 안정' : '시세 미수급';
 
