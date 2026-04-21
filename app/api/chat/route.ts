@@ -663,6 +663,12 @@ ${DISCLAIMER}`;
     // ✅ 추세 맥락 분석 (5일/20일 이평선)
     const trendCtx = analyzeTrendContext(marketData?.trend);
 
+    // ✅ JACK/LUCIA용 trendSummary — 오늘 등락률 부착
+    const changeForTrend = marketData?.change ? parseFloat(marketData.change) : NaN;
+    const trendSummaryWithChange = (trendCtx.trendSummary && !Number.isNaN(changeForTrend))
+      ? `${trendCtx.trendSummary}, 오늘 ${changeForTrend >= 0 ? '+' : ''}${changeForTrend.toFixed(2)}% ${changeForTrend > 0.1 ? '상승' : changeForTrend < -0.1 ? '하락' : '보합'} 마감`
+      : (trendCtx.trendSummary || null);
+
     // ✅ 관망 세분화
     const watchLevel = verdict === '관망' ? determineWatchLevel({
       confidence,
@@ -714,7 +720,7 @@ ${DISCLAIMER}`;
           volRatio: vol.label.includes('배') ? parseFloat(vol.label.match(/([\d.]+)배/)?.[1] || '0') : null,
           price: marketData.price,
           situation,
-          trendSummary: trendCtx.trendSummary || null,
+          trendSummary: trendSummaryWithChange,
           trendStrength: trendCtx.trendStrength,
           consecutiveDays: trendCtx.consecutiveDays,
           conflict,
@@ -749,7 +755,7 @@ ${DISCLAIMER}`;
             return prevKeyword;
           })(),
           situation,
-          trendSummary: trendCtx.trendSummary || null,
+          trendSummary: trendSummaryWithChange,
           trendStrength: trendCtx.trendStrength,
           conflict,
           jackVerdict: verdict,
@@ -870,8 +876,10 @@ ${DISCLAIMER}`;
         ? `외국인 수급 기준${closedNote} / ${keyword} ${marketData?.price || '미지원'} (${safeNum(marketData?.change)}%) / ${vix.label} / ${rayVolLabel}${rayVolDetail}입니다.`
         : `나스닥 ${safeNum(nasdaqData?.change)}% / ${keyword} ${marketData?.price || '미지원'} (${safeNum(marketData?.change)}%) / ${vix.label} / ${rayVolLabel}${rayVolDetail}${closedNote}입니다.`;
 
+      // ✅ rayVolLabel 기준으로 수급 상태 판정 — "증가"일 때만 "확대", 그 외(보통/감소)는 "제한적"
+      const rayVolIsIncreasing = rayVolLabel.includes('증가');
       const line2 = marketData
-        ? `${rayVolLabel}이기 때문에 수급 유입이 ${vol.isHigh ? '확대되고 있으며' : '제한적이며'}, ${vix.label} 구간이므로 가격 탄력이 ${vix.label.includes('고변동') ? '높아 급등락에 주의가 필요합니다' : vix.label.includes('중변동') ? '보통 수준입니다' : '낮아 추세 형성이 제한적입니다'}. ${correlationNote}.`
+        ? `${rayVolLabel}이기 때문에 수급 유입이 ${rayVolIsIncreasing ? '확대되고 있으며' : '제한적이며'}, ${vix.label} 구간이므로 가격 탄력이 ${vix.label.includes('고변동') ? '높아 급등락에 주의가 필요합니다' : vix.label.includes('중변동') ? '보통 수준입니다' : '낮아 추세 형성이 제한적입니다'}. ${correlationNote}.`
         : '시세 미수급 — 뉴스 및 외부 신호 기반으로 판단이 제한됩니다.';
 
       const line3 = situationNote[situation] + ` 진입 적합도: ${rayAdaptability}입니다.`;

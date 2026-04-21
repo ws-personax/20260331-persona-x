@@ -10,6 +10,15 @@ export const particle = (label: string): string => {
   return (code - 0xAC00) % 28 === 0 ? '로' : '으로';
 };
 
+// ✅ 은/는 조사 — 받침 있음 "은", 없음 "는"
+export const topicParticle = (label: string): string => {
+  if (!label) return '는';
+  const last = label[label.length - 1];
+  const code = last.charCodeAt(0);
+  if (code < 0xAC00 || code > 0xD7A3) return '는';
+  return (code - 0xAC00) % 28 === 0 ? '는' : '은';
+};
+
 // ─────────────────────────────────────────────
 // 잭 템플릿 파라미터
 // ─────────────────────────────────────────────
@@ -113,7 +122,7 @@ export const buildJackText = (p: JackParams): string => {
         ? `${nextSession} ${openTime} 개장 후 ${halfLabel}에 못 미치면 반등 동력이 약합니다. 포지션 축소를 검토하십시오.`
         : `${nextSession} ${openTime} 개장 후 ${halfLabel}인지 확인한 후 진입 여부를 결정하십시오.`;
     const statusLabel = p.isWeekend ? '주말 휴장 중입니다' : p.isBeforeOpen ? `장 개장 전(${openTime} 개장)입니다` : '장 마감 후입니다';
-    return `지휘관님, ${p.keyword}는 현재 ${statusLabel}. ${timeLabel} 기준 — ${trendEval}. ${condAction}`;
+    return `지휘관님, ${p.keyword}${topicParticle(p.keyword)} 현재 ${statusLabel}. ${timeLabel} 기준 — ${trendEval}. ${condAction}`;
   }
 
   const contextNote = (p.prevKeyword && p.prevKeyword !== p.keyword)
@@ -191,11 +200,11 @@ export const buildJackText = (p: JackParams): string => {
     : '';
 
   if (interpretation && interpretation !== JACK_INTERPRETATIONS.normal) {
-    return `지휘관님, ${contextNote}${p.keyword}는 ${p.volLabel}${particle(p.volLabel)} ${volSuffix}.${trendSentence} ${interpretation}${conflictNote} ${trend} 구간으로 ${action}`;
+    return `지휘관님, ${contextNote}${p.keyword}${topicParticle(p.keyword)} ${p.volLabel}${particle(p.volLabel)} ${volSuffix}.${trendSentence} ${interpretation}${conflictNote} ${trend} 구간으로 ${action}`;
   }
 
   // ✅ volSuffix 뒤 마침표 → 추세 문장 → vixNote → 구간 판단
-  return `지휘관님, ${contextNote}${p.keyword}는 ${p.volLabel}${particle(p.volLabel)} ${volSuffix}.${trendSentence}${vixNote ? ' ' + vixNote + '.' : ''} ${conflictNote}${trend} 구간으로 ${action}`;
+  return `지휘관님, ${contextNote}${p.keyword}${topicParticle(p.keyword)} ${p.volLabel}${particle(p.volLabel)} ${volSuffix}.${trendSentence}${vixNote ? ' ' + vixNote + '.' : ''} ${conflictNote}${trend} 구간으로 ${action}`;
 };
 
 // ─────────────────────────────────────────────
@@ -329,7 +338,7 @@ export const buildLuciaText = (p: LuciaParams): string => {
       ? `${p.trendSummary} 흐름이 유지되고 있어요`
       : '추세 방향은 아직 확정되지 않았어요';
     const closingOpener = luciaChangeRaw
-      ? `${timeLabel} ${p.keyword}은 ${luciaChangeRaw}로 마감했어요. ${trendFlow}.`
+      ? `${timeLabel} ${p.keyword}${topicParticle(p.keyword)} ${luciaChangeRaw}로 마감했어요. ${trendFlow}.`
       : `${timeLabel} ${p.keyword} 흐름을 보면 ${trendFeeling}.`;
 
     return `소장님, ${closingOpener} ${openAdvice}`;
