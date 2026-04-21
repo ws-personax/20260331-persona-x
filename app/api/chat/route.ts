@@ -755,7 +755,8 @@ ${DISCLAIMER}`;
             return prevKeyword;
           })(),
           situation,
-          trendSummary: trendSummaryWithChange,
+          // ✅ LUCIA는 오프너에서 이미 등락률을 표시하므로 trendSummary는 원본 유지 (중복 방지)
+          trendSummary: trendCtx.trendSummary || null,
           trendStrength: trendCtx.trendStrength,
           conflict,
           jackVerdict: verdict,

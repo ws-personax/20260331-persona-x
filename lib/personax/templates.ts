@@ -338,7 +338,7 @@ export const buildLuciaText = (p: LuciaParams): string => {
       ? `${p.trendSummary} 흐름이 유지되고 있어요`
       : '추세 방향은 아직 확정되지 않았어요';
     const closingOpener = luciaChangeRaw
-      ? `${timeLabel} ${p.keyword}${topicParticle(p.keyword)} ${luciaChangeRaw}로 마감했어요. ${trendFlow}.`
+      ? `${timeLabel} ${p.keyword}${topicParticle(p.keyword)} ${luciaChangeRaw} 마감했어요. ${trendFlow}.`
       : `${timeLabel} ${p.keyword} 흐름을 보면 ${trendFeeling}.`;
 
     return `소장님, ${closingOpener} ${openAdvice}`;
