@@ -684,20 +684,17 @@ ${DISCLAIMER}`;
         });
       }
 
-      // ✅ 전망 질문 — 코스피/나스닥으로 유도
-      const jackGuide = isForecastQuery
-        ? '지휘관님, 시장 전망을 분석하겠습니다. "코스피 전망" 또는 "나스닥 전망"으로 질문해 주시면 5일·20일 추세 기반으로 즉각 분석합니다.'
-        : '지휘관님, 분석할 종목명을 하달해 주십시오. 종목명 또는 키워드를 입력하면 즉각 분석을 개시합니다.';
-      const luciaGuide = '소장님, 구체적인 종목이나 시장을 알려주시면 바로 분석해 드릴게요. 예를 들어 삼성전자, 테슬라, 비트코인, 코스피처럼요.';
-      const rayGuide   = `분석 대상이 지정되지 않았습니다. 종목명 입력 시 시세, 뉴스, 거래량 데이터를 즉시 수집합니다.\n지원 종목: 국내주식, 미국주식, 암호화폐, 주요 지수.\n진입 적합도: 판단 보류입니다.`;
-      const echoGuide  = `결론: 분석 대기 상태입니다.\n근거: 종목명이 입력되지 않아 데이터 수집이 불가합니다.\n지금: 분석할 종목명을 입력해 주십시오.\n조건: 예) 삼성전자 / 테슬라 / 비트코인 / 나스닥\n비중: 판단 보류입니다.\n\n📡 데이터 출처 — 종목 미지정\n\n⚠️ PersonaX는 AI 금융 콘텐츠 플랫폼입니다.\n제공되는 모든 분석은 참고용 시나리오이며\n투자 자문·매매 추천이 아닙니다.\n투자 판단과 그에 따른 손익의 책임은\n전적으로 투자자 본인에게 있습니다.`;
+      // ✅ 전망 질문 — 코스피/나스닥으로 유도 (간단 안내 카드)
+      if (isForecastQuery) {
+        return Response.json({
+          errorType: 'keyword_not_recognized',
+          errorMessage: '시장 전망은 "코스피 전망" 또는 "나스닥 전망"으로\n질문해 주시면 즉각 분석해 드려요.',
+        });
+      }
+      // ✅ 종목 미인식 — 친절한 안내 카드
       return Response.json({
-        reply: [jackGuide, luciaGuide, rayGuide, echoGuide].join('\n\n'),
-        personas: {
-          jack: jackGuide, lucia: luciaGuide, ray: rayGuide, echo: echoGuide,
-          verdict: '관망' as Verdict, confidence: 0, breakdown: '종목 미지정', positionSizing: '0%',
-          jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
-        },
+        errorType: 'keyword_not_recognized',
+        errorMessage: '죄송합니다. 해당 종목을 찾을 수 없어요.\n다른 종목명으로 입력해주세요.\n예: 삼성전자, 테슬라, SK하이닉스',
       });
     }
 
@@ -716,6 +713,25 @@ ${DISCLAIMER}`;
       fetchMarketPrice('나스닥').catch(() => null),
       fetchInvestmentNews(keyword).catch(() => []),
     ]);
+
+    // ✅ 시세 미수급 — STOCK_MAP/CRYPTO_MAP에 없으면 "종목 미인식", 있는데 실패면 "시세 API 일시 장애"
+    if (!marketData) {
+      const isRecognized = !!(
+        STOCK_MAP[keyword] || STOCK_MAP[keyword.toUpperCase()] ||
+        CRYPTO_MAP[keyword] || CRYPTO_MAP[keyword.toUpperCase()]
+      );
+      if (!isRecognized) {
+        return Response.json({
+          errorType: 'keyword_not_recognized',
+          errorMessage: '죄송합니다. 해당 종목을 찾을 수 없어요.\n다른 종목명으로 입력해주세요.\n예: 삼성전자, 테슬라, SK하이닉스',
+        });
+      }
+      return Response.json({
+        errorType: 'market_data_unavailable',
+        errorMessage: '잠시 후 다시 시도해주세요.\n시세 데이터를 불러오는 중입니다. ⏳',
+        keyword,
+      });
+    }
 
     // ✅ 뉴스 필터링 — 키워드와 무관한 뉴스 제거
     const NEWS_EXCLUDE_PATTERNS = [
@@ -1533,6 +1549,9 @@ ${DISCLAIMER}`;
 
   } catch (e) {
     console.error("❌ 사령부 에러:", e);
-    return Response.json({ reply: "사령부 시스템 일시 지연. 잠시 후 재시도하십시오." });
+    return Response.json({
+      errorType: 'analysis_failed',
+      errorMessage: '분석 중 오류가 발생했습니다.\n종목명을 다시 입력해주세요. 🔄',
+    });
   }
 }

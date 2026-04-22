@@ -31,6 +31,8 @@ interface PersonaData {
   echoNews?: NewsLink | null;
 }
 
+type ErrorType = 'market_data_unavailable' | 'keyword_not_recognized' | 'analysis_failed';
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -39,6 +41,9 @@ interface Message {
   isRead?: boolean;
   personas?: PersonaData | null;
   newsLinks?: NewsLink[];
+  errorType?: ErrorType;
+  errorMessage?: string;
+  retryText?: string; // 재시도 버튼이 다시 보낼 사용자 입력
 }
 
 type PersonaKey = 'jack' | 'lucia' | 'ray' | 'echo';
@@ -688,6 +693,66 @@ const TypingIndicator = () => (
   </>
 );
 
+// ✅ 에러/안내 카드 — 빨간 경고 대신 부드러운 안내 톤
+//   market_data_unavailable / analysis_failed → 재시도 버튼
+//   keyword_not_recognized                    → 안내만
+const ErrorCard = ({
+  message,
+  showRetry,
+  onRetry,
+}: {
+  message: string;
+  showRetry: boolean;
+  onRetry?: () => void;
+}) => (
+  <div style={{ padding: '0 12px', marginBottom: 14 }}>
+    <div
+      style={{
+        background: '#f9fafb',
+        border: '1px solid #e5e7eb',
+        borderRadius: 12,
+        padding: '16px 18px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+      }}
+    >
+      <p
+        style={{
+          margin: 0,
+          fontSize: 13.5,
+          lineHeight: 1.7,
+          color: '#374151',
+          whiteSpace: 'pre-line',
+          textAlign: 'center',
+          fontWeight: 500,
+        }}
+      >
+        {message}
+      </p>
+      {showRetry && onRetry && (
+        <div style={{ textAlign: 'center', marginTop: 12 }}>
+          <button
+            type="button"
+            onClick={onRetry}
+            style={{
+              background: '#ffffff',
+              color: '#374151',
+              border: '1px solid #d1d5db',
+              borderRadius: 20,
+              padding: '7px 18px',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+            }}
+          >
+            다시 시도
+          </button>
+        </div>
+      )}
+    </div>
+  </div>
+);
+
 // ✅ 첫 진입 온보딩 카드 — 사용자가 아직 질의를 보내지 않았을 때만 표시
 //   역할: "ChatGPT랑 뭐가 달라?" 방지 + 서비스 정체성 전달
 const OnboardingCard = ({ onExample }: { onExample: (keyword: string) => void }) => (
@@ -948,6 +1013,10 @@ export default function ChatWindow() {
         content: data.reply || '',
         personas: data.personas || null,
         newsLinks: data.newsLinks || [],
+        errorType: data.errorType,
+        errorMessage: data.errorMessage,
+        // 종목 미인식은 같은 텍스트로 재시도해도 결과 같으므로 retryText 미설정
+        retryText: data.errorType === 'keyword_not_recognized' ? undefined : text,
       };
 
       const updated = [...nextMessages, assistantMsg];
@@ -957,8 +1026,11 @@ export default function ChatWindow() {
       const errMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: '사령부 시스템 일시 지연. 잠시 후 재시도하십시오.',
+        content: '',
         timestamp: new Date(),
+        errorType: 'analysis_failed',
+        errorMessage: '분석 중 오류가 발생했습니다.\n종목명을 다시 입력해주세요. 🔄',
+        retryText: text,
       };
       const updated = [...nextMessages, errMsg];
       messagesRef.current = updated;
@@ -1067,6 +1139,14 @@ export default function ChatWindow() {
                     ) : msg.content}
                   </p>
                 </div>
+              </div>
+            ) : msg.errorType && msg.errorMessage ? (
+              <div style={{ marginBottom: 12 }}>
+                <ErrorCard
+                  message={msg.errorMessage}
+                  showRetry={msg.errorType !== 'keyword_not_recognized' && !!msg.retryText}
+                  onRetry={msg.retryText ? () => handleSendWithPosition(msg.retryText!, null) : undefined}
+                />
               </div>
             ) : (
               <div style={{ marginBottom: 12 }}>
