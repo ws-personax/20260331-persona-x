@@ -1466,23 +1466,32 @@ ${DISCLAIMER}`;
       return { ...n, score };
     }).filter(n => (n.originallink || n.link || n.url || '').startsWith('http'));
 
-    const used = new Set<number>();
-    const pickNews = (scoreFn: (n: typeof scoredNews[0], i: number) => boolean) => {
-      const i = scoredNews.findIndex((n, i) => scoreFn(n, i) && !used.has(i));
-      if (i !== -1) { used.add(i); return i; }
-      const fb = scoredNews.findIndex((_, i) => !used.has(i));
-      if (fb !== -1) used.add(fb);
-      return fb;
-    };
+    // ─── 페르소나별 뉴스 배정 — URL 기준 중복 제거 ───
+    //   RAY   : 최신순 상위 1건 (scoredNews는 Naver API date 정렬)
+    //   JACK  : 긍정(score=1) 1건, 없으면 null
+    //   LUCIA : 부정(score=-1) 1건, 없으면 null
+    //   ECHO  : 위에서 사용되지 않은 URL 중 1건, 없으면 null
+    const getUrl = (n: NewsRaw): string => n.originallink || n.link || n.url || '';
+    const usedUrls = new Set<string>();
 
-    const jackIdx  = pickNews(n => n.score === 1);
-    const luciaIdx = pickNews(n => n.score === -1);
-    const rayIdx   = pickNews(n => n.score === 0);
+    const rayPick = scoredNews[0] || null;
+    const rayNews = rayPick ? cleanNewsItem(rayPick) : null;
+    if (rayPick) usedUrls.add(getUrl(rayPick));
 
-    const jackNews  = jackIdx  !== -1 ? cleanNewsItem(scoredNews[jackIdx])  : null;
-    const luciaNews = luciaIdx !== -1 ? cleanNewsItem(scoredNews[luciaIdx]) : null;
-    const rayNews   = rayIdx   !== -1 ? cleanNewsItem(scoredNews[rayIdx])   : null;
-    const echoNews  = scoredNews[0]   ? cleanNewsItem(scoredNews[0])        : null;
+    const jackPick = scoredNews.find(n => n.score === 1 && !usedUrls.has(getUrl(n))) ?? null;
+    const jackNews = jackPick ? cleanNewsItem(jackPick) : null;
+    if (jackPick) usedUrls.add(getUrl(jackPick));
+
+    const luciaPick = scoredNews.find(n => n.score === -1 && !usedUrls.has(getUrl(n))) ?? null;
+    const luciaNews = luciaPick ? cleanNewsItem(luciaPick) : null;
+    if (luciaPick) usedUrls.add(getUrl(luciaPick));
+
+    const echoPick = scoredNews.find(n => !usedUrls.has(getUrl(n))) ?? null;
+    const echoNews = echoPick ? cleanNewsItem(echoPick) : null;
+
+    console.log(
+      `[News 배정] total=${scoredNews.length} ray=${rayNews ? '✅' : '∅'} jack=${jackNews ? '✅' : '∅'} lucia=${luciaNews ? '✅' : '∅'} echo=${echoNews ? '✅' : '∅'}`
+    );
 
     // ─── 히스토리 저장 ───
     const isIndexKeyword = INDEX_KEYWORDS.has(keyword);
