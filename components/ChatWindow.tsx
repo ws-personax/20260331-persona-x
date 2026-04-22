@@ -1091,13 +1091,14 @@ export default function ChatWindow() {
           height: 100vh;
           height: 100dvh;
         }
-        /* 온보딩 카드를 상단 네비게이션 바 바로 아래 배치 (24px 여백) */
+        /* 온보딩 카드를 상단 네비게이션 바 아래 충분한 여백(70px) 두고 배치
+           iPad Safari 주소창/네비게이션 바 높이(약 50~60px) 회피 */
         .px-onboarding-wrap {
           display: flex;
           flex-direction: column;
           justify-content: flex-start;
           align-items: stretch;
-          padding: 24px 0 20px;
+          padding: 70px 0 20px;
           box-sizing: border-box;
         }
       `}</style>
