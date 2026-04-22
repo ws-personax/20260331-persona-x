@@ -59,16 +59,10 @@ export interface PrevContext {
   currSector: string | null;
   prevIsCrypto: boolean;
   currIsCrypto: boolean;
+  // ✅ RAY 섹터 비교용 — 같은 섹터일 때 한 줄 비교에 사용
+  prevChangePercent?: number | null;   // 이전 종목 등락률 (%)
+  prevDisplayName?: string | null;     // 이전 종목 표시명 (예: "삼성전자")
 }
-
-// ✅ 과/와 조사 — 받침 있으면 "과", 없으면 "와"
-const withParticle = (label: string): string => {
-  if (!label) return '와';
-  const last = label[label.length - 1];
-  const code = last.charCodeAt(0);
-  if (code < 0xAC00 || code > 0xD7A3) return '와';
-  return (code - 0xAC00) % 28 === 0 ? '와' : '과';
-};
 
 interface JackParams {
   keyword: string;
@@ -537,20 +531,11 @@ export const buildLuciaText = (p: LuciaParams): string => {
   }
 
 
-  // ✅ 이전 종목 맥락 커넥터
-  let connector = '';
-  if (p.prevCtx && p.prevCtx.prevKeyword && p.prevCtx.prevKeyword !== p.keyword) {
-    const ctx = p.prevCtx;
-    if (ctx.prevIsCrypto && !ctx.currIsCrypto) {
-      connector = '코인과 달리 주식은, ';
-    } else if (!ctx.prevIsCrypto && ctx.currIsCrypto) {
-      connector = '주식과 달리 코인은 변동성이 훨씬 커요. ';
-    } else if (ctx.prevSector && ctx.currSector && ctx.prevSector === ctx.currSector) {
-      connector = `${ctx.prevKeyword}${withParticle(ctx.prevKeyword)} 마찬가지로, `;
-    } else {
-      connector = `${ctx.prevKeyword}${withParticle(ctx.prevKeyword)} 달리, `;
-    }
-  }
+  // ✅ LUCIA 독립화 지시문:
+  //    현재 종목만 이야기한다. 이전 종목을 언급하거나 비교하는 표현
+  //    (~와 마찬가지로, ~와 달리 등)을 쓰지 않는다.
+  //    → 섹터 비교는 RAY 레이어 전담. LUCIA 커넥터는 항상 빈 문자열.
+  const connector = '';
 
   // ✅ 부정 데이터만 선별 (LUCIA는 부정 지표 챔피언)
   const flags = p.flags;

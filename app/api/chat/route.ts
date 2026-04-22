@@ -769,16 +769,33 @@ ${DISCLAIMER}`;
       bearCount >= 3 ? 'bear' :
       'conflict';
 
-    // ✅ 이전 종목 맥락 (섹터/자산군 비교용) — LUCIA 커넥터 생성 시 사용
+    // ✅ 이전 종목 맥락 (섹터/자산군 비교용) — RAY 섹터 비교 한 줄 + LUCIA 자산군 구분에 사용
     const prevIsCryptoKeyword = (k: string) =>
       ['비트코인','이더리움','리플','솔라나','도지','에이다','바이낸스','BTC','ETH','XRP','SOL','DOGE','ADA','BNB'].includes(k);
-    const prevCtx: PrevContext | undefined = prevKeyword && prevKeyword !== '시장' && prevKeyword !== keyword
+    const hasPrevCtx = !!(prevKeyword && prevKeyword !== '시장' && prevKeyword !== keyword);
+
+    // ✅ 이전 종목 change% 수급 — 같은 섹터일 때 RAY 비교 줄 생성에 필요
+    //    실패 시 null (조건 미충족 → 비교 줄 생략)
+    let prevChangePercent: number | null = null;
+    if (hasPrevCtx && prevKeyword) {
+      try {
+        const prevMd = await fetchMarketPrice(prevKeyword);
+        const parsed = prevMd?.change ? parseFloat(prevMd.change) : NaN;
+        if (Number.isFinite(parsed)) prevChangePercent = parsed;
+      } catch {
+        // noop — prevChangePercent null 유지
+      }
+    }
+
+    const prevCtx: PrevContext | undefined = hasPrevCtx && prevKeyword
       ? {
           prevKeyword,
           prevSector: getSector(prevKeyword) ?? null,
           currSector: getSector(keyword) ?? null,
           prevIsCrypto: prevIsCryptoKeyword(prevKeyword),
           currIsCrypto: assetType === 'CRYPTO',
+          prevChangePercent,
+          prevDisplayName: prevKeyword,
         }
       : undefined;
 
@@ -962,7 +979,33 @@ ${DISCLAIMER}`;
       const line2 = volLine;
       const line3 = vix.label;
 
-      return [line1, line2, line3].join('\n');
+      // ✅ RAY 섹터 비교 한 줄 — 조건부 삽입 (quote 바로 앞)
+      //    조건: 이전 종목 존재 + 같은 섹터 + 다른 키워드 + 양쪽 change% 확보
+      //    판정: Δ = currentChange - prevChange
+      //          > +0.3 → "상대적 강세", < -0.3 → "상대적 약세", 그 외 → "유사한 흐름"
+      let sectorCompareLine = '';
+      const currSectorForCompare = getSector(keyword) ?? null;
+      const prevSectorForCompare = prevCtx?.prevSector ?? null;
+      if (
+        prevCtx &&
+        prevCtx.prevKeyword &&
+        prevCtx.prevKeyword !== keyword &&
+        prevSectorForCompare &&
+        currSectorForCompare &&
+        prevSectorForCompare === currSectorForCompare &&
+        prevCtx.prevChangePercent !== null &&
+        prevCtx.prevChangePercent !== undefined &&
+        Number.isFinite(rayChangeNum)
+      ) {
+        const delta = rayChangeNum - prevCtx.prevChangePercent;
+        const judgment = delta > 0.3 ? '상대적 강세' : delta < -0.3 ? '상대적 약세' : '유사한 흐름';
+        const prevChangeStr = `${prevCtx.prevChangePercent >= 0 ? '+' : ''}${prevCtx.prevChangePercent.toFixed(2)}%`;
+        const candidate = `같은 ${currSectorForCompare} 섹터, ${prevCtx.prevDisplayName || prevCtx.prevKeyword}(${prevChangeStr}) 대비 ${judgment}.`;
+        // 35자 이내 가드
+        if (candidate.length <= 35) sectorCompareLine = candidate;
+      }
+
+      return [line1, line2, line3, sectorCompareLine].filter(Boolean).join('\n');
     })();
 
     // ─── ✅ Gemini 완전 제거 — 에코 템플릿 직접 사용 ───
