@@ -764,11 +764,14 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
     .replace(/{days}/g, days);
 
   // ✅ 충돌 상황 에코 처리 — 기존 line2 꼬리말 (Confluence 뒤 토론 블록과 분리)
+  //    mode='bull'일 때는 "포지션을 줄이는 것이 정석" 같은 하락 톤이 결론(🟢)과 모순되므로 생략
   let conflictNote = '';
-  if (p.conflict === 'conflict_jack_buy') {
-    conflictNote = ' 잭은 모멘텀을, 루시아는 과열을 경고합니다. 두 신호가 충돌할 때는 포지션을 줄이는 것이 포트폴리오 이론의 정석입니다(리스크를 분산해 손실을 줄이는 원칙).';
-  } else if (p.conflict === 'conflict_lucia_buy') {
-    conflictNote = ' 잭은 하락을 경고하고 루시아는 역발상 기회를 말합니다. 두 신호 충돌 시 절반만 진입하고 나머지는 확인 후 결정하십시오.';
+  if (p.mode !== 'bull') {
+    if (p.conflict === 'conflict_jack_buy') {
+      conflictNote = ' 잭은 모멘텀을, 루시아는 과열을 경고합니다. 두 신호가 충돌할 때는 포지션을 줄이는 것이 포트폴리오 이론의 정석입니다(리스크를 분산해 손실을 줄이는 원칙).';
+    } else if (p.conflict === 'conflict_lucia_buy') {
+      conflictNote = ' 잭은 하락을 경고하고 루시아는 역발상 기회를 말합니다. 두 신호 충돌 시 절반만 진입하고 나머지는 확인 후 결정하십시오.';
+    }
   }
 
   // ✅ ⚔️ 참모진 토론 블록 — 충돌 시에만 표시 (JACK/LUCIA 발언은 각자 말풍선에서)
@@ -1021,6 +1024,12 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   } else {
     const buy1 = effectiveBuyPrice || '매수 조건';
     line5 = `비중: 현재 0%입니다. ${buy1} 돌파 + ${volThresholdLabel}을 동시에 확인한 후 ${firstEntryPct}%씩 단계적으로 진입하십시오.${cryptoStopNote}`;
+  }
+
+  // ✅ bull 모드 line5 덮어쓰기 — verdict=매도 우위 + mode=bull 조합에서
+  //    "50% 정리" 같은 하락 톤이 결론(🟢)과 모순되는 문제 차단
+  if (p.mode === 'bull') {
+    line5 = '비중: 조건 충족 후 단계적 분할 접근 고려 가능.';
   }
 
   // ✅ 2단 분리

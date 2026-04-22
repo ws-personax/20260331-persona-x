@@ -117,7 +117,7 @@ const MARKET_INDEX_SET = new Set([
 
 // ─────────────────────────────────────────────
 // 자세히 보기 전용 후처리 — 지시형 표현 완화 + 이모지 허용 셋만 유지
-//   허용 이모지: ✅ ⚠️ 📍 📊 📈 📉 💡 🔴 🟡 🟢
+//   허용 이모지: ✅ ⚠️ 🔹 📊 📈 💡 🔴 🟡 🟢 (📍 렌더링 이슈로 🔹으로 대체)
 //   주의: 이 함수는 "자세히 보기(details)" 문자열에만 적용해야 함.
 //   ECHO 상단 summary / RAY·JACK·LUCIA 메인 버블에는 적용하지 않음 (지휘관 톤 유지).
 // ─────────────────────────────────────────────
@@ -126,7 +126,8 @@ const normalizeDetails = (text: string | null | undefined): string | null => {
   return text
     // 이모지 교체 (긴 것 먼저)
     .replace(/🛡️/g, '⚠️')
-    .replace(/📌/g, '📍')
+    .replace(/📌/g, '🔹')
+    .replace(/📍/g, '🔹')
     .replace(/🎯/g, '✅')
     .replace(/📉/g, '📊')
     .replace(/💭/g, '💡')
@@ -1040,21 +1041,22 @@ ${DISCLAIMER}`;
         if (v >= 10000) return `${Math.round(v / 10000).toLocaleString()}만주`;
         return `${v.toLocaleString()}주`;
       };
-      const rayRawVol = marketData?.rawVolume && marketData.rawVolume > 0 ? marketData.rawVolume : null;
-      const rayAvgVol = marketData?.avgVolume && marketData.avgVolume > 0 ? marketData.avgVolume : null;
+      // ✅ 비정상적으로 작은 값(< 1000주)도 데이터 미수급으로 취급
+      const rayRawVol = marketData?.rawVolume && marketData.rawVolume >= 1000 ? marketData.rawVolume : null;
+      const rayAvgVol = marketData?.avgVolume && marketData.avgVolume >= 1000 ? marketData.avgVolume : null;
       let volLine: string;
       if (assetType === 'CRYPTO') {
         volLine = marketData?.volume ? `24시간 거래량 ${marketData.volume}` : '24시간 거래량 미수급';
       } else if (rayRawVol && rayAvgVol) {
-        const delta = rayRawVol > rayAvgVol * 1.1 ? '증가' : rayRawVol < rayAvgVol * 0.9 ? '감소' : '보통';
+        // 판정 3단계 — 저조 / 보통 / 증가
+        const delta = rayRawVol > rayAvgVol * 1.1 ? '증가' : rayRawVol < rayAvgVol * 0.9 ? '저조' : '보통';
         volLine = `거래량 ${rayFmtVol(rayRawVol)} (5일 평균 ${rayFmtVol(rayAvgVol)}, ${delta})`;
       } else if (rayRawVol) {
-        // ✅ avgVolume 미수급이어도 raw 수치는 항상 표시 (기존 "거래량 저조" 단일 라벨로 퇴보 방지)
-        //    판정 라벨(저조/보통/증가)은 수치 뒤 괄호로 부가
-        const judgLabel = vol.label.replace(/^거래량\s*/, '').split(' ')[0] || '보통';
-        volLine = `거래량 ${rayFmtVol(rayRawVol)} (${judgLabel})`;
+        // avgVolume 미수급이어도 raw 수치는 표시
+        volLine = `거래량 ${rayFmtVol(rayRawVol)}`;
       } else {
-        volLine = vol.label;
+        // ✅ 데이터가 진짜 없는 경우 — "거래량 저조" 오표시 차단
+        volLine = '거래량 데이터 미수급';
       }
 
       const line1 = `${keyword} ${rayPriceDisplay}${changeStr}${closedNote}`;
@@ -1209,7 +1211,7 @@ ${DISCLAIMER}`;
         return `${v.toLocaleString()}주`;
       };
 
-      // RAY 상세 — 이모지는 허용 셋(✅ ⚠️ 📍 📊 📈 📉 💡 🔴 🟡 🟢)만 사용
+      // RAY 상세 — 이모지는 허용 셋(✅ ⚠️ 🔹 📊 📈 💡 🔴 🟡 🟢)만 사용
       const rayLines: string[] = [];
       const trend = marketData.trend;
       const curPrice = marketData.rawPrice;
@@ -1309,7 +1311,7 @@ ${DISCLAIMER}`;
         `  거래량: ${volComment}`,
         `  뉴스: ${newsComment}`,
         '',
-        '📍 핵심 시나리오',
+        '🔹 핵심 시나리오',
         `  ${scenario}`,
         '',
         '⚠️ 주의 리스크',
