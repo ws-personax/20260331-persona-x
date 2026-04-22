@@ -19,6 +19,15 @@ export const topicParticle = (label: string): string => {
   return (code - 0xAC00) % 28 === 0 ? '는' : '은';
 };
 
+// ✅ 이/가 조사 — 받침 있음 "이", 없음 "가"
+export const subjectParticle = (label: string): string => {
+  if (!label) return '가';
+  const last = label[label.length - 1];
+  const code = last.charCodeAt(0);
+  if (code < 0xAC00 || code > 0xD7A3) return '가';
+  return (code - 0xAC00) % 28 === 0 ? '가' : '이';
+};
+
 // ─────────────────────────────────────────────
 // 잭 템플릿 파라미터
 // ─────────────────────────────────────────────
@@ -244,10 +253,9 @@ export const buildJackText = (p: JackParams): string => {
       ? fmtBear(p.rawPrice * 1.02)
       : (p.breakoutPrice || '반등 기준가');
 
-    const bearL1 = `지휘관님, ${negText} 기준으로 조정 구간입니다.`;
-    const bearL2 = `단, ${supportLabel} 지지 확인 시 소량 역발상 진입을 검토하십시오.`;
-    const bearL3 = `반등 신호: ${breakoutLabel} 돌파 + 거래량 증가.`;
-    return `${bearL1}\n${bearL2}\n${bearL3}${jackRebuttal}`;
+    const bearL1 = `지휘관님, ${negText}${subjectParticle(negText)} 지속되고 있습니다.`;
+    const bearL2 = `${supportLabel} 확인 후 ${breakoutLabel} 돌파 + 거래량 증가 시 즉각 재진입하십시오.`;
+    return `${bearL1}\n${bearL2}${jackRebuttal}`;
   }
 
   return `${line1}\n${line2}${jackRebuttal}`;

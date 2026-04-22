@@ -418,10 +418,7 @@ const EchoDetailsToggle = memo(function EchoDetailsToggle({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <div style={{ textAlign: 'center', fontSize: 11, color: '#9ca3af', padding: '6px 12px 0' }}>
-        ⚠️ AI 생성 참고 자료 · 투자 권유 아님
-      </div>
-      <div style={{ padding: '4px 12px 0 58px', marginBottom: open ? 6 : 8 }}>
+      <div style={{ padding: '4px 12px 0 58px', marginBottom: 4 }}>
         <button
           type="button"
           onClick={() => setOpen(v => !v)}
@@ -438,6 +435,24 @@ const EchoDetailsToggle = memo(function EchoDetailsToggle({
         >
           {open ? '접기 ▲' : '자세히 보기 ▼'}
         </button>
+      </div>
+      {/* ✅ ECHO 요약 공지 — ECHO 2번째 MetaBox 하단 disclaimer와 동일 스타일 */}
+      <div style={{ marginTop: 4, padding: '0 12px 0 58px', marginBottom: open ? 6 : 8 }}>
+        <div
+          style={{
+            background: 'rgba(0,0,0,0.04)',
+            borderRadius: 10,
+            padding: '10px 14px',
+            border: '1px solid rgba(0,0,0,0.07)',
+          }}
+        >
+          <p style={{ fontSize: 10, color: '#6b7280', margin: 0, lineHeight: 1.6 }}>
+            ⚠️ 본 분석은 AI 생성 참고 자료이며 투자 권유가 아닙니다.
+          </p>
+          <p style={{ fontSize: 10, color: '#6b7280', margin: '3px 0 0', lineHeight: 1.6 }}>
+            ⚠️ 최종 투자 판단과 그에 따른 책임은 지휘관님께 있습니다.
+          </p>
+        </div>
       </div>
       {open && (
         <PersonaBubble personaKey="echo" text={text} timestamp={timestamp} echoNews={echoNews} />
