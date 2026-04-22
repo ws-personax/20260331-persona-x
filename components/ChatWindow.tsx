@@ -758,7 +758,8 @@ const ErrorCard = ({
 const OnboardingCard = ({ onExample }: { onExample: (keyword: string) => void }) => (
   <div
     style={{
-      margin: '12px 12px 20px',
+      // ✅ 상단 여유 확대 — iPad/모바일 Safari 주소창에 가려지지 않도록
+      margin: '20px 12px 20px',
       padding: '28px 20px',
       background: 'linear-gradient(180deg, #fff8d6 0%, #fffbeb 100%)',
       border: '1px solid #fde68a',
@@ -1083,7 +1084,27 @@ export default function ChatWindow() {
   if (!mounted) return null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#b2c7da', fontFamily: 'sans-serif' }}>
+    <>
+      {/* ✅ iOS Safari 주소창 동적 높이 대응 — 100dvh 지원 브라우저에서 정확한 뷰포트 높이 사용 */}
+      <style>{`
+        .px-app-root {
+          height: 100vh;
+          height: 100dvh;
+        }
+      `}</style>
+    <div
+      className="px-app-root"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        background: '#b2c7da',
+        fontFamily: 'sans-serif',
+        // ✅ iPad/iPhone Safari notch/주소창 대응 — 상단 safe-area 패딩
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        boxSizing: 'border-box',
+      }}
+    >
       <header
         style={{
           background: 'rgba(178,199,218,0.95)',
@@ -1120,7 +1141,7 @@ export default function ChatWindow() {
         </div>
       </header>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 0', paddingBottom: '140px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '28px 0 140px' }}>
         {!hasUserSent && (
           <OnboardingCard onExample={(name) => handleSendWithPosition(name, null)} />
         )}
@@ -1446,5 +1467,6 @@ export default function ChatWindow() {
         </div>
       </footer>
     </div>
+    </>
   );
 }
