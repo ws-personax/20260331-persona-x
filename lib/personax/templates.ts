@@ -173,13 +173,21 @@ export const buildJackText = (p: JackParams): string => {
         line2 = `내일 ${halfCheckpoint} 거래량 ${volTrigger} 확인 후 진입하십시오.`;
       }
     } else if (mode === 'bear') {
-      if (p.isBeforeOpen) {
-        line1 = `지휘관님, ${negText} 기준으로 단기 조정 가능성이 있습니다.`;
-        line2 = `${openTime} 개장 후 신호 확인 전까지 대기하십시오.`;
-      } else {
-        line1 = `지휘관님, ${negText} 기준으로 내일도 조정 지속 가능성이 있습니다.`;
-        line2 = `반등 신호 확인 전까지 신규 진입을 보류하십시오.`;
-      }
+      // ✅ 역발상 강세론자 — 지지/돌파 레벨 제시 후 재진입 조건 명시
+      const fmtForecast = (n: number): string =>
+        p.currency === 'USD'
+          ? `약 $${Math.round(n).toLocaleString('en-US')}`
+          : `${Math.round(n).toLocaleString('ko-KR')}원`;
+      const bearSupport = p.rawPrice && p.rawPrice > 0
+        ? fmtForecast(p.rawPrice * 0.98)
+        : (p.supportPrice || '지지선');
+      const bearBreakout = p.rawPrice && p.rawPrice > 0
+        ? fmtForecast(p.rawPrice * 1.02)
+        : (p.breakoutPrice || '반등 기준가');
+      const bearL1 = `지휘관님, ${negText} 기준으로 조정 구간입니다.`;
+      const bearL2 = `단, 현재가 ${bearSupport} 지지 확인 후`;
+      const bearL3 = `${bearBreakout} 돌파 + 거래량 증가 시 즉각 재진입하십시오.`;
+      return `${bearL1}\n${bearL2}\n${bearL3}`;
     } else {
       // conflict / 혼재 — JACK은 여전히 긍정에 무게
       if (p.isBeforeOpen) {
@@ -785,11 +793,17 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   const passCount = [trendPass, volumePass, newsPass, pricePass].filter(Boolean).length;
   const strengthLabel = passCount >= 4 ? '높음' : passCount === 3 ? '보통' : '낮음';
 
-  const trendText = trendPass
-    ? '이평선 상승 추세'
-    : p.trendStrength === 'strong_down' || p.trendStrength === 'weak_down'
-      ? '이평선 하락 추세'
-      : '이평선 방향 불확정';
+  // ✅ trendStrength 기반 서술 — 5일/20일 이평선 위치 + 방향성 표기
+  const trendText =
+    p.trendStrength === 'strong_up'
+      ? '5일·20일 이평선 위 상승 추세'
+      : p.trendStrength === 'strong_down'
+        ? '5일·20일 이평선 아래 하락 추세'
+        : p.trendStrength === 'weak_up'
+          ? '5일 이평선 위, 20일 이평선 아래 — 방향성 혼재'
+          : p.trendStrength === 'weak_down'
+            ? '5일 이평선 아래, 20일 이평선 위 — 방향성 혼재'
+            : '이평선 방향 혼재';
   const newsText   = `뉴스 ${p.sentiment}`;
   const priceText  = pricePass ? '시세 안정' : '시세 미수급';
 
@@ -804,18 +818,16 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   const line2 = `근거: ${p.trendSummary ? p.trendSummary + ' / ' : ''}${p.volLabel}${conflictNote}`;
   const line3 = `지금: ${insight}${timeNote}`;
   const line4 = `조건: ${p.condSummary}`;
-  // ✅ 거래량 기준 숫자 — 오늘 rawVolume의 절반 또는 5일 평균의 절반 (있을 때만)
-  const line5FmtVol = (v: number): string => {
+  // ✅ 거래량 기준 — ECHO 1/2 통일 (avgVolume × 1.3) — line5와 trigger에서 재사용
+  const triggerFmtVol = (v: number): string => {
     if (v >= 100000000) return `${(v / 100000000).toFixed(1)}억주`;
     if (v >= 10000) return `${Math.round(v / 10000).toLocaleString()}만주`;
     return `${v.toLocaleString()}주`;
   };
-  const line5BaseVol = (p.rawVolume && p.rawVolume > 0)
-    ? p.rawVolume
-    : (p.avgVolume && p.avgVolume > 0 ? p.avgVolume : 0);
-  const volThresholdLabel = line5BaseVol > 0
-    ? `거래량 ${line5FmtVol(Math.round(line5BaseVol * 0.5))} 이상`
-    : '거래량 증가';
+  const volNumberLabel = p.avgVolume && p.avgVolume > 0
+    ? `거래량 ${triggerFmtVol(Math.round(p.avgVolume * 1.3))} 이상`
+    : '거래량 평소 대비 30% 이상';
+  const volThresholdLabel = volNumberLabel;
 
   // ✅ 에코 line5 — 단계별 행동 경로 (코인은 비중 절반, 손절 -7% 명시)
   const isCryptoLine5 = p.assetType === 'CRYPTO';
@@ -851,15 +863,7 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   //    summary: 모드별 결론(conflict 시 ECHO 질문 포함) — 즉시 표시
   //    details: 기존 Confluence + 근거 + 지금 + 조건 + 비중 — 별도 버블
 
-  // 📍 조건 — 검증된 진입/정리 트리거 한 줄 (거래량 수치 명시 — 중복 방지)
-  const triggerFmtVol = (v: number): string => {
-    if (v >= 100000000) return `${(v / 100000000).toFixed(1)}억주`;
-    if (v >= 10000) return `${Math.round(v / 10000).toLocaleString()}만주`;
-    return `${v.toLocaleString()}주`;
-  };
-  const volNumberLabel = p.avgVolume && p.avgVolume > 0
-    ? `거래량 ${triggerFmtVol(Math.round(p.avgVolume * 1.3))} 이상`
-    : '거래량 평소 대비 30% 이상';
+  // 📍 조건 — 검증된 진입/정리 트리거 (volNumberLabel은 상단에서 재사용)
   const trigger = (p.verdict === '매도 우위')
     ? `${p.sellPrice || '손절가'} 이탈 시 정리`
     : `${p.buyPrice || '매수 조건'} 돌파 + ${volNumberLabel}`;
