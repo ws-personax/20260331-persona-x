@@ -898,34 +898,48 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   }
 
   // ✅ ECHO 질문 (conflict 모드 + 장 중일 때만) — forecastMode에서는 비활성화
+  // 충돌 유형별로 3가지씩 로테이션 (Math.floor(Date.now() / 1000) % 3)
   let echoQuestion = '';
+  let jackRebuttalLine = '';
+  let luciaRebuttalLine = '';
   if (mode === 'conflict' && p.flags && !p.isForecast) {
     const f = p.flags;
+    const qRotIdx = Math.floor(Date.now() / 1000) % 3;
     if (f.trendUp && f.newsPos && f.volDown) {
-      echoQuestion = [
-        '⚔️ 잭은 이평선+뉴스를, 루시아는 거래량을 근거로 합니다.',
-        '거래량 저조에도 진입할 가치가 있습니까?',
-      ].join('\n');
-    } else if (f.volUp && f.priceUp && !f.trendUp) {
-      echoQuestion = [
-        '⚔️ 잭은 거래량+시세를, 루시아는 이평선 위치를 근거로 합니다.',
-        '추세 미확인 상태에서 진입해야 합니까?',
-      ].join('\n');
-    } else if (f.newsPos && f.priceUp && f.trendDown) {
-      echoQuestion = [
-        '⚔️ 잭은 뉴스+시세를, 루시아는 이평선 하락을 근거로 합니다.',
-        '추세 역행 구간에서 뉴스에만 의존해도 됩니까?',
-      ].join('\n');
+      const trendVsVolQs = [
+        '⚔️ 잭은 이평선+뉴스를, 루시아는 거래량을 근거로 합니다. 거래량 저조에도 진입할 가치가 있습니까?',
+        '⚔️ 추세는 살아있지만 거래량이 침묵합니다. 신호를 믿어야 합니까?',
+        '⚔️ 이평선이 긍정적이나 거래량이 동의하지 않습니다. 어느 쪽이 맞습니까?',
+      ];
+      echoQuestion = trendVsVolQs[qRotIdx];
     } else {
-      echoQuestion = [
-        '⚔️ 잭과 루시아의 신호가 충돌합니다.',
-        '어느 쪽을 우선해야 합니까?',
-      ].join('\n');
+      const generalConflictQs = [
+        '⚔️ 잭과 루시아의 신호가 충돌합니다. 어느 쪽을 우선해야 합니까?',
+        '⚔️ 참모진 의견이 갈렸습니다. 지휘관님의 판단이 필요합니다.',
+        '⚔️ 두 신호가 상반됩니다. 어느 쪽이 더 신뢰할 수 있습니까?',
+      ];
+      echoQuestion = generalConflictQs[qRotIdx];
+    }
+
+    // ✅ JACK/LUCIA 재답변 — ECHO 질문 뒤 1줄씩 (conflict 유형별 차별화)
+    if (p.conflict === 'conflict_jack_buy') {
+      jackRebuttalLine = '→ 잭: 모멘텀이 명확합니다. 거래량만 뒤따르면 즉각 진입하십시오.';
+      luciaRebuttalLine = '→ 루시아: 거래량이 침묵해요. 서두르면 꼭 물려요. 확인이 먼저예요.';
+    } else if (p.conflict === 'conflict_lucia_buy') {
+      jackRebuttalLine = '→ 잭: 떨어지는 칼날은 잡지 마십시오. 지지 확인이 먼저입니다.';
+      luciaRebuttalLine = '→ 루시아: 공포가 최고의 매수 기회였어요. 분할로 접근하세요.';
+    } else {
+      jackRebuttalLine = '→ 잭: 긍정 신호가 살아있습니다. 거래량 돌파 시 진입하십시오.';
+      luciaRebuttalLine = '→ 루시아: 지표가 혼재돼요. 거래량이 따라줄 때 움직이세요.';
     }
   }
 
   const summaryParts: string[] = [];
-  if (echoQuestion) summaryParts.push(echoQuestion);
+  if (echoQuestion) {
+    summaryParts.push(echoQuestion);
+    if (jackRebuttalLine) summaryParts.push(jackRebuttalLine);
+    if (luciaRebuttalLine) summaryParts.push(luciaRebuttalLine);
+  }
 
   if (p.isForecast) {
     // ✅ forecastMode — 시간 조건 명시 + 잭/루시아 종합 요약
