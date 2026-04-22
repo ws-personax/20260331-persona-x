@@ -747,6 +747,12 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
     }
   }
 
+  // ✅ bull 모드 모순 차단 — watchLevel / situation 분기 결과가 "수급 이탈 + 하락" 등
+  //    bearish 톤일 때 상단 결론(🟢)과 어긋남. bull 모드에서는 상승 톤 문구로 최종 덮어씀.
+  if (p.mode === 'bull') {
+    insightTemplate = '상승 추세 유지 중. 조건 충족 시 분할 접근 고려 가능.';
+  }
+
   // 실제 수치 치환
   const days = p.consecutiveDays ? Math.abs(p.consecutiveDays).toString() : '';
   const insight = insightTemplate

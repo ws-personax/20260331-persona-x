@@ -533,13 +533,20 @@ export const fetchMarketPrice = async (keyword: string): Promise<MarketData | nu
     }
     const trend = calcTrend(allCloses);
 
-    // ✅ avgVolume fallback — Yahoo meta가 없으면(특히 한국 종목) 5d 거래량 평균으로 대체
+    // ✅ avgVolume + rawVolume fallback — Yahoo meta가 없으면(특히 한국 종목 장 마감 후) 5d 거래량 배열로 대체
     let avgVolFinal = meta.averageDailyVolume3Month || 0;
-    if (avgVolFinal === 0 && result5d) {
+    let rawVolFinal = meta.regularMarketVolume || 0;
+    if (result5d) {
       const volArr = result5d.indicators?.quote?.[0]?.volume || [];
       const validVols = volArr.filter((v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
       if (validVols.length > 0) {
-        avgVolFinal = Math.round(validVols.reduce((s: number, v: number) => s + v, 0) / validVols.length);
+        if (avgVolFinal === 0) {
+          avgVolFinal = Math.round(validVols.reduce((s: number, v: number) => s + v, 0) / validVols.length);
+        }
+        // ✅ 장 마감 후 regularMarketVolume이 0인 경우 — 5d 배열의 마지막 값(당일 종가 거래량) 사용
+        if (rawVolFinal === 0) {
+          rawVolFinal = validVols[validVols.length - 1];
+        }
       }
     }
 
@@ -548,9 +555,9 @@ export const fetchMarketPrice = async (keyword: string): Promise<MarketData | nu
       change: change.toFixed(2),
       high: isKR ? Math.round(high).toLocaleString('ko-KR') : high.toLocaleString('en-US', { minimumFractionDigits: 2 }),
       low:  isKR ? Math.round(low).toLocaleString('ko-KR')  : low.toLocaleString('en-US',  { minimumFractionDigits: 2 }),
-      volume: `${((meta.regularMarketVolume || 0) / 1_000_000).toFixed(1)}M`,
+      volume: `${(rawVolFinal / 1_000_000).toFixed(1)}M`,
       rawPrice: price, rawHigh: high, rawLow: low,
-      rawVolume: meta.regularMarketVolume || 0,
+      rawVolume: rawVolFinal,
       avgVolume: avgVolFinal,
       currency: isKR ? 'KRW' : 'USD',
       marketState,
