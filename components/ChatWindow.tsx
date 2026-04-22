@@ -755,18 +755,79 @@ const ErrorCard = ({
 
 // ✅ 첫 진입 온보딩 카드 — 사용자가 아직 질의를 보내지 않았을 때만 표시
 //   역할: "ChatGPT랑 뭐가 달라?" 방지 + 서비스 정체성 전달
-const OnboardingCard = ({ onExample }: { onExample: (keyword: string) => void }) => (
-  <div
+//   구조: [재테크 / 차 한잔] 2개 탭 + 각 탭 콘텐츠
+
+// ─── 차 한잔 탭 — 명언 로테이션 (5개, 하루 단위 순환) ───
+const QUOTES = [
+  { text: '혼자가 아니라는 것을 아는 것만으로도\n우리는 버틸 수 있다.', author: '헬렌 켈러' },
+  { text: '슬픔을 나누면 절반이 되고\n기쁨을 나누면 두 배가 된다.', author: '스웨덴 속담' },
+  { text: '괜찮지 않아도 괜찮아요.', author: '' },
+  { text: '가장 어두운 밤도\n반드시 끝이 있다.', author: '빅토르 위고' },
+  { text: '말하지 않은 감정은\n사라지지 않고 쌓인다.', author: '' },
+];
+const getTodayQuote = () => QUOTES[Math.floor(Date.now() / 86400000) % QUOTES.length];
+
+// ─── 탭 선택 버튼 ───
+const TabButton = ({
+  active,
+  icon,
+  title,
+  subtitle,
+  author,
+  onClick,
+}: {
+  active: boolean;
+  icon: string;
+  title: string;
+  subtitle: string;
+  author?: string;
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
     style={{
-      // 상단 여백은 래퍼(.px-onboarding-wrap)의 padding-top 24px가 담당
-      margin: '0 12px 20px',
-      padding: '28px 20px',
-      background: 'linear-gradient(180deg, #fff8d6 0%, #fffbeb 100%)',
-      border: '1px solid #fde68a',
-      borderRadius: 16,
-      boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+      flex: 1,
+      minWidth: 0,
+      padding: '14px 14px 16px',
+      background: active ? '#1f2937' : '#ffffff',
+      color: active ? '#ffffff' : '#374151',
+      border: active ? '1px solid #1f2937' : '1px solid #d1d5db',
+      borderRadius: 14,
+      cursor: 'pointer',
+      textAlign: 'left',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 4,
+      boxShadow: active ? '0 2px 8px rgba(0,0,0,0.15)' : '0 1px 3px rgba(0,0,0,0.05)',
+      transition: 'background 0.15s, color 0.15s',
     }}
   >
+    <div style={{ fontSize: 22, lineHeight: 1 }}>{icon}</div>
+    <div style={{ fontSize: 14, fontWeight: 800, marginTop: 2 }}>{title}</div>
+    <div
+      style={{
+        fontSize: 11,
+        opacity: active ? 0.85 : 0.7,
+        fontStyle: 'italic',
+        whiteSpace: 'pre-line',
+        lineHeight: 1.5,
+        marginTop: 2,
+      }}
+    >
+      {subtitle}
+    </div>
+    {author && (
+      <div style={{ fontSize: 10, opacity: active ? 0.7 : 0.55, fontStyle: 'italic', marginTop: 1 }}>
+        — {author}
+      </div>
+    )}
+  </button>
+);
+
+// ─── 재테크 탭 본문 ───
+const FinanceTabContent = ({ onExample }: { onExample: (keyword: string) => void }) => (
+  <div style={{ padding: '24px 4px 0' }}>
     <h2
       style={{
         fontSize: 21,
@@ -774,7 +835,7 @@ const OnboardingCard = ({ onExample }: { onExample: (keyword: string) => void })
         lineHeight: 1.4,
         color: '#111827',
         textAlign: 'center',
-        margin: '0 0 16px',
+        margin: '0 0 14px',
       }}
     >
       지금 이 순간의 데이터로
@@ -831,6 +892,117 @@ const OnboardingCard = ({ onExample }: { onExample: (keyword: string) => void })
     </div>
   </div>
 );
+
+// ─── 차 한잔 탭 본문 — 감정 카드 3개 + 임시 안내 ───
+const TEA_CARDS = [
+  { emoji: '😔', title: '속상해요',   sub: '털어놓고 싶어요' },
+  { emoji: '🎉', title: '자랑할래요', sub: '기쁜 일이 있어요' },
+  { emoji: '💭', title: '복잡해요',   sub: '돈 문제가 얽혀있어요' },
+];
+
+const TeaTabContent = () => {
+  const [notice, setNotice] = useState('');
+  const handleCardClick = () => setNotice('준비 중입니다. 곧 만나요 ☕');
+
+  return (
+    <div style={{ padding: '24px 4px 0' }}>
+      <h2
+        style={{
+          fontSize: 21,
+          fontWeight: 800,
+          lineHeight: 1.4,
+          color: '#111827',
+          textAlign: 'center',
+          margin: '0 0 20px',
+        }}
+      >
+        판단은 잠시 내려놓으시고
+        <br />
+        마음을 꺼내보세요
+      </h2>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {TEA_CARDS.map(card => (
+          <button
+            key={card.title}
+            type="button"
+            onClick={handleCardClick}
+            style={{
+              background: 'linear-gradient(180deg, #fff8eb 0%, #fffaf0 100%)',
+              border: '1px solid #fcd9a8',
+              borderRadius: 14,
+              padding: '14px 16px',
+              cursor: 'pointer',
+              textAlign: 'left',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            }}
+          >
+            <span style={{ fontSize: 28, lineHeight: 1 }}>{card.emoji}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span style={{ fontSize: 15, fontWeight: 800, color: '#7c2d12' }}>{card.title}</span>
+              <span style={{ fontSize: 12, color: '#92400e' }}>{card.sub}</span>
+            </div>
+          </button>
+        ))}
+      </div>
+      {notice && (
+        <div
+          style={{
+            marginTop: 14,
+            padding: '10px 14px',
+            background: '#fffbeb',
+            border: '1px dashed #fcd9a8',
+            borderRadius: 10,
+            textAlign: 'center',
+            fontSize: 13,
+            color: '#92400e',
+            fontWeight: 600,
+          }}
+        >
+          {notice}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── 탭 2개 + 활성 탭 내용 통합 컴포넌트 ───
+const OnboardingTabs = ({ onExample }: { onExample: (keyword: string) => void }) => {
+  const [activeTab, setActiveTab] = useState<'finance' | 'tea'>('finance');
+  const quote = useMemo(() => getTodayQuote(), []);
+
+  return (
+    <div style={{ padding: '0 12px' }}>
+      {/* 탭 선택 영역 */}
+      <div style={{ display: 'flex', gap: 10 }}>
+        <TabButton
+          active={activeTab === 'finance'}
+          icon="📊"
+          title="재테크"
+          subtitle="지금 이 순간의 데이터로"
+          onClick={() => setActiveTab('finance')}
+        />
+        <TabButton
+          active={activeTab === 'tea'}
+          icon="☕"
+          title="차 한잔 하실래요?"
+          subtitle={quote.text}
+          author={quote.author || undefined}
+          onClick={() => setActiveTab('tea')}
+        />
+      </div>
+
+      {/* 활성 탭 본문 */}
+      {activeTab === 'finance' ? (
+        <FinanceTabContent onExample={onExample} />
+      ) : (
+        <TeaTabContent />
+      )}
+    </div>
+  );
+};
 
 export default function ChatWindow() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -953,7 +1125,7 @@ export default function ChatWindow() {
 
   useEffect(() => {
     setMounted(true);
-    // ✅ 첫 진입은 빈 상태 — OnboardingCard가 SYSTEM ONLINE 안내를 대체
+    // ✅ 첫 진입은 빈 상태 — OnboardingTabs가 SYSTEM ONLINE 안내를 대체
     messagesRef.current = [];
     setMessages([]);
   }, []);
@@ -1154,7 +1326,7 @@ export default function ChatWindow() {
       <div style={{ flex: 1, overflowY: 'auto', padding: hasUserSent ? '20px 0 140px' : '0 0 140px' }}>
         {!hasUserSent && (
           <div className="px-onboarding-wrap">
-            <OnboardingCard onExample={(name) => handleSendWithPosition(name, null)} />
+            <OnboardingTabs onExample={(name) => handleSendWithPosition(name, null)} />
           </div>
         )}
         {messages.map(msg => (
