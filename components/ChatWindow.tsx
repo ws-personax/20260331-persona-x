@@ -1085,11 +1085,22 @@ export default function ChatWindow() {
 
   return (
     <>
-      {/* ✅ iOS Safari 주소창 동적 높이 대응 — 100dvh 지원 브라우저에서 정확한 뷰포트 높이 사용 */}
+      {/* ✅ iOS Safari 주소창 동적 높이 대응 + 온보딩 중앙 정렬 */}
       <style>{`
         .px-app-root {
           height: 100vh;
           height: 100dvh;
+        }
+        /* 온보딩 카드를 남은 공간 세로 중앙에 배치 — header(~54px)와 footer(~140px) 제외 */
+        .px-onboarding-wrap {
+          min-height: calc(100vh - 220px);
+          min-height: calc(100dvh - 220px);
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: stretch;
+          padding: 40px 0 20px;
+          box-sizing: border-box;
         }
       `}</style>
     <div
@@ -1141,9 +1152,11 @@ export default function ChatWindow() {
         </div>
       </header>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '28px 0 140px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: hasUserSent ? '20px 0 140px' : '0 0 140px' }}>
         {!hasUserSent && (
-          <OnboardingCard onExample={(name) => handleSendWithPosition(name, null)} />
+          <div className="px-onboarding-wrap">
+            <OnboardingCard onExample={(name) => handleSendWithPosition(name, null)} />
+          </div>
         )}
         {messages.map(msg => (
           <div key={msg.id}>
