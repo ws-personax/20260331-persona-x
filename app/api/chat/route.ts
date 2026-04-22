@@ -1311,7 +1311,7 @@ ${DISCLAIMER}`;
         `  거래량: ${volComment}`,
         `  뉴스: ${newsComment}`,
         '',
-        '🔹 핵심 시나리오',
+        '핵심 시나리오',
         `  ${scenario}`,
         '',
         '⚠️ 주의 리스크',
