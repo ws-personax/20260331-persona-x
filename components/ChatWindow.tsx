@@ -18,6 +18,9 @@ interface PersonaData {
   ray: string;
   echo: string;
   echoDetails?: string | null;
+  rayDetails?: string | null;
+  jackDetails?: string | null;
+  luciaDetails?: string | null;
   verdict: string;
   confidence: number;
   breakdown: string;
@@ -236,6 +239,7 @@ const PersonaBubble = memo(function PersonaBubble({
   newsItem,
   echoNews,
   isRebuttal = false,
+  details,
 }: {
   personaKey: PersonaKey;
   text: string;
@@ -243,9 +247,13 @@ const PersonaBubble = memo(function PersonaBubble({
   newsItem?: NewsLink | null;
   echoNews?: NewsLink | null;
   isRebuttal?: boolean;
+  details?: string | null;
 }) {
   const p = PERSONAS[personaKey];
   const isEcho = personaKey === 'echo';
+  const [open, setOpen] = useState(false);
+  const normalizedDetails = useMemo(() => (details || '').replace(/\\n/g, '\n').trim(), [details]);
+  const hasDetails = !isEcho && !isRebuttal && !!normalizedDetails;
   // ✅ \n↳ 기준으로 본문과 반박 분리 + ECHO 메타 파싱
   //    isRebuttal=true면 split 로직 건너뛰고 전체 텍스트를 반박 스타일 단일 버블로
   const { content, rebuttal, dataSource, disclaimer } = useMemo(() => {
@@ -361,6 +369,52 @@ const PersonaBubble = memo(function PersonaBubble({
               >
                 {content}
               </p>
+
+              {/* ✅ 자세히 보기 버튼 — RAY/JACK/LUCIA 공용 (말풍선 안) */}
+              {hasDetails && (
+                <div style={{ marginTop: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setOpen(v => !v)}
+                    style={{
+                      background: '#ffffff',
+                      color: '#374151',
+                      border: `1px solid ${p.bubbleBorder}`,
+                      borderRadius: 6,
+                      padding: '3px 9px',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {open ? '접기 ▲' : '자세히 보기 ▼'}
+                  </button>
+                </div>
+              )}
+
+              {/* details 본문 — 같은 말풍선 안에서 아래로 확장 */}
+              {hasDetails && open && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    paddingTop: 8,
+                    borderTop: `1px dashed ${p.bubbleBorder}`,
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 12.5,
+                      lineHeight: 1.7,
+                      color: p.textColor,
+                      whiteSpace: 'pre-wrap',
+                      margin: 0,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {normalizedDetails}
+                  </p>
+                </div>
+              )}
             </div>
             <span style={{ fontSize: 10, color: '#9ca3af', flexShrink: 0, paddingBottom: 2 }}>
               {formatTime(timestamp)}
@@ -989,9 +1043,9 @@ export default function ChatWindow() {
 
                     return (
                       <>
-                        <PersonaBubble personaKey="ray" text={msg.personas.ray} timestamp={msg.timestamp} newsItem={msg.personas.rayNews} />
-                        <PersonaBubble personaKey="jack" text={jackMain} timestamp={msg.timestamp} newsItem={msg.personas.jackNews} />
-                        <PersonaBubble personaKey="lucia" text={luciaMain} timestamp={msg.timestamp} newsItem={msg.personas.luciaNews} />
+                        <PersonaBubble personaKey="ray" text={msg.personas.ray} timestamp={msg.timestamp} newsItem={msg.personas.rayNews} details={msg.personas.rayDetails} />
+                        <PersonaBubble personaKey="jack" text={jackMain} timestamp={msg.timestamp} newsItem={msg.personas.jackNews} details={msg.personas.jackDetails} />
+                        <PersonaBubble personaKey="lucia" text={luciaMain} timestamp={msg.timestamp} newsItem={msg.personas.luciaNews} details={msg.personas.luciaDetails} />
                         <PersonaBubble personaKey="jack" text={jackRebuttalText} timestamp={msg.timestamp} isRebuttal />
                         <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>
                           ── ECHO COMMAND ──
@@ -1008,9 +1062,9 @@ export default function ChatWindow() {
 
                   return (
                     <>
-                      <PersonaBubble personaKey="ray" text={msg.personas.ray} timestamp={msg.timestamp} newsItem={msg.personas.rayNews} />
-                      <PersonaBubble personaKey="jack" text={jackText} timestamp={msg.timestamp} newsItem={msg.personas.jackNews} />
-                      <PersonaBubble personaKey="lucia" text={luciaText} timestamp={msg.timestamp} newsItem={msg.personas.luciaNews} />
+                      <PersonaBubble personaKey="ray" text={msg.personas.ray} timestamp={msg.timestamp} newsItem={msg.personas.rayNews} details={msg.personas.rayDetails} />
+                      <PersonaBubble personaKey="jack" text={jackText} timestamp={msg.timestamp} newsItem={msg.personas.jackNews} details={msg.personas.jackDetails} />
+                      <PersonaBubble personaKey="lucia" text={luciaText} timestamp={msg.timestamp} newsItem={msg.personas.luciaNews} details={msg.personas.luciaDetails} />
                       <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>
                         ── ECHO COMMAND ──
                       </div>

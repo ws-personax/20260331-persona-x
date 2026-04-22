@@ -1113,6 +1113,167 @@ ${DISCLAIMER}`;
       finalEchoDetails = `${echoBuilt.details}\n\n${dataSourceLabel}${marketClosedNote}${DISCLAIMER}`;
     }
 
+    // ─── RAY/JACK/LUCIA 자세히 보기 상세 ───
+    let finalRayDetails: string | null = null;
+    let finalJackDetails: string | null = null;
+    let finalLuciaDetails: string | null = null;
+
+    if (marketData && !isMarketIndex) {
+      const fmtPx = (n: number) =>
+        currency === 'KRW' ? `${Math.round(n).toLocaleString('ko-KR')}원` : `$${n.toFixed(2)}`;
+      const fmtVol = (v: number): string => {
+        if (v >= 100000000) return `${(v / 100000000).toFixed(1)}억주`;
+        if (v >= 10000) return `${Math.round(v / 10000).toLocaleString()}만주`;
+        return `${v.toLocaleString()}주`;
+      };
+
+      // RAY 상세
+      const rayLines: string[] = [];
+      const trend = marketData.trend;
+      const curPrice = marketData.rawPrice;
+      if (trend?.ma5 && trend?.ma20 && curPrice) {
+        const ma5Dir = curPrice > trend.ma5 ? '현재가 위' : '현재가 아래';
+        const ma20Dir = curPrice > trend.ma20 ? '현재가 위' : '현재가 아래';
+        rayLines.push('📐 이평선 상세');
+        rayLines.push(`  5일선: ${fmtPx(trend.ma5)} (${ma5Dir}, ${trend.trend5d})`);
+        rayLines.push(`  20일선: ${fmtPx(trend.ma20)} (${ma20Dir}, ${trend.trend20d})`);
+      }
+      if (assetType !== 'CRYPTO') {
+        const rv = marketData.rawVolume;
+        const av = marketData.avgVolume;
+        if (rv > 0 && av > 0) {
+          const ratioPct = Math.round((rv / av) * 100);
+          if (rayLines.length) rayLines.push('');
+          rayLines.push('📊 거래량 상세');
+          rayLines.push(`  오늘: ${fmtVol(rv)} / 5일 평균: ${fmtVol(av)}`);
+          rayLines.push(`  평균 대비: ${ratioPct}%`);
+        }
+      } else if (marketData.volume) {
+        if (rayLines.length) rayLines.push('');
+        rayLines.push('📊 거래량 상세');
+        rayLines.push(`  24시간 거래대금: ${marketData.volume}`);
+      }
+      const ampMatch = vix.label.match(/([\d.]+)%\s*진폭/);
+      if (ampMatch) {
+        const amp = parseFloat(ampMatch[1]);
+        const meaning =
+          amp < 2 ? '저변동성 — 방향성 약함'
+          : amp < 4 ? '중변동성 — 일반적 수준'
+          : '고변동성 — 급등락 주의';
+        if (rayLines.length) rayLines.push('');
+        rayLines.push('📈 변동성 의미');
+        rayLines.push(`  일중 ${amp.toFixed(1)}% 진폭 — ${meaning}`);
+      }
+      if (
+        prevCtx?.prevSector &&
+        getSector(keyword) === prevCtx.prevSector &&
+        prevCtx.prevChangePercent !== null &&
+        prevCtx.prevChangePercent !== undefined &&
+        Number.isFinite(parseFloat(marketData.change))
+      ) {
+        const curCh = parseFloat(marketData.change);
+        const delta = curCh - prevCtx.prevChangePercent;
+        const judgment = delta > 1.0 ? '상대적 강세' : delta < -1.0 ? '상대적 약세' : '유사한 흐름';
+        const prevStr = `${prevCtx.prevChangePercent >= 0 ? '+' : ''}${prevCtx.prevChangePercent.toFixed(2)}%`;
+        const deltaStr = `${delta >= 0 ? '+' : ''}${delta.toFixed(2)}%p`;
+        if (rayLines.length) rayLines.push('');
+        rayLines.push('🔗 섹터 비교');
+        rayLines.push(`  ${prevCtx.prevDisplayName || prevCtx.prevKeyword}(${prevStr}) 대비 ${judgment} (Δ ${deltaStr})`);
+      }
+      finalRayDetails = rayLines.length > 0 ? rayLines.join('\n') : null;
+
+      // JACK 상세
+      const maComment = trendCtx.trendSummary
+        || (trendCtx.trendStrength === 'strong_up' ? '단기·중기 모두 상승 추세'
+          : trendCtx.trendStrength === 'weak_up' ? '단기 상승, 중기 미확인'
+          : trendCtx.trendStrength === 'strong_down' ? '단기·중기 모두 하락 추세'
+          : trendCtx.trendStrength === 'weak_down' ? '단기 조정, 중기 지지선 주시'
+          : '이평선 방향성 불명확');
+      const volComment = vol.isHigh
+        ? `${vol.label} — 세력 개입 가능성`
+        : vol.score < 0
+          ? `${vol.label} — 관심도 약화`
+          : `${vol.label} — 특이 신호 없음`;
+      const newsComment = nData.sentiment === '긍정'
+        ? `호재성 뉴스 ${news.length}건 — 우호적 분위기`
+        : nData.sentiment === '부정'
+          ? `악재성 뉴스 ${news.length}건 — 경계 분위기`
+          : `뉴스 ${news.length}건 (중립) — 명확한 촉매 부재`;
+      const scenario = verdict === '매수 우위'
+        ? `추세·거래량 동반 확인 → 분할 진입 유효, 목표가 방향으로 보유`
+        : verdict === '매도 우위'
+          ? `하향 이탈 리스크 우세 → 현금화 또는 손절 기준 사수`
+          : `지표 혼조 → 진입 조건 충족 전 대기, 돌파/지지 확인`;
+      const risk = conflict === 'conflict_jack_buy'
+        ? '확인 신호 부재 — 거래량·뉴스 한 축 확인 전 섣부른 매수 금지'
+        : conflict === 'conflict_lucia_buy'
+          ? '하락 속 역발상 위험 — 바닥 확인 전 진입은 칼날 잡기'
+          : verdict === '관망'
+            ? '지표 혼조 — 억지 진입 시 손익비 악화'
+            : flags.vixHigh
+              ? '고변동성 구간 — 분할 진입으로 평단 관리'
+              : '시장 급변 시 손절 기준 엄수';
+      finalJackDetails = [
+        '🎯 진입 근거 항목별',
+        `  이평선: ${maComment}`,
+        `  거래량: ${volComment}`,
+        `  뉴스: ${newsComment}`,
+        '',
+        '📌 핵심 시나리오',
+        `  ${scenario}`,
+        '',
+        '⚠️ 주의 리스크',
+        `  ${risk}`,
+      ].join('\n');
+
+      // LUCIA 상세
+      const luciaWarning = conflict === 'conflict_jack_buy'
+        ? `${keyword} 추세는 살아있지만 확인 신호(거래량·뉴스)가 약해요. 군중이 기회라 부를 때가 가장 위험할 수 있어요.`
+        : conflict === 'conflict_lucia_buy'
+          ? `하락 속 역발상 기회가 보이지만 바닥 확인이 먼저예요. 떨어지는 칼날은 잡지 마세요.`
+          : verdict === '매도 우위'
+            ? `하방 압력이 누적되고 있어요. 손실을 줄이는 것이 곧 수익이에요.`
+            : verdict === '관망'
+              ? `지표가 엇갈려요. 확실하지 않을 땐 현금도 포지션이에요.`
+              : `강세 흐름에서도 과열·되돌림 가능성은 상존해요. 분할 접근이 안전해요.`;
+      const riskIndicators: string[] = [];
+      if (vix.label.includes('고변동성') || vix.label.includes('중변동성')) {
+        riskIndicators.push(`변동성: ${vix.label}`);
+      }
+      if (nData.sentiment === '부정' && news.length > 0) {
+        riskIndicators.push(`악재 뉴스 ${news.length}건 — 추가 악재 주시`);
+      }
+      if (pos.label.includes('고점')) {
+        riskIndicators.push(`${pos.label} — 되돌림 구간 경계`);
+      } else if (pos.label.includes('저점')) {
+        riskIndicators.push(`${pos.label} — 반등 전 추가 하락 여지`);
+      }
+      if (flags.priceDown) {
+        riskIndicators.push(`오늘 ${marketData.change}% 하락`);
+      }
+      if (vol.isHigh && (discussMode === 'bear' || verdict === '매도 우위')) {
+        riskIndicators.push('거래량 급증 + 하락 = 매도 압력');
+      }
+      if (riskIndicators.length === 0) {
+        riskIndicators.push('경고 등급 리스크 지표 없음 — 기본 리스크 관리 유지');
+      }
+      const emotionalGuard = verdict === '매수 우위'
+        ? 'FOMO로 뒤늦게 올라타면 고점에서 물릴 수 있어요.'
+        : verdict === '매도 우위'
+          ? '공포로 바닥 투매는 반등을 놓쳐요. 손절 규칙은 지키되 감정은 거르세요.'
+          : '조급함이 가장 큰 리스크예요. 조건 충족 전까지는 기다리세요.';
+      finalLuciaDetails = [
+        '🛡️ 경고 근거 상세',
+        `  ${luciaWarning}`,
+        '',
+        '📉 리스크 지표',
+        ...riskIndicators.slice(0, 3).map(s => `  • ${s}`),
+        '',
+        '💭 감정적 판단 경계',
+        `  ${emotionalGuard}`,
+      ].join('\n');
+    }
+
     console.log(`✅ ${keyword}(${assetType}) | ${verdict}(${total}점) | 신뢰도:${confidence}% | 에코:템플릿`);
 
     // ✅ MBTI 강화 문구 — 상승/하락 풀로 분리 (각 10개)
@@ -1254,6 +1415,9 @@ ${DISCLAIMER}`;
       personas: {
         jack: finalJackOut, lucia: finalLuciaOut, ray: finalRayOut, echo: finalEcho,
         echoDetails: finalEchoDetails,
+        rayDetails: finalRayDetails,
+        jackDetails: finalJackDetails,
+        luciaDetails: finalLuciaDetails,
         verdict, confidence, breakdown, positionSizing,
         jackNews, luciaNews, rayNews, echoNews,
       },
