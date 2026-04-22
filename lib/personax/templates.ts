@@ -975,36 +975,49 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   }
 
   // ✅ 2단 분리
-  //    summary: 모드별 결론(conflict 시 ECHO 질문 포함) — 즉시 표시
-  //    details: 기존 Confluence + 근거 + 지금 + 조건 + 비중 — 별도 버블
+  //    summary: 초압축 4줄(결론/상황요약/현재상황/트리거) — ECHO 말풍선 상단에 표시
+  //    details: 충돌 블록 + Confluence + 근거 + 지금 + 조건 + 비중 — "자세히 보기" 확장 영역
 
-  // 📍 조건 — 검증된 진입/정리 트리거 (volNumberLabel은 상단에서 재사용)
-  const trigger = (p.verdict === '매도 우위')
-    ? `${p.sellPrice || '손절가'} 이탈 시 정리`
-    : `${effectiveBuyPrice || '매수 조건'} 돌파 + ${volNumberLabel}`;
-
-  // ✅ 모드별 결론 결정 (actionShort 산출 전에 먼저 확정)
+  // ✅ 모드별 결론 결정 (초압축 5줄 포맷 산출 전에 먼저 확정)
   const mode: DiscussMode = p.mode ?? 'conflict';
   let modeEmoji: string;
   let modeVerdict: string;
   if (mode === 'bull') {
-    modeEmoji = '🟢'; modeVerdict = '진입';
+    modeEmoji = '🟢'; modeVerdict = '진입 가능';
   } else if (mode === 'bear') {
     modeEmoji = '🔴'; modeVerdict = '관망';
   } else {
-    modeEmoji = '🟡'; modeVerdict = '조건부';
+    modeEmoji = '🟡'; modeVerdict = '조건부 대기';
   }
 
-  // 📍 행동 — 결론(modeEmoji)과 1:1 동기화
-  //   🔴 관망/축소: "손절가 이탈 시 보유분 정리 고려"
-  //   🟡 조건부  : "조건 충족 시 분할 접근 고려"
-  //   🟢 진입    : "신호 확인 후 분할 접근 고려"
-  const actionShort =
+  // ✅ 시장 상황 한 줄 요약 — 시세 방향 × 모드 × 이평선 위치
+  //   high_volatility가 최우선, 그 뒤 mode × trendStrength 조합
+  const summaryFlagDirection: PriceDirection | null = p.flags ? determinePriceDirection(p.flags) : null;
+  const oneLineSummary: string = (() => {
+    if (summaryFlagDirection === 'high_volatility_up') return '단기 과열 구간';
+    if (summaryFlagDirection === 'high_volatility_down') return '급락 대응 구간';
+    if (mode === 'bull') {
+      return p.trendStrength === 'strong_up' ? '상승 초입 가능성' : '반등 시도 구간';
+    }
+    if (mode === 'bear') {
+      return p.trendStrength === 'strong_down' ? '하락 리스크 우세' : '조정 구간';
+    }
+    return '방향 탐색 구간';
+  })();
+
+  // ✅ 현재 상황 텍스트
+  const statusText =
+    mode === 'bull' ? '진입 조건 임박'
+      : mode === 'bear' ? '리스크 관리 구간'
+        : '신호 대기 중';
+
+  // ✅ 트리거 텍스트 — mode 기준(verdict 아님)
+  //   bull/conflict → 관심 구간 돌파 + 거래량
+  //   bear          → 리스크 기준선 이탈 감시
+  const triggerText =
     mode === 'bear'
-      ? '손절가 이탈 시 보유분 정리 고려'
-      : mode === 'bull'
-        ? '신호 확인 후 분할 접근 고려'
-        : '조건 충족 시 분할 접근 고려';
+      ? `리스크 기준선 ${p.sellPrice || '손절가'} 이탈 감시`
+      : `${effectiveBuyPrice || '매수 조건'} 돌파 + ${volNumberLabel}`;
 
   // ✅ ECHO 질문 (conflict 모드 + 장 중일 때만) — forecastMode에서는 비활성화
   // 충돌 유형별 3가지씩 로테이션 — getRotationIndex(ticker, length) 공통 시드 사용
@@ -1057,41 +1070,38 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
     }
   }
 
-  const summaryParts: string[] = [];
-  if (echoQuestion) {
-    summaryParts.push(echoQuestion);
-    if (jackRebuttalLine) summaryParts.push(jackRebuttalLine);
-    if (luciaRebuttalLine) summaryParts.push(luciaRebuttalLine);
-  }
-
-  if (p.isForecast) {
-    // ✅ forecastMode — 시간 조건 명시 + 잭/루시아 종합 요약
+  // ✅ forecastMode는 트리거에 시간 프리픽스만 덧붙이고 동일한 4줄 포맷을 유지
+  const finalTriggerText: string = (() => {
+    if (!p.isForecast) return triggerText;
     const isKR = p.assetType === 'KOREAN_STOCK';
     const openTime = isKR ? '09:00' : '23:30';
     const halfCheckpoint = isKR ? '12시 30분까지' : '02:30(개장 3시간)까지';
-    const forecastCondition = p.isBeforeOpen
-      ? `${openTime} 개장 후 ${halfCheckpoint} ${trigger}`
-      : `내일 ${halfCheckpoint} ${trigger}`;
-    const forecastAction = mode === 'bull'
-      ? '신호 확인 후 분할 접근 고려 → 잭의 상승 전망 + 루시아의 거래량 조건 채택'
-      : mode === 'bear'
-        ? '손절가 이탈 시 보유분 정리 고려 → 잭의 하락 전망 + 루시아의 리스크 경고 채택'
-        : '조건 충족 시 분할 접근 고려 → 잭의 긍정 신호 + 루시아의 거래량 조건 동시 확인';
-    summaryParts.push(`📍 결론: ${modeEmoji} ${modeVerdict} (${verdictShort})`);
-    summaryParts.push(`📍 조건: ${forecastCondition}`);
-    summaryParts.push(`📍 행동: ${forecastAction}`);
-  } else {
-    summaryParts.push(`📍 결론: ${modeEmoji} ${modeVerdict} (${verdictShort})`);
-    summaryParts.push(`📍 조건: ${trigger}`);
-    summaryParts.push(`📍 행동: ${actionShort}`);
-  }
-  const summary = summaryParts.join('\n');
+    const prefix = p.isBeforeOpen
+      ? `${openTime} 개장 후 ${halfCheckpoint} `
+      : `내일 ${halfCheckpoint} `;
+    return `${prefix}${triggerText}`;
+  })();
 
-  // ✅ details는 상세 맥락을 보존 (verdictText 원문 + confluence + 근거/지금/조건/비중)
-  // ✅ ECHO 1/2 이모지 통일 — modeEmoji(bull=🟢, bear=🔴, conflict=🟡) 사용
-  //    verdictText는 상세 설명으로 유지
+  // ✅ ECHO 말풍선 상단 — 초압축 4줄 고정
+  const summary = [
+    `${modeEmoji} ${modeVerdict}`,
+    oneLineSummary,
+    `현재 상황: ${statusText}`,
+    `트리거: ${finalTriggerText}`,
+  ].join('\n');
+
+  // ✅ details는 "자세히 보기" 확장 영역 — 기존 ECHO 2 전체 + 충돌 블록 흡수
+  //   순서: (conflict 시) ECHO 질문 + JACK/LUCIA 재답변 → 결론 상세 → confluence
+  //        → ⚔️ 참모진 판단 → 근거/지금/조건/비중
   const detailHeader = `결론: ${modeEmoji} ${verdictText}`;
-  const detailParts: string[] = [detailHeader, confluenceBlock];
+  const detailParts: string[] = [];
+  if (echoQuestion) {
+    detailParts.push(echoQuestion);
+    if (jackRebuttalLine) detailParts.push(jackRebuttalLine);
+    if (luciaRebuttalLine) detailParts.push(luciaRebuttalLine);
+    detailParts.push('');
+  }
+  detailParts.push(detailHeader, confluenceBlock);
   if (debateBlock) detailParts.push(debateBlock);
   detailParts.push(line2, line3, line4, line5);
   const details = detailParts.join('\n');

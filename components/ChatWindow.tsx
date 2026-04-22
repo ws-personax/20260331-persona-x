@@ -406,19 +406,174 @@ const PersonaBubble = memo(function PersonaBubble({
   );
 });
 
-const EchoDetailsToggle = memo(function EchoDetailsToggle({
-  text,
+// ✅ ECHO 초압축 말풍선 — summary 4줄 + [자세히 보기 ▼] 버튼을 한 버블 안에 통합.
+//    펼치면 details(ECHO 2 전체 + ⚔️ 충돌 블록)가 같은 버블 하단에 확장됨.
+const EchoBubble = memo(function EchoBubble({
+  summary,
+  details,
   timestamp,
   echoNews,
 }: {
-  text: string;
+  summary: string;
+  details?: string | null;
   timestamp: Date;
   echoNews?: NewsLink | null;
 }) {
   const [open, setOpen] = useState(false);
+  const p = PERSONAS.echo;
+
+  const summaryText = useMemo(() => (summary || '').replace(/\\n/g, '\n'), [summary]);
+
+  // details에서 본문 / 데이터소스 / 면책을 분리 — 확장 시 본문만 말풍선 안에 출력하고,
+  // 데이터소스/면책은 말풍선 밖 MetaBox로 렌더링.
+  const parsedDetails = useMemo(() => {
+    if (!details) return { content: '', dataSource: '', disclaimer: '' };
+    return parseEchoParts(details.replace(/\\n/g, '\n'));
+  }, [details]);
+
+  if (!summaryText.trim()) return null;
+
+  const hasDetails = !!parsedDetails.content?.trim();
+
   return (
-    <>
-      {/* ✅ ECHO 요약 공지 — ECHO 2번째 MetaBox 하단 disclaimer와 동일 스타일, 버튼 위 위치 */}
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '0 12px' }}>
+        <div
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 12,
+            background: p.iconBg,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            boxShadow: '0 2px 5px rgba(0,0,0,0.12)',
+          }}
+        >
+          <span style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>{p.initial}</span>
+        </div>
+
+        <div style={{ flex: 1, maxWidth: '85%', minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <span style={{ fontSize: 13, color: '#1f2937', fontWeight: 700 }}>{p.name}</span>
+            <span
+              style={{
+                fontSize: 10,
+                color: '#6b7280',
+                background: '#f3f4f6',
+                padding: '1px 6px',
+                borderRadius: 4,
+              }}
+            >
+              {p.label}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
+            <div
+              style={{
+                position: 'relative',
+                background: p.bubbleBg,
+                borderRadius: '0 14px 14px 14px',
+                padding: '14px 16px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                border: `2px solid ${p.bubbleBorder}`,
+                minWidth: 0,
+                maxWidth: '100%',
+                overflowWrap: 'break-word',
+                wordBreak: 'break-word',
+              }}
+            >
+              {p.echoTag && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: -11,
+                    left: 10,
+                    background: p.iconBg,
+                    color: '#111827',
+                    fontSize: 10,
+                    fontWeight: 900,
+                    padding: '2px 8px',
+                    borderRadius: 5,
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                  }}
+                >
+                  {p.echoTag}
+                </div>
+              )}
+
+              {/* 초압축 4줄 */}
+              <p
+                style={{
+                  fontSize: 14,
+                  lineHeight: 1.75,
+                  color: p.textColor,
+                  whiteSpace: 'pre-wrap',
+                  margin: 0,
+                  fontWeight: 600,
+                }}
+              >
+                {summaryText}
+              </p>
+
+              {/* 자세히 보기 버튼 — 말풍선 안 */}
+              {hasDetails && (
+                <div style={{ marginTop: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => setOpen(v => !v)}
+                    style={{
+                      background: '#fff8d6',
+                      color: '#92400e',
+                      border: '1px solid #d4a017',
+                      borderRadius: 6,
+                      padding: '4px 10px',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {open ? '접기 ▲' : '자세히 보기 ▼'}
+                  </button>
+                </div>
+              )}
+
+              {/* details 본문 — 같은 말풍선 안에서 아래로 확장 */}
+              {open && hasDetails && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    paddingTop: 10,
+                    borderTop: `1px dashed ${p.bubbleBorder}`,
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 13,
+                      lineHeight: 1.7,
+                      color: p.textColor,
+                      whiteSpace: 'pre-wrap',
+                      margin: 0,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {parsedDetails.content}
+                  </p>
+                </div>
+              )}
+            </div>
+            <span style={{ fontSize: 10, color: '#9ca3af', flexShrink: 0, paddingBottom: 2 }}>
+              {formatTime(timestamp)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {echoNews?.url && <EchoNewsChip news={echoNews} />}
+
+      {/* PersonaX 공지 — 항상 표시 */}
       <div style={{ marginTop: 4, padding: '0 12px 0 58px', marginBottom: 6 }}>
         <div
           style={{
@@ -437,28 +592,12 @@ const EchoDetailsToggle = memo(function EchoDetailsToggle({
           </p>
         </div>
       </div>
-      <div style={{ padding: '4px 12px 0 58px', marginBottom: open ? 6 : 8 }}>
-        <button
-          type="button"
-          onClick={() => setOpen(v => !v)}
-          style={{
-            background: '#fff8d6',
-            color: '#92400e',
-            border: '1px solid #d4a017',
-            borderRadius: 6,
-            padding: '4px 10px',
-            fontSize: 11,
-            fontWeight: 700,
-            cursor: 'pointer',
-          }}
-        >
-          {open ? '접기 ▲' : '자세히 보기 ▼'}
-        </button>
-      </div>
-      {open && (
-        <PersonaBubble personaKey="echo" text={text} timestamp={timestamp} echoNews={echoNews} />
+
+      {/* 데이터 소스 + 디스클레이머 — 자세히 보기 펼쳤을 때만 */}
+      {open && (parsedDetails.dataSource || parsedDetails.disclaimer) && (
+        <MetaBox dataSource={parsedDetails.dataSource} disclaimer={parsedDetails.disclaimer} />
       )}
-    </>
+    </div>
   );
 });
 
@@ -857,10 +996,12 @@ export default function ChatWindow() {
                         <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>
                           ── ECHO COMMAND ──
                         </div>
-                        <PersonaBubble personaKey="echo" text={msg.personas.echo} timestamp={msg.timestamp} />
-                        {msg.personas.echoDetails && (
-                          <EchoDetailsToggle text={msg.personas.echoDetails} timestamp={msg.timestamp} echoNews={msg.personas.echoNews} />
-                        )}
+                        <EchoBubble
+                          summary={msg.personas.echo}
+                          details={msg.personas.echoDetails}
+                          timestamp={msg.timestamp}
+                          echoNews={msg.personas.echoNews}
+                        />
                       </>
                     );
                   }
@@ -873,10 +1014,12 @@ export default function ChatWindow() {
                       <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>
                         ── ECHO COMMAND ──
                       </div>
-                      <PersonaBubble personaKey="echo" text={msg.personas.echo} timestamp={msg.timestamp} />
-                      {msg.personas.echoDetails && (
-                        <EchoDetailsToggle text={msg.personas.echoDetails} timestamp={msg.timestamp} echoNews={msg.personas.echoNews} />
-                      )}
+                      <EchoBubble
+                        summary={msg.personas.echo}
+                        details={msg.personas.echoDetails}
+                        timestamp={msg.timestamp}
+                        echoNews={msg.personas.echoNews}
+                      />
                     </>
                   );
                 })() : (
