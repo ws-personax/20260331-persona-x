@@ -844,7 +844,14 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   // ✅ 뉴스 언급 제거 — 각 페르소나의 뉴스 칩에서 확인
   const line2 = `근거: ${p.trendSummary ? p.trendSummary + ' / ' : ''}${p.volLabel}${conflictNote}`;
   const line3 = `지금: ${insight}${timeNote}`;
-  const line4 = `조건: ${p.condSummary}`;
+  // ✅ ECHO 2 (details) 조건 매수가 — ECHO 1 trigger와 동일하게 effectiveBuyPrice 사용
+  //    기존: p.condSummary는 route.ts에서 extractConditionPrices로 뽑은 raw buyPrice(예: rawLow*0.98)
+  //    수정: effectiveBuyPrice(rawPrice*1.02) 기준으로 재구성 → ECHO 1/2 매수가 통일
+  const rebuiltCondSummary = [
+    effectiveBuyPrice && `매수(${effectiveBuyPrice})`,
+    p.sellPrice && `손절(${p.sellPrice})`,
+  ].filter(Boolean).join(' / ') || p.condSummary || '시장 상황 주시';
+  const line4 = `조건: ${rebuiltCondSummary}`;
   // ✅ 거래량 기준 — ECHO 1/2 통일 (avgVolume × 1.3) — line5와 trigger에서 재사용
   const triggerFmtVol = (v: number): string => {
     if (v >= 100000000) return `${(v / 100000000).toFixed(1)}억주`;
@@ -925,30 +932,38 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   }
 
   // ✅ ECHO 질문 (conflict 모드 + 장 중일 때만) — forecastMode에서는 비활성화
-  // 충돌 유형별로 3가지씩 로테이션
-  //   - 기존 Math.floor(Date.now() / 1000) % 3은 같은 초 내 재요청 시 고정값 → 테스트 시 항상 같은 문구로 보임
-  //   - 매 요청 완전 다른 문구 보장을 위해 Math.random() 기반으로 변경
+  // 충돌 유형별 3가지씩 로테이션 — pool.length 기반으로 인덱스 계산 (배열 적용 보장)
+  //   이전: Math.floor(Date.now() / 1000) % 3 → 같은 초 내 재요청 시 고정값
+  //   현재: Math.random() + ms 엔트로피 xor → 매 요청 완전 독립 인덱스
   let echoQuestion = '';
   let jackRebuttalLine = '';
   let luciaRebuttalLine = '';
   if (mode === 'conflict' && p.flags && !p.isForecast) {
     const f = p.flags;
-    const qRotIdx = Math.floor(Math.random() * 3);
-    if (f.trendUp && f.newsPos && f.volDown) {
-      const trendVsVolQs = [
-        '⚔️ 잭은 이평선+뉴스를, 루시아는 거래량을 근거로 합니다. 거래량 저조에도 진입할 가치가 있습니까?',
-        '⚔️ 추세는 살아있지만 거래량이 침묵합니다. 신호를 믿어야 합니까?',
-        '⚔️ 이평선이 긍정적이나 거래량이 동의하지 않습니다. 어느 쪽이 맞습니까?',
-      ];
-      echoQuestion = trendVsVolQs[qRotIdx];
-    } else {
-      const generalConflictQs = [
-        '⚔️ 잭과 루시아의 신호가 충돌합니다. 어느 쪽을 우선해야 합니까?',
-        '⚔️ 참모진 의견이 갈렸습니다. 지휘관님의 판단이 필요합니다.',
-        '⚔️ 두 신호가 상반됩니다. 어느 쪽이 더 신뢰할 수 있습니까?',
-      ];
-      echoQuestion = generalConflictQs[qRotIdx];
-    }
+
+    // 충돌 유형 선택 (이평선+뉴스 vs 거래량 / 일반 충돌)
+    const isTrendVsVol = f.trendUp && f.newsPos && f.volDown;
+    const questionPool: string[] = isTrendVsVol
+      ? [
+          '⚔️ 잭은 이평선+뉴스를, 루시아는 거래량을 근거로 합니다. 거래량 저조에도 진입할 가치가 있습니까?',
+          '⚔️ 추세는 살아있지만 거래량이 침묵합니다. 신호를 믿어야 합니까?',
+          '⚔️ 이평선이 긍정적이나 거래량이 동의하지 않습니다. 어느 쪽이 맞습니까?',
+        ]
+      : [
+          '⚔️ 잭과 루시아의 신호가 충돌합니다. 어느 쪽을 우선해야 합니까?',
+          '⚔️ 참모진 의견이 갈렸습니다. 지휘관님의 판단이 필요합니다.',
+          '⚔️ 두 신호가 상반됩니다. 어느 쪽이 더 신뢰할 수 있습니까?',
+        ];
+
+    // ✅ 강화된 로테이션 — Math.random() + Date.now() 하위 비트 xor로 매 호출 독립 인덱스 보장
+    const qRotIdx = Math.floor(
+      ((Math.random() * 1_000_000) ^ (Date.now() & 0xFFFFF)) % questionPool.length,
+    );
+    const safeIdx = ((qRotIdx % questionPool.length) + questionPool.length) % questionPool.length;
+    echoQuestion = questionPool[safeIdx];
+
+    // 🔍 진단 로그 — Vercel 서버 로그에서 로테이션 실제 작동 여부 확인 가능
+    console.log(`[ECHO 질문 로테이션] type=${isTrendVsVol ? 'trendVsVol' : 'general'} idx=${safeIdx}/${questionPool.length - 1} question="${echoQuestion.slice(0, 30)}..."`);
 
     // ✅ JACK/LUCIA 재답변 — ECHO 질문 뒤 1줄씩 (conflict 유형별 차별화)
     if (p.conflict === 'conflict_jack_buy') {
