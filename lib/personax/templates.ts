@@ -696,13 +696,13 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
       // ✅ 미국 주식은 즉각 진입 불가 — 다음 날 종가 확인 후 검토
       const entryClause = p.assetType === 'US_STOCK'
         ? '다음 날 미국장 종가 확인 후 진입을 검토하십시오'
-        : '즉각 분할 접근을 고려하십시오';
+        : '분할 접근을 고려하십시오';
       // ✅ 다양한 표현으로 반복 방지 — 키워드 해시 기반 선택
       const weakPhrases = [
-        `신호가 거의 만들어지고 있습니다. {buy} 돌파 확인 시 투자금의 10%만 먼저 진입하십시오. 매수 조건 동시 충족 시 ${entryClause}.`,
-        `조금만 더 기다리십시오. {buy} 위로 올라서면서 거래량이 늘어날 때가 진입 시점입니다. 투자금의 10%만 먼저 진입을 고려할 수 있습니다.`,
-        `진입 조건이 가까워지고 있습니다. {buy} 돌파 + 거래량 증가 동시 확인 시 투자금의 10%로 시작하십시오.`,
-        `준비 구간입니다. {buy}을 오늘 종가에서 돌파하면 투자금의 10%만 선취매하십시오. 서두르지 마십시오.`,
+        `신호가 거의 만들어지고 있습니다. {buy} 돌파 확인 시 분할 접근을 고려하십시오. 매수 조건 동시 충족 시 ${entryClause}.`,
+        `조금만 더 기다리십시오. {buy} 위로 올라서면서 거래량이 늘어날 때가 진입 시점입니다. 분할 접근을 고려할 수 있습니다.`,
+        `진입 조건이 가까워지고 있습니다. {buy} 돌파 + 거래량 증가 동시 확인 시 분할 접근을 고려하십시오.`,
+        `준비 구간입니다. {buy}을 오늘 종가에서 돌파하면 분할 접근을 고려하십시오. 서두르지 마십시오.`,
       ];
       // ✅ 결정론적 로테이션 — ticker + 분 단위 시드 (getRotationIndex 공통 사용)
       const phraseIdx = getRotationIndex(p.keyword, weakPhrases.length);
@@ -733,8 +733,9 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
 
   // ✅ ⚔️ 참모진 토론 블록 — 충돌 시에만 표시 (JACK/LUCIA 발언은 각자 말풍선에서)
   //    ECHO는 충돌 감지 사실과 판단만 제시
+  //    mode === 'bull'일 때는 bear 맥락의 "LUCIA 채택 — 포지션 축소" 등이 결론과 모순되므로 블록 자체를 생략
   let debateBlock = '';
-  if (p.conflict === 'conflict_jack_buy' || p.conflict === 'conflict_lucia_buy') {
+  if ((p.conflict === 'conflict_jack_buy' || p.conflict === 'conflict_lucia_buy') && p.mode !== 'bull') {
     let echoJudgement: string;
     if (p.verdict === '매수 우위') {
       echoJudgement = p.conflict === 'conflict_jack_buy'
@@ -839,6 +840,14 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
         verdictEmoji = '⚪';
       }
     }
+  }
+
+  // ✅ bull 모드 모순 해결 — 상단 말풍선 결론(🟢)과 details 본문이 어긋나지 않도록
+  //    mode가 bull이면 verdict/situation 기반 분기 결과(예: "포지션 축소를 권고합니다 — 하락 신호 감지")를 덮어씀.
+  //    LG전자처럼 mode=bull + verdict=매도 우위 조합에서 bear 톤이 섞여 나오는 모순을 차단.
+  if (p.mode === 'bull') {
+    verdictText = '진입 조건 임박 — 조건 확인 후 분할 접근 고려';
+    verdictEmoji = '🟢';
   }
 
   // ✅ summary용 짧은 결론 라벨 (verdictText 안의 부가 설명은 제거)
@@ -966,7 +975,7 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   } else if (p.watchLevel === 'weak') {
     const buy1 = effectiveBuyPrice || '매수 조건';
     const sell1 = p.sellPrice || '손절가';
-    line5 = `비중: 아직 0%이지만 준비하십시오. ${buy1} 돌파 + ${volThresholdLabel} 동시 확인 시 → ${firstEntryPct}% 진입하십시오. 3거래일 유지 확인 시 → 추가 ${addEntryPct}% 진입하십시오. ${sell1} 이탈 시 → 리스크 관리가 필요한 구간입니다.${cryptoStopNote}`;
+    line5 = `비중: 아직 0%이지만 준비하십시오. ${buy1} 돌파 + ${volThresholdLabel} 동시 확인 시 → 분할 접근을 고려하십시오. 3거래일 유지 확인 시 → 추가 분할 접근을 고려하십시오. ${sell1} 이탈 시 → 리스크 관리가 필요한 구간입니다.${cryptoStopNote}`;
   } else if (p.watchLevel === 'strong') {
     line5 = `비중: 현재 0%를 유지하십시오. 지금 진입하면 손실 위험이 큽니다. 시장이 안정될 때까지 현금을 지키는 것이 최선입니다.`;
   } else {
