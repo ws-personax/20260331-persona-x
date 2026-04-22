@@ -153,6 +153,39 @@ export const buildJackText = (p: JackParams): string => {
 
     const mode: DiscussMode = p.mode ?? 'conflict';
 
+    // ✅ 장 마감 후(!isBeforeOpen) 전용 템플릿 — "신호 확인 중 / 개장 후 거래량이 따라주는지 확인한 뒤 움직이세요" 등
+    //    장 시작 전(isBeforeOpen) 표현을 장 마감 후에 재사용하던 중복/어색함 제거.
+    //    isBeforeOpen 플로우는 아래 기존 블록이 그대로 처리한다.
+    const isAfterMarketClose = !p.isBeforeOpen;
+    if (isAfterMarketClose) {
+      const changePctAfter = p.changeRaw && p.changeRaw !== '0.00'
+        ? `${parseFloat(p.changeRaw) >= 0 ? '+' : ''}${p.changeRaw}%`
+        : '변동 없음';
+      const maComment = p.trendSummary && p.trendSummary.trim()
+        ? p.trendSummary
+        : (mode === 'bull' ? '이평선 상승 추세 유지'
+            : mode === 'bear' ? '이평선 하락 우세'
+              : '이평선 방향 혼재');
+      const fmtAfter = (n: number): string =>
+        p.currency === 'USD'
+          ? `약 $${Math.round(n).toLocaleString('en-US')}`
+          : `${Math.round(n).toLocaleString('ko-KR')}원`;
+      const triggerPriceAfter = p.rawPrice && p.rawPrice > 0
+        ? fmtAfter(p.rawPrice * 1.02)
+        : (p.breakoutPrice || '돌파 기준가');
+      const stopPriceAfter = p.rawPrice && p.rawPrice > 0
+        ? fmtAfter(p.rawPrice * 0.98)
+        : (p.supportPrice || '리스크 기준선');
+
+      if (mode === 'bull') {
+        return `오늘 ${changePctAfter} 마감. ${maComment}.\n내일 ${triggerPriceAfter} 돌파 + 거래량 증가 시\n진입 시나리오가 유효합니다.`;
+      }
+      if (mode === 'bear') {
+        return `오늘 ${changePctAfter} 마감. 약세 마감.\n내일 리스크 기준선 ${stopPriceAfter} 이탈 여부가\n핵심 확인 포인트입니다.`;
+      }
+      return `오늘 ${changePctAfter} 마감. 방향성 없는 횡보.\n내일 ${triggerPriceAfter} 돌파 또는 ${stopPriceAfter} 이탈로\n방향이 결정될 가능성이 높습니다.`;
+    }
+
     let line1: string;
     let line2: string;
     if (mode === 'bull') {
@@ -490,6 +523,20 @@ export const buildLuciaText = (p: LuciaParams): string => {
 
     const mode: DiscussMode = p.mode ?? 'conflict';
 
+    // ✅ 장 마감 후(!isBeforeOpen) 전용 템플릿 — 비유 중심 3줄, 시장 흐름 감상 톤.
+    //    "마감 후에도 방향이 확정되지 않았어요 / 방향이 확인되기 전까지 신규 진입은 보류하세요 /
+    //    개장 후 거래량이 따라주는지 확인한 뒤 움직이세요" 같은 장 시작 전 재탕 문구를 제거한다.
+    const isAfterMarketCloseLucia = !p.isBeforeOpen;
+    if (isAfterMarketCloseLucia) {
+      if (mode === 'bull') {
+        return `소장님, 오늘 ${metaphor}.\n종가 기준 나쁘지 않았어요.\n내일 거래량이 따라준다면 좋은 신호예요.`;
+      }
+      if (mode === 'bear') {
+        return `소장님, 오늘 ${metaphor}.\n마감이 아쉬웠어요.\n내일 추가 하락 없이 버텨주는지가 중요해요.`;
+      }
+      return `소장님, 오늘 ${metaphor}.\n방향을 못 정한 하루였어요.\n오늘 같은 날은 쉬는 것도 전략이에요.`;
+    }
+
     let line1: string;
     let line2: string;
     // ✅ 최근 흐름(어제 거래량) 인지 문장 — isBeforeOpen 대기 안내 전용
@@ -502,28 +549,15 @@ export const buildLuciaText = (p: LuciaParams): string => {
 
     if (mode === 'bear') {
       const head = negText ? `${negText} 기준으로` : '부정 신호 누적으로';
-      line1 = p.isBeforeOpen
-        ? `소장님, ${head} 마치 ${metaphor}.`
-        : `소장님, 오늘 흐름도 약했어요 — 마치 ${metaphor}.`;
-      line2 = p.isBeforeOpen
-        ? historyAwareLine
-        : `내일 개장 후 반등 확인 전까지 진입은 미루세요.`;
+      line1 = `소장님, ${head} 마치 ${metaphor}.`;
+      line2 = historyAwareLine;
     } else if (mode === 'bull') {
-      // 흐름은 좋아 보여도 FOMO 경고
-      line1 = p.isBeforeOpen
-        ? `소장님, 지표는 긍정적이에요. 하지만 FOMO에 휩쓸리지 마세요.`
-        : `소장님, 오늘 흐름은 좋았어요. 하지만 과열 구간은 늘 되돌림이 있어요.`;
-      line2 = p.isBeforeOpen
-        ? `${openTime} 개장 후 거래량 확인 후 진입하세요.`
-        : `내일 개장 후 거래량이 따라주는지 확인한 뒤 움직이세요.`;
+      line1 = `소장님, 지표는 긍정적이에요. 하지만 FOMO에 휩쓸리지 마세요.`;
+      line2 = `${openTime} 개장 후 거래량 확인 후 진입하세요.`;
     } else {
       const head = negText ? `${negText}가 있어요.` : `방향이 아직 확정되지 않았어요.`;
-      line1 = p.isBeforeOpen
-        ? `소장님, ${head} 마치 ${metaphor}.`
-        : `소장님, 오늘 마감 후에도 ${head.replace(/이 있어요\.|가 있어요\.$/, '')}. 마치 ${metaphor}.`;
-      line2 = p.isBeforeOpen
-        ? historyAwareLine
-        : `내일 방향이 확인되기 전까지 신규 진입은 보류하세요.`;
+      line1 = `소장님, ${head} 마치 ${metaphor}.`;
+      line2 = historyAwareLine;
     }
 
     // ✅ 재반박 비활성화 — forecastMode
