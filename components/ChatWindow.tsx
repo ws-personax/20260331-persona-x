@@ -758,8 +758,8 @@ const ErrorCard = ({
 const OnboardingCard = ({ onExample }: { onExample: (keyword: string) => void }) => (
   <div
     style={{
-      // ✅ 상단 여유 확대 — iPad/모바일 Safari 주소창에 가려지지 않도록
-      margin: '20px 12px 20px',
+      // 상단 여백은 래퍼(.px-onboarding-wrap)의 padding-top 24px가 담당
+      margin: '0 12px 20px',
       padding: '28px 20px',
       background: 'linear-gradient(180deg, #fff8d6 0%, #fffbeb 100%)',
       border: '1px solid #fde68a',
@@ -1091,15 +1091,13 @@ export default function ChatWindow() {
           height: 100vh;
           height: 100dvh;
         }
-        /* 온보딩 카드를 남은 공간 세로 중앙에 배치 — header(~54px)와 footer(~140px) 제외 */
+        /* 온보딩 카드를 상단 네비게이션 바 바로 아래 배치 (24px 여백) */
         .px-onboarding-wrap {
-          min-height: calc(100vh - 220px);
-          min-height: calc(100dvh - 220px);
           display: flex;
           flex-direction: column;
-          justify-content: center;
+          justify-content: flex-start;
           align-items: stretch;
-          padding: 40px 0 20px;
+          padding: 24px 0 20px;
           box-sizing: border-box;
         }
       `}</style>
