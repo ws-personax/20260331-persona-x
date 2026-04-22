@@ -228,27 +228,31 @@ export const buildJackText = (p: JackParams): string => {
     ? `거래량 ${jackFormatVol(Math.round(jackAvgVol * 1.3))} 이상 돌파 확인 시`
     : '거래량이 평소 대비 30% 이상 증가할 때';
 
-  // ✅ JACK 매수 표현 로테이션
-  const phraseIdx = Math.floor(Date.now() / 1000) % JACK_BUY_PHRASES.length;
+  // ✅ JACK 매수 표현 로테이션 — 결정론적 시드 (ticker + 분)
+  const phraseIdx = getRotationIndex(p.keyword, JACK_BUY_PHRASES.length);
   const buyPhrase = JACK_BUY_PHRASES[phraseIdx];
+
+  // ✅ 시세 방향별 JACK 본문 선택 — "뉴스 긍정 기준으로 진입 가능성" 고정 출력 문제 해결
+  //    상승/하락/sideways/급등락에 따라 서로 다른 전술 메시지
+  const jackDirection: PriceDirection = flags
+    ? determinePriceDirection(flags)
+    : 'sideways';
+  const jackBodyPool = JACK_BODY_POOL[jackDirection];
+  const jackBodyIdx = getRotationIndex(p.keyword, jackBodyPool.length);
+  const jackDirectionLine = jackBodyPool[jackBodyIdx];
 
   const mode: DiscussMode = p.mode ?? 'conflict';
   let line1: string;
   let line2: string;
 
   if (mode === 'bull') {
-    // 긍정 3개 이상 — 강한 매수 권고
+    // 긍정 3개 이상 — 강한 매수 권고 (방향 맥락 prefix 추가)
     line1 = `지휘관님, ${p.keyword}${topicParticle(p.keyword)} ${positiveText} — 명백한 매수 우위입니다.`;
     line2 = `${buyPhrase}. ${volCondition} 단계 진입.`;
   } else if (mode === 'conflict') {
-    // 갈등 — 긍정 지표 유무에 따라 표현 차별화
-    if (positives.length > 0) {
-      line1 = `지휘관님, ${p.keyword}${topicParticle(p.keyword)} ${positiveText} 기준으로 진입 가능성이 있습니다.`;
-      line2 = `${volCondition} 1차 진입 검토. ${buyPhrase}.`;
-    } else {
-      line1 = `지휘관님, 신호 확인 중입니다. 거래량 돌파 대기.`;
-      line2 = `${volCondition} 1차 진입 검토.`;
-    }
+    // 갈등 — 시세 방향별 JACK_BODY_POOL 사용 (방향 무시 "진입 가능성" 고정 출력 제거)
+    line1 = `지휘관님, ${p.keyword}${topicParticle(p.keyword)} ${jackDirectionLine}.`;
+    line2 = `${volCondition} 1차 진입 검토. ${buyPhrase}.`;
   } else {
     // bear — 역발상 강세론자 (조정 속 기회 탐색, 3줄)
     const negatives: string[] = [];
@@ -311,58 +315,109 @@ interface LuciaParams {
   prevCtx?: PrevContext;
 }
 
-// ✅ 거래량 저조 비유 — 5개 로테이션 ("마치 X" 형태로 자연스럽게 붙도록)
-const LUCIA_LOW_VOL_METAPHORS = [
-  '손님 없는 식당처럼 겉만 화려한 상태예요',
-  '박수 소리 없는 공연 같아요',
-  '바람만 가득한 풍선 같아요',
-  '뼈대 없이 올라가는 건물 같아요',
-  '관중 없는 경기장처럼 흥이 안 올라요',
-];
+// ─────────────────────────────────────────────
+// ✅ 시세 방향 분류 + 결정론적 로테이션 시드
+// ─────────────────────────────────────────────
+// 🔍 진단 메모 (수정 4): "quote는 로테이션 되는데 body는 고정" 원인
+//   - quote/body 모두 기존에 Math.floor(Date.now() / 1000) % length 사용 → 구조상 rotation은 작동 중.
+//   - 그런데 body가 "같아 보이는" 이유는 (1) pool이 direction 무관하게 동일 카테고리(lowVol_neutral 등)에
+//     몰려 있어 종목 방향이 달라도 같은 풀에서 뽑혔고 (2) 초 단위 랜덤이라 사용자가 방향 차이를
+//     인지하기 어려웠기 때문. 즉 "배열 인덱스가 0에 고정"이 아니라 "배열 자체가 방향 무시"였던 것.
+//   - 수정: pool을 direction별로 분리하고 시드를 (ticker + minute) 결정론으로 교체.
 
-// ✅ 변동성 위험 비유 — 5개 로테이션 (코인 포함, "마치 X" 형태)
-const LUCIA_VOLATILITY_METAPHORS = [
-  '안전벨트 없이 탄 롤러코스터 같아요',
-  '태풍 속으로 나선 항해 같아요',
-  '높은 파도 위에 선 서퍼 같아요',
-  '흔들리는 사다리 꼭대기에 있는 것 같아요',
-  '번개 치는 하늘 아래 우산 하나 든 모습 같아요',
-];
+export type PriceDirection =
+  | 'rising_weak_volume'
+  | 'falling_weak_volume'
+  | 'sideways'
+  | 'high_volatility_up'
+  | 'high_volatility_down';
 
-// 비유 풀 — 상황별 (비슷한 표현 반복 방지)
-// ✅ 비유 풀 확장 — 7개 이상으로 반복 방지
-const LUCIA_METAPHORS = {
-  highVol_bull: [
-    '인기 맛집에 손님이 갑자기 몰려든 것처럼 과열된 분위기예요',
-    '인기 가수 콘서트 직전에 팬들이 한꺼번에 몰려드는 것처럼 들뜬 상태예요',
-    '중요한 경기 막판에 관중이 열광하는 것과 같아요',
-    '마라톤 결승선 앞에서 갑자기 모두가 스퍼트를 올리는 상황이에요',
-    '세일 첫날 오픈런처럼 모두가 한꺼번에 달려드는 분위기예요',
+// ✅ 시세 방향 판정 — flags 기반 (change는 flags.priceUp/Down에 이미 반영됨)
+export const determinePriceDirection = (flags: IndicatorFlags): PriceDirection => {
+  if (flags.vixHigh) {
+    if (flags.priceUp || flags.trendUp) return 'high_volatility_up';
+    if (flags.priceDown || flags.trendDown) return 'high_volatility_down';
+  }
+  const isRising = flags.priceUp || flags.trendUp;
+  const isFalling = flags.priceDown || flags.trendDown;
+  if (isRising && !isFalling) return 'rising_weak_volume';
+  if (isFalling && !isRising) return 'falling_weak_volume';
+  return 'sideways';
+};
+
+// ✅ 결정론적 로테이션 인덱스 — (ticker + 분 단위 시간) 시드
+//   - 같은 종목을 1분 안에 재질의 → 동일 문구 (예측 가능)
+//   - 1분 경과 후 재질의 → 다른 문구 (시간 경과에 따른 자연스러운 변화)
+//   - 다른 종목 동시 질의 → 서로 다른 문구 (ticker hash 차이)
+export const getRotationIndex = (ticker: string, arrayLength: number): number => {
+  if (arrayLength <= 0) return 0;
+  const minute = Math.floor(Date.now() / 60000);
+  const hash = (ticker || '').split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return (hash + minute) % arrayLength;
+};
+
+// ✅ LUCIA 비유 풀 — 시세 방향별로 분기 (각 3개 이상 로테이션)
+const LUCIA_METAPHORS: Record<PriceDirection, string[]> = {
+  rising_weak_volume: [
+    '뼈대 없이 올라가는 건물 같아요',
+    '바람 없이 떠오른 연 같아요',
+    '받침돌 없는 탑 같아요',
   ],
-  highVol_bear: [
-    '갑자기 불이 났을 때 모두가 출구로 달려가는 상황이에요',
-    '폐점 세일에 사람들이 몰리듯 패닉이 번지고 있어요',
-    '갑작스러운 소나기에 모두가 처마 밑으로 뛰어드는 것 같아요',
+  falling_weak_volume: [
+    '안개 속 비탈길 같아요',
+    '브레이크 없이 내려가는 차 같아요',
+    '바닥을 확인 못 한 계단 같아요',
   ],
-  lowVol_neutral: [
-    '손님 없는 텅 빈 시장처럼 조용한 상태예요',
-    '쉬는 날 아무도 없는 운동장처럼 적막해요',
-    '재료가 준비됐는데 요리사가 아직 오지 않은 주방 같아요',
-    '개막을 앞두고 관중이 아직 입장하지 않은 경기장 같아요',
+  sideways: [
+    '태풍의 눈 속에 있는 것 같아요',
     '바람 한 점 없는 한여름 오후처럼 움직임이 없어요',
+    '출발 신호를 기다리는 단거리 선수 같아요',
   ],
-  midVol: [
-    '경기 전 워밍업 중인 선수들처럼 아직 본격적인 움직임이 나오지 않았어요',
-    '손님은 있는데 주방이 아직 준비 중인 식당 같아요',
-    '출발 신호를 기다리는 단거리 선수들처럼 긴장감은 있지만 아직 출발 전이에요',
-    '구름은 잔뜩 끼었는데 아직 비가 오지 않는 흐린 날씨 같아요',
+  high_volatility_up: [
+    '안전벨트 없이 탄 롤러코스터 같아요',
+    '높은 파도 위에 선 서퍼 같아요',
+    '세일 첫날 오픈런처럼 모두가 달려드는 분위기예요',
+  ],
+  high_volatility_down: [
+    '태풍 속으로 나선 항해 같아요',
+    '번개 치는 하늘 아래 우산 하나 든 모습 같아요',
+    '갑자기 불이 났을 때 모두가 출구로 달려가는 상황이에요',
   ],
 };
 
-const pickMetaphor = (key: keyof typeof LUCIA_METAPHORS, _keyword: string): string => {
-  const pool = LUCIA_METAPHORS[key];
-  // ✅ 시간 기반 로테이션 — Vercel 서버리스에서도 매 요청마다 다른 문구 유지
-  const idx = Math.floor(Date.now() / 1000) % pool.length;
+// ✅ JACK 본문 풀 — 시세 방향별로 분기 (긍정 편향은 유지하되 방향에 맞는 전술 제시)
+const JACK_BODY_POOL: Record<PriceDirection, string[]> = {
+  rising_weak_volume: [
+    '상승세이나 거래량 부진입니다. 돌파 확인 전까지 진입 보류하십시오',
+    '추세는 살아있으나 수급이 약합니다. 거래량 동반 돌파 시 진입하십시오',
+    '이평선은 우상향이나 거래량이 따라오지 않습니다. 수급 유입 대기',
+  ],
+  falling_weak_volume: [
+    '하락세이나 매도 압력도 약합니다. 반등 신호 전까지 관망하십시오',
+    '바닥 확인이 우선입니다. 거래량 동반 반등 시 재평가하십시오',
+    '조정 구간입니다. 지지 확인 후 재진입 검토하십시오',
+  ],
+  sideways: [
+    '방향성 부재 구간입니다. 돌파 방향 확인 후 추종하십시오',
+    '교착 구간입니다. 한 방향 확정 전까지 신규 진입을 보류하십시오',
+    '관망 구간입니다. 트리거 가격 이탈/돌파 시 대응하십시오',
+  ],
+  high_volatility_up: [
+    '급등 국면입니다. 조정 대기 또는 분할 진입을 검토하십시오',
+    '과열 구간입니다. 추격 매수보다 눌림 대기가 유리합니다',
+    '상승 가속 국면입니다. 분할 진입으로 리스크를 분산하십시오',
+  ],
+  high_volatility_down: [
+    '급락 국면입니다. 하방 압력 해소 전까지 진입 금지입니다',
+    '패닉 구간입니다. 바닥 캔들 확인 후 역발상 진입을 검토하십시오',
+    '매도 가속 국면입니다. 포지션 축소 후 현금 보유를 권고합니다',
+  ],
+};
+
+// ✅ 방향별 비유 선택 — getRotationIndex 기반 (ticker + minute 결정론)
+const pickMetaphor = (direction: PriceDirection, keyword: string): string => {
+  const pool = LUCIA_METAPHORS[direction];
+  const idx = getRotationIndex(keyword, pool.length);
   return pool[idx];
 };
 
@@ -380,15 +435,11 @@ export const buildLuciaText = (p: LuciaParams): string => {
     const openTime = isKR ? '09:00' : '23:30';
 
     const f = p.flags;
-    const useVolatility = f?.vixHigh || p.assetType === 'CRYPTO';
-    const useLowVol = f?.volDown && !useVolatility;
-    const pool = useLowVol
-      ? LUCIA_LOW_VOL_METAPHORS
-      : useVolatility
-        ? LUCIA_VOLATILITY_METAPHORS
-        : LUCIA_METAPHORS.lowVol_neutral;
-    const mIdx = Math.floor(Date.now() / 1000) % pool.length;
-    const metaphor = pool[mIdx];
+    // ✅ 시세 방향별 비유 선택 — 상승/하락/sideways/급등락에 따라 다른 풀
+    const direction: PriceDirection = f
+      ? determinePriceDirection(f)
+      : (p.assetType === 'CRYPTO' ? 'high_volatility_down' : 'sideways');
+    const metaphor = pickMetaphor(direction, p.keyword);
 
     const negatives: string[] = [];
     if (f?.volDown) negatives.push('거래량 저조');
@@ -463,16 +514,12 @@ export const buildLuciaText = (p: LuciaParams): string => {
   if (flags?.trendDown) negatives.push('이평선 하락');
   if (flags?.newsNeg) negatives.push('뉴스 부정');
 
-  // ✅ 비유 선택 — 거래량 저조 / 변동성 위험 / 기본
-  const useVolatility = flags?.vixHigh || p.assetType === 'CRYPTO';
-  const useLowVol = flags?.volDown && !useVolatility;
-  const pool = useLowVol
-    ? LUCIA_LOW_VOL_METAPHORS
-    : useVolatility
-      ? LUCIA_VOLATILITY_METAPHORS
-      : LUCIA_METAPHORS.lowVol_neutral;
-  const metaphorIdx = Math.floor(Date.now() / 1000) % pool.length;
-  const metaphor = pool[metaphorIdx];
+  // ✅ 시세 방향별 비유 선택 — rising/falling/sideways/high_volatility_up/down
+  //    삼성전자 -1.37% + 거래량 0.47 같은 케이스 → falling_weak_volume 풀만 선택
+  const direction: PriceDirection = flags
+    ? determinePriceDirection(flags)
+    : (p.assetType === 'CRYPTO' ? 'high_volatility_down' : 'sideways');
+  const metaphor = pickMetaphor(direction, p.keyword);
 
   const mode: DiscussMode = p.mode ?? 'conflict';
   let line1: string;
@@ -626,8 +673,8 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
         `진입 조건이 가까워지고 있습니다. {buy} 돌파 + 거래량 증가 동시 확인 시 투자금의 10%로 시작하십시오.`,
         `준비 구간입니다. {buy}을 오늘 종가에서 돌파하면 투자금의 10%만 선취매하십시오. 서두르지 마십시오.`,
       ];
-      // ✅ 시간 기반 로테이션 — 서버리스 요청마다 다른 문구
-      const phraseIdx = Math.floor(Date.now() / 1000) % weakPhrases.length;
+      // ✅ 결정론적 로테이션 — ticker + 분 단위 시드 (getRotationIndex 공통 사용)
+      const phraseIdx = getRotationIndex(p.keyword, weakPhrases.length);
       insightTemplate = `${p.trendSummary ? p.trendSummary + '. ' : ''}${weakPhrases[phraseIdx]}`;
     } else {
       // neutral
@@ -932,9 +979,9 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   }
 
   // ✅ ECHO 질문 (conflict 모드 + 장 중일 때만) — forecastMode에서는 비활성화
-  // 충돌 유형별 3가지씩 로테이션 — pool.length 기반으로 인덱스 계산 (배열 적용 보장)
-  //   이전: Math.floor(Date.now() / 1000) % 3 → 같은 초 내 재요청 시 고정값
-  //   현재: Math.random() + ms 엔트로피 xor → 매 요청 완전 독립 인덱스
+  // 충돌 유형별 3가지씩 로테이션 — getRotationIndex(ticker, length) 공통 시드 사용
+  //   - ticker + 분 단위 결정론 → 같은 종목 1분 내 재요청은 동일, 1분 경과 후 다른 문구
+  //   - LUCIA/JACK 본문과 동일한 시드 로직으로 일관성 확보
   let echoQuestion = '';
   let jackRebuttalLine = '';
   let luciaRebuttalLine = '';
@@ -955,15 +1002,13 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
           '⚔️ 두 신호가 상반됩니다. 어느 쪽이 더 신뢰할 수 있습니까?',
         ];
 
-    // ✅ 강화된 로테이션 — Math.random() + Date.now() 하위 비트 xor로 매 호출 독립 인덱스 보장
-    const qRotIdx = Math.floor(
-      ((Math.random() * 1_000_000) ^ (Date.now() & 0xFFFFF)) % questionPool.length,
-    );
-    const safeIdx = ((qRotIdx % questionPool.length) + questionPool.length) % questionPool.length;
+    // ✅ 결정론적 로테이션 — getRotationIndex (ticker + 분 시드) 공통 사용
+    //    같은 종목 1분 내 재질의 → 동일 질문 / 1분 경과 후 → 다른 질문
+    const safeIdx = getRotationIndex(p.keyword, questionPool.length);
     echoQuestion = questionPool[safeIdx];
 
     // 🔍 진단 로그 — Vercel 서버 로그에서 로테이션 실제 작동 여부 확인 가능
-    console.log(`[ECHO 질문 로테이션] type=${isTrendVsVol ? 'trendVsVol' : 'general'} idx=${safeIdx}/${questionPool.length - 1} question="${echoQuestion.slice(0, 30)}..."`);
+    console.log(`[ECHO 질문 로테이션] keyword=${p.keyword} type=${isTrendVsVol ? 'trendVsVol' : 'general'} idx=${safeIdx}/${questionPool.length - 1} question="${echoQuestion.slice(0, 30)}..."`);
 
     // ✅ JACK/LUCIA 재답변 — ECHO 질문 뒤 1줄씩 (conflict 유형별 차별화)
     if (p.conflict === 'conflict_jack_buy') {
