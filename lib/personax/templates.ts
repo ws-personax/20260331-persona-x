@@ -105,7 +105,7 @@ interface JackParams {
 
 // ✅ JACK 매수 표현 로테이션 — 5개
 const JACK_BUY_PHRASES = [
-  '즉각 진입하십시오',
+  '조건 충족 시 분할 접근 고려',
   '기회의 창이 열렸습니다',
   '지금이 마지막 저점일 수 있습니다',
   '신호가 명확합니다. 행동하십시오',
@@ -158,7 +158,7 @@ export const buildJackText = (p: JackParams): string => {
     if (mode === 'bull') {
       if (p.isBeforeOpen) {
         line1 = `지휘관님, ${posText} 기준으로 오늘 상승 출발 가능성이 높습니다.`;
-        line2 = `${openTime} 개장 후 거래량 ${volTrigger}이면 즉각 진입하십시오.`;
+        line2 = `${openTime} 개장 후 거래량 ${volTrigger}이면 조건 충족 시 분할 접근 고려.`;
       } else {
         const changePct = p.changeRaw && p.changeRaw !== '0.00'
           ? `${parseFloat(p.changeRaw) >= 0 ? '+' : ''}${p.changeRaw}%`
@@ -645,11 +645,11 @@ const ECHO_INSIGHTS: Partial<Record<string, string>> = {
   'drain_관망':
     '거래량 저조 — 수급 이탈 구간입니다. {change}%의 가격 움직임은 신뢰하기 어렵습니다. 거래량이 회복되고 {buy} 조건이 충족될 때까지 신규 진입을 금지하십시오.',
   'drain_매도 우위':
-    '수급 이탈 + 하락 — 보유 포지션 50% 즉시 축소하십시오. 잔여분은 {sell} 이탈 시 전량 정리하십시오.',
+    '수급 이탈 + 하락 — 분할 축소를 고려하십시오. 잔여분은 {sell} 이탈 시 리스크 관리가 필요한 구간입니다.',
 
   // 패닉 셀 — 거래량 폭증 + 급락
   'panic_매도 우위':
-    '거래량 폭증과 급락 동시 발생 — 감정적 투매 구간입니다. {sell} 이탈 시 전량 정리하십시오. 역발상 진입은 반드시 바닥 캔들 확인 후 시도하십시오.',
+    '거래량 폭증과 급락 동시 발생 — 감정적 투매 구간입니다. {sell} 이탈 시 리스크 관리가 필요한 구간입니다. 역발상 진입은 반드시 바닥 캔들 확인 후 시도하십시오.',
   'panic_관망':
     '패닉 셀 구간이나 종합 신호는 관망입니다. {sell} 지지 확인 후 소량 진입을 검토하십시오. 성급한 역발상은 금지합니다.',
 
@@ -657,7 +657,7 @@ const ECHO_INSIGHTS: Partial<Record<string, string>> = {
   'exhaustion_관망':
     '고점 근접 + 거래량 둔화 — 상승 에너지 소진 신호입니다. 신규 진입보다 {sell} 기준 기존 포지션 익절 검토가 우선입니다. 추격 매수는 금지하십시오.',
   'exhaustion_매도 우위':
-    '고점 과열 + 매도 신호 — 포지션 50% 즉시 축소하십시오. {sell} 이탈 확인 시 전량 정리하십시오.',
+    '고점 과열 + 매도 신호 — 분할 축소를 고려하십시오. {sell} 이탈 확인 시 리스크 관리가 필요한 구간입니다.',
 
   // 일반 — 특이 신호 없음
   'normal_관망':
@@ -696,11 +696,11 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
       // ✅ 미국 주식은 즉각 진입 불가 — 다음 날 종가 확인 후 검토
       const entryClause = p.assetType === 'US_STOCK'
         ? '다음 날 미국장 종가 확인 후 진입을 검토하십시오'
-        : '즉각 10% 진입하십시오';
+        : '즉각 분할 접근을 고려하십시오';
       // ✅ 다양한 표현으로 반복 방지 — 키워드 해시 기반 선택
       const weakPhrases = [
         `신호가 거의 만들어지고 있습니다. {buy} 돌파 확인 시 투자금의 10%만 먼저 진입하십시오. 매수 조건 동시 충족 시 ${entryClause}.`,
-        `조금만 더 기다리십시오. {buy} 위로 올라서면서 거래량이 늘어날 때가 진입 시점입니다. 투자금의 10%만 먼저 매수하십시오.`,
+        `조금만 더 기다리십시오. {buy} 위로 올라서면서 거래량이 늘어날 때가 진입 시점입니다. 투자금의 10%만 먼저 진입을 고려할 수 있습니다.`,
         `진입 조건이 가까워지고 있습니다. {buy} 돌파 + 거래량 증가 동시 확인 시 투자금의 10%로 시작하십시오.`,
         `준비 구간입니다. {buy}을 오늘 종가에서 돌파하면 투자금의 10%만 선취매하십시오. 서두르지 마십시오.`,
       ];
@@ -929,8 +929,8 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   //    기존: p.condSummary는 route.ts에서 extractConditionPrices로 뽑은 raw buyPrice(예: rawLow*0.98)
   //    수정: effectiveBuyPrice(rawPrice*1.02) 기준으로 재구성 → ECHO 1/2 매수가 통일
   const rebuiltCondSummary = [
-    effectiveBuyPrice && `매수(${effectiveBuyPrice})`,
-    p.sellPrice && `손절(${p.sellPrice})`,
+    effectiveBuyPrice && `관심 구간(${effectiveBuyPrice})`,
+    p.sellPrice && `리스크 기준선(${p.sellPrice})`,
   ].filter(Boolean).join(' / ') || p.condSummary || '시장 상황 주시';
   const line4 = `조건: ${rebuiltCondSummary}`;
   // ✅ 거래량 기준 — ECHO 1/2 통일 (avgVolume × 1.3) — line5와 trigger에서 재사용
@@ -956,17 +956,17 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
     const buy1 = effectiveBuyPrice || '매수 조건';
     const sell1 = p.sellPrice || '손절가';
     if ((p.trendStrength === 'strong_up') && p.volScore >= 2) {
-      line5 = `비중: 지금 바로 투자금의 ${aggressiveEntryPct}%를 먼저 매수하십시오. 3거래일 후 ${buy1} 유지 확인 시 추가 ${addEntryPct}% 매수하십시오. ${sell1} 이탈 시 전량 정리하십시오.${cryptoStopNote}`;
+      line5 = `비중: 지금 바로 투자금의 ${aggressiveEntryPct}%를 먼저 진입을 고려할 수 있습니다. 3거래일 후 ${buy1} 유지 확인 시 추가 ${addEntryPct}% 진입을 고려할 수 있습니다. ${sell1} 이탈 시 리스크 관리가 필요한 구간입니다.${cryptoStopNote}`;
     } else {
-      line5 = `비중: 지금 바로 투자금의 ${firstEntryPct}%만 먼저 매수하십시오. 3거래일 후 ${buy1} 유지 확인 시 추가 ${addEntryPct}% 매수하십시오. ${sell1} 이탈 시 전량 정리하십시오.${cryptoStopNote}`;
+      line5 = `비중: 지금 바로 투자금의 ${firstEntryPct}%만 먼저 진입을 고려할 수 있습니다. 3거래일 후 ${buy1} 유지 확인 시 추가 ${addEntryPct}% 진입을 고려할 수 있습니다. ${sell1} 이탈 시 리스크 관리가 필요한 구간입니다.${cryptoStopNote}`;
     }
   } else if (p.verdict === '매도 우위') {
     const sell1 = p.sellPrice || '손절가';
-    line5 = `비중: 보유 중이라면 지금 즉시 50% 정리하십시오. ${sell1} 이탈 확인 시 나머지 전량 정리하십시오. 신규 매수는 절대 금지입니다.${cryptoStopNote}`;
+    line5 = `비중: 보유 중이라면 지금 즉시 50% 정리하십시오. ${sell1} 이탈 확인 시 나머지 리스크 관리가 필요한 구간입니다. 신규 진입은 신중하게 접근하십시오.${cryptoStopNote}`;
   } else if (p.watchLevel === 'weak') {
     const buy1 = effectiveBuyPrice || '매수 조건';
     const sell1 = p.sellPrice || '손절가';
-    line5 = `비중: 아직 0%이지만 준비하십시오. ${buy1} 돌파 + ${volThresholdLabel} 동시 확인 시 → ${firstEntryPct}% 진입하십시오. 3거래일 유지 확인 시 → 추가 ${addEntryPct}% 진입하십시오. ${sell1} 이탈 시 → 전량 정리하십시오.${cryptoStopNote}`;
+    line5 = `비중: 아직 0%이지만 준비하십시오. ${buy1} 돌파 + ${volThresholdLabel} 동시 확인 시 → ${firstEntryPct}% 진입하십시오. 3거래일 유지 확인 시 → 추가 ${addEntryPct}% 진입하십시오. ${sell1} 이탈 시 → 리스크 관리가 필요한 구간입니다.${cryptoStopNote}`;
   } else if (p.watchLevel === 'strong') {
     line5 = `비중: 현재 0%를 유지하십시오. 지금 진입하면 손실 위험이 큽니다. 시장이 안정될 때까지 현금을 지키는 것이 최선입니다.`;
   } else {
@@ -983,24 +983,7 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
     ? `${p.sellPrice || '손절가'} 이탈 시 정리`
     : `${effectiveBuyPrice || '매수 조건'} 돌파 + ${volNumberLabel}`;
 
-  // 📍 행동 — 한 줄 (코인은 더 보수적 비중)
-  const isCrypto = p.assetType === 'CRYPTO';
-  const actionShort =
-    p.verdict === '매수 우위'
-      ? isCrypto
-        ? '투자금의 5~10%만 진입 (코인 변동성). 손절 -7%.'
-        : ((p.trendStrength === 'strong_up' || p.trendStrength === 'weak_up') && p.volScore >= 2)
-          ? '투자금의 20% 선진입, 유지 확인 시 추가 10%.'
-          : '투자금의 10% 선진입, 유지 확인 시 추가 10%.'
-      : p.verdict === '매도 우위'
-        ? '보유분 50% 즉시 정리, 손절 이탈 시 전량.'
-        : p.watchLevel === 'strong'
-          ? '현금 유지. 지금 진입하면 손실 위험이 큽니다.'
-          : p.watchLevel === 'weak'
-            ? isCrypto ? '조건 충족 시 5% 선진입 준비.' : '조건 충족 시 10% 선진입 준비.'
-            : isCrypto ? '신호 확인 후 5%씩 단계 진입.' : '신호 확인 후 10%씩 단계 진입.';
-
-  // ✅ 모드별 결론 결정
+  // ✅ 모드별 결론 결정 (actionShort 산출 전에 먼저 확정)
   const mode: DiscussMode = p.mode ?? 'conflict';
   let modeEmoji: string;
   let modeVerdict: string;
@@ -1011,6 +994,17 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   } else {
     modeEmoji = '🟡'; modeVerdict = '조건부';
   }
+
+  // 📍 행동 — 결론(modeEmoji)과 1:1 동기화
+  //   🔴 관망/축소: "손절가 이탈 시 보유분 정리 고려"
+  //   🟡 조건부  : "조건 충족 시 분할 접근 고려"
+  //   🟢 진입    : "신호 확인 후 분할 접근 고려"
+  const actionShort =
+    mode === 'bear'
+      ? '손절가 이탈 시 보유분 정리 고려'
+      : mode === 'bull'
+        ? '신호 확인 후 분할 접근 고려'
+        : '조건 충족 시 분할 접근 고려';
 
   // ✅ ECHO 질문 (conflict 모드 + 장 중일 때만) — forecastMode에서는 비활성화
   // 충돌 유형별 3가지씩 로테이션 — getRotationIndex(ticker, length) 공통 시드 사용
@@ -1044,16 +1038,22 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
     // 🔍 진단 로그 — Vercel 서버 로그에서 로테이션 실제 작동 여부 확인 가능
     console.log(`[ECHO 질문 로테이션] keyword=${p.keyword} type=${isTrendVsVol ? 'trendVsVol' : 'general'} idx=${safeIdx}/${questionPool.length - 1} question="${echoQuestion.slice(0, 30)}..."`);
 
-    // ✅ JACK/LUCIA 재답변 — ECHO 질문 뒤 1줄씩 (conflict 유형별 차별화)
-    if (p.conflict === 'conflict_jack_buy') {
-      jackRebuttalLine = '→ 잭: 모멘텀이 명확합니다. 거래량만 뒤따르면 즉각 진입하십시오.';
-      luciaRebuttalLine = '→ 루시아: 거래량이 침묵해요. 서두르면 꼭 물려요. 확인이 먼저예요.';
-    } else if (p.conflict === 'conflict_lucia_buy') {
-      jackRebuttalLine = '→ 잭: 떨어지는 칼날은 잡지 마십시오. 지지 확인이 먼저입니다.';
-      luciaRebuttalLine = '→ 루시아: 공포가 최고의 매수 기회였어요. 분할로 접근하세요.';
+    // ✅ JACK/LUCIA 재답변 — 시세 방향(direction)과 동기화
+    //   falling/high_volatility_down → 하락 맥락 발언
+    //   rising/high_volatility_up    → 상승 맥락 발언
+    //   sideways                     → 방향성 부재 발언
+    const summaryDirection: PriceDirection = determinePriceDirection(f);
+    const isFalling = summaryDirection === 'falling_weak_volume' || summaryDirection === 'high_volatility_down';
+    const isRising  = summaryDirection === 'rising_weak_volume'  || summaryDirection === 'high_volatility_up';
+    if (isFalling) {
+      jackRebuttalLine  = '→ 잭: 바닥 확인이 먼저입니다. 반등 신호 전까지 관망하십시오.';
+      luciaRebuttalLine = '→ 루시아: 바닥이 불확실해요. 반등 확인 전까지 기다리세요.';
+    } else if (isRising) {
+      jackRebuttalLine  = '→ 잭: 모멘텀이 명확합니다. 거래량만 뒤따르면 진입을 고려하십시오.';
+      luciaRebuttalLine = '→ 루시아: 거래량이 따라줄 때 움직이세요.';
     } else {
-      jackRebuttalLine = '→ 잭: 긍정 신호가 살아있습니다. 거래량 돌파 시 진입하십시오.';
-      luciaRebuttalLine = '→ 루시아: 지표가 혼재돼요. 거래량이 따라줄 때 움직이세요.';
+      jackRebuttalLine  = '→ 잭: 방향성이 확인되기 전까지 포지션 유보하십시오.';
+      luciaRebuttalLine = '→ 루시아: 방향이 정해질 때까지 지켜보는 게 맞아요.';
     }
   }
 
@@ -1073,10 +1073,10 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
       ? `${openTime} 개장 후 ${halfCheckpoint} ${trigger}`
       : `내일 ${halfCheckpoint} ${trigger}`;
     const forecastAction = mode === 'bull'
-      ? '조건 충족 시 10% 진입 → 잭의 상승 전망 + 루시아의 거래량 조건 채택'
+      ? '신호 확인 후 분할 접근 고려 → 잭의 상승 전망 + 루시아의 거래량 조건 채택'
       : mode === 'bear'
-        ? '신규 진입 보류 → 잭의 하락 전망 + 루시아의 리스크 경고 채택'
-        : '조건 충족 시 10% 진입 → 잭의 긍정 신호 + 루시아의 거래량 조건 동시 확인';
+        ? '손절가 이탈 시 보유분 정리 고려 → 잭의 하락 전망 + 루시아의 리스크 경고 채택'
+        : '조건 충족 시 분할 접근 고려 → 잭의 긍정 신호 + 루시아의 거래량 조건 동시 확인';
     summaryParts.push(`📍 결론: ${modeEmoji} ${modeVerdict} (${verdictShort})`);
     summaryParts.push(`📍 조건: ${forecastCondition}`);
     summaryParts.push(`📍 행동: ${forecastAction}`);

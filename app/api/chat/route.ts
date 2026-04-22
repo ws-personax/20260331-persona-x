@@ -594,7 +594,7 @@ ${DISCLAIMER}`;
         const objectParticle = topHasBatchim ? '을' : '를';
         const luciaRec = `소장님, 제가 보기엔 ${lastStock}${subjectParticle} 오히려 주목할 만해요. 모두가 ${topStock}${objectParticle} 볼 때, 덜 주목받는 종목에서 기회가 나오는 경우가 많거든요. 한번 살펴보시겠어요?`;
         const rayRec = `${trendDesc} 기준 브리핑:\n${briefingText}\n\n1순위: ${topStock} (점수 우위). 개별 분석 요청 시 상세 수치를 제공합니다.`;
-        const echoRec = `결론: 종목 브리핑 완료\n근거: 현재 ${trendDesc} + ${picks.sector}\n1순위: ${topStock} — ${topReason}\n조건: 종목명을 입력하시면 즉각 상세 분석을 개시합니다.\n비중: 개별 분석 완료 후 결정하십시오.\n\n${briefingText}\n\n📡 데이터 출처 — 실시간 추세 기반 추천\n\n⚠️ 본 분석은 AI 생성 참고 자료이며 투자 권유가 아닙니다.\n⚠️ 최종 투자 판단과 그에 따른 책임은 지휘관님께 있습니다.`;
+        const echoRec = `결론: 종목 브리핑 완료\n근거: 현재 ${trendDesc} + ${picks.sector}\n1순위: ${topStock} — ${topReason}\n조건: 종목명을 입력하시면 즉각 상세 분석을 개시합니다.\n비중: 개별 분석 완료 후 결정하십시오.\n\n${briefingText}\n\n📡 데이터 출처 — 실시간 추세 기반 추천\n\n⚠️ PersonaX는 AI 금융 콘텐츠 플랫폼입니다.\n제공되는 모든 분석은 참고용 시나리오이며\n투자 자문·매매 추천이 아닙니다.\n투자 판단과 그에 따른 손익의 책임은\n전적으로 투자자 본인에게 있습니다.`;
 
         return Response.json({
           reply: [jackRec, luciaRec, rayRec, echoRec].join('\n\n'),
@@ -612,7 +612,7 @@ ${DISCLAIMER}`;
         : '지휘관님, 분석할 종목명을 하달해 주십시오. 종목명 또는 키워드를 입력하면 즉각 분석을 개시합니다.';
       const luciaGuide = '소장님, 구체적인 종목이나 시장을 알려주시면 바로 분석해 드릴게요. 예를 들어 삼성전자, 테슬라, 비트코인, 코스피처럼요.';
       const rayGuide   = `분석 대상이 지정되지 않았습니다. 종목명 입력 시 시세, 뉴스, 거래량 데이터를 즉시 수집합니다.\n지원 종목: 국내주식, 미국주식, 암호화폐, 주요 지수.\n진입 적합도: 판단 보류입니다.`;
-      const echoGuide  = `결론: 분석 대기 상태입니다.\n근거: 종목명이 입력되지 않아 데이터 수집이 불가합니다.\n지금: 분석할 종목명을 입력해 주십시오.\n조건: 예) 삼성전자 / 테슬라 / 비트코인 / 나스닥\n비중: 판단 보류입니다.\n\n📡 데이터 출처 — 종목 미지정\n\n⚠️ 본 분석은 AI 생성 참고 자료이며 투자 권유가 아닙니다.\n⚠️ 최종 투자 판단과 그에 따른 책임은 지휘관님께 있습니다.`;
+      const echoGuide  = `결론: 분석 대기 상태입니다.\n근거: 종목명이 입력되지 않아 데이터 수집이 불가합니다.\n지금: 분석할 종목명을 입력해 주십시오.\n조건: 예) 삼성전자 / 테슬라 / 비트코인 / 나스닥\n비중: 판단 보류입니다.\n\n📡 데이터 출처 — 종목 미지정\n\n⚠️ PersonaX는 AI 금융 콘텐츠 플랫폼입니다.\n제공되는 모든 분석은 참고용 시나리오이며\n투자 자문·매매 추천이 아닙니다.\n투자 판단과 그에 따른 손익의 책임은\n전적으로 투자자 본인에게 있습니다.`;
       return Response.json({
         reply: [jackGuide, luciaGuide, rayGuide, echoGuide].join('\n\n'),
         personas: {
@@ -695,7 +695,7 @@ ${DISCLAIMER}`;
     const dataSourceLabel = buildDataSourceLabel(assetType as 'CRYPTO' | 'KOREAN_STOCK' | 'US_STOCK', marketData, news.length);
     const entryCondition  = buildEntryCondition(marketData, pos.ratio, vol.isHigh, verdict, keyword);
     const { buy: buyPrice, sell: sellPrice } = extractConditionPrices(entryCondition);
-    const condSummary = [buyPrice && `매수(${buyPrice})`, sellPrice && `손절(${sellPrice})`]
+    const condSummary = [buyPrice && `관심 구간(${buyPrice})`, sellPrice && `리스크 기준선(${sellPrice})`]
       .filter(Boolean).join(' / ') || '시장 상황 주시';
 
     const confidenceBasis = [

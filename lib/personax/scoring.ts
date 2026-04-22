@@ -12,8 +12,11 @@ export const fmtPrice = (n: number, currency: 'KRW' | 'USD'): string =>
 
 export const DISCLAIMER = `
 ─────────────────────────
-⚠️ 본 분석은 AI 생성 참고 자료이며 투자 권유가 아닙니다.
-⚠️ 최종 투자 판단과 그에 따른 책임은 지휘관님께 있습니다.`;
+⚠️ PersonaX는 AI 금융 콘텐츠 플랫폼입니다.
+제공되는 모든 분석은 참고용 시나리오이며
+투자 자문·매매 추천이 아닙니다.
+투자 판단과 그에 따른 손익의 책임은
+전적으로 투자자 본인에게 있습니다.`;
 
 export const getVolumeInfo = (v: number, av: number, t: AssetType) => {
   if (t === 'US_STOCK' && av > 0) {
