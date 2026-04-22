@@ -189,14 +189,18 @@ export const buildJackText = (p: JackParams): string => {
       const bearL3 = `${bearBreakout} 돌파 + 거래량 증가 시 즉각 재진입하십시오.`;
       return `${bearL1}\n${bearL2}\n${bearL3}`;
     } else {
-      // conflict / 혼재 — JACK은 여전히 긍정에 무게
-      if (p.isBeforeOpen) {
-        line1 = `지휘관님, ${posText} 신호는 살아있으나 지표 혼재입니다.`;
-        line2 = `${openTime} 개장 후 거래량 ${volTrigger} 확인 시 진입을 검토하십시오.`;
+      // conflict / 혼재 — 긍정 지표 유무에 따라 표현 차별화
+      const line2Body = p.isBeforeOpen
+        ? `${openTime} 개장 후 거래량 ${volTrigger} 확인 시 진입을 검토하십시오.`
+        : `내일 ${halfCheckpoint} 거래량 ${volTrigger} 확인 후 판단하십시오.`;
+      if (positives.length > 0) {
+        line1 = p.isBeforeOpen
+          ? `지휘관님, ${posText} 기준으로 진입 가능성이 있습니다.`
+          : `지휘관님, 오늘 ${posText} 기준으로 진입 가능성이 있습니다.`;
       } else {
-        line1 = `지휘관님, 오늘 지표 혼재 — 긍정 ${positives.length}/부정 ${negatives.length}입니다.`;
-        line2 = `내일 ${halfCheckpoint} 거래량 ${volTrigger} 확인 후 판단하십시오.`;
+        line1 = `지휘관님, 신호 확인 중입니다. 거래량 돌파 대기.`;
       }
+      line2 = line2Body;
     }
 
     // ✅ 재반박 비활성화 — forecastMode
@@ -237,9 +241,14 @@ export const buildJackText = (p: JackParams): string => {
     line1 = `지휘관님, ${p.keyword}${topicParticle(p.keyword)} ${positiveText} — 명백한 매수 우위입니다.`;
     line2 = `${buyPhrase}. ${volCondition} 단계 진입.`;
   } else if (mode === 'conflict') {
-    // 갈등 — 긍정 데이터 강조하며 진입 주장
-    line1 = `지휘관님, ${p.keyword}${topicParticle(p.keyword)} ${positiveText}. 이 신호만으로도 진입은 정당화됩니다.`;
-    line2 = `${volCondition} 1차 진입 검토. ${buyPhrase}.`;
+    // 갈등 — 긍정 지표 유무에 따라 표현 차별화
+    if (positives.length > 0) {
+      line1 = `지휘관님, ${p.keyword}${topicParticle(p.keyword)} ${positiveText} 기준으로 진입 가능성이 있습니다.`;
+      line2 = `${volCondition} 1차 진입 검토. ${buyPhrase}.`;
+    } else {
+      line1 = `지휘관님, 신호 확인 중입니다. 거래량 돌파 대기.`;
+      line2 = `${volCondition} 1차 진입 검토.`;
+    }
   } else {
     // bear — 역발상 강세론자 (조정 속 기회 탐색, 3줄)
     const negatives: string[] = [];
@@ -583,6 +592,24 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   const key = `${p.situation}_${p.verdict}`;
   let insightTemplate = ECHO_INSIGHTS[key] || ECHO_INSIGHTS[`normal_${p.verdict}`] || '';
 
+  // ✅ 매수 조건 가격 정규화 — 현재가보다 낮으면 현재가 × 1.02로 강제 (오류 방지)
+  //    buildEntryCondition에서 rawLow*0.98 같은 "낮은 가격"이 buyPrice로 들어올 수 있어,
+  //    현재가보다 낮은 매수 조건이 표시되는 오류를 차단한다.
+  const effectiveBuyPrice: string = (() => {
+    const cur = p.currency || 'KRW';
+    const fmt = (n: number): string =>
+      cur === 'KRW'
+        ? `${Math.round(n).toLocaleString('ko-KR')}원`
+        : `약 $${Math.round(n).toLocaleString('en-US')}`;
+    if (!p.rawPrice || p.rawPrice <= 0) return p.buyPrice || '';
+    const fallback = fmt(p.rawPrice * 1.02);
+    if (!p.buyPrice) return fallback;
+    const parsed = parseFloat(p.buyPrice.replace(/[^\d.]/g, ''));
+    if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+    if (parsed < p.rawPrice) return fallback;
+    return p.buyPrice;
+  })();
+
   // ✅ 관망 세분화 — watchLevel에 따라 다른 메시지
   if (p.verdict === '관망' && p.watchLevel) {
     if (p.watchLevel === 'strong') {
@@ -611,7 +638,7 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   // 실제 수치 치환
   const days = p.consecutiveDays ? Math.abs(p.consecutiveDays).toString() : '';
   const insight = insightTemplate
-    .replace(/{buy}/g, p.buyPrice || p.condSummary.split('/')[0]?.trim() || '매수 조건')
+    .replace(/{buy}/g, effectiveBuyPrice || p.condSummary.split('/')[0]?.trim() || '매수 조건')
     .replace(/{sell}/g, p.sellPrice || p.condSummary.split('/')[1]?.trim() || '손절가')
     .replace(/{change}/g, p.changeRaw !== '0.00' ? `${parseFloat(p.changeRaw) >= 0 ? '+' : ''}${p.changeRaw}` : '0')
     .replace(/{nasdaq}/g, p.nasdaqChange !== '0' ? `${parseFloat(p.nasdaqChange) >= 0 ? '+' : ''}${p.nasdaqChange}` : '0')
@@ -651,7 +678,7 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   // ✅ 시간 개념 추가 — 매수 우위일 때
   let timeNote = '';
   if (p.verdict === '매수 우위') {
-    timeNote = ` 오늘 종가(장 마감) 기준으로 ${p.buyPrice} 위에 있으면 진입하십시오. 내일 오전 시초가가 ${p.buyPrice} 아래로 열리면 추가 매수는 보류하십시오.`;
+    timeNote = ` 오늘 종가(장 마감) 기준으로 ${effectiveBuyPrice} 위에 있으면 진입하십시오. 내일 오전 시초가가 ${effectiveBuyPrice} 아래로 열리면 추가 매수는 보류하십시오.`;
   }
 
   // ✅ 에코 결론 5단계 강제 분기
@@ -699,7 +726,7 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
           : `약 $${Math.round(n).toLocaleString('en-US')}`;
       const buyTrigger = p.rawPrice && p.rawPrice > 0
         ? echoFmtPrice(p.rawPrice * 1.02)
-        : (p.buyPrice || '매수 조건');
+        : (effectiveBuyPrice || '매수 조건');
       const volTrigger = p.avgVolume && p.avgVolume > 0
         ? `${echoFmtVol(Math.round(p.avgVolume * 1.3))} 이상(평균 ${echoFmtVol(p.avgVolume)} 대비 30%)`
         : '평소 대비 30% 이상';
@@ -838,7 +865,7 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
 
   let line5 = '';
   if (p.verdict === '매수 우위') {
-    const buy1 = p.buyPrice || '매수 조건';
+    const buy1 = effectiveBuyPrice || '매수 조건';
     const sell1 = p.sellPrice || '손절가';
     if ((p.trendStrength === 'strong_up') && p.volScore >= 2) {
       line5 = `비중: 지금 바로 투자금의 ${aggressiveEntryPct}%를 먼저 매수하십시오. 3거래일 후 ${buy1} 유지 확인 시 추가 ${addEntryPct}% 매수하십시오. ${sell1} 이탈 시 전량 정리하십시오.${cryptoStopNote}`;
@@ -849,13 +876,13 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
     const sell1 = p.sellPrice || '손절가';
     line5 = `비중: 보유 중이라면 지금 즉시 50% 정리하십시오. ${sell1} 이탈 확인 시 나머지 전량 정리하십시오. 신규 매수는 절대 금지입니다.${cryptoStopNote}`;
   } else if (p.watchLevel === 'weak') {
-    const buy1 = p.buyPrice || '매수 조건';
+    const buy1 = effectiveBuyPrice || '매수 조건';
     const sell1 = p.sellPrice || '손절가';
     line5 = `비중: 아직 0%이지만 준비하십시오. ${buy1} 돌파 + ${volThresholdLabel} 동시 확인 시 → ${firstEntryPct}% 진입하십시오. 3거래일 유지 확인 시 → 추가 ${addEntryPct}% 진입하십시오. ${sell1} 이탈 시 → 전량 정리하십시오.${cryptoStopNote}`;
   } else if (p.watchLevel === 'strong') {
     line5 = `비중: 현재 0%를 유지하십시오. 지금 진입하면 손실 위험이 큽니다. 시장이 안정될 때까지 현금을 지키는 것이 최선입니다.`;
   } else {
-    const buy1 = p.buyPrice || '매수 조건';
+    const buy1 = effectiveBuyPrice || '매수 조건';
     line5 = `비중: 현재 0%입니다. ${buy1} 돌파 + ${volThresholdLabel}을 동시에 확인한 후 ${firstEntryPct}%씩 단계적으로 진입하십시오.${cryptoStopNote}`;
   }
 
@@ -866,7 +893,7 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   // 📍 조건 — 검증된 진입/정리 트리거 (volNumberLabel은 상단에서 재사용)
   const trigger = (p.verdict === '매도 우위')
     ? `${p.sellPrice || '손절가'} 이탈 시 정리`
-    : `${p.buyPrice || '매수 조건'} 돌파 + ${volNumberLabel}`;
+    : `${effectiveBuyPrice || '매수 조건'} 돌파 + ${volNumberLabel}`;
 
   // 📍 행동 — 한 줄 (코인은 더 보수적 비중)
   const isCrypto = p.assetType === 'CRYPTO';
@@ -898,13 +925,15 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   }
 
   // ✅ ECHO 질문 (conflict 모드 + 장 중일 때만) — forecastMode에서는 비활성화
-  // 충돌 유형별로 3가지씩 로테이션 (Math.floor(Date.now() / 1000) % 3)
+  // 충돌 유형별로 3가지씩 로테이션
+  //   - 기존 Math.floor(Date.now() / 1000) % 3은 같은 초 내 재요청 시 고정값 → 테스트 시 항상 같은 문구로 보임
+  //   - 매 요청 완전 다른 문구 보장을 위해 Math.random() 기반으로 변경
   let echoQuestion = '';
   let jackRebuttalLine = '';
   let luciaRebuttalLine = '';
   if (mode === 'conflict' && p.flags && !p.isForecast) {
     const f = p.flags;
-    const qRotIdx = Math.floor(Date.now() / 1000) % 3;
+    const qRotIdx = Math.floor(Math.random() * 3);
     if (f.trendUp && f.newsPos && f.volDown) {
       const trendVsVolQs = [
         '⚔️ 잭은 이평선+뉴스를, 루시아는 거래량을 근거로 합니다. 거래량 저조에도 진입할 가치가 있습니까?',
