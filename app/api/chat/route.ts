@@ -116,6 +116,79 @@ const MARKET_INDEX_SET = new Set([
 ]);
 
 // ─────────────────────────────────────────────
+// 자세히 보기 전용 후처리 — 지시형 표현 완화 + 이모지 허용 셋만 유지
+//   허용 이모지: ✅ ⚠️ 📍 📊 📈 📉 💡 🔴 🟡 🟢
+//   주의: 이 함수는 "자세히 보기(details)" 문자열에만 적용해야 함.
+//   ECHO 상단 summary / RAY·JACK·LUCIA 메인 버블에는 적용하지 않음 (지휘관 톤 유지).
+// ─────────────────────────────────────────────
+const normalizeDetails = (text: string | null | undefined): string | null => {
+  if (!text) return text ?? null;
+  return text
+    // 이모지 교체 (긴 것 먼저)
+    .replace(/🛡️/g, '⚠️')
+    .replace(/📌/g, '📍')
+    .replace(/🎯/g, '✅')
+    .replace(/📉/g, '📊')
+    .replace(/💭/g, '💡')
+    .replace(/📐/g, '📊')
+    // 허용 셋에 없는 이모지 제거 (선행 공백 흡수)
+    .replace(/⚔️\s?/g, '')
+    .replace(/🔗\s?/g, '')
+    // 금지 표현 — 긴 패턴부터
+    .replace(/손절\s*기준\s*사수/g, '리스크 기준선 관리')
+    .replace(/손절\s*기준\s*엄수/g, '리스크 기준선 이탈 여부 모니터링 권장')
+    .replace(/손절\s*라인\s*확인\s*권고/g, '리스크 기준선 확인 권고')
+    .replace(/손절\s*설정/g, '리스크 기준선 설정')
+    .replace(/손절\s*규칙/g, '리스크 관리 규칙')
+    .replace(/손절\s*라인/g, '리스크 기준선')
+    .replace(/손절가/g, '리스크 기준선')
+    .replace(/손절선/g, '리스크 기준선')
+    .replace(/권장\s*손절\s*-?\s*(\d+)\s*%/g, '권장 리스크 기준선 -$1%')
+    .replace(/손절/g, '리스크 기준선')
+    .replace(/현금화/g, '리스크 관리 고려')
+    .replace(/섣부른\s*매수\s*금지/g, '충분한 확인 후 판단 권장')
+    .replace(/매수\s*금지/g, '신중한 접근 권장')
+    .replace(/추격\s*매수는\s*금지/g, '추격 매수는 자제 권장')
+    .replace(/섣부른\s*역발상은\s*금지/g, '섣부른 역발상은 자제 권장')
+    .replace(/성급한\s*진입은\s*금지/g, '성급한 진입은 자제 권장')
+    .replace(/섣부른\s*저점\s*매수는\s*금지/g, '섣부른 저점 매수는 자제 권장')
+    .replace(/신규\s*진입을\s*금지/g, '신규 진입 자제 권장')
+    .replace(/진입은\s*금지가\s*원칙/g, '진입은 자제가 원칙')
+    .replace(/금지합니다/g, '자제 권장')
+    .replace(/금지가\s*원칙/g, '자제가 원칙')
+    .replace(/즉각\s*재진입하십시오/g, '재진입 시나리오 검토 가능')
+    .replace(/즉각\s*/g, '')
+    .replace(/사수/g, '')
+    .replace(/엄수/g, '준수 권장')
+    // "하십시오" 계열 → 권장/검토 형태로 (긴 것 먼저)
+    .replace(/서두르지\s*마십시오/g, '서두름 자제 권장')
+    .replace(/추격은\s*피하십시오/g, '추격 자제 권장')
+    .replace(/피하십시오/g, '자제 권장')
+    .replace(/정리하십시오/g, '정리 권장')
+    .replace(/진입하십시오/g, '진입 권장')
+    .replace(/확인하십시오/g, '확인 권장')
+    .replace(/기다리십시오/g, '대기 권장')
+    .replace(/준비하십시오/g, '준비 권장')
+    .replace(/검토하십시오/g, '검토 권장')
+    .replace(/고려하십시오/g, '고려 권장')
+    .replace(/유지하십시오/g, '유지 권장')
+    .replace(/대기하십시오/g, '대기 권장')
+    .replace(/판단하십시오/g, '판단 권장')
+    .replace(/대응하십시오/g, '대응 권장')
+    .replace(/결정하십시오/g, '결정 권장')
+    .replace(/접근하십시오/g, '접근 권장')
+    .replace(/보류하십시오/g, '보류 권장')
+    .replace(/재진입하십시오/g, '재진입 검토')
+    .replace(/추종하십시오/g, '추종 검토')
+    .replace(/시도하십시오/g, '시도 검토')
+    .replace(/설정하십시오/g, '설정 권장')
+    // 공백 정리
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+};
+
+// ─────────────────────────────────────────────
 // POST 핸들러
 // ─────────────────────────────────────────────
 export async function POST(req: Request) {
@@ -1132,14 +1205,14 @@ ${DISCLAIMER}`;
         return `${v.toLocaleString()}주`;
       };
 
-      // RAY 상세
+      // RAY 상세 — 이모지는 허용 셋(✅ ⚠️ 📍 📊 📈 📉 💡 🔴 🟡 🟢)만 사용
       const rayLines: string[] = [];
       const trend = marketData.trend;
       const curPrice = marketData.rawPrice;
       if (trend?.ma5 && trend?.ma20 && curPrice) {
         const ma5Dir = curPrice > trend.ma5 ? '현재가 위' : '현재가 아래';
         const ma20Dir = curPrice > trend.ma20 ? '현재가 위' : '현재가 아래';
-        rayLines.push('📐 이평선 상세');
+        rayLines.push('📊 이평선 상세');
         rayLines.push(`  5일선: ${fmtPx(trend.ma5)} (${ma5Dir}, ${trend.trend5d})`);
         rayLines.push(`  20일선: ${fmtPx(trend.ma20)} (${ma20Dir}, ${trend.trend20d})`);
       }
@@ -1182,7 +1255,7 @@ ${DISCLAIMER}`;
         const prevStr = `${prevCtx.prevChangePercent >= 0 ? '+' : ''}${prevCtx.prevChangePercent.toFixed(2)}%`;
         const deltaStr = `${delta >= 0 ? '+' : ''}${delta.toFixed(2)}%p`;
         if (rayLines.length) rayLines.push('');
-        rayLines.push('🔗 섹터 비교');
+        rayLines.push('📊 섹터 비교');
         rayLines.push(`  ${prevCtx.prevDisplayName || prevCtx.prevKeyword}(${prevStr}) 대비 ${judgment} (Δ ${deltaStr})`);
       }
       finalRayDetails = rayLines.length > 0 ? rayLines.join('\n') : null;
@@ -1212,27 +1285,27 @@ ${DISCLAIMER}`;
         : discussMode === 'bear'  ? 'bear'
         : 'sideways';
       const scenario =
-        jackDirection === 'bull' ? '상승 추세 유지 — 거래량 확인 후 분할 접근 고려'
-        : jackDirection === 'bear' ? '하향 이탈 리스크 우세 → 손절 기준 사수'
-        : jackDirection === 'high_volatility_up' ? '급등 후 조정 가능 — 과열 진입 주의, 거래량 동반 여부 확인'
-        : jackDirection === 'high_volatility_down' ? '급락 구간 — 반등 시도 전 하방 압력 해소 확인 필수'
-        : '방향 확정 전 관망 — 돌파/이탈 방향 추종';
+        jackDirection === 'bull' ? '상승 추세 유지 중. 거래량 동반 여부가 핵심 확인 포인트.'
+        : jackDirection === 'bear' ? '하락 압력 우세. 리스크 기준선 이탈 여부 모니터링 필요.'
+        : jackDirection === 'high_volatility_up' ? '단기 급등 구간. 되돌림 가능성 열어두는 것이 합리적.'
+        : jackDirection === 'high_volatility_down' ? '단기 급락 구간. 추가 하락 여부 확인 전 접근 신중.'
+        : '방향성 부재 구간. 돌파 또는 이탈 방향 확인이 우선.';
       const risk = conflict === 'conflict_jack_buy'
-        ? '확인 신호 부재 — 거래량·뉴스 한 축 확인 전 섣부른 매수 금지'
+        ? '확인 신호 부재 — 거래량·뉴스 한 축 확인 전 충분한 확인 후 판단 권장'
         : conflict === 'conflict_lucia_buy'
           ? '하락 속 역발상 위험 — 바닥 확인 전 진입은 칼날 잡기'
           : verdict === '관망'
             ? '지표 혼조 — 억지 진입 시 손익비 악화'
             : flags.vixHigh
-              ? '고변동성 구간 — 분할 진입으로 평단 관리'
-              : '시장 급변 시 손절 기준 엄수';
+              ? '고변동성 구간 — 분할 접근으로 평단 관리'
+              : '시장 급변 시 리스크 기준선 이탈 여부 모니터링 권장';
       finalJackDetails = [
-        '🎯 진입 근거 항목별',
+        '✅ 진입 근거 항목별',
         `  이평선: ${maComment}`,
         `  거래량: ${volComment}`,
         `  뉴스: ${newsComment}`,
         '',
-        '📌 핵심 시나리오',
+        '📍 핵심 시나리오',
         `  ${scenario}`,
         '',
         '⚠️ 주의 리스크',
@@ -1273,16 +1346,16 @@ ${DISCLAIMER}`;
       const emotionalGuard = verdict === '매수 우위'
         ? 'FOMO로 뒤늦게 올라타면 고점에서 물릴 수 있어요.'
         : verdict === '매도 우위'
-          ? '공포로 바닥 투매는 반등을 놓쳐요. 손절 규칙은 지키되 감정은 거르세요.'
-          : '조급함이 가장 큰 리스크예요. 조건 충족 전까지는 기다리세요.';
+          ? '공포로 바닥 투매는 반등을 놓쳐요. 리스크 관리 규칙은 지키되 감정은 거르세요.'
+          : '조급함이 가장 큰 리스크예요. 조건 충족 전까지는 관찰 권장.';
       finalLuciaDetails = [
-        '🛡️ 경고 근거 상세',
+        '⚠️ 경고 근거 상세',
         `  ${luciaWarning}`,
         '',
-        '📉 리스크 지표',
+        '📊 리스크 지표',
         ...riskIndicators.slice(0, 3).map(s => `  • ${s}`),
         '',
-        '💭 감정적 판단 경계',
+        '💡 감정적 판단 경계',
         `  ${emotionalGuard}`,
       ].join('\n');
     }
@@ -1423,14 +1496,21 @@ ${DISCLAIMER}`;
       console.log(`[saveHistory] 저장 스킵 — 지수: ${keyword}`);
     }
 
+    // ✅ 자세히 보기 전용 후처리 — 지시형 표현 완화 + 이모지 허용 셋 통일
+    //    (summary / 메인 페르소나 말풍선은 지휘관 톤 유지를 위해 미적용)
+    const echoDetailsOut   = normalizeDetails(finalEchoDetails);
+    const rayDetailsOut    = normalizeDetails(finalRayDetails);
+    const jackDetailsOut   = normalizeDetails(finalJackDetails);
+    const luciaDetailsOut  = normalizeDetails(finalLuciaDetails);
+
     return Response.json({
       reply: finalReply,
       personas: {
         jack: finalJackOut, lucia: finalLuciaOut, ray: finalRayOut, echo: finalEcho,
-        echoDetails: finalEchoDetails,
-        rayDetails: finalRayDetails,
-        jackDetails: finalJackDetails,
-        luciaDetails: finalLuciaDetails,
+        echoDetails: echoDetailsOut,
+        rayDetails: rayDetailsOut,
+        jackDetails: jackDetailsOut,
+        luciaDetails: luciaDetailsOut,
         verdict, confidence, breakdown, positionSizing,
         jackNews, luciaNews, rayNews, echoNews,
       },
