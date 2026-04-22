@@ -241,21 +241,22 @@ export const buildJackText = (p: JackParams): string => {
     if (flags?.priceDown) negatives.push('시세 하락');
     const negText = negatives.join(' + ') || '하락 지표 우세';
 
-    // ✅ 현재가 기준 지지선(-5%) / 돌파 기준가(+2%) 실시간 계산
+    // ✅ 현재가 기준 지지선(-2%) / 돌파 기준가(+2%) 실시간 계산
     const fmtBear = (n: number): string =>
       p.currency === 'USD'
         ? `약 $${Math.round(n).toLocaleString('en-US')}`
         : `${Math.round(n).toLocaleString('ko-KR')}원`;
     const supportLabel = p.rawPrice && p.rawPrice > 0
-      ? fmtBear(p.rawPrice * 0.95)
+      ? fmtBear(p.rawPrice * 0.98)
       : (p.supportPrice || '지지선');
     const breakoutLabel = p.rawPrice && p.rawPrice > 0
       ? fmtBear(p.rawPrice * 1.02)
       : (p.breakoutPrice || '반등 기준가');
 
-    const bearL1 = `지휘관님, ${negText}${subjectParticle(negText)} 지속되고 있습니다.`;
-    const bearL2 = `${supportLabel} 확인 후 ${breakoutLabel} 돌파 + 거래량 증가 시 즉각 재진입하십시오.`;
-    return `${bearL1}\n${bearL2}${jackRebuttal}`;
+    const bearL1 = `지휘관님, ${negText} 기준으로 조정 구간입니다.`;
+    const bearL2 = `단, 현재가 ${supportLabel} 지지 확인 후`;
+    const bearL3 = `${breakoutLabel} 돌파 + 거래량 증가 시 즉각 재진입하십시오.`;
+    return `${bearL1}\n${bearL2}\n${bearL3}${jackRebuttal}`;
   }
 
   return `${line1}\n${line2}${jackRebuttal}`;
@@ -386,7 +387,7 @@ export const buildLuciaText = (p: LuciaParams): string => {
     // ✅ 최근 흐름(어제 거래량) 인지 문장 — isBeforeOpen 대기 안내 전용
     const hasPrevVolData = !!(p.rawVolume && p.rawVolume > 0);
     const isKRForecast = p.assetType === 'KOREAN_STOCK';
-    const volCheckLabel = isKRForecast ? '12시 30분까지' : '개장 후 3시간(02:30)까지';
+    const volCheckLabel = isKRForecast ? '12시 30분까지' : '02:30(개장 3시간)까지';
     const historyAwareLine = hasPrevVolData
       ? '어제도 거래량이 저조했어요. 오늘 개장 후 첫 캔들 방향이 중요해요.'
       : `개장 후 거래량이 살아나는지 ${volCheckLabel} 확인해보세요.`;
@@ -926,7 +927,7 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
     // ✅ forecastMode — 시간 조건 명시 + 잭/루시아 종합 요약
     const isKR = p.assetType === 'KOREAN_STOCK';
     const openTime = isKR ? '09:00' : '23:30';
-    const halfCheckpoint = isKR ? '12시 30분까지' : '개장 후 3시간(02:30)까지';
+    const halfCheckpoint = isKR ? '12시 30분까지' : '02:30(개장 3시간)까지';
     const forecastCondition = p.isBeforeOpen
       ? `${openTime} 개장 후 ${halfCheckpoint} ${trigger}`
       : `내일 ${halfCheckpoint} ${trigger}`;
@@ -946,7 +947,9 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   const summary = summaryParts.join('\n');
 
   // ✅ details는 상세 맥락을 보존 (verdictText 원문 + confluence + 근거/지금/조건/비중)
-  const detailHeader = `결론: ${verdictEmoji} ${verdictText}`;
+  // ✅ ECHO 1/2 이모지 통일 — modeEmoji(bull=🟢, bear=🔴, conflict=🟡) 사용
+  //    verdictText는 상세 설명으로 유지
+  const detailHeader = `결론: ${modeEmoji} ${verdictText}`;
   const detailParts: string[] = [detailHeader, confluenceBlock];
   if (debateBlock) detailParts.push(debateBlock);
   detailParts.push(line2, line3, line4, line5);
