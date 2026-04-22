@@ -982,7 +982,8 @@ ${DISCLAIMER}`;
       // ✅ RAY 섹터 비교 한 줄 — 조건부 삽입 (quote 바로 앞)
       //    조건: 이전 종목 존재 + 같은 섹터 + 다른 키워드 + 양쪽 change% 확보
       //    판정: Δ = currentChange - prevChange
-      //          > +0.3 → "상대적 강세", < -0.3 → "상대적 약세", 그 외 → "유사한 흐름"
+      //          > +1.0 → "상대적 강세", < -1.0 → "상대적 약세", 그 외 → "유사한 흐름"
+      //    0.3%p는 장중 노이즈 범위라 1.0%p 이상 차이 날 때만 강/약 표현.
       let sectorCompareLine = '';
       const currSectorForCompare = getSector(keyword) ?? null;
       const prevSectorForCompare = prevCtx?.prevSector ?? null;
@@ -998,7 +999,7 @@ ${DISCLAIMER}`;
         Number.isFinite(rayChangeNum)
       ) {
         const delta = rayChangeNum - prevCtx.prevChangePercent;
-        const judgment = delta > 0.3 ? '상대적 강세' : delta < -0.3 ? '상대적 약세' : '유사한 흐름';
+        const judgment = delta > 1.0 ? '상대적 강세' : delta < -1.0 ? '상대적 약세' : '유사한 흐름';
         const prevChangeStr = `${prevCtx.prevChangePercent >= 0 ? '+' : ''}${prevCtx.prevChangePercent.toFixed(2)}%`;
         const candidate = `같은 ${currSectorForCompare} 섹터, ${prevCtx.prevDisplayName || prevCtx.prevKeyword}(${prevChangeStr}) 대비 ${judgment}.`;
         // 35자 이내 가드
