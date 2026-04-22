@@ -971,6 +971,11 @@ ${DISCLAIMER}`;
       } else if (rayRawVol && rayAvgVol) {
         const delta = rayRawVol > rayAvgVol * 1.1 ? '증가' : rayRawVol < rayAvgVol * 0.9 ? '감소' : '보통';
         volLine = `거래량 ${rayFmtVol(rayRawVol)} (5일 평균 ${rayFmtVol(rayAvgVol)}, ${delta})`;
+      } else if (rayRawVol) {
+        // ✅ avgVolume 미수급이어도 raw 수치는 항상 표시 (기존 "거래량 저조" 단일 라벨로 퇴보 방지)
+        //    판정 라벨(저조/보통/증가)은 수치 뒤 괄호로 부가
+        const judgLabel = vol.label.replace(/^거래량\s*/, '').split(' ')[0] || '보통';
+        volLine = `거래량 ${rayFmtVol(rayRawVol)} (${judgLabel})`;
       } else {
         volLine = vol.label;
       }
@@ -1199,11 +1204,19 @@ ${DISCLAIMER}`;
         : nData.sentiment === '부정'
           ? `악재성 뉴스 ${news.length}건 — 경계 분위기`
           : `뉴스 ${news.length}건 (중립) — 명확한 촉매 부재`;
-      const scenario = verdict === '매수 우위'
-        ? `추세·거래량 동반 확인 → 분할 진입 유효, 목표가 방향으로 보유`
-        : verdict === '매도 우위'
-          ? `하향 이탈 리스크 우세 → 현금화 또는 손절 기준 사수`
-          : `지표 혼조 → 진입 조건 충족 전 대기, 돌파/지지 확인`;
+      // ✅ 시나리오는 verdict가 아닌 방향(direction)으로 분기 — bull인데 하락 톤 섞이는 모순 차단
+      const jackDirection: 'bull' | 'bear' | 'sideways' | 'high_volatility_up' | 'high_volatility_down' =
+        flags.vixHigh && flags.priceUp   ? 'high_volatility_up'
+        : flags.vixHigh && flags.priceDown ? 'high_volatility_down'
+        : discussMode === 'bull'  ? 'bull'
+        : discussMode === 'bear'  ? 'bear'
+        : 'sideways';
+      const scenario =
+        jackDirection === 'bull' ? '상승 추세 유지 — 거래량 확인 후 분할 접근 고려'
+        : jackDirection === 'bear' ? '하향 이탈 리스크 우세 → 손절 기준 사수'
+        : jackDirection === 'high_volatility_up' ? '급등 후 조정 가능 — 과열 진입 주의, 거래량 동반 여부 확인'
+        : jackDirection === 'high_volatility_down' ? '급락 구간 — 반등 시도 전 하방 압력 해소 확인 필수'
+        : '방향 확정 전 관망 — 돌파/이탈 방향 추종';
       const risk = conflict === 'conflict_jack_buy'
         ? '확인 신호 부재 — 거래량·뉴스 한 축 확인 전 섣부른 매수 금지'
         : conflict === 'conflict_lucia_buy'

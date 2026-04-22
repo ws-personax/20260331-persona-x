@@ -99,34 +99,40 @@ const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)
 const formatTime = (d: Date) =>
   d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 
+// ✅ PersonaX 면책 고지 — 모든 종목 공통 (중앙 상수)
+const PERSONAX_DISCLAIMER = `⚠️ PersonaX는 AI 금융 콘텐츠 플랫폼입니다.
+제공되는 모든 분석은 참고용 시나리오이며
+투자 자문·매매 추천이 아닙니다.
+투자 판단과 그에 따른 손익의 책임은
+전적으로 투자자 본인에게 있습니다.`;
+
 const parseEchoParts = (text: string) => {
-  // ✅ Gemini가 \n을 리터럴로 반환하는 경우 정규화
-  const normalized = text.replace(/\\n/g, '\n');
-  text = normalized;
+  // ✅ 리터럴 \n 정규화
+  const normalized = (text || '').replace(/\\n/g, '\n');
 
   const markers = ['📡', '─────────────────────────'];
   let splitIdx = -1;
-
   for (const m of markers) {
-    const idx = text.indexOf(m);
+    const idx = normalized.indexOf(m);
     if (idx !== -1 && (splitIdx === -1 || idx < splitIdx)) splitIdx = idx;
   }
 
-  if (splitIdx === -1) return { content: text, dataSource: '', disclaimer: '' };
+  if (splitIdx === -1) {
+    return { content: normalized, dataSource: '', marketClosedNote: '' };
+  }
 
-  const content = text.slice(0, splitIdx).trim();
-  const remainder = text.slice(splitIdx);
+  const content = normalized.slice(0, splitIdx).trim();
+  const remainder = normalized.slice(splitIdx);
   const lines = remainder.split('\n');
-  const dataLine = lines.find(l => l.includes('📡')) || '';
-  const discLines = lines
-    .filter(l => {
-      const t = l.trim();
-      return t && !t.includes('📡') && !/^─+$/.test(t);
-    })
-    .join('\n')
-    .trim();
+  const dataLine = (lines.find(l => l.includes('📡')) || '').trim();
 
-  return { content, dataSource: dataLine, disclaimer: discLines };
+  // ⚠️ 장 개장 전/마감 후/주말 휴장 — PersonaX 면책과 분리
+  const marketClosedLine = (lines.find(l => {
+    const t = l.trim();
+    return t.startsWith('⚠️ 장') || t.startsWith('⚠️ 주말');
+  }) || '').trim();
+
+  return { content, dataSource: dataLine, marketClosedNote: marketClosedLine };
 };
 
 const InlineNewsChip = ({ news }: { news: NewsLink }) => (
@@ -187,7 +193,18 @@ const EchoNewsChip = ({ news }: { news: NewsLink }) => (
   </div>
 );
 
-const MetaBox = ({ dataSource, disclaimer }: { dataSource: string; disclaimer: string }) => (
+// ✅ 통일된 공지 박스 — 모든 종목 동일 순서/형식
+//   1. ⚠️ 장 개장 전/마감 후 (해당 시에만)
+//   2. 📡 데이터 출처
+//   3. 💡 컨플루언스 가이드
+//   4. ⚠️ PersonaX 면책 고지 (1번만, 중앙 상수 사용)
+const NoticeBox = ({
+  dataSource,
+  marketClosedNote,
+}: {
+  dataSource: string;
+  marketClosedNote: string;
+}) => (
   <div style={{ marginTop: 8, padding: '0 12px 0 58px' }}>
     <div
       style={{
@@ -197,37 +214,22 @@ const MetaBox = ({ dataSource, disclaimer }: { dataSource: string; disclaimer: s
         border: '1px solid rgba(0,0,0,0.07)',
       }}
     >
+      {marketClosedNote && (
+        <p style={{ fontSize: 11, color: '#b45309', margin: 0, fontWeight: 700, lineHeight: 1.5 }}>
+          {marketClosedNote}
+        </p>
+      )}
       {dataSource && (
-        <p style={{ fontSize: 11, color: '#374151', margin: 0, fontWeight: 700, lineHeight: 1.5 }}>
+        <p style={{ fontSize: 11, color: '#374151', margin: marketClosedNote ? '3px 0 0' : 0, fontWeight: 700, lineHeight: 1.5 }}>
           {dataSource}
         </p>
       )}
-      <p style={{ fontSize: 10, color: '#2563eb', margin: '5px 0 0', lineHeight: 1.5, fontWeight: 600 }}>
+      <p style={{ fontSize: 10, color: '#2563eb', margin: '3px 0 0', lineHeight: 1.5, fontWeight: 600 }}>
         💡 컨플루언스 가이드: 낮음 → 참고 · 보통 → 고려 · 높음 → 확신
       </p>
-      {disclaimer && (
-        <div style={{ marginTop: 8, borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: 8 }}>
-          {disclaimer
-            .split('\n')
-            .filter(l => {
-              const t = l.trim();
-              return t && !/^─+$/.test(t);
-            })
-            .map((line, i) => (
-              <p
-                key={i}
-                style={{
-                  fontSize: 10,
-                  color: '#6b7280',
-                  margin: i > 0 ? '3px 0 0' : 0,
-                  lineHeight: 1.6,
-                }}
-              >
-                {line}
-              </p>
-            ))}
-        </div>
-      )}
+      <p style={{ fontSize: 10, color: '#6b7280', margin: '6px 0 0', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
+        {PERSONAX_DISCLAIMER}
+      </p>
     </div>
   </div>
 );
@@ -254,37 +256,19 @@ const PersonaBubble = memo(function PersonaBubble({
   const [open, setOpen] = useState(false);
   const normalizedDetails = useMemo(() => (details || '').replace(/\\n/g, '\n').trim(), [details]);
   const hasDetails = !isEcho && !isRebuttal && !!normalizedDetails;
-  // ✅ \n↳ 기준으로 본문과 반박 분리 + ECHO 메타 파싱
-  //    isRebuttal=true면 split 로직 건너뛰고 전체 텍스트를 반박 스타일 단일 버블로
-  const { content, rebuttal, dataSource, disclaimer } = useMemo(() => {
-    const normalizedText = text.replace(/\\n/g, '\n');
-    const parsed = isEcho
-      ? parseEchoParts(normalizedText)
-      : { content: normalizedText, dataSource: '', disclaimer: '' };
-    if (isRebuttal) {
-      return {
-        content: parsed.content,
-        rebuttal: '',
-        dataSource: parsed.dataSource,
-        disclaimer: parsed.disclaimer,
-      };
-    }
-    const splitIdx = parsed.content.indexOf('\n↳ ');
+  // ✅ \n↳ 기준으로 본문과 반박 분리 — PersonaBubble(ray/jack/lucia)은 ECHO 메타 없음
+  const { content, rebuttal } = useMemo(() => {
+    const normalizedText = (text || '').replace(/\\n/g, '\n');
+    if (isRebuttal) return { content: normalizedText, rebuttal: '' };
+    const splitIdx = normalizedText.indexOf('\n↳ ');
     if (splitIdx !== -1) {
       return {
-        content: parsed.content.slice(0, splitIdx).trim(),
-        rebuttal: parsed.content.slice(splitIdx + 1).trim(), // "↳ " 포함
-        dataSource: parsed.dataSource,
-        disclaimer: parsed.disclaimer,
+        content: normalizedText.slice(0, splitIdx).trim(),
+        rebuttal: normalizedText.slice(splitIdx + 1).trim(),
       };
     }
-    return {
-      content: parsed.content,
-      rebuttal: '',
-      dataSource: parsed.dataSource,
-      disclaimer: parsed.disclaimer,
-    };
-  }, [text, isEcho, isRebuttal]);
+    return { content: normalizedText, rebuttal: '' };
+  }, [text, isRebuttal]);
 
   if (!content?.trim()) return null;
 
@@ -455,7 +439,6 @@ const PersonaBubble = memo(function PersonaBubble({
       </div>
 
       {isEcho && echoNews?.url && <EchoNewsChip news={echoNews} />}
-      {isEcho && (dataSource || disclaimer) && <MetaBox dataSource={dataSource} disclaimer={disclaimer} />}
     </div>
   );
 });
@@ -476,18 +459,25 @@ const EchoBubble = memo(function EchoBubble({
   const [open, setOpen] = useState(false);
   const p = PERSONAS.echo;
 
-  const summaryText = useMemo(() => (summary || '').replace(/\\n/g, '\n'), [summary]);
-
-  // details에서 본문 / 데이터소스 / 면책을 분리 — 확장 시 본문만 말풍선 안에 출력하고,
-  // 데이터소스/면책은 말풍선 밖 MetaBox로 렌더링.
-  const parsedDetails = useMemo(() => {
-    if (!details) return { content: '', dataSource: '', disclaimer: '' };
-    return parseEchoParts(details.replace(/\\n/g, '\n'));
-  }, [details]);
+  // ✅ summary / details 모두에서 📡 메타 분리
+  //    지수(나스닥/코스피) 모드는 summary에 메타가 인라인이고, 개별 종목은 details에 들어감.
+  //    메타는 본문에서 제거하고 항상-표시되는 통일된 NoticeBox로 렌더.
+  const { summaryText, detailsText, dataSource, marketClosedNote } = useMemo(() => {
+    const summaryParsed = parseEchoParts(summary || '');
+    const detailsParsed = details
+      ? parseEchoParts(details)
+      : { content: '', dataSource: '', marketClosedNote: '' };
+    return {
+      summaryText: summaryParsed.content,
+      detailsText: detailsParsed.content,
+      dataSource: detailsParsed.dataSource || summaryParsed.dataSource,
+      marketClosedNote: detailsParsed.marketClosedNote || summaryParsed.marketClosedNote,
+    };
+  }, [summary, details]);
 
   if (!summaryText.trim()) return null;
 
-  const hasDetails = !!parsedDetails.content?.trim();
+  const hasDetails = !!detailsText.trim();
 
   return (
     <div style={{ marginBottom: 16 }}>
@@ -613,7 +603,7 @@ const EchoBubble = memo(function EchoBubble({
                       fontWeight: 500,
                     }}
                   >
-                    {parsedDetails.content}
+                    {detailsText}
                   </p>
                 </div>
               )}
@@ -627,30 +617,8 @@ const EchoBubble = memo(function EchoBubble({
 
       {echoNews?.url && <EchoNewsChip news={echoNews} />}
 
-      {/* PersonaX 공지 — 항상 표시 */}
-      <div style={{ marginTop: 4, padding: '0 12px 0 58px', marginBottom: 6 }}>
-        <div
-          style={{
-            background: 'rgba(0,0,0,0.04)',
-            borderRadius: 10,
-            padding: '10px 14px',
-            border: '1px solid rgba(0,0,0,0.07)',
-          }}
-        >
-          <p style={{ fontSize: 10, color: '#6b7280', margin: 0, lineHeight: 1.6, whiteSpace: 'pre-line' }}>
-            {`⚠️ PersonaX는 AI 금융 콘텐츠 플랫폼입니다.
-제공되는 모든 분석은 참고용 시나리오이며
-투자 자문·매매 추천이 아닙니다.
-투자 판단과 그에 따른 손익의 책임은
-전적으로 투자자 본인에게 있습니다.`}
-          </p>
-        </div>
-      </div>
-
-      {/* 데이터 소스 + 디스클레이머 — 자세히 보기 펼쳤을 때만 */}
-      {open && (parsedDetails.dataSource || parsedDetails.disclaimer) && (
-        <MetaBox dataSource={parsedDetails.dataSource} disclaimer={parsedDetails.disclaimer} />
-      )}
+      {/* ✅ 통일된 공지 박스 — 항상 1번만 표시 (장 마감 / 데이터 출처 / 가이드 / 면책 순) */}
+      <NoticeBox dataSource={dataSource} marketClosedNote={marketClosedNote} />
     </div>
   );
 });

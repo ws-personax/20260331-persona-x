@@ -1136,7 +1136,9 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   // ✅ details는 "자세히 보기" 확장 영역 — 기존 ECHO 2 전체 + 충돌 블록 흡수
   //   순서: (conflict 시) ECHO 질문 + JACK/LUCIA 재답변 → 결론 상세 → confluence
   //        → ⚔️ 참모진 판단 → 근거/지금/조건/비중
-  const detailHeader = `결론: ${modeEmoji} ${verdictText}`;
+  // ✅ 상단 summary의 modeVerdict와 details 첫 줄을 동일 문구로 통일
+  //    (기존 verdictText는 "포지션 축소를 권고합니다" 등 상단과 다른 문구가 나와 모순 발생)
+  const detailHeader = `결론: ${modeEmoji} ${modeVerdict}`;
   const detailParts: string[] = [];
   if (echoQuestion) {
     detailParts.push(echoQuestion);
