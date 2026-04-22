@@ -688,6 +688,84 @@ const TypingIndicator = () => (
   </>
 );
 
+// ✅ 첫 진입 온보딩 카드 — 사용자가 아직 질의를 보내지 않았을 때만 표시
+//   역할: "ChatGPT랑 뭐가 달라?" 방지 + 서비스 정체성 전달
+const OnboardingCard = ({ onExample }: { onExample: (keyword: string) => void }) => (
+  <div
+    style={{
+      margin: '12px 12px 20px',
+      padding: '28px 20px',
+      background: 'linear-gradient(180deg, #fff8d6 0%, #fffbeb 100%)',
+      border: '1px solid #fde68a',
+      borderRadius: 16,
+      boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+    }}
+  >
+    <h2
+      style={{
+        fontSize: 21,
+        fontWeight: 800,
+        lineHeight: 1.4,
+        color: '#111827',
+        textAlign: 'center',
+        margin: '0 0 16px',
+      }}
+    >
+      지금 이 순간의 데이터로
+      <br />
+      4개의 관점이 충돌합니다
+    </h2>
+    <p
+      style={{
+        textAlign: 'center',
+        color: '#6b7280',
+        fontSize: 13,
+        lineHeight: 1.7,
+        margin: '0 0 18px',
+      }}
+    >
+      ChatGPT는 어제 삼성전자 주가를 모릅니다.
+      <br />
+      PersonaX는 지금 이 순간 실시간 데이터를 가져와
+      <br />
+      4명의 참모진이 분석합니다.
+    </p>
+    <p
+      style={{
+        textAlign: 'center',
+        color: '#92400e',
+        fontSize: 13,
+        fontWeight: 700,
+        margin: '0 0 12px',
+      }}
+    >
+      종목명을 입력하세요
+    </p>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+      {['삼성전자', '테슬라', 'SK하이닉스', '비트코인'].map(name => (
+        <button
+          key={name}
+          type="button"
+          onClick={() => onExample(name)}
+          style={{
+            background: '#ffffff',
+            border: '1px solid #d4a017',
+            borderRadius: 20,
+            padding: '7px 16px',
+            fontSize: 13,
+            color: '#92400e',
+            fontWeight: 700,
+            cursor: 'pointer',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+          }}
+        >
+          {name}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
 export default function ChatWindow() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [mounted, setMounted] = useState(false);
@@ -809,18 +887,13 @@ export default function ChatWindow() {
 
   useEffect(() => {
     setMounted(true);
-    const initMessages: Message[] = [
-      {
-        id: 'init',
-        role: 'assistant',
-        timestamp: new Date(),
-        isRead: true,
-        content: '[SYSTEM ONLINE]\n지휘관님, 전략 센터 가동됨. 분석할 종목을 하달하십시오.\n⏱ 분석에는 약 10초가 소요됩니다.',
-      },
-    ];
-    messagesRef.current = initMessages;
-    setMessages(initMessages);
+    // ✅ 첫 진입은 빈 상태 — OnboardingCard가 SYSTEM ONLINE 안내를 대체
+    messagesRef.current = [];
+    setMessages([]);
   }, []);
+
+  // ✅ 온보딩 카드 표시 조건 — 사용자가 아직 질의를 보내지 않음
+  const hasUserSent = useMemo(() => messages.some(m => m.role === 'user'), [messages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -976,6 +1049,9 @@ export default function ChatWindow() {
       </header>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 0', paddingBottom: '140px' }}>
+        {!hasUserSent && (
+          <OnboardingCard onExample={(name) => handleSendWithPosition(name, null)} />
+        )}
         {messages.map(msg => (
           <div key={msg.id}>
             {msg.role === 'user' ? (
@@ -1253,7 +1329,7 @@ export default function ChatWindow() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
-            placeholder="종목명 입력 (예: 삼성전자)"
+            placeholder="종목명을 입력하세요 (예: 삼성전자, 테슬라)"
             style={{
               flex: 1,
               border: '1px solid #d1d5db',
