@@ -232,14 +232,15 @@ export const buildJackText = (p: JackParams): string => {
   const phraseIdx = getRotationIndex(p.keyword, JACK_BUY_PHRASES.length);
   const buyPhrase = JACK_BUY_PHRASES[phraseIdx];
 
-  // ✅ 시세 방향별 JACK 본문 선택 — "뉴스 긍정 기준으로 진입 가능성" 고정 출력 문제 해결
-  //    상승/하락/sideways/급등락에 따라 서로 다른 전술 메시지
+  // ✅ 시세 방향별 JACK 전략 선택 — falling 세트에 "진입 검토" 혼입 문제 해결
+  //    JACK_STRATEGIES 각 엔트리는 진단+행동이 완결된 한 세트. rising/sideways만 {volCondition} 포함.
   const jackDirection: PriceDirection = flags
     ? determinePriceDirection(flags)
     : 'sideways';
-  const jackBodyPool = JACK_BODY_POOL[jackDirection];
+  const jackBodyPool = JACK_STRATEGIES[jackDirection];
   const jackBodyIdx = getRotationIndex(p.keyword, jackBodyPool.length);
-  const jackDirectionLine = jackBodyPool[jackBodyIdx];
+  const jackStrategyRaw = jackBodyPool[jackBodyIdx];
+  const jackStrategy = jackStrategyRaw.replace('{volCondition}', volCondition);
 
   const mode: DiscussMode = p.mode ?? 'conflict';
   let line1: string;
@@ -250,9 +251,9 @@ export const buildJackText = (p: JackParams): string => {
     line1 = `지휘관님, ${p.keyword}${topicParticle(p.keyword)} ${positiveText} — 명백한 매수 우위입니다.`;
     line2 = `${buyPhrase}. ${volCondition} 단계 진입.`;
   } else if (mode === 'conflict') {
-    // 갈등 — 시세 방향별 JACK_BODY_POOL 사용 (방향 무시 "진입 가능성" 고정 출력 제거)
-    line1 = `지휘관님, ${p.keyword}${topicParticle(p.keyword)} ${jackDirectionLine}.`;
-    line2 = `${volCondition} 1차 진입 검토. ${buyPhrase}.`;
+    // 갈등 — 방향별 완결 전략 사용. 전략 문장 내부에 행동 지침 포함돼 line2 불필요.
+    line1 = `지휘관님, ${p.keyword}${topicParticle(p.keyword)} ${jackStrategy}`;
+    line2 = '';
   } else {
     // bear — 역발상 강세론자 (조정 속 기회 탐색, 3줄)
     const negatives: string[] = [];
@@ -280,7 +281,10 @@ export const buildJackText = (p: JackParams): string => {
     return `${bearL1}\n${bearL2}\n${bearL3}${jackRebuttal}`;
   }
 
-  return `${line1}\n${line2}${jackRebuttal}`;
+  // conflict 모드에서 line2=''일 수 있음 (전략 문장이 완결형)
+  return line2
+    ? `${line1}\n${line2}${jackRebuttal}`
+    : `${line1}${jackRebuttal}`;
 };
 
 // ─────────────────────────────────────────────
@@ -385,38 +389,80 @@ const LUCIA_METAPHORS: Record<PriceDirection, string[]> = {
   ],
 };
 
-// ✅ JACK 본문 풀 — 시세 방향별로 분기 (긍정 편향은 유지하되 방향에 맞는 전술 제시)
-const JACK_BODY_POOL: Record<PriceDirection, string[]> = {
+// ✅ LUCIA 꼬리말 풀 — 시세 방향별로 분기 (metaphor와 같은 direction 기반 선택)
+//    수정 1 배경: 기존엔 conflict 모드에서 "${negText}겉은 좋아 보여도 속은 아직 확인이 필요해요"
+//    같은 상승장 표현이 모든 방향에 고정 부착되어 하락/급등/급락 케이스에서 논리 모순 발생.
+//    이제 metaphor와 tail을 동일 direction으로 분기해 일관성 확보.
+const LUCIA_TAILS: Record<PriceDirection, string[]> = {
   rising_weak_volume: [
-    '상승세이나 거래량 부진입니다. 돌파 확인 전까지 진입 보류하십시오',
-    '추세는 살아있으나 수급이 약합니다. 거래량 동반 돌파 시 진입하십시오',
-    '이평선은 우상향이나 거래량이 따라오지 않습니다. 수급 유입 대기',
+    '거래량이 따라붙을 때까지 확인이 필요해요',
+    '올라가는 속도만큼 받침도 확인해야 해요',
+    '겉은 좋아 보여도 수급이 확인돼야 안심이에요',
   ],
   falling_weak_volume: [
-    '하락세이나 매도 압력도 약합니다. 반등 신호 전까지 관망하십시오',
-    '바닥 확인이 우선입니다. 거래량 동반 반등 시 재평가하십시오',
-    '조정 구간입니다. 지지 확인 후 재진입 검토하십시오',
+    '매도세도 약해서 아직 바닥은 불확실해요',
+    '내려가는 중이라 섣부른 저점 매수는 조심해요',
+    '반등 신호가 나올 때까지 기다리는 게 나아요',
   ],
   sideways: [
-    '방향성 부재 구간입니다. 돌파 방향 확인 후 추종하십시오',
-    '교착 구간입니다. 한 방향 확정 전까지 신규 진입을 보류하십시오',
-    '관망 구간입니다. 트리거 가격 이탈/돌파 시 대응하십시오',
+    '방향이 정해질 때까지 지켜보는 구간이에요',
+    '어느 쪽이든 돌파 신호가 먼저 필요해요',
+    '지금은 판단보다 관찰이 우선이에요',
   ],
   high_volatility_up: [
-    '급등 국면입니다. 조정 대기 또는 분할 진입을 검토하십시오',
-    '과열 구간입니다. 추격 매수보다 눌림 대기가 유리합니다',
-    '상승 가속 국면입니다. 분할 진입으로 리스크를 분산하십시오',
+    '과열 구간이라 조정 가능성도 열어두세요',
+    '추격매수보다 조정 때 접근이 안전해요',
+    '흥분한 시장일수록 한 박자 쉬어가는 게 나아요',
   ],
   high_volatility_down: [
-    '급락 국면입니다. 하방 압력 해소 전까지 진입 금지입니다',
-    '패닉 구간입니다. 바닥 캔들 확인 후 역발상 진입을 검토하십시오',
-    '매도 가속 국면입니다. 포지션 축소 후 현금 보유를 권고합니다',
+    '낙폭 과대 구간이라 반등 유혹이 크지만 위험해요',
+    '하방 압력 해소 전엔 접근 금지가 원칙이에요',
+    '떨어지는 칼날은 잡지 않는 게 원칙이에요',
+  ],
+};
+
+// ✅ JACK 전략 풀 — 시세 방향별 "완결된 한 세트" 문장
+//    수정 2 배경: 기존엔 line1만 방향 분기되고 line2는 "거래량 … 이상 돌파 시 1차 진입 검토 + buyPhrase" 고정이라
+//    falling/급락 케이스에서도 "진입 검토"가 섞여 출력되는 모순 발생.
+//    이제 각 방향별 단일 엔트리가 진단+행동까지 완결되도록 구성. {volCondition}은 rising/sideways에서만 사용.
+const JACK_STRATEGIES: Record<PriceDirection, string[]> = {
+  rising_weak_volume: [
+    '상승세이나 거래량 부진입니다. 돌파 확인 전까지 진입 보류하십시오. {volCondition} 1차 진입 검토.',
+    '추세는 살아있으나 수급이 약합니다. 거래량 동반 돌파 시 진입하십시오. {volCondition} 대응하십시오.',
+    '이평선은 우상향이나 거래량이 따라오지 않습니다. 수급 유입 대기. {volCondition} 1차 진입 검토.',
+  ],
+  falling_weak_volume: [
+    '하락세이나 매도 압력도 약합니다. 반등 신호 전까지 관망하십시오. 거래량 동반 반등이 확인될 때 재평가합니다.',
+    '바닥 확인이 우선입니다. 손절선 이탈 감시가 1순위입니다. 섣부른 저점 매수는 금지합니다.',
+    '조정 구간입니다. 지지 확인 후 재진입을 검토하십시오. 반등 신호 전 매수는 금지가 원칙입니다.',
+  ],
+  sideways: [
+    '방향성 부재 구간입니다. 돌파 방향 확인 후 추종하십시오. {volCondition} 1차 진입 검토.',
+    '교착 구간입니다. 한 방향 확정 전까지 신규 진입을 보류하십시오. 트리거 돌파 시에만 대응합니다.',
+    '관망 구간입니다. 트리거 가격 이탈/돌파 시 대응하십시오. {volCondition} 진입 판단.',
+  ],
+  high_volatility_up: [
+    '급등 국면입니다. 조정 대기 또는 분할 진입을 검토하십시오. 추격매수는 리스크가 큽니다.',
+    '과열 구간입니다. 추격 매수보다 눌림 대기가 유리합니다. 조정 시 분할 진입을 원칙으로 합니다.',
+    '상승 가속 국면입니다. 분할 진입으로 리스크를 분산하십시오. 추격은 피하십시오.',
+  ],
+  high_volatility_down: [
+    '급락 국면입니다. 하방 압력 해소 전까지 진입 금지입니다. 바닥 캔들 확인이 선행되어야 합니다.',
+    '패닉 구간입니다. 바닥 캔들 확인 후 역발상 진입을 검토하십시오. 성급한 진입은 금지합니다.',
+    '매도 가속 국면입니다. 포지션 축소 후 현금 보유를 권고합니다. 진입은 금지가 원칙입니다.',
   ],
 };
 
 // ✅ 방향별 비유 선택 — getRotationIndex 기반 (ticker + minute 결정론)
 const pickMetaphor = (direction: PriceDirection, keyword: string): string => {
   const pool = LUCIA_METAPHORS[direction];
+  const idx = getRotationIndex(keyword, pool.length);
+  return pool[idx];
+};
+
+// ✅ 방향별 꼬리말 선택 — metaphor와 동일 시드로 호출 (둘 다 direction 일관)
+const pickTail = (direction: PriceDirection, keyword: string): string => {
+  const pool = LUCIA_TAILS[direction];
   const idx = getRotationIndex(keyword, pool.length);
   return pool[idx];
 };
@@ -530,10 +576,10 @@ export const buildLuciaText = (p: LuciaParams): string => {
     line1 = `소장님, ${connector}마치 ${metaphor}. 지금은 현금이 맞아요.`;
     line2 = `하지만 모두가 포기할 때가 오히려 기회일 수 있어요. 조금만 더 지켜봐요.`;
   } else if (mode === 'conflict') {
-    // 갈등 — 부정 데이터 강조하며 신중론
-    const negText = negatives.length > 0 ? `${negatives.join(' + ')} 때문에 ` : '';
+    // 갈등 — metaphor와 tail 모두 같은 direction으로 선택 (수정 1: 하락/급락 케이스 모순 제거)
+    const tail = pickTail(direction, p.keyword);
     line1 = `소장님, ${connector}마치 ${metaphor}.`;
-    line2 = `${negText}겉은 좋아 보여도 속은 아직 확인이 필요해요.`;
+    line2 = tail;
   } else {
     // bull — FOMO 경고 (짧게)
     line1 = `소장님, ${connector}${p.keyword}${topicParticle(p.keyword)} 지금 많은 신호가 긍정적이지만,`;
@@ -834,18 +880,19 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   const newsWarn   = p.sentiment === '중립';
   const pricePass  = !!p.hasMarketData;
 
-  // ✅ 거래량 판정 — RAY와 동일 기준: rawVolume vs avgVolume 직접 비교
-  //    있을 때: >1.1배 증가, 0.9~1.1배 보통, <0.9배 감소
-  //    없을 때: vol.isHigh fallback
+  // ✅ 거래량 판정 — volumeRatio 기반 단일 소스
+  //    수정 3: "근거" 문장과 컨플루언스 지표의 거래량 판정을 동일 계산에서 파생하도록 통일.
+  //    ratio ≥ 1.2 → 거래량 증가 / 0.7 ≤ ratio < 1.2 → 거래량 보통 / ratio < 0.7 → 거래량 감소
   let volumePass: boolean;
   let volumeIcon: string;
   let volumeText: string;
   if (p.rawVolume && p.rawVolume > 0 && p.avgVolume && p.avgVolume > 0) {
-    if (p.rawVolume > p.avgVolume * 1.1) {
+    const volumeRatio = p.rawVolume / p.avgVolume;
+    if (volumeRatio >= 1.2) {
       volumePass = true;
       volumeIcon = '✅';
       volumeText = '거래량 증가';
-    } else if (p.rawVolume >= p.avgVolume * 0.9) {
+    } else if (volumeRatio >= 0.7) {
       volumePass = false;
       volumeIcon = '⚠️';
       volumeText = '거래량 보통';
@@ -889,7 +936,9 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
     `${priceIcon} ${priceText}`,
   ].join('\n');
   // ✅ 뉴스 언급 제거 — 각 페르소나의 뉴스 칩에서 확인
-  const line2 = `근거: ${p.trendSummary ? p.trendSummary + ' / ' : ''}${p.volLabel}${conflictNote}`;
+  //    수정 3: volLabel(scoring.ts의 절대치 기반) 대신 volumeText(ratio 기반)로 통일
+  //    → 컨플루언스 "⚠️ 거래량 감소"와 근거 문구가 일치 (삼성전자 케이스 모순 해결)
+  const line2 = `근거: ${p.trendSummary ? p.trendSummary + ' / ' : ''}${volumeText}${conflictNote}`;
   const line3 = `지금: ${insight}${timeNote}`;
   // ✅ ECHO 2 (details) 조건 매수가 — ECHO 1 trigger와 동일하게 effectiveBuyPrice 사용
   //    기존: p.condSummary는 route.ts에서 extractConditionPrices로 뽑은 raw buyPrice(예: rawLow*0.98)
