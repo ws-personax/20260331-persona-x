@@ -980,13 +980,24 @@ const OnboardingTabs = ({
             box-shadow: 0 8px 20px rgba(0,0,0,0.10);
           }
         `}</style>
-        <div style={{ padding: '24px 12px 0', display: 'flex', justifyContent: 'center' }}>
+        {/* 부모 컨테이너 — 화면 세로 중앙 정렬 (헤더 + footer 높이 제외) */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: 'calc(100vh - 120px)',
+            padding: '20px 12px',
+            boxSizing: 'border-box',
+          }}
+        >
           <div
             style={{
               display: 'flex',
               flexWrap: 'wrap',
               gap: 16,
               justifyContent: 'center',
+              alignItems: 'stretch',
               width: '100%',
               maxWidth: 560,
             }}
@@ -997,8 +1008,8 @@ const OnboardingTabs = ({
               className="px-intro-card"
               onClick={() => onTabChange('finance')}
               style={{
-                flex: '1 1 220px',
-                minHeight: 140,
+                flex: '1 1 240px',
+                minHeight: 160,
                 padding: '20px 18px',
                 background: '#ffffff',
                 border: '2px solid #1f2937',
@@ -1013,8 +1024,15 @@ const OnboardingTabs = ({
             >
               <span style={{ fontSize: 32, lineHeight: 1 }}>📊</span>
               <span style={{ fontSize: 16, fontWeight: 800, color: '#111827' }}>재테크</span>
-              <span style={{ fontSize: 12, color: '#4b5563', lineHeight: 1.5 }}>
-                지금 이 순간의 데이터로 4명의 참모가 분석합니다
+              <span
+                style={{
+                  fontSize: 12,
+                  color: '#4b5563',
+                  lineHeight: 1.5,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                실시간 데이터로 4명의 참모가 분석합니다
               </span>
             </button>
 
@@ -1024,8 +1042,8 @@ const OnboardingTabs = ({
               className="px-intro-card"
               onClick={() => onTabChange('tea')}
               style={{
-                flex: '1 1 220px',
-                minHeight: 140,
+                flex: '1 1 240px',
+                minHeight: 160,
                 padding: '20px 18px',
                 background: '#fffaf0',
                 border: '2px solid #fb923c',
@@ -1040,8 +1058,15 @@ const OnboardingTabs = ({
             >
               <span style={{ fontSize: 32, lineHeight: 1 }}>☕</span>
               <span style={{ fontSize: 16, fontWeight: 800, color: '#7c2d12' }}>차 한잔 하실래요?</span>
-              <span style={{ fontSize: 12, color: '#92400e', lineHeight: 1.5 }}>
-                투자 고민, 기쁜 일, 복잡한 감정을 털어놓으세요
+              <span
+                style={{
+                  fontSize: 12,
+                  color: '#92400e',
+                  lineHeight: 1.5,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                고민과 감정을 참모진과 나눠보세요
               </span>
             </button>
           </div>
