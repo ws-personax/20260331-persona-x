@@ -5,21 +5,15 @@
 @tailwind utilities;
 
 :root {
+  /* 다크모드 강제 비활성화 — 앱 자체 색상 팔레트만 사용 */
+  color-scheme: light;
   --foreground-rgb: 15, 23, 42; /* Slate-900 */
   --background-start-rgb: 248, 250, 252; /* Slate-50 */
   --background-end-rgb: 255, 255, 255;
 }
 
-/* 🌙 야간 작전(Dark Mode) 프로토콜 */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 248, 250, 252;
-    --background-start-rgb: 15, 23, 42; /* Slate-950 */
-    --background-end-rgb: 30, 41, 59;   /* Slate-900 */
-  }
-  .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
-  .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
-}
+/* ⚠️ 이전에 있던 @media (prefers-color-scheme: dark) 블록 제거.
+   OS 다크모드일 때 앱 배경이 검정으로 반전되던 문제 방지. */
 
 body {
   color: rgb(var(--foreground-rgb));

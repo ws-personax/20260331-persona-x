@@ -29,6 +29,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // OS 다크모드와 무관하게 앱 컬러 스킴을 light 로 고정 — 배경 반전 방지
+  colorScheme: "light",
 };
 
 export default function RootLayout({

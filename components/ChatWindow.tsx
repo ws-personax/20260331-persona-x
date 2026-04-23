@@ -979,10 +979,22 @@ const OnboardingTabs = ({
             transform: translateY(-3px);
             box-shadow: 0 8px 20px rgba(0,0,0,0.10);
           }
+          /* 모바일(< 600px): 카드 2개 세로 스택, 각 카드 100% 너비 */
+          @media (max-width: 599px) {
+            .px-intro-cards-row {
+              flex-direction: column !important;
+              flex-wrap: nowrap !important;
+            }
+            .px-intro-card {
+              flex: 0 0 auto !important;
+              width: 100% !important;
+            }
+          }
         `}</style>
-        {/* 카드 2개 가로 배치 (모바일은 flex-wrap 으로 세로 스택).
-            세로 중앙 정렬은 부모 .px-onboarding-wrap 이 담당. */}
+        {/* 카드 2개 — PC 는 가로 나란히, 모바일(< 600px) 은 세로 스택
+            (media query .px-intro-cards-row). 세로 중앙정렬은 부모 담당. */}
         <div
+          className="px-intro-cards-row"
           style={{
             display: 'flex',
             flexWrap: 'wrap',
