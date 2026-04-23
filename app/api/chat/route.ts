@@ -22,6 +22,91 @@ import type { DiscussMode, IndicatorFlags, PrevContext } from '@/lib/personax/te
 
 export const maxDuration = 60;
 
+// ─────────────────────────────────────────────
+// ✅ 차 한잔(teaMode) 전용 — Claude Haiku 4.5 LLM 호출
+//   재테크 탭과 완전히 분리 (import/사용처 전부 teaMode 블록 안에서만)
+//   LLM 실패 시 호출부에서 기존 템플릿으로 폴백
+// ─────────────────────────────────────────────
+const TEA_HAIKU_MODEL = 'claude-haiku-4-5-20251001';
+const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+
+const TEA_SYSTEM_LUCIA = `당신은 LUCIA입니다. ENFP 성격의 따뜻한 참모.
+- 3줄 이내
+- 공감 먼저, 판단 금지
+- 마지막 줄은 질문 하나
+- 투자 조언 절대 금지
+- 존댓말, 이모지 금지
+- 맥락을 기억하고 이어가는 대화`;
+
+const TEA_SYSTEM_JACK = `당신은 JACK입니다. INTJ 성격의 전략 참모.
+- 3줄 이내
+- 감정보다 상황 구조화
+- 단호하되 차갑지 않게
+- 투자 조언 절대 금지
+- 존댓말, 이모지 금지
+- 맥락을 기억하고 다른 각도로 질문`;
+
+const TEA_SYSTEM_ECHO = `당신은 ECHO입니다. 참모진의 사령관.
+- 3줄 이내
+- LUCIA와 JACK 의견을 통합
+- 유저에게 핵심 질문 하나
+- 투자 조언 절대 금지
+- 존댓말, 이모지 금지
+- 대화가 깊어질수록 더 핵심을 찌르는 질문`;
+
+type TeaPersonaKey = 'lucia' | 'jack' | 'echo';
+type TeaMsg = { role: 'user' | 'assistant'; content: string };
+
+// 원본 messages 에서 특정 페르소나의 이력만 재구성.
+//   - user 턴은 그대로.
+//   - assistant 턴은 해당 페르소나의 텍스트(teaJack/teaEcho)가 있으면 그것을,
+//     없으면 content(=teaLucia) 를 사용.
+//   - 마지막 6 턴 (~12 메시지) 유지.
+const buildTeaHistory = (rawMessages: unknown, persona: TeaPersonaKey): TeaMsg[] => {
+  if (!Array.isArray(rawMessages)) return [];
+  const mapped: TeaMsg[] = [];
+  for (const raw of rawMessages) {
+    if (!raw || typeof raw !== 'object') continue;
+    const m = raw as { role?: string; content?: string; teaJack?: string; teaEcho?: string };
+    if (m.role !== 'user' && m.role !== 'assistant') continue;
+    let content = typeof m.content === 'string' ? m.content : '';
+    if (m.role === 'assistant') {
+      if (persona === 'jack' && typeof m.teaJack === 'string' && m.teaJack.trim()) content = m.teaJack;
+      else if (persona === 'echo' && typeof m.teaEcho === 'string' && m.teaEcho.trim()) content = m.teaEcho;
+    }
+    if (!content.trim()) continue;
+    mapped.push({ role: m.role, content });
+  }
+  return mapped.slice(-12);
+};
+
+const callTeaPersona = async (system: string, history: TeaMsg[]): Promise<string | null> => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || history.length === 0) return null;
+  try {
+    const res = await fetch(ANTHROPIC_API_URL, {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: TEA_HAIKU_MODEL,
+        max_tokens: 150,
+        system,
+        messages: history,
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = data?.content?.[0]?.text;
+    return typeof text === 'string' && text.trim() ? text.trim() : null;
+  } catch {
+    return null;
+  }
+};
+
 const getSupabase = () => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -203,14 +288,14 @@ export async function POST(req: Request) {
     const { messages, positionContext, teaMode, teaRound } = await req.json();
     const lastMsg = messages.at(-1)?.content || "";
 
-    // ✅ 차 한잔 모드 — 턴 수 기반 단계적 응답
-    //   Round 1: LUCIA 공감만
-    //   Round 2+: LUCIA(다른 공감) + JACK(상황 정리 질문) + ECHO(행동 질문)
+    // ✅ 차 한잔 모드 — LLM 기반 3 페르소나 응답 (Claude Haiku 4.5, 병렬 호출)
+    //   Round 1: LUCIA 단독 (감정 수용 단계)
+    //   Round 2+: LUCIA + JACK + ECHO (세 API Promise.all 병렬)
+    //   LLM 실패 시 round/카테고리 기반 템플릿으로 자동 폴백.
+    //   ⚠️ 재테크 탭(teaMode=false)은 아래 블록을 건너뛰므로 동작 변화 없음.
     if (teaMode) {
-      // 카테고리 감지 — 우선순위: 가족/건강 > 손실 > 기쁨 > 기타
-      //   1) 가족/건강이 최우선: "어머니가 아프셔서 주식이..." 같은 혼합 케이스 보호
-      //   2) 손실이 기쁨보다 우선: "3천만원 날렸는데 합격했어" 같이 부정/긍정 혼재 시
-      //      감정의 무게는 손실 쪽 — 공감 우선.
+      // ── 카테고리 감지 — 폴백 템플릿 분기용 (LLM 응답 자체는 시스템 프롬프트가 알아서 적응) ──
+      //   우선순위: 가족/건강 > 손실 > 기쁨 > 기타
       const isFamily = /(가족|부모|어머니|아버지|엄마|아빠|자식|아이|아들|딸|남편|아내|형제|자매|건강|병|아프|수술|입원|병원|암|치매)/.test(lastMsg);
       const isLoss = /(손실|손절|물렸|물림|떨어|빠졌|하락|폭락|투자|주식|코인|마이너스|잃었|날렸|망했|망하)/.test(lastMsg);
       const isJoy = /(기쁨|기뻐|행복|성공|올랐|올라|상승|수익|벌었|대박|축하|자랑|합격|승진|좋은 일)/.test(lastMsg);
@@ -221,8 +306,7 @@ export async function POST(req: Request) {
         : isJoy   ? '정말 잘 되셨네요!'
         :           '많이 힘드셨겠어요.';
 
-      // 🔧 teaRound 결정 — 클라이언트 값 우선, 누락 시 messages 배열의 user 턴 수로 폴백
-      //   (이전에는 typeof 체크만 써서 문자열/undefined 전송 시 항상 Round 1로 떨어짐)
+      // ── teaRound 결정 — 클라이언트 값 우선, 누락 시 user 턴 수 폴백 ──
       const userTurns = Array.isArray(messages)
         ? messages.filter((m: { role?: string }) => m?.role === 'user').length
         : 0;
@@ -230,63 +314,71 @@ export async function POST(req: Request) {
         ? Number(teaRound)
         : userTurns || 1;
 
-      // ── Round 3+ — 감정 심화 질문 + 마무리 톤 (round 증가할수록 ECHO가 closing 쪽으로) ──
+      // ── 페르소나별 이력 구성 (JACK/ECHO 는 과거 자기 발화로 재구성) ──
+      const luciaHistory = buildTeaHistory(messages, 'lucia');
+      const jackHistory = buildTeaHistory(messages, 'jack');
+      const echoHistory = buildTeaHistory(messages, 'echo');
+
+      // ── 폴백 템플릿 (LLM 실패 시 per-persona 사용) ──
+      let fallbackLucia: string;
+      let fallbackJack: string;
+      let fallbackEcho: string;
+
       if (round >= 3) {
-        // Round 3: 감정 자체에 초점 / Round 4+: 완전 마무리 모드
         const isClosing = round >= 4;
-
-        const teaLucia = `계속 말씀해주셔서 고마워요.\n${empathyLine}\n지금 이 순간 어떤 감정이 가장 크게 느껴지세요?`;
-
-        const teaJack = isClosing
+        fallbackLucia = `계속 말씀해주셔서 고마워요.\n${empathyLine}\n지금 이 순간 어떤 감정이 가장 크게 느껴지세요?`;
+        fallbackJack = isClosing
           ? '충분히 이야기하셨어요.\n지금 마음에 가장 남은 한 문장이 뭔가요?'
           : '지금까지 말씀하신 걸 들어보니,\n한 가지 여쭤봐도 될까요?\n이 상황에서 가장 후회되는 결정이 뭔가요?';
-
-        const teaEcho = isClosing
-          ? '오늘은 여기까지 하셔도 괜찮아요.\n충분히 꺼내주셨어요. 따뜻한 차 한 잔, 드세요. 🫖'
-          : '오늘 여기까지 털어놓아 주셨어요.\n천천히, 한 걸음씩이면 충분합니다. ☕';
-
-        return Response.json({
-          teaMode: true,
-          teaRound: round,
-          teaLucia,
-          teaJack,
-          teaEcho,
-        });
-      }
-
-      // ── Round 2 — 공감 변주 + JACK/ECHO 질문으로 확장 ──
-      if (round >= 2) {
+        fallbackEcho = isClosing
+          ? '오늘은 여기까지 하셔도 괜찮아요.\n충분히 꺼내주셨어요.'
+          : '오늘 여기까지 털어놓아 주셨어요.\n천천히, 한 걸음씩이면 충분합니다.';
+      } else if (round >= 2) {
         const luciaDeep =
           isFamily ? '그 마음이 얼마나 무거우셨을지 느껴져요.'
           : isLoss  ? '그때 가장 힘들었던 순간이 언제였어요?'
           : isJoy   ? '그 순간 어떤 기분이 드셨어요? 더 들려주세요.'
           :           '그 마음을 꺼내주셔서 감사해요.';
-
-        // 손실/가족은 '정리' 톤, 기쁨은 '과정' 톤
-        const jackQuestion =
+        fallbackLucia = `${empathyLine}\n${luciaDeep}`;
+        fallbackJack =
           isJoy && !isLoss && !isFamily
             ? '상황을 조금 더 구체적으로 정리해볼까요?\n어떤 과정에서 그런 결과가 나왔는지 들려주세요.'
             : '상황을 조금 더 구체적으로 정리해볼까요?\n언제부터, 어떤 계기로 이 마음이 시작됐는지 알려주세요.';
-
-        const echoQuestion =
+        fallbackEcho =
           isJoy && !isLoss && !isFamily
-            ? '지금 가장 나누고 싶은 게 뭐예요?\n축하할 일인지, 다음 계획인지 — 함께 정리해봐요.'
+            ? '지금 가장 나누고 싶은 게 뭐예요?\n축하할 일인지, 다음 계획인지 함께 정리해봐요.'
             : '지금 이 순간, 가장 하고 싶은 건 뭐예요?\n들어주기만 해도 되고, 같이 풀어가도 돼요.';
+      } else {
+        // Round 1 — LUCIA 외에는 응답 없음 (호출도 안 함)
+        fallbackLucia = `말씀해주셔서 고마워요.\n${empathyLine}\n조금 더 이야기해주실 수 있어요?`;
+        fallbackJack = '';
+        fallbackEcho = '';
+      }
+
+      // ── LLM 호출 ──
+      if (round >= 2) {
+        // Round 2+ — 세 페르소나 병렬 호출
+        const [luciaLLM, jackLLM, echoLLM] = await Promise.all([
+          callTeaPersona(TEA_SYSTEM_LUCIA, luciaHistory),
+          callTeaPersona(TEA_SYSTEM_JACK, jackHistory),
+          callTeaPersona(TEA_SYSTEM_ECHO, echoHistory),
+        ]);
 
         return Response.json({
           teaMode: true,
           teaRound: round,
-          teaLucia: `${empathyLine}\n${luciaDeep}`,
-          teaJack: jackQuestion,
-          teaEcho: echoQuestion,
+          teaLucia: luciaLLM || fallbackLucia,
+          teaJack: jackLLM || fallbackJack,
+          teaEcho: echoLLM || fallbackEcho,
         });
       }
 
-      // ── Round 1 — LUCIA 단독 공감 ──
+      // Round 1 — LUCIA 단독
+      const luciaLLM = await callTeaPersona(TEA_SYSTEM_LUCIA, luciaHistory);
       return Response.json({
         teaMode: true,
         teaRound: round,
-        teaLucia: `말씀해주셔서 고마워요.\n${empathyLine}\n조금 더 이야기해주실 수 있어요?`,
+        teaLucia: luciaLLM || fallbackLucia,
       });
     }
 
