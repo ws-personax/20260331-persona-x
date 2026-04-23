@@ -230,7 +230,31 @@ export async function POST(req: Request) {
         ? Number(teaRound)
         : userTurns || 1;
 
-      // ── Round 2+ — 공감 변주 + JACK/ECHO 질문으로 확장 ──
+      // ── Round 3+ — 감정 심화 질문 + 마무리 톤 (round 증가할수록 ECHO가 closing 쪽으로) ──
+      if (round >= 3) {
+        // Round 3: 감정 자체에 초점 / Round 4+: 완전 마무리 모드
+        const isClosing = round >= 4;
+
+        const teaLucia = `계속 말씀해주셔서 고마워요.\n${empathyLine}\n지금 이 순간 어떤 감정이 가장 크게 느껴지세요?`;
+
+        const teaJack = isClosing
+          ? '충분히 이야기하셨어요.\n지금 마음에 가장 남은 한 문장이 뭔가요?'
+          : '지금까지 말씀하신 걸 들어보니,\n한 가지 여쭤봐도 될까요?\n이 상황에서 가장 후회되는 결정이 뭔가요?';
+
+        const teaEcho = isClosing
+          ? '오늘은 여기까지 하셔도 괜찮아요.\n충분히 꺼내주셨어요. 따뜻한 차 한 잔, 드세요. 🫖'
+          : '오늘 여기까지 털어놓아 주셨어요.\n천천히, 한 걸음씩이면 충분합니다. ☕';
+
+        return Response.json({
+          teaMode: true,
+          teaRound: round,
+          teaLucia,
+          teaJack,
+          teaEcho,
+        });
+      }
+
+      // ── Round 2 — 공감 변주 + JACK/ECHO 질문으로 확장 ──
       if (round >= 2) {
         const luciaDeep =
           isFamily ? '그 마음이 얼마나 무거우셨을지 느껴져요.'

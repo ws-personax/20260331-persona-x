@@ -1486,8 +1486,8 @@ export default function ChatWindow() {
         </div>
       )}
 
-      {/* ✅ 추천 질문 탭 패널 — footer 바로 위에 고정 */}
-      {showQuickQ && (
+      {/* ✅ 추천 질문 탭 패널 — footer 바로 위에 고정. 차 한잔 탭에서는 절대 표시 안 함 */}
+      {showQuickQ && onboardingTab !== 'tea' && (
         <div style={{
           background: '#fff',
           borderTop: '1px solid #e5e7eb',
@@ -1638,8 +1638,9 @@ export default function ChatWindow() {
 
       <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {/* 사전 질문 토글 버튼 — 재테크 맥락에서만 표시 (차 한잔 탭 첫 화면에서는 숨김) */}
-          {(hasUserSent || onboardingTab === 'finance') && (
+          {/* 사전 질문 토글 버튼 — 재테크 탭일 때만 표시.
+              차 한잔 탭(onboardingTab === 'tea')에서는 hasUserSent 여부와 무관하게 항상 숨김. */}
+          {onboardingTab === 'finance' && (
             <button
               onClick={() => setShowQuickQ(prev => !prev)}
               title="추천 질문 / 주요 뉴스"
