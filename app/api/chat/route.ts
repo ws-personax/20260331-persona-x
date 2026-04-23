@@ -29,7 +29,7 @@ export const maxDuration = 60;
 //   기존 GOOGLE_GENERATIVE_AI_API_KEY 재사용. LLM 실패 시 호출부에서
 //   기존 템플릿으로 폴백.
 // ─────────────────────────────────────────────
-const TEA_GEMINI_MODEL = 'gemini-1.5-flash';
+const TEA_GEMINI_MODEL = 'gemini-2.0-flash';
 const teaGenAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '');
 
 const TEA_SYSTEM_LUCIA = `당신은 LUCIA입니다. ENFP 성격의 따뜻한 참모.
