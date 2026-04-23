@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // 중앙 금고 설정 로드
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || "");
-const modelName = process.env.NEXT_PUBLIC_AI_MODEL || 'gemini-2.0-flash-lite';
+const modelName = process.env.NEXT_PUBLIC_AI_MODEL || 'gemini-2.0-flash';
 
 export const getEchoResponse = async (input: string) => {
   try {

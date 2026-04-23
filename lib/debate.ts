@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // 중앙 금고에서 키와 모델명을 가져옵니다.
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || "");
-const modelName = process.env.NEXT_PUBLIC_AI_MODEL || '2.0-flash-lite';
+const modelName = process.env.NEXT_PUBLIC_AI_MODEL || 'gemini-2.0-flash';
 
 export const getDebateResponse = async (prompt: string) => {
   try {
