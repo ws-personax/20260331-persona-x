@@ -813,28 +813,13 @@ const FinanceTabContent = ({ onExample }: { onExample: (keyword: string) => void
         lineHeight: 1.4,
         color: '#111827',
         textAlign: 'center',
-        margin: '0 0 14px',
+        margin: '0 0 22px',
       }}
     >
       지금 이 순간의 데이터로
       <br />
       4개의 관점이 충돌합니다
     </h2>
-    <p
-      style={{
-        textAlign: 'center',
-        color: '#6b7280',
-        fontSize: 13,
-        lineHeight: 1.7,
-        margin: '0 0 18px',
-      }}
-    >
-      ChatGPT는 어제 삼성전자 주가를 모릅니다.
-      <br />
-      PersonaX는 지금 이 순간 실시간 데이터를 가져와
-      <br />
-      4명의 참모진이 분석합니다.
-    </p>
     <p
       style={{
         textAlign: 'center',
