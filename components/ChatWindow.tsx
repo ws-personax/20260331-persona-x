@@ -963,10 +963,16 @@ const TeaTabContent = () => {
   );
 };
 
-// ─── 탭 2개 + 활성 탭 내용 통합 컴포넌트 ───
-const OnboardingTabs = ({ onExample }: { onExample: (keyword: string) => void }) => {
-  const [activeTab, setActiveTab] = useState<'finance' | 'tea'>('finance');
-
+// ─── 탭 2개 + 활성 탭 내용 통합 컴포넌트 (controlled — state는 부모가 보유) ───
+const OnboardingTabs = ({
+  onExample,
+  activeTab,
+  onTabChange,
+}: {
+  onExample: (keyword: string) => void;
+  activeTab: 'finance' | 'tea';
+  onTabChange: (tab: 'finance' | 'tea') => void;
+}) => {
   return (
     <div style={{ padding: '0 12px' }}>
       {/* 탭 선택 영역 — compact pill 버튼 2개 + 하단 구분선 */}
@@ -982,13 +988,13 @@ const OnboardingTabs = ({ onExample }: { onExample: (keyword: string) => void })
           active={activeTab === 'finance'}
           icon="📊"
           title="재테크"
-          onClick={() => setActiveTab('finance')}
+          onClick={() => onTabChange('finance')}
         />
         <TabButton
           active={activeTab === 'tea'}
           icon="☕"
           title="차 한잔 하실래요?"
-          onClick={() => setActiveTab('tea')}
+          onClick={() => onTabChange('tea')}
         />
       </div>
 
@@ -1007,6 +1013,8 @@ export default function ChatWindow() {
   const [mounted, setMounted] = useState(false);
   const [input, setInput] = useState('');
   const [showQuickQ, setShowQuickQ] = useState(false);
+  // ✅ 온보딩 탭 상태를 부모로 끌어올림 — footer/placeholder와 연동
+  const [onboardingTab, setOnboardingTab] = useState<'finance' | 'tea'>('finance');
 
   // ✅ 시장 상황 + 시간대 기반 동적 추천 질문
   // ✅ 탭 타입 정의
@@ -1324,7 +1332,11 @@ export default function ChatWindow() {
       <div style={{ flex: 1, overflowY: 'auto', padding: hasUserSent ? '20px 0 140px' : '0 0 140px' }}>
         {!hasUserSent && (
           <div className="px-onboarding-wrap">
-            <OnboardingTabs onExample={(name) => handleSendWithPosition(name, null)} />
+            <OnboardingTabs
+              onExample={(name) => handleSendWithPosition(name, null)}
+              activeTab={onboardingTab}
+              onTabChange={setOnboardingTab}
+            />
           </div>
         )}
         {messages.map(msg => (
@@ -1578,41 +1590,43 @@ export default function ChatWindow() {
 
       <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {/* 사전 질문 토글 버튼 — 2줄 라벨 */}
-          <button
-            onClick={() => setShowQuickQ(prev => !prev)}
-            title="추천 질문 / 주요 뉴스"
-            style={{
-              background: showQuickQ ? '#FAE100' : '#f3f4f6',
-              border: 'none',
-              borderRadius: 12,
-              padding: '6px 12px',
-              minHeight: 56,
-              height: 56,
-              boxSizing: 'border-box',
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: 'pointer',
-              flexShrink: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 2,
-              whiteSpace: 'nowrap',
-              color: '#374151',
-              lineHeight: 1.2,
-            }}
-          >
-            <span>💡 추천 질문</span>
-            <span>📰 주요 뉴스</span>
-          </button>
+          {/* 사전 질문 토글 버튼 — 재테크 맥락에서만 표시 (차 한잔 탭 첫 화면에서는 숨김) */}
+          {(hasUserSent || onboardingTab === 'finance') && (
+            <button
+              onClick={() => setShowQuickQ(prev => !prev)}
+              title="추천 질문 / 주요 뉴스"
+              style={{
+                background: showQuickQ ? '#FAE100' : '#f3f4f6',
+                border: 'none',
+                borderRadius: 12,
+                padding: '6px 12px',
+                minHeight: 56,
+                height: 56,
+                boxSizing: 'border-box',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 2,
+                whiteSpace: 'nowrap',
+                color: '#374151',
+                lineHeight: 1.2,
+              }}
+            >
+              <span>💡 추천 질문</span>
+              <span>📰 주요 뉴스</span>
+            </button>
+          )}
           <textarea
             ref={textareaRef}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
-            placeholder="종목명을 입력하세요 (예: 삼성전자, 테슬라)"
+            placeholder={!hasUserSent && onboardingTab === 'tea' ? '마음을 꺼내보세요' : '종목명을 입력하세요 (예: 삼성전자, 테슬라)'}
             style={{
               flex: 1,
               border: '1px solid #d1d5db',
