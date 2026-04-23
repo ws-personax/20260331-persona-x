@@ -954,7 +954,8 @@ const TeaTabContent = ({ onCardClick }: { onCardClick: (text: string) => void })
 };
 
 // ─── 탭 2개 + 활성 탭 내용 통합 컴포넌트 (controlled — state는 부모가 보유) ───
-//   activeTab=null → 탭 버튼만 표시, 콘텐츠 영역은 비움 (클릭 전 상태)
+//   activeTab=null → 큰 카드 2개로 안내 (첫 화면)
+//   activeTab!=null → 기존 pill TabButton 2개 + 활성 탭 콘텐츠
 const OnboardingTabs = ({
   onExample,
   onCardClick,
@@ -966,9 +967,92 @@ const OnboardingTabs = ({
   activeTab: 'finance' | 'tea' | null;
   onTabChange: (tab: 'finance' | 'tea') => void;
 }) => {
+  // ─ 첫 화면 — 큰 카드 2개 (flex-wrap 으로 모바일은 자동 세로 스택) ─
+  if (activeTab === null) {
+    return (
+      <>
+        <style>{`
+          .px-intro-card {
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+          }
+          .px-intro-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.10);
+          }
+        `}</style>
+        <div style={{ padding: '24px 12px 0', display: 'flex', justifyContent: 'center' }}>
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 16,
+              justifyContent: 'center',
+              width: '100%',
+              maxWidth: 560,
+            }}
+          >
+            {/* 재테크 카드 — 흰색 배경 + 진한 테두리 */}
+            <button
+              type="button"
+              className="px-intro-card"
+              onClick={() => onTabChange('finance')}
+              style={{
+                flex: '1 1 220px',
+                minHeight: 140,
+                padding: '20px 18px',
+                background: '#ffffff',
+                border: '2px solid #1f2937',
+                borderRadius: 14,
+                cursor: 'pointer',
+                textAlign: 'left',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+              }}
+            >
+              <span style={{ fontSize: 32, lineHeight: 1 }}>📊</span>
+              <span style={{ fontSize: 16, fontWeight: 800, color: '#111827' }}>재테크</span>
+              <span style={{ fontSize: 12, color: '#4b5563', lineHeight: 1.5 }}>
+                지금 이 순간의 데이터로 4명의 참모가 분석합니다
+              </span>
+            </button>
+
+            {/* 차 한잔 카드 — 크림색 배경 + 주황 테두리 */}
+            <button
+              type="button"
+              className="px-intro-card"
+              onClick={() => onTabChange('tea')}
+              style={{
+                flex: '1 1 220px',
+                minHeight: 140,
+                padding: '20px 18px',
+                background: '#fffaf0',
+                border: '2px solid #fb923c',
+                borderRadius: 14,
+                cursor: 'pointer',
+                textAlign: 'left',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+              }}
+            >
+              <span style={{ fontSize: 32, lineHeight: 1 }}>☕</span>
+              <span style={{ fontSize: 16, fontWeight: 800, color: '#7c2d12' }}>차 한잔 하실래요?</span>
+              <span style={{ fontSize: 12, color: '#92400e', lineHeight: 1.5 }}>
+                투자 고민, 기쁜 일, 복잡한 감정을 털어놓으세요
+              </span>
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ─ 탭 선택 후 — 기존 pill TabButton + 해당 탭 콘텐츠 ─
   return (
     <div style={{ padding: '0 12px' }}>
-      {/* 탭 선택 영역 — compact pill 버튼 2개 + 하단 구분선 */}
       <div
         style={{
           display: 'flex',
@@ -991,27 +1075,6 @@ const OnboardingTabs = ({
         />
       </div>
 
-      {/* 탭 미선택 상태 — 두 탭 각각의 한 줄 안내 문구 */}
-      {activeTab === null && (
-        <div
-          style={{
-            textAlign: 'center',
-            fontSize: 13,
-            color: '#6b7280',
-            padding: '36px 16px 24px',
-            lineHeight: 2,
-          }}
-        >
-          <p style={{ margin: '0 0 8px' }}>
-            📊 재테크 — 지금 이 순간의 데이터로 4명의 참모가 분석합니다
-          </p>
-          <p style={{ margin: 0 }}>
-            ☕ 차 한잔 — 투자 고민, 기쁜 일, 복잡한 감정을 털어놓으세요
-          </p>
-        </div>
-      )}
-
-      {/* 활성 탭 본문 — null이면 렌더하지 않음 (탭 클릭 전 상태) */}
       {activeTab === 'finance' && <FinanceTabContent onExample={onExample} />}
       {activeTab === 'tea' && <TeaTabContent onCardClick={onCardClick} />}
     </div>
