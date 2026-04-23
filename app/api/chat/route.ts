@@ -203,11 +203,22 @@ export async function POST(req: Request) {
     const { messages, positionContext, teaMode } = await req.json();
     const lastMsg = messages.at(-1)?.content || "";
 
-    // ✅ 차 한잔 모드 — LUCIA 단독 응답 (Stage 1: 템플릿 고정)
+    // ✅ 차 한잔 모드 — LUCIA 단독 응답 (Stage 1: 키워드 감지 공감 템플릿)
     if (teaMode) {
+      // 카테고리 감지 — 우선순위: 가족/건강 > 기쁨 > 손실/투자 > 기타
+      //   가족/건강이 투자보다 우선: "어머니가 아프셔서 주식이..." 같은 혼합 케이스 보호
+      const empathyLine =
+        /(가족|부모|어머니|아버지|엄마|아빠|자식|아이|아들|딸|남편|아내|형제|자매|건강|병|아프|수술|입원|병원|암|치매)/.test(lastMsg)
+          ? '많이 걱정되시겠어요.'
+        : /(기쁨|기뻐|행복|성공|올랐|올라|상승|수익|벌었|대박|축하|자랑|합격|승진|좋은 일)/.test(lastMsg)
+          ? '정말 잘 되셨네요!'
+        : /(손실|손절|물렸|물림|떨어졌|하락|폭락|투자|주식|코인|마이너스|잃었|날렸)/.test(lastMsg)
+          ? '많이 속상하셨겠어요.'
+        : '많이 힘드셨겠어요.';
+
       return Response.json({
         teaMode: true,
-        luciaReply: '말씀해주셔서 고마워요.\n천천히 들을게요. 어떤 일이 있으셨어요?',
+        luciaReply: `말씀해주셔서 고마워요.\n${empathyLine}\n조금 더 이야기해주실 수 있어요?`,
       });
     }
 
