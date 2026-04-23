@@ -1396,15 +1396,10 @@ export default function ChatWindow() {
           height: 100vh;
           height: 100dvh;
         }
-        /* 첫 화면 온보딩 래퍼 — 화면 세로 정중앙에 카드 배치
-           헤더(약 50-60px) + 잠재적 footer 공간 제외한 영역의 가운데. */
+        /* 첫 화면 온보딩 래퍼 — 기본은 탭 선택 후 콘텐츠용 (상단 정렬).
+           onboardingTab === null 일 때만 인라인 style 로 flex 중앙정렬 override. */
         .px-onboarding-wrap {
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          min-height: calc(100vh - 120px);
-          padding: 20px 12px;
+          padding: 20px 0;
           box-sizing: border-box;
         }
       `}</style>
@@ -1459,7 +1454,20 @@ export default function ChatWindow() {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: hasUserSent ? '20px 0 140px' : '0 0 140px' }}>
         {!hasUserSent && (
-          <div className="px-onboarding-wrap">
+          <div
+            className="px-onboarding-wrap"
+            style={
+              onboardingTab === null
+                ? {
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: 'calc(100vh - 60px)',
+                    padding: 0,
+                  }
+                : undefined
+            }
+          >
             <OnboardingTabs
               onExample={(name) => handleSendWithPosition(name, null)}
               onCardClick={(text) => {
