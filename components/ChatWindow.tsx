@@ -1011,7 +1011,8 @@ const OnboardingTabs = ({
             className="px-intro-card"
             onClick={() => onTabChange('finance')}
             style={{
-              flex: '1 1 240px',
+              flex: '1 1 280px',
+              minWidth: '280px',
               minHeight: 160,
               height: 160,
               padding: '20px 18px',
@@ -1047,7 +1048,8 @@ const OnboardingTabs = ({
             className="px-intro-card"
             onClick={() => onTabChange('tea')}
             style={{
-              flex: '1 1 240px',
+              flex: '1 1 280px',
+              minWidth: '280px',
               minHeight: 160,
               height: 160,
               padding: '20px 18px',
@@ -1411,7 +1413,7 @@ export default function ChatWindow() {
         /* 첫 화면 온보딩 래퍼 — 기본은 탭 선택 후 콘텐츠용 (상단 정렬).
            onboardingTab === null 일 때만 인라인 style 로 flex 중앙정렬 override. */
         .px-onboarding-wrap {
-          padding: 0;
+          padding: 16px 0 20px;
           box-sizing: border-box;
         }
       `}</style>
@@ -1464,7 +1466,7 @@ export default function ChatWindow() {
         </div>
       </header>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: hasUserSent ? '80px 0 140px' : '60px 0 140px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: hasUserSent ? '80px 0 140px' : '64px 0 140px' }}>
         {!hasUserSent && (
           <div
             className="px-onboarding-wrap"
@@ -1476,6 +1478,7 @@ export default function ChatWindow() {
                     justifyContent: 'center',
                     height: 'calc(100vh - 60px)',
                     padding: 0,
+                    marginTop: '16px',
                   }
                 : undefined
             }

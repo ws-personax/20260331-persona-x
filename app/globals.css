@@ -12,17 +12,16 @@
   --background-end-rgb: 255, 255, 255;
 }
 
-/* ⚠️ 이전에 있던 @media (prefers-color-scheme: dark) 블록 제거.
+/* ⚠️ @media (prefers-color-scheme: dark) 블록은 전체 제거.
    OS 다크모드일 때 앱 배경이 검정으로 반전되던 문제 방지. */
+
+html, body {
+  background-color: #b2c7da !important;
+  color-scheme: light !important;
+}
 
 body {
   color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
   min-height: 100vh;
 }
 
