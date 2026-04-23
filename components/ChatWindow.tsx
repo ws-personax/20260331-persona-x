@@ -876,7 +876,7 @@ const TeaTabContent = ({ onCardClick }: { onCardClick: (text: string) => void })
   const quote = useMemo(() => getTodayQuote(), []);
 
   return (
-    <div style={{ padding: '80px 4px 0' }}>
+    <div style={{ padding: '80px 4px 160px' }}>
       {/* 오늘의 명언 */}
       <div
         style={{
