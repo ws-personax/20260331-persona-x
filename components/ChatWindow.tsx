@@ -47,6 +47,8 @@ interface Message {
   // 차 한잔 탭 전용 — LUCIA 단독 응답
   teaMode?: boolean;
   luciaReply?: string;
+  jackReply?: string;
+  echoReply?: string;
 }
 
 type PersonaKey = 'jack' | 'lucia' | 'ray' | 'echo';
@@ -250,6 +252,7 @@ const PersonaBubble = memo(function PersonaBubble({
   echoNews,
   isRebuttal = false,
   details,
+  hideEchoTag = false,
 }: {
   personaKey: PersonaKey;
   text: string;
@@ -258,6 +261,7 @@ const PersonaBubble = memo(function PersonaBubble({
   echoNews?: NewsLink | null;
   isRebuttal?: boolean;
   details?: string | null;
+  hideEchoTag?: boolean;
 }) {
   const p = PERSONAS[personaKey];
   const isEcho = personaKey === 'echo';
@@ -331,7 +335,7 @@ const PersonaBubble = memo(function PersonaBubble({
                     : `1px solid ${p.bubbleBorder}`,
               }}
             >
-              {isEcho && p.echoTag && (
+              {isEcho && p.echoTag && !hideEchoTag && (
                 <div
                   style={{
                     position: 'absolute',
@@ -1145,12 +1149,22 @@ export default function ChatWindow() {
   const handleSendWithPosition = useCallback(async (text: string, position: Position | null) => {
     setShowPosition(false);
 
+    // ✅ 차 한잔 탭에서 보낼 때는 LUCIA 단독 응답 루트
+    const isTeaSend = onboardingTab === 'tea';
+
+    // ✅ 차 한잔 대화 턴 수 — 이번 전송 포함 (1 = 첫 메시지)
+    //    기존에 보낸 user 메시지 중 teaMode=true 인 것 +1
+    const teaRound = isTeaSend
+      ? messagesRef.current.filter(m => m.role === 'user' && m.teaMode).length + 1
+      : 0;
+
     const userMsg: Message = {
       id: generateId(),
       role: 'user',
       content: text,
       timestamp: new Date(),
       isRead: false,
+      teaMode: isTeaSend,
     };
 
     const nextMessages = [...messagesRef.current, userMsg];
@@ -1158,9 +1172,6 @@ export default function ChatWindow() {
     setMessages(nextMessages);
     setIsLoading(true);
     setInput('');
-
-    // ✅ 차 한잔 탭에서 보낼 때는 LUCIA 단독 응답 루트
-    const isTeaSend = onboardingTab === 'tea';
 
     try {
       const response = await fetch('/api/chat', {
@@ -1170,6 +1181,7 @@ export default function ChatWindow() {
           messages: nextMessages.slice(-10).map(m => ({ role: m.role, content: m.content })),
           positionContext: buildPositionContext(position),
           teaMode: isTeaSend,
+          teaRound,
         }),
       });
 
@@ -1188,6 +1200,8 @@ export default function ChatWindow() {
         retryText: data.errorType === 'keyword_not_recognized' ? undefined : text,
         teaMode: data.teaMode,
         luciaReply: data.luciaReply,
+        jackReply: data.jackReply,
+        echoReply: data.echoReply,
       };
 
       const updated = [...nextMessages, assistantMsg];
@@ -1237,7 +1251,11 @@ export default function ChatWindow() {
     const hasInlinePosition = !!(inlineAvg || inlineBuy || inlineQty);
 
     // ✅ 평단가 등이 인라인으로 있으면 종목명 매칭 + 모달 표시 강제 (트리거 강화)
-    const showModal = matched && (hasInlinePosition || shouldShowPosition(content, matched));
+    // ⚠️ 차 한잔 탭(onboardingTab === 'tea')에서는 포지션 입력창 절대 표시 금지
+    const showModal =
+      onboardingTab === 'finance' &&
+      matched &&
+      (hasInlinePosition || shouldShowPosition(content, matched));
     if (showModal) {
       setPendingText(content);
       setPendingKeyword(matched);
@@ -1249,7 +1267,7 @@ export default function ChatWindow() {
     }
 
     handleSendWithPosition(content, null);
-  }, [input, isLoading, handleSendWithPosition]);
+  }, [input, isLoading, handleSendWithPosition, onboardingTab]);
 
   if (!mounted) return null;
 
@@ -1366,6 +1384,21 @@ export default function ChatWindow() {
                   text={msg.luciaReply || ''}
                   timestamp={msg.timestamp}
                 />
+                {msg.jackReply && (
+                  <PersonaBubble
+                    personaKey="jack"
+                    text={msg.jackReply}
+                    timestamp={msg.timestamp}
+                  />
+                )}
+                {msg.echoReply && (
+                  <PersonaBubble
+                    personaKey="echo"
+                    text={msg.echoReply}
+                    timestamp={msg.timestamp}
+                    hideEchoTag
+                  />
+                )}
               </div>
             ) : (
               <div style={{ marginBottom: 12 }}>
