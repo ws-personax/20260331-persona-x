@@ -767,61 +767,39 @@ const QUOTES = [
 ];
 const getTodayQuote = () => QUOTES[Math.floor(Date.now() / 86400000) % QUOTES.length];
 
-// ─── 탭 선택 버튼 ───
+// ─── 탭 선택 버튼 — 아이콘 + 제목만 (compact pill 스타일) ───
 const TabButton = ({
   active,
   icon,
   title,
-  subtitle,
-  author,
   onClick,
 }: {
   active: boolean;
   icon: string;
   title: string;
-  subtitle: string;
-  author?: string;
   onClick: () => void;
 }) => (
   <button
     type="button"
     onClick={onClick}
     style={{
-      flex: 1,
-      minWidth: 0,
-      padding: '14px 14px 16px',
+      padding: '9px 16px',
       background: active ? '#1f2937' : '#ffffff',
-      color: active ? '#ffffff' : '#374151',
+      color: active ? '#ffffff' : '#6b7280',
       border: active ? '1px solid #1f2937' : '1px solid #d1d5db',
-      borderRadius: 14,
+      borderRadius: 20,
       cursor: 'pointer',
-      textAlign: 'left',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 4,
-      boxShadow: active ? '0 2px 8px rgba(0,0,0,0.15)' : '0 1px 3px rgba(0,0,0,0.05)',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 6,
+      fontSize: 13,
+      fontWeight: 700,
+      whiteSpace: 'nowrap',
       transition: 'background 0.15s, color 0.15s',
     }}
   >
-    <div style={{ fontSize: 22, lineHeight: 1 }}>{icon}</div>
-    <div style={{ fontSize: 14, fontWeight: 800, marginTop: 2 }}>{title}</div>
-    <div
-      style={{
-        fontSize: 11,
-        opacity: active ? 0.85 : 0.7,
-        fontStyle: 'italic',
-        whiteSpace: 'pre-line',
-        lineHeight: 1.5,
-        marginTop: 2,
-      }}
-    >
-      {subtitle}
-    </div>
-    {author && (
-      <div style={{ fontSize: 10, opacity: active ? 0.7 : 0.55, fontStyle: 'italic', marginTop: 1 }}>
-        — {author}
-      </div>
-    )}
+    <span style={{ fontSize: 15 }}>{icon}</span>
+    <span>{title}</span>
   </button>
 );
 
@@ -903,9 +881,41 @@ const TEA_CARDS = [
 const TeaTabContent = () => {
   const [notice, setNotice] = useState('');
   const handleCardClick = () => setNotice('준비 중입니다. 곧 만나요 ☕');
+  const quote = useMemo(() => getTodayQuote(), []);
 
   return (
-    <div style={{ padding: '24px 4px 0' }}>
+    <div style={{ padding: '20px 4px 0' }}>
+      {/* 오늘의 명언 */}
+      <div
+        style={{
+          margin: '0 auto 22px',
+          maxWidth: 440,
+          padding: '14px 18px',
+          background: '#fffaf0',
+          border: '1px solid #fcd9a8',
+          borderRadius: 12,
+          textAlign: 'center',
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontSize: 13,
+            lineHeight: 1.7,
+            color: '#7c2d12',
+            fontStyle: 'italic',
+            whiteSpace: 'pre-line',
+          }}
+        >
+          “{quote.text}”
+        </p>
+        {quote.author && (
+          <p style={{ margin: '6px 0 0', fontSize: 11, color: '#92400e', fontWeight: 600 }}>
+            — {quote.author}
+          </p>
+        )}
+      </div>
+
       <h2
         style={{
           fontSize: 21,
@@ -971,25 +981,28 @@ const TeaTabContent = () => {
 // ─── 탭 2개 + 활성 탭 내용 통합 컴포넌트 ───
 const OnboardingTabs = ({ onExample }: { onExample: (keyword: string) => void }) => {
   const [activeTab, setActiveTab] = useState<'finance' | 'tea'>('finance');
-  const quote = useMemo(() => getTodayQuote(), []);
 
   return (
     <div style={{ padding: '0 12px' }}>
-      {/* 탭 선택 영역 */}
-      <div style={{ display: 'flex', gap: 10 }}>
+      {/* 탭 선택 영역 — compact pill 버튼 2개 + 하단 구분선 */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          paddingBottom: 12,
+          borderBottom: '1px solid #e5e7eb',
+        }}
+      >
         <TabButton
           active={activeTab === 'finance'}
           icon="📊"
           title="재테크"
-          subtitle="지금 이 순간의 데이터로"
           onClick={() => setActiveTab('finance')}
         />
         <TabButton
           active={activeTab === 'tea'}
           icon="☕"
           title="차 한잔 하실래요?"
-          subtitle={quote.text}
-          author={quote.author || undefined}
           onClick={() => setActiveTab('tea')}
         />
       </div>
