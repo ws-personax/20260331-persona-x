@@ -210,7 +210,7 @@ const callTeaPersona = async (
       });
       const result = await model.generateContent({
         contents,
-        generationConfig: { maxOutputTokens: 800, temperature: 0.9 },
+        generationConfig: { maxOutputTokens: 1000, temperature: 0.9 },
       });
       const blockReason = result?.response?.promptFeedback?.blockReason;
       if (blockReason) {
