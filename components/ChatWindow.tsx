@@ -991,6 +991,26 @@ const OnboardingTabs = ({
         />
       </div>
 
+      {/* 탭 미선택 상태 — 두 탭 각각의 한 줄 안내 문구 */}
+      {activeTab === null && (
+        <div
+          style={{
+            textAlign: 'center',
+            fontSize: 13,
+            color: '#6b7280',
+            padding: '36px 16px 24px',
+            lineHeight: 2,
+          }}
+        >
+          <p style={{ margin: '0 0 8px' }}>
+            📊 재테크 — 지금 이 순간의 데이터로 4명의 참모가 분석합니다
+          </p>
+          <p style={{ margin: 0 }}>
+            ☕ 차 한잔 — 투자 고민, 기쁜 일, 복잡한 감정을 털어놓으세요
+          </p>
+        </div>
+      )}
+
       {/* 활성 탭 본문 — null이면 렌더하지 않음 (탭 클릭 전 상태) */}
       {activeTab === 'finance' && <FinanceTabContent onExample={onExample} />}
       {activeTab === 'tea' && <TeaTabContent onCardClick={onCardClick} />}
