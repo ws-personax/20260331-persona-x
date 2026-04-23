@@ -1470,7 +1470,7 @@ export default function ChatWindow() {
       </header>
 
       {/* ✅ 헤더 spacer — sticky 헤더가 스크롤 컨테이너 위로 떠 콘텐츠가 가려지는 현상 방지 */}
-      <div style={{ height: 56, flexShrink: 0 }} />
+      <div style={{ height: 120, flexShrink: 0 }} />
 
       <div style={{ flex: 1, overflowY: 'auto', padding: scrollPadding }}>
         {!hasUserSent && (
@@ -1484,6 +1484,7 @@ export default function ChatWindow() {
                     justifyContent: 'center',
                     height: 'calc(100vh - 60px)',
                     padding: 0,
+                    paddingTop: '16px',
                   }
                 : undefined
             }
