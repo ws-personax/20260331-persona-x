@@ -876,7 +876,7 @@ const TeaTabContent = ({ onCardClick }: { onCardClick: (text: string) => void })
   const quote = useMemo(() => getTodayQuote(), []);
 
   return (
-    <div style={{ padding: '80px 4px 160px' }}>
+    <div style={{ padding: '20px 12px 200px' }}>
       {/* 오늘의 명언 */}
       <div
         style={{
@@ -1472,7 +1472,7 @@ export default function ChatWindow() {
       {/* ✅ 첫 화면(hasUserSent=false & onboardingTab=null) — 카드 전용 스크롤 컨테이너.
           헤더 바로 아래에 자연스럽게 카드 배치 (spacer/특수 패딩 없이 단순 padding 만). */}
       {!hasUserSent && onboardingTab === null && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 12px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
           <OnboardingTabs
             onExample={(name) => handleSendWithPosition(name, null)}
             onCardClick={(text) => {
