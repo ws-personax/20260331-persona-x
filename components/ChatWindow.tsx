@@ -980,96 +980,90 @@ const OnboardingTabs = ({
             box-shadow: 0 8px 20px rgba(0,0,0,0.10);
           }
         `}</style>
-        {/* 부모 컨테이너 — 화면 세로 중앙 정렬 (헤더 + footer 높이 제외) */}
+        {/* 카드 2개 가로 배치 (모바일은 flex-wrap 으로 세로 스택).
+            세로 중앙 정렬은 부모 .px-onboarding-wrap 이 담당. */}
         <div
           style={{
             display: 'flex',
-            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 16,
             justifyContent: 'center',
-            minHeight: 'calc(100vh - 120px)',
-            padding: '20px 12px',
-            boxSizing: 'border-box',
+            alignItems: 'stretch',
+            width: '100%',
+            maxWidth: 560,
           }}
         >
-          <div
+          {/* 재테크 카드 — 흰색 배경 + 진한 테두리 */}
+          <button
+            type="button"
+            className="px-intro-card"
+            onClick={() => onTabChange('finance')}
             style={{
+              flex: '1 1 240px',
+              minHeight: 160,
+              height: 160,
+              padding: '20px 18px',
+              background: '#ffffff',
+              border: '2px solid #1f2937',
+              borderRadius: 14,
+              cursor: 'pointer',
+              textAlign: 'left',
               display: 'flex',
-              flexWrap: 'wrap',
-              gap: 16,
-              justifyContent: 'center',
-              alignItems: 'stretch',
-              width: '100%',
-              maxWidth: 560,
+              flexDirection: 'column',
+              gap: 8,
+              boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+              boxSizing: 'border-box',
             }}
           >
-            {/* 재테크 카드 — 흰색 배경 + 진한 테두리 */}
-            <button
-              type="button"
-              className="px-intro-card"
-              onClick={() => onTabChange('finance')}
+            <span style={{ fontSize: 32, lineHeight: 1 }}>📊</span>
+            <span style={{ fontSize: 16, fontWeight: 800, color: '#111827' }}>재테크</span>
+            <span
               style={{
-                flex: '1 1 240px',
-                minHeight: 160,
-                padding: '20px 18px',
-                background: '#ffffff',
-                border: '2px solid #1f2937',
-                borderRadius: 14,
-                cursor: 'pointer',
-                textAlign: 'left',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                fontSize: 12,
+                color: '#4b5563',
+                lineHeight: 1.5,
+                whiteSpace: 'nowrap',
               }}
             >
-              <span style={{ fontSize: 32, lineHeight: 1 }}>📊</span>
-              <span style={{ fontSize: 16, fontWeight: 800, color: '#111827' }}>재테크</span>
-              <span
-                style={{
-                  fontSize: 12,
-                  color: '#4b5563',
-                  lineHeight: 1.5,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                실시간 데이터로 4명의 참모가 분석합니다
-              </span>
-            </button>
+              실시간 데이터로 4명의 참모가 분석합니다
+            </span>
+          </button>
 
-            {/* 차 한잔 카드 — 크림색 배경 + 주황 테두리 */}
-            <button
-              type="button"
-              className="px-intro-card"
-              onClick={() => onTabChange('tea')}
+          {/* 차 한잔 카드 — 크림색 배경 + 주황 테두리 */}
+          <button
+            type="button"
+            className="px-intro-card"
+            onClick={() => onTabChange('tea')}
+            style={{
+              flex: '1 1 240px',
+              minHeight: 160,
+              height: 160,
+              padding: '20px 18px',
+              background: '#fffaf0',
+              border: '2px solid #fb923c',
+              borderRadius: 14,
+              cursor: 'pointer',
+              textAlign: 'left',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+              boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+              boxSizing: 'border-box',
+            }}
+          >
+            <span style={{ fontSize: 32, lineHeight: 1 }}>☕</span>
+            <span style={{ fontSize: 16, fontWeight: 800, color: '#7c2d12' }}>차 한잔 하실래요?</span>
+            <span
               style={{
-                flex: '1 1 240px',
-                minHeight: 160,
-                padding: '20px 18px',
-                background: '#fffaf0',
-                border: '2px solid #fb923c',
-                borderRadius: 14,
-                cursor: 'pointer',
-                textAlign: 'left',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                fontSize: 12,
+                color: '#92400e',
+                lineHeight: 1.5,
+                whiteSpace: 'nowrap',
               }}
             >
-              <span style={{ fontSize: 32, lineHeight: 1 }}>☕</span>
-              <span style={{ fontSize: 16, fontWeight: 800, color: '#7c2d12' }}>차 한잔 하실래요?</span>
-              <span
-                style={{
-                  fontSize: 12,
-                  color: '#92400e',
-                  lineHeight: 1.5,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                고민과 감정을 참모진과 나눠보세요
-              </span>
-            </button>
-          </div>
+              고민과 감정을 참모진과 나눠보세요
+            </span>
+          </button>
         </div>
       </>
     );
@@ -1402,14 +1396,15 @@ export default function ChatWindow() {
           height: 100vh;
           height: 100dvh;
         }
-        /* 온보딩 카드를 상단 네비게이션 바 아래 충분한 여백(70px) 두고 배치
-           iPad Safari 주소창/네비게이션 바 높이(약 50~60px) 회피 */
+        /* 첫 화면 온보딩 래퍼 — 화면 세로 정중앙에 카드 배치
+           헤더(약 50-60px) + 잠재적 footer 공간 제외한 영역의 가운데. */
         .px-onboarding-wrap {
           display: flex;
           flex-direction: column;
-          justify-content: flex-start;
-          align-items: stretch;
-          padding: 70px 0 20px;
+          justify-content: center;
+          align-items: center;
+          min-height: calc(100vh - 120px);
+          padding: 20px 12px;
           box-sizing: border-box;
         }
       `}</style>
