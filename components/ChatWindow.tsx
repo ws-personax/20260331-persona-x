@@ -1246,8 +1246,8 @@ export default function ChatWindow() {
   // ✅ 온보딩 카드 표시 조건 — 사용자가 아직 질의를 보내지 않음
   const hasUserSent = useMemo(() => messages.some(m => m.role === 'user'), [messages]);
 
-  // ✅ 스크롤 컨테이너 상단 패딩 — 상단 여백은 헤더 아래 spacer(<div height=56>)가 담당
-  const scrollPadding = hasUserSent ? '20px 0 140px' : '0 0 140px';
+  // ✅ 스크롤 컨테이너 상단 패딩 — spacer 대신 padding 으로만 관리
+  const scrollPadding = hasUserSent ? '20px 0 140px' : '16px 0 140px';
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1470,7 +1470,7 @@ export default function ChatWindow() {
       </header>
 
       {/* ✅ 헤더 spacer — sticky 헤더가 스크롤 컨테이너 위로 떠 콘텐츠가 가려지는 현상 방지 */}
-      <div style={{ height: 120, flexShrink: 0 }} />
+      <div style={{ height: 0, flexShrink: 0 }} />
 
       <div style={{ flex: 1, overflowY: 'auto', padding: scrollPadding }}>
         {!hasUserSent && (
@@ -1480,11 +1480,10 @@ export default function ChatWindow() {
               onboardingTab === null
                 ? {
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    height: 'calc(100vh - 60px)',
-                    padding: 0,
-                    paddingTop: '80px',
+                    justifyContent: 'flex-start',
+                    padding: '16px 12px 20px',
                   }
                 : undefined
             }
