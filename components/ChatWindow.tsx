@@ -1246,24 +1246,8 @@ export default function ChatWindow() {
   // ✅ 온보딩 카드 표시 조건 — 사용자가 아직 질의를 보내지 않음
   const hasUserSent = useMemo(() => messages.some(m => m.role === 'user'), [messages]);
 
-  // ✅ 스크롤 컨테이너 상단 패딩 — 헤더/탭버튼 겹침 방지용 3단 분기
-  //   1) 대화 중: 20px
-  //   2) 첫 화면 카드(탭 미선택): 헤더 50px + 여백 6px = 56px
-  //   3) 탭 선택 후: 헤더 50px + 탭버튼 50px + 여백 8px = 108px
-  const scrollPadding = hasUserSent
-    ? '20px 0 140px'
-    : onboardingTab === null
-      ? '56px 0 140px'
-      : '108px 0 140px';
-
-  // 🐞 DEBUG: 상단 잘림 원인 추적용 임시 로그 (배포 후 제거 예정)
-  if (typeof window !== 'undefined') {
-    console.log('scrollPadding:', scrollPadding, 'onboardingTab:', onboardingTab, 'hasUserSent:', hasUserSent);
-  }
-
-  // 🐞 DEBUG: 스크롤 컨테이너 배경색으로 영역 시각화
-  //   onboardingTab === null → red / 탭 선택 후 → blue
-  const debugBg = onboardingTab === null ? 'red' : 'blue';
+  // ✅ 스크롤 컨테이너 상단 패딩 — 상단 여백은 헤더 아래 spacer(<div height=56>)가 담당
+  const scrollPadding = hasUserSent ? '20px 0 140px' : '0 0 140px';
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1485,7 +1469,10 @@ export default function ChatWindow() {
         </div>
       </header>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: scrollPadding, background: debugBg }}>
+      {/* ✅ 헤더 spacer — sticky 헤더가 스크롤 컨테이너 위로 떠 콘텐츠가 가려지는 현상 방지 */}
+      <div style={{ height: 56, flexShrink: 0 }} />
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: scrollPadding }}>
         {!hasUserSent && (
           <div
             className="px-onboarding-wrap"
