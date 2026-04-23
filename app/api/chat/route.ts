@@ -85,31 +85,82 @@ const buildTeaHistory = (rawMessages: unknown, persona: TeaPersonaKey): TeaMsg[]
 // Gemini contents 형식으로 변환.
 //   - role: 'user' → 'user', 'assistant' → 'model'
 //   - contents 는 반드시 'user' 역할로 시작해야 하므로 앞의 model 턴을 제거.
+//   - consecutive same-role 은 줄바꿈으로 병합 (Gemini 는 strict alternation 요구).
+//   - 마지막이 model 이면 꼬리를 잘라 user 로 끝나도록 (Gemini 는 마지막 user 만 응답).
 const toGeminiContents = (history: TeaMsg[]) => {
-  const arr = history.map(m => ({
+  type G = { role: 'user' | 'model'; parts: { text: string }[] };
+  const raw: G[] = history.map(m => ({
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: m.content }],
   }));
-  while (arr.length > 0 && arr[0].role !== 'user') arr.shift();
-  return arr;
+  // 선두의 model 턴 제거 (user 시작 요구)
+  while (raw.length > 0 && raw[0].role !== 'user') raw.shift();
+  // 마지막이 model 이면 뒤로부터 잘라서 user 로 끝나게
+  while (raw.length > 0 && raw[raw.length - 1].role !== 'user') raw.pop();
+  // consecutive same-role 병합
+  const merged: G[] = [];
+  for (const item of raw) {
+    const last = merged[merged.length - 1];
+    if (last && last.role === item.role) {
+      last.parts[0].text = `${last.parts[0].text}\n\n${item.parts[0].text}`;
+    } else {
+      merged.push({ role: item.role, parts: [{ text: item.parts[0].text }] });
+    }
+  }
+  return merged;
 };
 
-const callTeaPersona = async (system: string, history: TeaMsg[]): Promise<string | null> => {
-  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY || history.length === 0) return null;
+const callTeaPersona = async (
+  persona: TeaPersonaKey,
+  system: string,
+  history: TeaMsg[],
+): Promise<string | null> => {
+  const tag = `[tea:${persona}]`;
+  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    console.warn(`${tag} GOOGLE_GENERATIVE_AI_API_KEY 미설정 → 템플릿 폴백`);
+    return null;
+  }
+  if (history.length === 0) {
+    console.warn(`${tag} 히스토리 0 → 템플릿 폴백`);
+    return null;
+  }
+  const contents = toGeminiContents(history);
+  if (contents.length === 0 || contents[contents.length - 1].role !== 'user') {
+    console.warn(`${tag} contents 무효 (length=${contents.length}) → 템플릿 폴백`);
+    return null;
+  }
   try {
+    console.log(`${tag} Gemini 호출 시작 — history=${history.length}턴, contents=${contents.length}턴`);
     const model = teaGenAI.getGenerativeModel({
       model: TEA_GEMINI_MODEL,
       systemInstruction: system,
     });
-    const contents = toGeminiContents(history);
-    if (contents.length === 0) return null;
     const result = await model.generateContent({
       contents,
-      generationConfig: { maxOutputTokens: 150 },
+      generationConfig: { maxOutputTokens: 150, temperature: 0.9 },
     });
-    const text = result?.response?.text?.();
-    return typeof text === 'string' && text.trim() ? text.trim() : null;
-  } catch {
+    // safety 차단 / 빈 응답 분기
+    const blockReason = result?.response?.promptFeedback?.blockReason;
+    if (blockReason) {
+      console.warn(`${tag} Gemini 차단됨 — blockReason=${blockReason} → 템플릿 폴백`);
+      return null;
+    }
+    const finishReason = result?.response?.candidates?.[0]?.finishReason;
+    let text = '';
+    try {
+      text = result?.response?.text?.() || '';
+    } catch (e) {
+      console.warn(`${tag} text() 추출 실패 (finishReason=${finishReason}):`, e instanceof Error ? e.message : e);
+      return null;
+    }
+    if (!text.trim()) {
+      console.warn(`${tag} Gemini 빈 응답 (finishReason=${finishReason}) → 템플릿 폴백`);
+      return null;
+    }
+    console.log(`${tag} Gemini 성공 — ${text.trim().length}자 (finishReason=${finishReason})`);
+    return text.trim();
+  } catch (err) {
+    console.error(`${tag} Gemini 호출 오류:`, err instanceof Error ? err.message : err);
     return null;
   }
 };
@@ -326,6 +377,10 @@ export async function POST(req: Request) {
       const jackHistory = buildTeaHistory(messages, 'jack');
       const echoHistory = buildTeaHistory(messages, 'echo');
 
+      console.log(
+        `[tea] round=${round} / userTurns=${userTurns} / history lucia=${luciaHistory.length} jack=${jackHistory.length} echo=${echoHistory.length} / key=${process.env.GOOGLE_GENERATIVE_AI_API_KEY ? 'OK' : 'MISSING'}`,
+      );
+
       // ── 폴백 템플릿 (LLM 실패 시 per-persona 사용) ──
       let fallbackLucia: string;
       let fallbackJack: string;
@@ -364,12 +419,16 @@ export async function POST(req: Request) {
 
       // ── LLM 호출 ──
       if (round >= 2) {
-        // Round 2+ — 세 페르소나 병렬 호출
+        // Round 2+ — 세 페르소나 병렬 호출 (LUCIA/JACK/ECHO 모두 동일 경로)
         const [luciaLLM, jackLLM, echoLLM] = await Promise.all([
-          callTeaPersona(TEA_SYSTEM_LUCIA, luciaHistory),
-          callTeaPersona(TEA_SYSTEM_JACK, jackHistory),
-          callTeaPersona(TEA_SYSTEM_ECHO, echoHistory),
+          callTeaPersona('lucia', TEA_SYSTEM_LUCIA, luciaHistory),
+          callTeaPersona('jack', TEA_SYSTEM_JACK, jackHistory),
+          callTeaPersona('echo', TEA_SYSTEM_ECHO, echoHistory),
         ]);
+
+        console.log(
+          `[tea] round=${round} 결과 — lucia=${luciaLLM ? 'LLM' : 'FALLBACK'} jack=${jackLLM ? 'LLM' : 'FALLBACK'} echo=${echoLLM ? 'LLM' : 'FALLBACK'}`,
+        );
 
         return Response.json({
           teaMode: true,
@@ -381,7 +440,8 @@ export async function POST(req: Request) {
       }
 
       // Round 1 — LUCIA 단독
-      const luciaLLM = await callTeaPersona(TEA_SYSTEM_LUCIA, luciaHistory);
+      const luciaLLM = await callTeaPersona('lucia', TEA_SYSTEM_LUCIA, luciaHistory);
+      console.log(`[tea] round=1 결과 — lucia=${luciaLLM ? 'LLM' : 'FALLBACK'}`);
       return Response.json({
         teaMode: true,
         teaRound: round,
