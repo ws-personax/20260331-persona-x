@@ -1643,6 +1643,9 @@ export default function ChatWindow() {
         </div>
       )}
 
+      {/* 첫 화면(탭 미선택 & 대화 전) 에서는 footer 전체 숨김.
+          탭(재테크/차 한잔) 을 클릭하거나 한 번이라도 보낸 후에만 입력창 표시. */}
+      {(onboardingTab !== null || hasUserSent) && (
       <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {/* 사전 질문 토글 버튼 — 재테크 탭일 때만 표시.
@@ -1718,6 +1721,7 @@ export default function ChatWindow() {
           </button>
         </div>
       </footer>
+      )}
     </div>
     </>
   );
