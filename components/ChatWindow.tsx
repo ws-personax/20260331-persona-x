@@ -1700,25 +1700,6 @@ export default function ChatWindow() {
                     hideEchoTag
                   />
                 )}
-                {/* 다른 참모 의견 보기 — UI 만 먼저 제공, 기능은 추후 */}
-                <div style={{ display: 'flex', justifyContent: 'center', marginTop: 6, padding: '0 12px' }}>
-                  <button
-                    type="button"
-                    onClick={() => alert('다른 참모 의견은 추후 지원 예정입니다.')}
-                    style={{
-                      background: '#fff',
-                      border: '1px solid #d1d5db',
-                      borderRadius: 999,
-                      padding: '5px 12px',
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: '#6b7280',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    다른 참모 의견도 들어볼까요?
-                  </button>
-                </div>
               </div>
             ) : (
               <div style={{ marginBottom: 12 }}>
