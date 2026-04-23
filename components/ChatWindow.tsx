@@ -1408,11 +1408,31 @@ export default function ChatWindow() {
           height: 100vh;
           height: 100dvh;
         }
-        /* 첫 화면 온보딩 래퍼 — 기본은 탭 선택 후 콘텐츠용 (상단 정렬).
-           onboardingTab === null 일 때만 인라인 style 로 flex 중앙정렬 override. */
+        /* 첫 화면 온보딩 래퍼 — 기본 (탭 선택 후 콘텐츠용, 상단 정렬) */
         .px-onboarding-wrap {
           padding: 20px 0;
           box-sizing: border-box;
+        }
+        /* onboardingTab === null 전용 변형 — 카드 2개를 화면에 배치 */
+        .px-onboarding-wrap.px-intro-mode {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: calc(100vh - 60px);
+          padding: 0;
+          overflow-y: auto;
+        }
+        /* 모바일 (< 600px) — 카드가 세로 스택되면 상단부터 시작,
+           sticky 헤더(safe-area-inset-top 포함 ≈ 60-80px)와 겹치지 않도록
+           paddingTop 80px 강제. 수직 중앙정렬은 PC 에서만. */
+        @media (max-width: 599px) {
+          .px-onboarding-wrap.px-intro-mode {
+            justify-content: flex-start;
+            padding-top: 80px;
+            padding-bottom: 40px;
+            min-height: 100vh;
+          }
         }
       `}</style>
     <div
@@ -1467,18 +1487,7 @@ export default function ChatWindow() {
       <div style={{ flex: 1, overflowY: 'auto', padding: hasUserSent ? '20px 0 140px' : '0 0 140px' }}>
         {!hasUserSent && (
           <div
-            className="px-onboarding-wrap"
-            style={
-              onboardingTab === null
-                ? {
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    height: 'calc(100vh - 60px)',
-                    padding: 0,
-                  }
-                : undefined
-            }
+            className={`px-onboarding-wrap${onboardingTab === null ? ' px-intro-mode' : ''}`}
           >
             <OnboardingTabs
               onExample={(name) => handleSendWithPosition(name, null)}
