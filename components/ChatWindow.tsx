@@ -244,6 +244,13 @@ const NoticeBox = ({
   </div>
 );
 
+// 차 한잔 탭 LLM 응답 정리 — 마크다운 볼드/불필요한 빈 줄 제거.
+// LLM이 프롬프트 지시를 어기고 **볼드** 나 빈 줄을 내보내는 경우를 렌더 직전 차단.
+const cleanTeaText = (text: string): string =>
+  text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\n{2,}/g, '\n');
+
 const PersonaBubble = memo(function PersonaBubble({
   personaKey,
   text,
@@ -1681,21 +1688,21 @@ export default function ChatWindow() {
                 {msg.teaLucia && (
                   <PersonaBubble
                     personaKey="lucia"
-                    text={msg.teaLucia}
+                    text={cleanTeaText(msg.teaLucia)}
                     timestamp={msg.timestamp}
                   />
                 )}
                 {msg.teaJack && (
                   <PersonaBubble
                     personaKey="jack"
-                    text={msg.teaJack}
+                    text={cleanTeaText(msg.teaJack)}
                     timestamp={msg.timestamp}
                   />
                 )}
                 {msg.teaEcho && (
                   <PersonaBubble
                     personaKey="echo"
-                    text={msg.teaEcho}
+                    text={cleanTeaText(msg.teaEcho)}
                     timestamp={msg.timestamp}
                     hideEchoTag
                   />
