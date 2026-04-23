@@ -29,7 +29,7 @@ export const maxDuration = 60;
 //   기존 GOOGLE_GENERATIVE_AI_API_KEY 재사용. LLM 실패 시 호출부에서
 //   기존 템플릿으로 폴백.
 // ─────────────────────────────────────────────
-const TEA_GEMINI_MODEL = 'gemini-2.0-flash';
+const TEA_GEMINI_MODEL = 'gemini-1.5-flash';
 const teaGenAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '');
 
 const TEA_SYSTEM_LUCIA = `당신은 LUCIA입니다. ENFP 성격의 따뜻한 참모.
@@ -150,7 +150,11 @@ const callTeaPersona = async (
     try {
       text = result?.response?.text?.() || '';
     } catch (e) {
-      console.warn(`${tag} text() 추출 실패 (finishReason=${finishReason}):`, e instanceof Error ? e.message : e);
+      // text() 추출 실패 — 전체 에러 객체 덤프
+      console.error(`${tag} text() 추출 실패 (finishReason=${finishReason}) — full error:`, e);
+      if (e instanceof Error) {
+        console.error(`${tag} text() 추출 실패 — name=${e.name}, message=${e.message}, stack=${e.stack}`);
+      }
       return null;
     }
     if (!text.trim()) {
@@ -160,7 +164,27 @@ const callTeaPersona = async (
     console.log(`${tag} Gemini 성공 — ${text.trim().length}자 (finishReason=${finishReason})`);
     return text.trim();
   } catch (err) {
-    console.error(`${tag} Gemini 호출 오류:`, err instanceof Error ? err.message : err);
+    // Gemini 호출 자체 실패 — 전체 에러 객체 덤프 (이름/메시지/스택/원본)
+    console.error(`${tag} Gemini 호출 오류 — full error object:`, err);
+    if (err instanceof Error) {
+      console.error(
+        `${tag} Gemini 호출 오류 — name=${err.name}, message=${err.message}, stack=${err.stack}`,
+      );
+      // google-generative-ai SDK 가 HTTP 응답을 error 에 담아주는 경우 대비
+      const anyErr = err as Error & { status?: number; statusText?: string; errorDetails?: unknown; response?: unknown };
+      if (anyErr.status !== undefined) {
+        console.error(`${tag} Gemini HTTP status=${anyErr.status} statusText=${anyErr.statusText}`);
+      }
+      if (anyErr.errorDetails !== undefined) {
+        console.error(`${tag} Gemini errorDetails:`, anyErr.errorDetails);
+      }
+      if (anyErr.response !== undefined) {
+        console.error(`${tag} Gemini error.response:`, anyErr.response);
+      }
+    } else {
+      // Error 가 아닌 값도 그대로 직렬화
+      try { console.error(`${tag} Gemini 호출 오류 (non-Error) JSON:`, JSON.stringify(err)); } catch { /* ignore */ }
+    }
     return null;
   }
 };
