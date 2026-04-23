@@ -383,7 +383,7 @@ export async function POST(req: Request) {
   // ✅ Gemini 제거됨 — API 키 불필요
 
   try {
-    const { messages, positionContext, teaMode, teaRound } = await req.json();
+    const { messages, positionContext, teaMode, teaRound, teaPersona } = await req.json();
     const lastMsg = messages.at(-1)?.content || "";
 
     // ✅ 차 한잔 모드 — LLM 기반 3 페르소나 응답 (Gemini 2.0 Flash, 병렬 호출)
@@ -459,34 +459,40 @@ export async function POST(req: Request) {
         fallbackEcho = '';
       }
 
-      // ── LLM 호출 ──
-      if (round >= 2) {
-        // Round 2+ — 세 페르소나 병렬 호출 (LUCIA/JACK/ECHO 모두 동일 경로)
-        const [luciaLLM, jackLLM, echoLLM] = await Promise.all([
-          callTeaPersona('lucia', TEA_SYSTEM_LUCIA, luciaHistory),
-          callTeaPersona('jack', TEA_SYSTEM_JACK, jackHistory),
-          callTeaPersona('echo', TEA_SYSTEM_ECHO, echoHistory),
-        ]);
+      // ── 단일 페르소나 1:1 응답 (teaPersona 값에 따라 해당 페르소나만 호출) ──
+      //   teaPersona 누락 시 기본 'lucia' 로 폴백 (구버전 클라이언트 호환).
+      const selectedPersona: 'lucia' | 'jack' | 'echo' =
+        teaPersona === 'jack' ? 'jack' : teaPersona === 'echo' ? 'echo' : 'lucia';
 
-        console.log(
-          `[tea] round=${round} 결과 — lucia=${luciaLLM ? 'LLM' : 'FALLBACK'} jack=${jackLLM ? 'LLM' : 'FALLBACK'} echo=${echoLLM ? 'LLM' : 'FALLBACK'}`,
-        );
-
+      if (selectedPersona === 'jack') {
+        const jackLLM = await callTeaPersona('jack', TEA_SYSTEM_JACK, jackHistory);
+        console.log(`[tea] round=${round} persona=jack 결과 — ${jackLLM ? 'LLM' : 'FALLBACK'}`);
         return Response.json({
           teaMode: true,
           teaRound: round,
-          teaLucia: luciaLLM || fallbackLucia,
-          teaJack: jackLLM || fallbackJack,
-          teaEcho: echoLLM || fallbackEcho,
+          teaPersona: 'jack',
+          teaJack: jackLLM || fallbackJack || '지금 상황의 핵심이 뭐라고 보세요?',
         });
       }
 
-      // Round 1 — LUCIA 단독
+      if (selectedPersona === 'echo') {
+        const echoLLM = await callTeaPersona('echo', TEA_SYSTEM_ECHO, echoHistory);
+        console.log(`[tea] round=${round} persona=echo 결과 — ${echoLLM ? 'LLM' : 'FALLBACK'}`);
+        return Response.json({
+          teaMode: true,
+          teaRound: round,
+          teaPersona: 'echo',
+          teaEcho: echoLLM || fallbackEcho || '말하지 않은 것 중에 가장 무거운 건 뭔가요?',
+        });
+      }
+
+      // lucia 기본
       const luciaLLM = await callTeaPersona('lucia', TEA_SYSTEM_LUCIA, luciaHistory);
-      console.log(`[tea] round=1 결과 — lucia=${luciaLLM ? 'LLM' : 'FALLBACK'}`);
+      console.log(`[tea] round=${round} persona=lucia 결과 — ${luciaLLM ? 'LLM' : 'FALLBACK'}`);
       return Response.json({
         teaMode: true,
         teaRound: round,
+        teaPersona: 'lucia',
         teaLucia: luciaLLM || fallbackLucia,
       });
     }

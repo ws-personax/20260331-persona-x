@@ -635,8 +635,8 @@ const EchoBubble = memo(function EchoBubble({
   );
 });
 
-// ✅ 차 한잔 모드에서는 LUCIA 단독, 재테크 모드에서는 RAY/JACK/LUCIA 3인
-const TypingIndicator = ({ teaMode = false }: { teaMode?: boolean }) => (
+// ✅ 차 한잔 모드에서는 선택된 페르소나 1인, 재테크 모드에서는 RAY/JACK/LUCIA 3인
+const TypingIndicator = ({ teaMode = false, teaPersona = null }: { teaMode?: boolean; teaPersona?: 'lucia' | 'jack' | 'echo' | null }) => (
   <>
     <style>{`
       @keyframes typingDot {
@@ -645,7 +645,7 @@ const TypingIndicator = ({ teaMode = false }: { teaMode?: boolean }) => (
       }
     `}</style>
     <div style={{ padding: '0 0 8px' }}>
-      {((teaMode ? ['lucia'] : ['ray', 'jack', 'lucia']) as PersonaKey[]).map((key, ki) => {
+      {((teaMode ? [teaPersona || 'lucia'] : ['ray', 'jack', 'lucia']) as PersonaKey[]).map((key, ki) => {
         const p = PERSONAS[key];
         return (
           <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '4px 12px' }}>
@@ -872,11 +872,115 @@ const TEA_CARDS: { emoji: string; title: string; sub: string; prompt: string }[]
   { emoji: '💭', title: '복잡해요',   sub: '돈 문제가 얽혀있어요', prompt: '복잡한 문제가 있어요' },
 ];
 
-const TeaTabContent = ({ onCardClick }: { onCardClick: (text: string) => void }) => {
+// ✅ 차 한잔 페르소나 선택 — 카드 데이터
+const TEA_PERSONAS_INFO: { key: 'lucia' | 'jack' | 'echo'; emoji: string; name: string; desc: string; border: string; bg: string; fg: string }[] = [
+  { key: 'lucia', emoji: '☕', name: 'LUCIA', desc: '따뜻하게 들어드릴게요',   border: '#fb923c', bg: '#fff7ed', fg: '#7c2d12' },
+  { key: 'jack',  emoji: '💪', name: 'JACK',  desc: '직설적으로 얘기해드릴게요', border: '#1f2937', bg: '#f3f4f6', fg: '#111827' },
+  { key: 'echo',  emoji: '🎯', name: 'ECHO',  desc: '핵심을 짚어드릴게요',     border: '#b45309', bg: '#fefce8', fg: '#78350f' },
+];
+
+const TeaTabContent = ({
+  onCardClick,
+  teaPersona,
+  onPersonaChange,
+}: {
+  onCardClick: (text: string) => void;
+  teaPersona: 'lucia' | 'jack' | 'echo' | null;
+  onPersonaChange: (p: 'lucia' | 'jack' | 'echo' | null) => void;
+}) => {
   const quote = useMemo(() => getTodayQuote(), []);
+
+  // ── 페르소나 미선택 — 선택 UI 만 표시 ──
+  if (teaPersona === null) {
+    return (
+      <div style={{ padding: '20px 12px 200px' }}>
+        <h2
+          style={{
+            fontSize: 21,
+            fontWeight: 800,
+            lineHeight: 1.4,
+            color: '#111827',
+            textAlign: 'center',
+            margin: '0 0 20px',
+          }}
+        >
+          오늘 누구와 이야기하시겠어요?
+        </h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 440, margin: '0 auto' }}>
+          {TEA_PERSONAS_INFO.map(p => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => onPersonaChange(p.key)}
+              style={{
+                background: p.bg,
+                border: `2px solid ${p.border}`,
+                borderRadius: 14,
+                padding: '16px 18px',
+                cursor: 'pointer',
+                textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 14,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+              }}
+            >
+              <span style={{ fontSize: 30, lineHeight: 1 }}>{p.emoji}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 16, fontWeight: 800, color: p.fg }}>{p.name}</span>
+                <span style={{ fontSize: 12, color: p.fg, opacity: 0.85 }}>{p.desc}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const selected = TEA_PERSONAS_INFO.find(p => p.key === teaPersona)!;
 
   return (
     <div style={{ padding: '20px 12px 200px' }}>
+      {/* 선택된 페르소나 안내 + 변경 */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          maxWidth: 440,
+          margin: '0 auto 18px',
+          padding: '10px 14px',
+          background: selected.bg,
+          border: `1px solid ${selected.border}`,
+          borderRadius: 12,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 22 }}>{selected.emoji}</span>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color: selected.fg }}>{selected.name}</span>
+            <span style={{ fontSize: 11, color: selected.fg, opacity: 0.85 }}>{selected.desc}</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => onPersonaChange(null)}
+          style={{
+            background: '#fff',
+            border: `1px solid ${selected.border}`,
+            borderRadius: 8,
+            padding: '5px 10px',
+            fontSize: 11,
+            fontWeight: 700,
+            color: selected.fg,
+            cursor: 'pointer',
+          }}
+        >
+          변경
+        </button>
+      </div>
+
       {/* 오늘의 명언 */}
       <div
         style={{
@@ -961,11 +1065,15 @@ const OnboardingTabs = ({
   onCardClick,
   activeTab,
   onTabChange,
+  teaPersona,
+  onTeaPersonaChange,
 }: {
   onExample: (keyword: string) => void;
   onCardClick: (text: string) => void;
   activeTab: 'finance' | 'tea' | null;
   onTabChange: (tab: 'finance' | 'tea') => void;
+  teaPersona: 'lucia' | 'jack' | 'echo' | null;
+  onTeaPersonaChange: (p: 'lucia' | 'jack' | 'echo' | null) => void;
 }) => {
   // ─ 첫 화면 — 큰 카드 2개 (flex-wrap 으로 모바일은 자동 세로 스택) ─
   if (activeTab === null) {
@@ -1109,7 +1217,13 @@ const OnboardingTabs = ({
       </div>
 
       {activeTab === 'finance' && <FinanceTabContent onExample={onExample} />}
-      {activeTab === 'tea' && <TeaTabContent onCardClick={onCardClick} />}
+      {activeTab === 'tea' && (
+        <TeaTabContent
+          onCardClick={onCardClick}
+          teaPersona={teaPersona}
+          onPersonaChange={onTeaPersonaChange}
+        />
+      )}
     </div>
   );
 };
@@ -1122,6 +1236,8 @@ export default function ChatWindow() {
   // ✅ 온보딩 탭 상태를 부모로 끌어올림 — footer/placeholder와 연동
   //   첫 화면은 null — 탭을 클릭해야 콘텐츠가 표시되도록 (중복 체감 방지)
   const [onboardingTab, setOnboardingTab] = useState<'finance' | 'tea' | null>(null);
+  // ✅ 차 한잔 — 선택된 페르소나. null 이면 선택 화면만 표시
+  const [teaPersona, setTeaPersona] = useState<'lucia' | 'jack' | 'echo' | null>(null);
 
   // ✅ 시장 상황 + 시간대 기반 동적 추천 질문
   // ✅ 탭 타입 정의
@@ -1309,6 +1425,7 @@ export default function ChatWindow() {
           positionContext: buildPositionContext(position),
           teaMode: isTeaSend,
           teaRound,
+          teaPersona: isTeaSend ? teaPersona : undefined,
         }),
       });
 
@@ -1481,6 +1598,8 @@ export default function ChatWindow() {
             }}
             activeTab={onboardingTab}
             onTabChange={setOnboardingTab}
+            teaPersona={teaPersona}
+            onTeaPersonaChange={setTeaPersona}
           />
         </div>
       )}
@@ -1498,9 +1617,40 @@ export default function ChatWindow() {
               }}
               activeTab={onboardingTab}
               onTabChange={setOnboardingTab}
+              teaPersona={teaPersona}
+              onTeaPersonaChange={setTeaPersona}
             />
           </div>
         )}
+        {/* ✅ 차 한잔 대화 중 — 선택된 페르소나 표시 바. 클릭 시 페르소나 재선택. */}
+        {hasUserSent && onboardingTab === 'tea' && teaPersona && (() => {
+          const p = TEA_PERSONAS_INFO.find(x => x.key === teaPersona)!;
+          return (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '0 12px 10px' }}>
+              <button
+                type="button"
+                onClick={() => setTeaPersona(null)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  background: p.bg,
+                  border: `1px solid ${p.border}`,
+                  borderRadius: 999,
+                  padding: '5px 12px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: p.fg,
+                  cursor: 'pointer',
+                }}
+                title="페르소나 변경"
+              >
+                <span style={{ fontSize: 14 }}>{p.emoji}</span>
+                <span>{p.name}와 대화 중 · 변경</span>
+              </button>
+            </div>
+          );
+        })()}
         {messages.map(msg => (
           <div key={msg.id}>
             {msg.role === 'user' ? (
@@ -1527,13 +1677,14 @@ export default function ChatWindow() {
               </div>
             ) : msg.teaMode ? (
               <div style={{ marginBottom: 12 }}>
-                {/* 1) LUCIA — 공감 */}
-                <PersonaBubble
-                  personaKey="lucia"
-                  text={msg.teaLucia || ''}
-                  timestamp={msg.timestamp}
-                />
-                {/* 2) JACK — 상황 정리 질문 (Round 2+) */}
+                {/* 선택된 페르소나만 렌더 (1:1 대화). 각 필드는 비어있으면 표시 안 함. */}
+                {msg.teaLucia && (
+                  <PersonaBubble
+                    personaKey="lucia"
+                    text={msg.teaLucia}
+                    timestamp={msg.timestamp}
+                  />
+                )}
                 {msg.teaJack && (
                   <PersonaBubble
                     personaKey="jack"
@@ -1541,7 +1692,6 @@ export default function ChatWindow() {
                     timestamp={msg.timestamp}
                   />
                 )}
-                {/* 3) ECHO — 행동/욕구 질문 (Round 2+, FINAL COMMAND 태그 숨김) */}
                 {msg.teaEcho && (
                   <PersonaBubble
                     personaKey="echo"
@@ -1550,6 +1700,25 @@ export default function ChatWindow() {
                     hideEchoTag
                   />
                 )}
+                {/* 다른 참모 의견 보기 — UI 만 먼저 제공, 기능은 추후 */}
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: 6, padding: '0 12px' }}>
+                  <button
+                    type="button"
+                    onClick={() => alert('다른 참모 의견은 추후 지원 예정입니다.')}
+                    style={{
+                      background: '#fff',
+                      border: '1px solid #d1d5db',
+                      borderRadius: 999,
+                      padding: '5px 12px',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: '#6b7280',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    다른 참모 의견도 들어볼까요?
+                  </button>
+                </div>
               </div>
             ) : (
               <div style={{ marginBottom: 12 }}>
@@ -1610,7 +1779,7 @@ export default function ChatWindow() {
             )}
           </div>
         ))}
-        {isLoading && <TypingIndicator teaMode={onboardingTab === 'tea'} />}
+        {isLoading && <TypingIndicator teaMode={onboardingTab === 'tea'} teaPersona={teaPersona} />}
         <div ref={bottomRef} />
       </div>
       )}
@@ -1778,8 +1947,9 @@ export default function ChatWindow() {
       )}
 
       {/* 첫 화면(탭 미선택 & 대화 전) 에서는 footer 전체 숨김.
-          탭(재테크/차 한잔) 을 클릭하거나 한 번이라도 보낸 후에만 입력창 표시. */}
-      {(onboardingTab !== null || hasUserSent) && (
+          탭(재테크/차 한잔) 을 클릭하거나 한 번이라도 보낸 후에만 입력창 표시.
+          ✅ 차 한잔 탭은 teaPersona 가 선택된 후에만 입력창 노출. */}
+      {(onboardingTab !== null || hasUserSent) && !(onboardingTab === 'tea' && teaPersona === null) && (
       <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {/* 사전 질문 토글 버튼 — 재테크 탭일 때만 표시.
