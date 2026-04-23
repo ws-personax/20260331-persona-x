@@ -31,7 +31,7 @@ export const maxDuration = 60;
 // ─────────────────────────────────────────────
 const TEA_GEMINI_MODEL = process.env.NEXT_PUBLIC_AI_MODEL || 'gemini-2.5-flash';
 const TEA_GEMINI_FALLBACK_CHAIN: string[] = Array.from(
-  new Set([TEA_GEMINI_MODEL, 'gemini-2.5-flash-lite', 'gemini-1.5-flash']),
+  new Set([TEA_GEMINI_MODEL, 'gemini-2.0-flash', 'gemini-2.0-flash-lite']),
 );
 const TEA_RETRY_DELAY_MS = 500;
 const isRetriableModelError = (err: unknown): boolean => {
