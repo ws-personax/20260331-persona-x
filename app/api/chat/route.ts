@@ -200,8 +200,17 @@ export async function POST(req: Request) {
   // ✅ Gemini 제거됨 — API 키 불필요
 
   try {
-    const { messages, positionContext } = await req.json();
+    const { messages, positionContext, teaMode } = await req.json();
     const lastMsg = messages.at(-1)?.content || "";
+
+    // ✅ 차 한잔 모드 — LUCIA 단독 응답 (Stage 1: 템플릿 고정)
+    if (teaMode) {
+      return Response.json({
+        teaMode: true,
+        luciaReply: '말씀해주셔서 고마워요.\n천천히 들을게요. 어떤 일이 있으셨어요?',
+      });
+    }
+
     const keyword = extractKeyword(messages);
 
     // ✅ 추천 질문 감지

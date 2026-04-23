@@ -44,6 +44,9 @@ interface Message {
   errorType?: ErrorType;
   errorMessage?: string;
   retryText?: string; // 재시도 버튼이 다시 보낼 사용자 입력
+  // 차 한잔 탭 전용 — LUCIA 단독 응답
+  teaMode?: boolean;
+  luciaReply?: string;
 }
 
 type PersonaKey = 'jack' | 'lucia' | 'ray' | 'echo';
@@ -856,16 +859,15 @@ const FinanceTabContent = ({ onExample }: { onExample: (keyword: string) => void
   </div>
 );
 
-// ─── 차 한잔 탭 본문 — 감정 카드 3개 + 임시 안내 ───
-const TEA_CARDS = [
-  { emoji: '😔', title: '속상해요',   sub: '털어놓고 싶어요' },
-  { emoji: '🎉', title: '자랑할래요', sub: '기쁜 일이 있어요' },
-  { emoji: '💭', title: '복잡해요',   sub: '돈 문제가 얽혀있어요' },
+// ─── 차 한잔 탭 본문 — 감정 카드 3개 ───
+//   클릭 시 자동 전송이 아닌, 입력창에 템플릿 텍스트를 채워준다 (onCardClick).
+const TEA_CARDS: { emoji: string; title: string; sub: string; prompt: string }[] = [
+  { emoji: '😔', title: '속상해요',   sub: '털어놓고 싶어요',    prompt: '속상한 일이 있어요' },
+  { emoji: '🎉', title: '자랑할래요', sub: '기쁜 일이 있어요',    prompt: '자랑하고 싶어요' },
+  { emoji: '💭', title: '복잡해요',   sub: '돈 문제가 얽혀있어요', prompt: '복잡한 문제가 있어요' },
 ];
 
-const TeaTabContent = () => {
-  const [notice, setNotice] = useState('');
-  const handleCardClick = () => setNotice('준비 중입니다. 곧 만나요 ☕');
+const TeaTabContent = ({ onCardClick }: { onCardClick: (text: string) => void }) => {
   const quote = useMemo(() => getTodayQuote(), []);
 
   return (
@@ -920,7 +922,7 @@ const TeaTabContent = () => {
           <button
             key={card.title}
             type="button"
-            onClick={handleCardClick}
+            onClick={() => onCardClick(card.prompt)}
             style={{
               background: 'linear-gradient(180deg, #fff8eb 0%, #fffaf0 100%)',
               border: '1px solid #fcd9a8',
@@ -942,23 +944,6 @@ const TeaTabContent = () => {
           </button>
         ))}
       </div>
-      {notice && (
-        <div
-          style={{
-            marginTop: 14,
-            padding: '10px 14px',
-            background: '#fffbeb',
-            border: '1px dashed #fcd9a8',
-            borderRadius: 10,
-            textAlign: 'center',
-            fontSize: 13,
-            color: '#92400e',
-            fontWeight: 600,
-          }}
-        >
-          {notice}
-        </div>
-      )}
     </div>
   );
 };
@@ -966,10 +951,12 @@ const TeaTabContent = () => {
 // ─── 탭 2개 + 활성 탭 내용 통합 컴포넌트 (controlled — state는 부모가 보유) ───
 const OnboardingTabs = ({
   onExample,
+  onCardClick,
   activeTab,
   onTabChange,
 }: {
   onExample: (keyword: string) => void;
+  onCardClick: (text: string) => void;
   activeTab: 'finance' | 'tea';
   onTabChange: (tab: 'finance' | 'tea') => void;
 }) => {
@@ -1002,7 +989,7 @@ const OnboardingTabs = ({
       {activeTab === 'finance' ? (
         <FinanceTabContent onExample={onExample} />
       ) : (
-        <TeaTabContent />
+        <TeaTabContent onCardClick={onCardClick} />
       )}
     </div>
   );
@@ -1173,6 +1160,9 @@ export default function ChatWindow() {
     setIsLoading(true);
     setInput('');
 
+    // ✅ 차 한잔 탭에서 보낼 때는 LUCIA 단독 응답 루트
+    const isTeaSend = onboardingTab === 'tea';
+
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -1180,6 +1170,7 @@ export default function ChatWindow() {
         body: JSON.stringify({
           messages: nextMessages.slice(-10).map(m => ({ role: m.role, content: m.content })),
           positionContext: buildPositionContext(position),
+          teaMode: isTeaSend,
         }),
       });
 
@@ -1189,13 +1180,15 @@ export default function ChatWindow() {
         id: generateId(),
         role: 'assistant',
         timestamp: new Date(),
-        content: data.reply || '',
+        content: data.reply || data.luciaReply || '',
         personas: data.personas || null,
         newsLinks: data.newsLinks || [],
         errorType: data.errorType,
         errorMessage: data.errorMessage,
         // 종목 미인식은 같은 텍스트로 재시도해도 결과 같으므로 retryText 미설정
         retryText: data.errorType === 'keyword_not_recognized' ? undefined : text,
+        teaMode: data.teaMode,
+        luciaReply: data.luciaReply,
       };
 
       const updated = [...nextMessages, assistantMsg];
@@ -1217,7 +1210,7 @@ export default function ChatWindow() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [onboardingTab]);
 
   const handleSend = useCallback(() => {
     const content = input.trim();
@@ -1334,6 +1327,10 @@ export default function ChatWindow() {
           <div className="px-onboarding-wrap">
             <OnboardingTabs
               onExample={(name) => handleSendWithPosition(name, null)}
+              onCardClick={(text) => {
+                setInput(text);
+                textareaRef.current?.focus();
+              }}
               activeTab={onboardingTab}
               onTabChange={setOnboardingTab}
             />
@@ -1361,6 +1358,14 @@ export default function ChatWindow() {
                   message={msg.errorMessage}
                   showRetry={msg.errorType !== 'keyword_not_recognized' && !!msg.retryText}
                   onRetry={msg.retryText ? () => handleSendWithPosition(msg.retryText!, null) : undefined}
+                />
+              </div>
+            ) : msg.teaMode ? (
+              <div style={{ marginBottom: 12 }}>
+                <PersonaBubble
+                  personaKey="lucia"
+                  text={msg.luciaReply || ''}
+                  timestamp={msg.timestamp}
                 />
               </div>
             ) : (
