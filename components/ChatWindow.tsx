@@ -949,6 +949,7 @@ const TeaTabContent = ({ onCardClick }: { onCardClick: (text: string) => void })
 };
 
 // ─── 탭 2개 + 활성 탭 내용 통합 컴포넌트 (controlled — state는 부모가 보유) ───
+//   activeTab=null → 탭 버튼만 표시, 콘텐츠 영역은 비움 (클릭 전 상태)
 const OnboardingTabs = ({
   onExample,
   onCardClick,
@@ -957,7 +958,7 @@ const OnboardingTabs = ({
 }: {
   onExample: (keyword: string) => void;
   onCardClick: (text: string) => void;
-  activeTab: 'finance' | 'tea';
+  activeTab: 'finance' | 'tea' | null;
   onTabChange: (tab: 'finance' | 'tea') => void;
 }) => {
   return (
@@ -985,12 +986,9 @@ const OnboardingTabs = ({
         />
       </div>
 
-      {/* 활성 탭 본문 */}
-      {activeTab === 'finance' ? (
-        <FinanceTabContent onExample={onExample} />
-      ) : (
-        <TeaTabContent onCardClick={onCardClick} />
-      )}
+      {/* 활성 탭 본문 — null이면 렌더하지 않음 (탭 클릭 전 상태) */}
+      {activeTab === 'finance' && <FinanceTabContent onExample={onExample} />}
+      {activeTab === 'tea' && <TeaTabContent onCardClick={onCardClick} />}
     </div>
   );
 };
@@ -1001,7 +999,8 @@ export default function ChatWindow() {
   const [input, setInput] = useState('');
   const [showQuickQ, setShowQuickQ] = useState(false);
   // ✅ 온보딩 탭 상태를 부모로 끌어올림 — footer/placeholder와 연동
-  const [onboardingTab, setOnboardingTab] = useState<'finance' | 'tea'>('finance');
+  //   첫 화면은 null — 탭을 클릭해야 콘텐츠가 표시되도록 (중복 체감 방지)
+  const [onboardingTab, setOnboardingTab] = useState<'finance' | 'tea' | null>(null);
 
   // ✅ 시장 상황 + 시간대 기반 동적 추천 질문
   // ✅ 탭 타입 정의
@@ -1631,7 +1630,7 @@ export default function ChatWindow() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
-            placeholder={!hasUserSent && onboardingTab === 'tea' ? '마음을 꺼내보세요' : '종목명을 입력하세요 (예: 삼성전자, 테슬라)'}
+            placeholder={onboardingTab === 'tea' ? '마음을 꺼내보세요' : '종목명을 입력하세요 (예: 삼성전자, 테슬라)'}
             style={{
               flex: 1,
               border: '1px solid #d1d5db',
