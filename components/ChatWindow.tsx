@@ -44,11 +44,11 @@ interface Message {
   errorType?: ErrorType;
   errorMessage?: string;
   retryText?: string; // 재시도 버튼이 다시 보낼 사용자 입력
-  // 차 한잔 탭 전용 — LUCIA 단독 응답
+  // 차 한잔 탭 전용 — Round 1 LUCIA 단독 / Round 2+ LUCIA+JACK+ECHO
   teaMode?: boolean;
-  luciaReply?: string;
-  jackReply?: string;
-  echoReply?: string;
+  teaLucia?: string;
+  teaJack?: string;
+  teaEcho?: string;
 }
 
 type PersonaKey = 'jack' | 'lucia' | 'ray' | 'echo';
@@ -1191,7 +1191,7 @@ export default function ChatWindow() {
         id: generateId(),
         role: 'assistant',
         timestamp: new Date(),
-        content: data.reply || data.luciaReply || '',
+        content: data.reply || data.teaLucia || '',
         personas: data.personas || null,
         newsLinks: data.newsLinks || [],
         errorType: data.errorType,
@@ -1199,9 +1199,9 @@ export default function ChatWindow() {
         // 종목 미인식은 같은 텍스트로 재시도해도 결과 같으므로 retryText 미설정
         retryText: data.errorType === 'keyword_not_recognized' ? undefined : text,
         teaMode: data.teaMode,
-        luciaReply: data.luciaReply,
-        jackReply: data.jackReply,
-        echoReply: data.echoReply,
+        teaLucia: data.teaLucia,
+        teaJack: data.teaJack,
+        teaEcho: data.teaEcho,
       };
 
       const updated = [...nextMessages, assistantMsg];
@@ -1379,22 +1379,25 @@ export default function ChatWindow() {
               </div>
             ) : msg.teaMode ? (
               <div style={{ marginBottom: 12 }}>
+                {/* 1) LUCIA — 공감 */}
                 <PersonaBubble
                   personaKey="lucia"
-                  text={msg.luciaReply || ''}
+                  text={msg.teaLucia || ''}
                   timestamp={msg.timestamp}
                 />
-                {msg.jackReply && (
+                {/* 2) JACK — 상황 정리 질문 (Round 2+) */}
+                {msg.teaJack && (
                   <PersonaBubble
                     personaKey="jack"
-                    text={msg.jackReply}
+                    text={msg.teaJack}
                     timestamp={msg.timestamp}
                   />
                 )}
-                {msg.echoReply && (
+                {/* 3) ECHO — 행동/욕구 질문 (Round 2+, FINAL COMMAND 태그 숨김) */}
+                {msg.teaEcho && (
                   <PersonaBubble
                     personaKey="echo"
-                    text={msg.echoReply}
+                    text={msg.teaEcho}
                     timestamp={msg.timestamp}
                     hideEchoTag
                   />

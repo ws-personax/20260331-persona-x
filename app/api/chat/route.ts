@@ -207,42 +207,45 @@ export async function POST(req: Request) {
     //   Round 1: LUCIA 공감만
     //   Round 2+: LUCIA(다른 공감) + JACK(상황 정리 질문) + ECHO(행동 질문)
     if (teaMode) {
-      // 카테고리 감지 — 우선순위: 가족/건강 > 기쁨 > 손실/투자 > 기타
-      //   가족/건강이 투자보다 우선: "어머니가 아프셔서 주식이..." 같은 혼합 케이스 보호
+      // 카테고리 감지 — 우선순위: 가족/건강 > 손실 > 기쁨 > 기타
+      //   1) 가족/건강이 최우선: "어머니가 아프셔서 주식이..." 같은 혼합 케이스 보호
+      //   2) 손실이 기쁨보다 우선: "3천만원 날렸는데 합격했어" 같이 부정/긍정 혼재 시
+      //      감정의 무게는 손실 쪽 — 공감 우선.
       const isFamily = /(가족|부모|어머니|아버지|엄마|아빠|자식|아이|아들|딸|남편|아내|형제|자매|건강|병|아프|수술|입원|병원|암|치매)/.test(lastMsg);
+      const isLoss = /(손실|손절|물렸|물림|떨어|빠졌|하락|폭락|투자|주식|코인|마이너스|잃었|날렸|망했|망하)/.test(lastMsg);
       const isJoy = /(기쁨|기뻐|행복|성공|올랐|올라|상승|수익|벌었|대박|축하|자랑|합격|승진|좋은 일)/.test(lastMsg);
-      const isLoss = /(손실|손절|물렸|물림|떨어졌|하락|폭락|투자|주식|코인|마이너스|잃었|날렸)/.test(lastMsg);
 
       const empathyLine =
         isFamily ? '많이 걱정되시겠어요.'
-        : isJoy   ? '정말 잘 되셨네요!'
         : isLoss  ? '많이 속상하셨겠어요.'
+        : isJoy   ? '정말 잘 되셨네요!'
         :           '많이 힘드셨겠어요.';
 
       // ── Round 2+ — 공감 변주 + JACK/ECHO 질문으로 확장 ──
       if (typeof teaRound === 'number' && teaRound >= 2) {
         const luciaDeep =
           isFamily ? '그 마음이 얼마나 무거우셨을지 느껴져요.'
-          : isJoy   ? '그 순간 어떤 기분이 드셨어요? 더 들려주세요.'
           : isLoss  ? '그때 가장 힘들었던 순간이 언제였어요?'
+          : isJoy   ? '그 순간 어떤 기분이 드셨어요? 더 들려주세요.'
           :           '그 마음을 꺼내주셔서 감사해요.';
 
+        // 손실/가족은 '정리' 톤, 기쁨은 '과정' 톤
         const jackQuestion =
-          isJoy
+          isJoy && !isLoss && !isFamily
             ? '상황을 조금 더 구체적으로 정리해볼까요?\n어떤 과정에서 그런 결과가 나왔는지 들려주세요.'
             : '상황을 조금 더 구체적으로 정리해볼까요?\n언제부터, 어떤 계기로 이 마음이 시작됐는지 알려주세요.';
 
         const echoQuestion =
-          isJoy
+          isJoy && !isLoss && !isFamily
             ? '지금 가장 나누고 싶은 게 뭐예요?\n축하할 일인지, 다음 계획인지 — 함께 정리해봐요.'
             : '지금 이 순간, 가장 하고 싶은 건 뭐예요?\n들어주기만 해도 되고, 같이 풀어가도 돼요.';
 
         return Response.json({
           teaMode: true,
           teaRound,
-          luciaReply: `${empathyLine}\n${luciaDeep}`,
-          jackReply: jackQuestion,
-          echoReply: echoQuestion,
+          teaLucia: `${empathyLine}\n${luciaDeep}`,
+          teaJack: jackQuestion,
+          teaEcho: echoQuestion,
         });
       }
 
@@ -250,7 +253,7 @@ export async function POST(req: Request) {
       return Response.json({
         teaMode: true,
         teaRound: teaRound || 1,
-        luciaReply: `말씀해주셔서 고마워요.\n${empathyLine}\n조금 더 이야기해주실 수 있어요?`,
+        teaLucia: `말씀해주셔서 고마워요.\n${empathyLine}\n조금 더 이야기해주실 수 있어요?`,
       });
     }
 
