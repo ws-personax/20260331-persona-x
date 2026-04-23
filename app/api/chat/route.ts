@@ -30,6 +30,24 @@ export const maxDuration = 60;
 //   기존 템플릿으로 폴백.
 // ─────────────────────────────────────────────
 const TEA_GEMINI_MODEL = process.env.NEXT_PUBLIC_AI_MODEL || 'gemini-2.5-flash';
+const TEA_GEMINI_FALLBACK_CHAIN: string[] = Array.from(
+  new Set([TEA_GEMINI_MODEL, 'gemini-2.5-flash-lite', 'gemini-1.5-flash']),
+);
+const TEA_RETRY_DELAY_MS = 500;
+const isRetriableModelError = (err: unknown): boolean => {
+  const anyErr = err as { status?: number; message?: string };
+  if (anyErr?.status === 503 || anyErr?.status === 429) return true;
+  const msg = (anyErr?.message || '').toLowerCase();
+  return (
+    msg.includes('503') ||
+    msg.includes('429') ||
+    msg.includes('overloaded') ||
+    msg.includes('unavailable') ||
+    msg.includes('rate limit') ||
+    msg.includes('too many requests')
+  );
+};
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const teaGenAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '');
 
 const TEA_SYSTEM_LUCIA = `당신은 LUCIA입니다.
@@ -172,64 +190,72 @@ const callTeaPersona = async (
     console.warn(`${tag} contents 무효 (length=${contents.length}) → 템플릿 폴백`);
     return null;
   }
-  try {
-    console.log(`${tag} Gemini 호출 시작 — history=${history.length}턴, contents=${contents.length}턴`);
-    const model = teaGenAI.getGenerativeModel({
-      model: TEA_GEMINI_MODEL,
-      systemInstruction: system,
-    });
-    const result = await model.generateContent({
-      contents,
-      generationConfig: { maxOutputTokens: 150, temperature: 0.9 },
-    });
-    // safety 차단 / 빈 응답 분기
-    const blockReason = result?.response?.promptFeedback?.blockReason;
-    if (blockReason) {
-      console.warn(`${tag} Gemini 차단됨 — blockReason=${blockReason} → 템플릿 폴백`);
-      return null;
-    }
-    const finishReason = result?.response?.candidates?.[0]?.finishReason;
-    let text = '';
+  console.log(
+    `${tag} Gemini 호출 시작 — history=${history.length}턴, contents=${contents.length}턴, chain=[${TEA_GEMINI_FALLBACK_CHAIN.join(' → ')}]`,
+  );
+  for (let i = 0; i < TEA_GEMINI_FALLBACK_CHAIN.length; i++) {
+    const modelName = TEA_GEMINI_FALLBACK_CHAIN[i];
+    const nextModel = TEA_GEMINI_FALLBACK_CHAIN[i + 1];
+    console.log(`${tag} ${modelName} 시도 중`);
     try {
-      text = result?.response?.text?.() || '';
-    } catch (e) {
-      // text() 추출 실패 — 전체 에러 객체 덤프
-      console.error(`${tag} text() 추출 실패 (finishReason=${finishReason}) — full error:`, e);
-      if (e instanceof Error) {
-        console.error(`${tag} text() 추출 실패 — name=${e.name}, message=${e.message}, stack=${e.stack}`);
+      const model = teaGenAI.getGenerativeModel({
+        model: modelName,
+        systemInstruction: system,
+      });
+      const result = await model.generateContent({
+        contents,
+        generationConfig: { maxOutputTokens: 150, temperature: 0.9 },
+      });
+      const blockReason = result?.response?.promptFeedback?.blockReason;
+      if (blockReason) {
+        console.warn(`${tag} ${modelName} 차단됨 — blockReason=${blockReason} → 템플릿 폴백`);
+        return null;
       }
-      return null;
-    }
-    if (!text.trim()) {
-      console.warn(`${tag} Gemini 빈 응답 (finishReason=${finishReason}) → 템플릿 폴백`);
-      return null;
-    }
-    console.log(`${tag} Gemini 성공 — ${text.trim().length}자 (finishReason=${finishReason})`);
-    return text.trim();
-  } catch (err) {
-    // Gemini 호출 자체 실패 — 전체 에러 객체 덤프 (이름/메시지/스택/원본)
-    console.error(`${tag} Gemini 호출 오류 — full error object:`, err);
-    if (err instanceof Error) {
-      console.error(
-        `${tag} Gemini 호출 오류 — name=${err.name}, message=${err.message}, stack=${err.stack}`,
-      );
-      // google-generative-ai SDK 가 HTTP 응답을 error 에 담아주는 경우 대비
+      const finishReason = result?.response?.candidates?.[0]?.finishReason;
+      let text = '';
+      try {
+        text = result?.response?.text?.() || '';
+      } catch (e) {
+        console.error(`${tag} ${modelName} text() 추출 실패 (finishReason=${finishReason}) — full error:`, e);
+        if (e instanceof Error) {
+          console.error(`${tag} ${modelName} text() 추출 실패 — name=${e.name}, message=${e.message}, stack=${e.stack}`);
+        }
+        return null;
+      }
+      if (!text.trim()) {
+        console.warn(`${tag} ${modelName} 빈 응답 (finishReason=${finishReason}) → 템플릿 폴백`);
+        return null;
+      }
+      console.log(`${tag} ${modelName} 성공 — ${text.trim().length}자 (finishReason=${finishReason})`);
+      return text.trim();
+    } catch (err) {
+      const retriable = isRetriableModelError(err);
       const anyErr = err as Error & { status?: number; statusText?: string; errorDetails?: unknown; response?: unknown };
-      if (anyErr.status !== undefined) {
-        console.error(`${tag} Gemini HTTP status=${anyErr.status} statusText=${anyErr.statusText}`);
+      console.error(`${tag} ${modelName} 호출 오류 — full error object:`, err);
+      if (err instanceof Error) {
+        console.error(
+          `${tag} ${modelName} 호출 오류 — name=${err.name}, message=${err.message}, status=${anyErr.status ?? 'n/a'}`,
+        );
+        if (anyErr.errorDetails !== undefined) {
+          console.error(`${tag} ${modelName} errorDetails:`, anyErr.errorDetails);
+        }
+      } else {
+        try { console.error(`${tag} ${modelName} 호출 오류 (non-Error) JSON:`, JSON.stringify(err)); } catch { /* ignore */ }
       }
-      if (anyErr.errorDetails !== undefined) {
-        console.error(`${tag} Gemini errorDetails:`, anyErr.errorDetails);
+      if (!retriable) {
+        console.error(`${tag} ${modelName} 재시도 불가 오류 → 템플릿 폴백`);
+        return null;
       }
-      if (anyErr.response !== undefined) {
-        console.error(`${tag} Gemini error.response:`, anyErr.response);
+      if (nextModel) {
+        console.warn(`${tag} ${modelName} 실패 → ${nextModel} 시도 (${TEA_RETRY_DELAY_MS}ms 대기)`);
+        await sleep(TEA_RETRY_DELAY_MS);
+        continue;
       }
-    } else {
-      // Error 가 아닌 값도 그대로 직렬화
-      try { console.error(`${tag} Gemini 호출 오류 (non-Error) JSON:`, JSON.stringify(err)); } catch { /* ignore */ }
+      console.error(`${tag} ${modelName} 실패 — 폴백 체인 소진 → 템플릿 폴백`);
+      return null;
     }
-    return null;
   }
+  return null;
 };
 
 const getSupabase = () => {
