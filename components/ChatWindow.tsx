@@ -1469,25 +1469,27 @@ export default function ChatWindow() {
         </div>
       </header>
 
-      {/* ✅ 헤더 spacer — sticky 헤더가 스크롤 컨테이너 위로 떠 콘텐츠가 가려지는 현상 방지 */}
-      <div style={{ height: 0, flexShrink: 0 }} />
+      {/* ✅ 첫 화면(hasUserSent=false & onboardingTab=null) — 카드 전용 스크롤 컨테이너.
+          헤더 바로 아래에 자연스럽게 카드 배치 (spacer/특수 패딩 없이 단순 padding 만). */}
+      {!hasUserSent && onboardingTab === null && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 12px' }}>
+          <OnboardingTabs
+            onExample={(name) => handleSendWithPosition(name, null)}
+            onCardClick={(text) => {
+              setInput(text);
+              textareaRef.current?.focus();
+            }}
+            activeTab={onboardingTab}
+            onTabChange={setOnboardingTab}
+          />
+        </div>
+      )}
 
+      {/* ✅ 탭 선택 후(onboardingTab !== null) OR 사용자가 메시지 전송 후(hasUserSent) — 기존 스크롤 컨테이너 */}
+      {(hasUserSent || onboardingTab !== null) && (
       <div style={{ flex: 1, overflowY: 'auto', padding: scrollPadding }}>
         {!hasUserSent && (
-          <div
-            className="px-onboarding-wrap"
-            style={
-              onboardingTab === null
-                ? {
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'flex-start',
-                    padding: '16px 12px 20px',
-                  }
-                : undefined
-            }
-          >
+          <div className="px-onboarding-wrap">
             <OnboardingTabs
               onExample={(name) => handleSendWithPosition(name, null)}
               onCardClick={(text) => {
@@ -1611,6 +1613,7 @@ export default function ChatWindow() {
         {isLoading && <TypingIndicator teaMode={onboardingTab === 'tea'} />}
         <div ref={bottomRef} />
       </div>
+      )}
 
       {showPosition && (
         <div style={{ position: 'fixed', left: 0, right: 0, bottom: 60, zIndex: 100 }}>
