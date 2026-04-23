@@ -1256,6 +1256,15 @@ export default function ChatWindow() {
       ? '56px 0 140px'
       : '108px 0 140px';
 
+  // 🐞 DEBUG: 상단 잘림 원인 추적용 임시 로그 (배포 후 제거 예정)
+  if (typeof window !== 'undefined') {
+    console.log('scrollPadding:', scrollPadding, 'onboardingTab:', onboardingTab, 'hasUserSent:', hasUserSent);
+  }
+
+  // 🐞 DEBUG: 스크롤 컨테이너 배경색으로 영역 시각화
+  //   onboardingTab === null → red / 탭 선택 후 → blue
+  const debugBg = onboardingTab === null ? 'red' : 'blue';
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -1476,7 +1485,7 @@ export default function ChatWindow() {
         </div>
       </header>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: scrollPadding }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: scrollPadding, background: debugBg }}>
         {!hasUserSent && (
           <div
             className="px-onboarding-wrap"
