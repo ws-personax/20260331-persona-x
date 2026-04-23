@@ -642,20 +642,30 @@ const EchoBubble = memo(function EchoBubble({
   );
 });
 
-// ✅ 차 한잔 모드에서는 선택된 페르소나 1인, 재테크 모드에서는 RAY/JACK/LUCIA 3인
-const TypingIndicator = ({ teaMode = false, teaPersona = null }: { teaMode?: boolean; teaPersona?: 'lucia' | 'jack' | 'echo' | null }) => (
-  <>
-    <style>{`
-      @keyframes typingDot {
-        0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-        30% { transform: translateY(-5px); opacity: 1; }
-      }
-    `}</style>
-    <div style={{ padding: '0 0 8px' }}>
-      {((teaMode ? [teaPersona || 'lucia'] : ['ray', 'jack', 'lucia']) as PersonaKey[]).map((key, ki) => {
-        const p = PERSONAS[key];
-        return (
-          <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '4px 12px' }}>
+// 차 한잔 탭 타이핑 인디케이터 문구 — 선택된 페르소나에 맞춰 분기
+const TEA_TYPING_TEXT: Record<'lucia' | 'jack' | 'echo', string> = {
+  lucia: 'LUCIA가 마음을 모으고 있어요...',
+  jack: 'JACK이 생각을 정리하고 있어요...',
+  echo: 'ECHO가 핵심을 찾고 있어요...',
+};
+
+// ✅ 차 한잔 모드에서는 선택된 페르소나 1인의 말풍선에 문구 표시,
+//    재테크 모드에서는 RAY/JACK/LUCIA 3인의 점 3개 깜빡임.
+const TypingIndicator = ({ teaMode = false, teaPersona = null }: { teaMode?: boolean; teaPersona?: 'lucia' | 'jack' | 'echo' | null }) => {
+  if (teaMode) {
+    const personaKey = (teaPersona || 'lucia') as 'lucia' | 'jack' | 'echo';
+    const p = PERSONAS[personaKey];
+    const text = TEA_TYPING_TEXT[personaKey];
+    return (
+      <>
+        <style>{`
+          @keyframes teaTypingPulse {
+            0%, 100% { opacity: 0.65; }
+            50% { opacity: 1; }
+          }
+        `}</style>
+        <div style={{ padding: '0 0 8px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '4px 12px' }}>
             <div
               style={{
                 width: 38,
@@ -666,7 +676,7 @@ const TypingIndicator = ({ teaMode = false, teaPersona = null }: { teaMode?: boo
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
-                opacity: 0.7,
+                opacity: 0.85,
               }}
             >
               <span style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>{p.initial}</span>
@@ -681,32 +691,85 @@ const TypingIndicator = ({ teaMode = false, teaPersona = null }: { teaMode?: boo
                   border: `1px solid ${p.bubbleBorder}`,
                   borderRadius: '0 12px 12px 12px',
                   padding: '10px 14px',
-                  display: 'flex',
-                  gap: 4,
-                  alignItems: 'center',
+                  fontSize: 13.5,
+                  color: '#374151',
+                  fontWeight: 500,
+                  animation: 'teaTypingPulse 1.4s ease-in-out infinite',
                 }}
               >
-                {[0, 1, 2].map(i => (
-                  <div
-                    key={i}
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: '50%',
-                      background: p.iconBg,
-                      animation: `typingDot 1.2s infinite`,
-                      animationDelay: `${ki * 0.15 + i * 0.2}s`,
-                    }}
-                  />
-                ))}
+                {text}
               </div>
             </div>
           </div>
-        );
-      })}
-    </div>
-  </>
-);
+        </div>
+      </>
+    );
+  }
+  return (
+    <>
+      <style>{`
+        @keyframes typingDot {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+          30% { transform: translateY(-5px); opacity: 1; }
+        }
+      `}</style>
+      <div style={{ padding: '0 0 8px' }}>
+        {(['ray', 'jack', 'lucia'] as PersonaKey[]).map((key, ki) => {
+          const p = PERSONAS[key];
+          return (
+            <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '4px 12px' }}>
+              <div
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 12,
+                  background: p.iconBg,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  opacity: 0.7,
+                }}
+              >
+                <span style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>{p.initial}</span>
+              </div>
+              <div style={{ paddingTop: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>{p.name}</span>
+                </div>
+                <div
+                  style={{
+                    background: p.bubbleBg,
+                    border: `1px solid ${p.bubbleBorder}`,
+                    borderRadius: '0 12px 12px 12px',
+                    padding: '10px 14px',
+                    display: 'flex',
+                    gap: 4,
+                    alignItems: 'center',
+                  }}
+                >
+                  {[0, 1, 2].map(i => (
+                    <div
+                      key={i}
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: p.iconBg,
+                        animation: `typingDot 1.2s infinite`,
+                        animationDelay: `${ki * 0.15 + i * 0.2}s`,
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+};
 
 // ✅ 에러/안내 카드 — 빨간 경고 대신 부드러운 안내 톤
 //   market_data_unavailable / analysis_failed → 재시도 버튼
