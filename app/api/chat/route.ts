@@ -221,8 +221,17 @@ export async function POST(req: Request) {
         : isJoy   ? '정말 잘 되셨네요!'
         :           '많이 힘드셨겠어요.';
 
+      // 🔧 teaRound 결정 — 클라이언트 값 우선, 누락 시 messages 배열의 user 턴 수로 폴백
+      //   (이전에는 typeof 체크만 써서 문자열/undefined 전송 시 항상 Round 1로 떨어짐)
+      const userTurns = Array.isArray(messages)
+        ? messages.filter((m: { role?: string }) => m?.role === 'user').length
+        : 0;
+      const round = Number.isFinite(Number(teaRound)) && Number(teaRound) > 0
+        ? Number(teaRound)
+        : userTurns || 1;
+
       // ── Round 2+ — 공감 변주 + JACK/ECHO 질문으로 확장 ──
-      if (typeof teaRound === 'number' && teaRound >= 2) {
+      if (round >= 2) {
         const luciaDeep =
           isFamily ? '그 마음이 얼마나 무거우셨을지 느껴져요.'
           : isLoss  ? '그때 가장 힘들었던 순간이 언제였어요?'
@@ -242,7 +251,7 @@ export async function POST(req: Request) {
 
         return Response.json({
           teaMode: true,
-          teaRound,
+          teaRound: round,
           teaLucia: `${empathyLine}\n${luciaDeep}`,
           teaJack: jackQuestion,
           teaEcho: echoQuestion,
@@ -252,7 +261,7 @@ export async function POST(req: Request) {
       // ── Round 1 — LUCIA 단독 공감 ──
       return Response.json({
         teaMode: true,
-        teaRound: teaRound || 1,
+        teaRound: round,
         teaLucia: `말씀해주셔서 고마워요.\n${empathyLine}\n조금 더 이야기해주실 수 있어요?`,
       });
     }

@@ -635,7 +635,8 @@ const EchoBubble = memo(function EchoBubble({
   );
 });
 
-const TypingIndicator = () => (
+// ✅ 차 한잔 모드에서는 LUCIA 단독, 재테크 모드에서는 RAY/JACK/LUCIA 3인
+const TypingIndicator = ({ teaMode = false }: { teaMode?: boolean }) => (
   <>
     <style>{`
       @keyframes typingDot {
@@ -644,7 +645,7 @@ const TypingIndicator = () => (
       }
     `}</style>
     <div style={{ padding: '0 0 8px' }}>
-      {(['ray', 'jack', 'lucia'] as PersonaKey[]).map((key, ki) => {
+      {((teaMode ? ['lucia'] : ['ray', 'jack', 'lucia']) as PersonaKey[]).map((key, ki) => {
         const p = PERSONAS[key];
         return (
           <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '4px 12px' }}>
@@ -1187,6 +1188,13 @@ export default function ChatWindow() {
 
       const data = await response.json();
 
+      // 🔍 차 한잔 모드 응답 구조 진단 로그 — 브라우저 콘솔에서 확인
+      //    teaLucia / teaJack / teaEcho 필드 존재 여부와 teaRound 트래킹
+      if (isTeaSend) {
+        // eslint-disable-next-line no-console
+        console.debug('[tea] request teaRound:', teaRound, '/ response keys:', Object.keys(data), '/ teaLucia?', !!data.teaLucia, '/ teaJack?', !!data.teaJack, '/ teaEcho?', !!data.teaEcho);
+      }
+
       const assistantMsg: Message = {
         id: generateId(),
         role: 'assistant',
@@ -1462,7 +1470,7 @@ export default function ChatWindow() {
             )}
           </div>
         ))}
-        {isLoading && <TypingIndicator />}
+        {isLoading && <TypingIndicator teaMode={onboardingTab === 'tea'} />}
         <div ref={bottomRef} />
       </div>
 
