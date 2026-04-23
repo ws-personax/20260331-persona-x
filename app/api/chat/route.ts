@@ -1,6 +1,7 @@
 import { fetchInvestmentNews } from '@/lib/news';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // ✅ 분리된 모듈 import
 import type { Verdict } from '@/lib/personax/types';
@@ -23,12 +24,13 @@ import type { DiscussMode, IndicatorFlags, PrevContext } from '@/lib/personax/te
 export const maxDuration = 60;
 
 // ─────────────────────────────────────────────
-// ✅ 차 한잔(teaMode) 전용 — Claude Haiku 4.5 LLM 호출
+// ✅ 차 한잔(teaMode) 전용 — Gemini Flash LLM 호출
 //   재테크 탭과 완전히 분리 (import/사용처 전부 teaMode 블록 안에서만)
-//   LLM 실패 시 호출부에서 기존 템플릿으로 폴백
+//   기존 GOOGLE_GENERATIVE_AI_API_KEY 재사용. LLM 실패 시 호출부에서
+//   기존 템플릿으로 폴백.
 // ─────────────────────────────────────────────
-const TEA_HAIKU_MODEL = 'claude-haiku-4-5-20251001';
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+const TEA_GEMINI_MODEL = 'gemini-2.0-flash';
+const teaGenAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '');
 
 const TEA_SYSTEM_LUCIA = `당신은 LUCIA입니다. ENFP 성격의 따뜻한 참모.
 - 3줄 이내
@@ -80,27 +82,32 @@ const buildTeaHistory = (rawMessages: unknown, persona: TeaPersonaKey): TeaMsg[]
   return mapped.slice(-12);
 };
 
+// Gemini contents 형식으로 변환.
+//   - role: 'user' → 'user', 'assistant' → 'model'
+//   - contents 는 반드시 'user' 역할로 시작해야 하므로 앞의 model 턴을 제거.
+const toGeminiContents = (history: TeaMsg[]) => {
+  const arr = history.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }));
+  while (arr.length > 0 && arr[0].role !== 'user') arr.shift();
+  return arr;
+};
+
 const callTeaPersona = async (system: string, history: TeaMsg[]): Promise<string | null> => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey || history.length === 0) return null;
+  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY || history.length === 0) return null;
   try {
-    const res = await fetch(ANTHROPIC_API_URL, {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: TEA_HAIKU_MODEL,
-        max_tokens: 150,
-        system,
-        messages: history,
-      }),
+    const model = teaGenAI.getGenerativeModel({
+      model: TEA_GEMINI_MODEL,
+      systemInstruction: system,
     });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = data?.content?.[0]?.text;
+    const contents = toGeminiContents(history);
+    if (contents.length === 0) return null;
+    const result = await model.generateContent({
+      contents,
+      generationConfig: { maxOutputTokens: 150 },
+    });
+    const text = result?.response?.text?.();
     return typeof text === 'string' && text.trim() ? text.trim() : null;
   } catch {
     return null;
@@ -288,7 +295,7 @@ export async function POST(req: Request) {
     const { messages, positionContext, teaMode, teaRound } = await req.json();
     const lastMsg = messages.at(-1)?.content || "";
 
-    // ✅ 차 한잔 모드 — LLM 기반 3 페르소나 응답 (Claude Haiku 4.5, 병렬 호출)
+    // ✅ 차 한잔 모드 — LLM 기반 3 페르소나 응답 (Gemini 2.0 Flash, 병렬 호출)
     //   Round 1: LUCIA 단독 (감정 수용 단계)
     //   Round 2+: LUCIA + JACK + ECHO (세 API Promise.all 병렬)
     //   LLM 실패 시 round/카테고리 기반 템플릿으로 자동 폴백.
