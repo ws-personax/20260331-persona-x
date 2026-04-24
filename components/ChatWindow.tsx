@@ -2155,7 +2155,13 @@ export default function ChatWindow() {
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
             <button
               type="button"
-              onClick={() => { setOnboardingTab('tea'); setTeaPersona(null); }}
+              onClick={() => {
+                setOnboardingTab('tea');
+                setTeaPersona(null);
+                setMessages([]);
+                messagesRef.current = [];
+                setInput('');
+              }}
               style={{
                 background: '#fff8f0',
                 border: '1px solid #fbbf24',
@@ -2176,7 +2182,13 @@ export default function ChatWindow() {
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
             <button
               type="button"
-              onClick={() => { setOnboardingTab('finance'); setTeaPersona(null); }}
+              onClick={() => {
+                setOnboardingTab('finance');
+                setTeaPersona(null);
+                setMessages([]);
+                messagesRef.current = [];
+                setInput('');
+              }}
               style={{
                 background: '#f0f4ff',
                 border: '1px solid #93c5fd',
