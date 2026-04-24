@@ -1416,6 +1416,28 @@ export default function ChatWindow() {
       { level: '전략', color: R, bg: RB, text: '오늘 장 결과 — 내일 전략은?' },
     ] as Q[];
   }, []);
+
+  // ✅ 고급 질문 — 정적 리스트 (시장 상황 무관)
+  // 전략형 (분홍) / 시장분석형 (초록) / 심리판단형 (보라)
+  const ADVANCED_QUESTIONS = useMemo(() => {
+    type AQ = { level: '전략형' | '시장분석형' | '심리판단형'; color: string; bg: string; text: string };
+    const P = '#db2777'; const PB = '#fce7f3';   // 분홍
+    const G = '#16a34a'; const GB = '#dcfce7';   // 초록
+    const V = '#9333ea'; const VB = '#f3e8ff';   // 보라
+    return [
+      { level: '전략형', color: P, bg: PB, text: '상승 추세에서 눌림 매수 vs 돌파 매수, 어떤 상황에서 유리한가요?' },
+      { level: '전략형', color: P, bg: PB, text: '손절을 가격 기준으로 할지, 시간 기준으로 할지 어떻게 정하나요?' },
+      { level: '전략형', color: P, bg: PB, text: '수익 중일 때 계속 들고 갈지, 일부 익절할지 기준은?' },
+      { level: '전략형', color: P, bg: PB, text: '시장이 불확실할 때 현금 비중 늘리는 타이밍은?' },
+      { level: '시장분석형', color: G, bg: GB, text: '지금 구간이 상승 초입인지 끝물인지 어떻게 구분하나요?' },
+      { level: '시장분석형', color: G, bg: GB, text: '지금 시장이 유동성 장인지 실적 장인지 어떻게 구분하나요?' },
+      { level: '시장분석형', color: G, bg: GB, text: '외국인 매수와 기관 매수가 동시에 들어올 때 신뢰도는?' },
+      { level: '심리판단형', color: V, bg: VB, text: '공포에 팔고 욕심에 사는 패턴을 끊는 방법은?' },
+      { level: '심리판단형', color: V, bg: VB, text: '확신과 과신의 차이를 어떻게 구분하나요?' },
+      { level: '심리판단형', color: V, bg: VB, text: '손실 후 복구 매매를 하면 안 되는 이유는?' },
+    ] as AQ[];
+  }, []);
+
   const [isLoading, setIsLoading] = useState(false);
   const [showPosition, setShowPosition] = useState(false);
   const [pendingText, setPendingText] = useState('');
@@ -1989,20 +2011,79 @@ export default function ChatWindow() {
             )}
 
             {activeTab === '고급' && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 0', gap: 8 }}>
-                <span style={{ fontSize: 28 }}>🔒</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: '#374151' }}>고급 질문은 유료 회원 전용입니다</span>
-                <span style={{ fontSize: 12, color: '#6b7280' }}>기관급 수급 분석 · 옵션 만기 전략 · 매크로 심화 분석</span>
-                <button style={{
-                  marginTop: 8,
-                  background: '#FAE100',
-                  border: 'none',
-                  borderRadius: 8,
-                  padding: '8px 20px',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                }}>업그레이드</button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {(['전략형', '시장분석형', '심리판단형'] as const).map(section => {
+                  const items = ADVANCED_QUESTIONS.filter(q => q.level === section);
+                  if (items.length === 0) return null;
+                  const sectionColor = section === '전략형' ? '#db2777' : section === '시장분석형' ? '#16a34a' : '#9333ea';
+                  return (
+                    <div key={section} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {/* 섹션 헤더 */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontSize: 11,
+                        fontWeight: 800,
+                        color: sectionColor,
+                        paddingTop: 4,
+                      }}>
+                        <span style={{
+                          display: 'inline-block',
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: sectionColor,
+                        }} />
+                        {section} ({items.length})
+                        <span style={{ flex: 1, height: 1, background: `${sectionColor}22`, marginLeft: 4 }} />
+                      </div>
+                      {/* 섹션 내 질문들 */}
+                      {items.map((q, i) => (
+                        <button
+                          key={`${section}-${i}`}
+                          onClick={() => {
+                            setInput(q.text);
+                            setShowQuickQ(false);
+                            setTimeout(() => {
+                              handleSendWithPosition(q.text, null);
+                              setInput('');
+                            }, 50);
+                          }}
+                          disabled={isLoading}
+                          style={{
+                            background: q.bg,
+                            border: `1px solid ${q.color}22`,
+                            borderRadius: 10,
+                            padding: '8px 12px',
+                            textAlign: 'left',
+                            fontSize: 13,
+                            fontWeight: 500,
+                            color: '#111827',
+                            cursor: isLoading ? 'not-allowed' : 'pointer',
+                            opacity: isLoading ? 0.5 : 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                          }}
+                        >
+                          <span style={{
+                            fontSize: 10,
+                            fontWeight: 800,
+                            color: q.color,
+                            background: '#fff',
+                            border: `1px solid ${q.color}`,
+                            borderRadius: 4,
+                            padding: '1px 5px',
+                            minWidth: 24,
+                            textAlign: 'center',
+                          }}>{q.level}</span>
+                          {q.text}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
