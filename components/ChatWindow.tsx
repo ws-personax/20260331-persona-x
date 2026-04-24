@@ -1268,9 +1268,9 @@ const OnboardingTabs = ({
             style={{
               flex: '1 1 280px',
               minWidth: '280px',
-              minHeight: 160,
-              height: 160,
-              padding: '20px 18px',
+              minHeight: 120,
+              height: 120,
+              padding: '14px 16px',
               background: '#ffffff',
               border: '2px solid #1f2937',
               borderRadius: 14,
@@ -1283,8 +1283,8 @@ const OnboardingTabs = ({
               boxSizing: 'border-box',
             }}
           >
-            <span style={{ fontSize: 32, lineHeight: 1 }}>📊</span>
-            <span style={{ fontSize: 16, fontWeight: 800, color: '#111827' }}>재테크</span>
+            <span style={{ fontSize: 24, lineHeight: 1 }}>📊</span>
+            <span style={{ fontSize: 14, fontWeight: 800, color: '#111827' }}>재테크</span>
             <span
               style={{
                 fontSize: 12,
@@ -1305,9 +1305,9 @@ const OnboardingTabs = ({
             style={{
               flex: '1 1 280px',
               minWidth: '280px',
-              minHeight: 160,
-              height: 160,
-              padding: '20px 18px',
+              minHeight: 120,
+              height: 120,
+              padding: '14px 16px',
               background: '#fffaf0',
               border: '2px solid #fb923c',
               borderRadius: 14,
@@ -1320,8 +1320,8 @@ const OnboardingTabs = ({
               boxSizing: 'border-box',
             }}
           >
-            <span style={{ fontSize: 32, lineHeight: 1 }}>☕</span>
-            <span style={{ fontSize: 16, fontWeight: 800, color: '#7c2d12' }}>차 한잔 하실래요?</span>
+            <span style={{ fontSize: 24, lineHeight: 1 }}>☕</span>
+            <span style={{ fontSize: 14, fontWeight: 800, color: '#7c2d12' }}>차 한잔 하실래요?</span>
             <span
               style={{
                 fontSize: 12,
