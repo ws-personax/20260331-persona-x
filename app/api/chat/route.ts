@@ -26,6 +26,12 @@ import { TEA_SYSTEM_LUCIA } from './prompts/tea-lucia';
 import { TEA_SYSTEM_JACK } from './prompts/tea-jack';
 import { TEA_SYSTEM_ECHO } from './prompts/tea-echo';
 
+// ✅ 재테크 탭 고급 질문 — 4명 페르소나 투자 철학 프롬프트
+import { ADVANCED_SYSTEM_RAY } from './prompts/advanced-ray';
+import { ADVANCED_SYSTEM_JACK } from './prompts/advanced-jack';
+import { ADVANCED_SYSTEM_LUCIA } from './prompts/advanced-lucia';
+import { ADVANCED_SYSTEM_ECHO } from './prompts/advanced-echo';
+
 export const maxDuration = 60;
 
 // ─────────────────────────────────────────────
@@ -55,7 +61,7 @@ const isRetriableModelError = (err: unknown): boolean => {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const teaGenAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '');
 
-type TeaPersonaKey = 'lucia' | 'jack' | 'echo';
+type TeaPersonaKey = 'lucia' | 'jack' | 'echo' | 'ray';
 type TeaMsg = { role: 'user' | 'assistant'; content: string };
 
 // 원본 messages 에서 특정 페르소나의 이력만 재구성.
@@ -374,7 +380,7 @@ export async function POST(req: Request) {
   // ✅ Gemini 제거됨 — API 키 불필요
 
   try {
-    const { messages, positionContext, teaMode, teaRound, teaPersona } = await req.json();
+    const { messages, positionContext, teaMode, teaRound, teaPersona, isAdvancedQuestion } = await req.json();
     const lastMsg = messages.at(-1)?.content || "";
 
     // ✅ 차 한잔 모드 — LLM 기반 3 페르소나 응답 (Gemini 2.0 Flash, 병렬 호출)
@@ -487,6 +493,47 @@ export async function POST(req: Request) {
         teaRound: round,
         teaPersona: 'lucia',
         teaLucia: luciaLLM || fallbackLucia,
+      });
+    }
+
+    // ✅ 재테크 탭 고급 질문 — 4명 페르소나 LLM 병렬 호출 (투자 철학 기반)
+    //   isAdvancedQuestion=true 일 때만 진입.
+    //   종목 데이터 없이 순수 전략·철학 답변.
+    //   LLM 실패 시 폴백 텍스트 반환.
+    if (isAdvancedQuestion) {
+      console.log('[advanced] 고급 질문 감지 — 4명 페르소나 병렬 호출 시작');
+      const advancedHistory: TeaMsg[] = [{ role: 'user', content: lastMsg }];
+
+      const [rayLLM, jackLLM, luciaLLM, echoLLM] = await Promise.all([
+        callTeaPersona('ray', ADVANCED_SYSTEM_RAY, advancedHistory),
+        callTeaPersona('jack', ADVANCED_SYSTEM_JACK, advancedHistory),
+        callTeaPersona('lucia', ADVANCED_SYSTEM_LUCIA, advancedHistory),
+        callTeaPersona('echo', ADVANCED_SYSTEM_ECHO, advancedHistory),
+      ]);
+
+      const rayText = rayLLM || '데이터 기반 분석이 필요합니다.\n지금 구간의 통계적 특성을 먼저 확인하시고\n과거 유사 상황의 패턴을 비교해 보시는 걸 권합니다.';
+      const jackText = jackLLM || '판단 기준을 먼저 정하세요.\n추세가 살아있는지, 꺾였는지 확인부터.\n손절선 없이는 진입도 없습니다.';
+      const luciaText = luciaLLM || '이 질문에 답하기 전에 먼저 본인 심리 상태를 점검하세요.\n손실 회피 편향이 작동하는 구간입니다.\n최악의 시나리오를 가정하고 그때 어떻게 할지 먼저 정해두세요.';
+      const echoText = echoLLM || '핵심만 보겠습니다.\n원칙 없이 답하면 매번 다른 결론이 나옵니다.\n먼저 본인의 판단 기준을 종이에 적으세요.\n그게 출발점입니다.';
+
+      console.log(
+        `[advanced] 결과 — RAY:${rayLLM ? 'LLM' : 'FB'} / JACK:${jackLLM ? 'LLM' : 'FB'} / LUCIA:${luciaLLM ? 'LLM' : 'FB'} / ECHO:${echoLLM ? 'LLM' : 'FB'}`,
+      );
+
+      return Response.json({
+        reply: [rayText, jackText, luciaText, echoText].join('\n\n'),
+        personas: {
+          jack: jackText,
+          lucia: luciaText,
+          ray: rayText,
+          echo: echoText,
+          verdict: '관망' as Verdict,
+          confidence: 0,
+          breakdown: '전략 분석',
+          positionSizing: '0%',
+          jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
+          isAdvancedAnswer: true,
+        },
       });
     }
 

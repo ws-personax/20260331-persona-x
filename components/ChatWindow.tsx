@@ -29,6 +29,8 @@ interface PersonaData {
   luciaNews?: NewsLink | null;
   rayNews?: NewsLink | null;
   echoNews?: NewsLink | null;
+  // ✅ 고급 질문 응답 플래그 — true 면 상단에 "💡 전략 분석" 헤더 표시
+  isAdvancedAnswer?: boolean;
 }
 
 type ErrorType = 'market_data_unavailable' | 'keyword_not_recognized' | 'analysis_failed';
@@ -1478,7 +1480,7 @@ export default function ChatWindow() {
     el.style.overflowY = el.scrollHeight > 160 ? 'auto' : 'hidden';
   }, [input]);
 
-  const handleSendWithPosition = useCallback(async (text: string, position: Position | null) => {
+  const handleSendWithPosition = useCallback(async (text: string, position: Position | null, isAdvanced: boolean = false) => {
     setShowPosition(false);
 
     // ✅ 차 한잔 탭에서 보낼 때는 LUCIA 단독 응답 루트
@@ -1524,6 +1526,8 @@ export default function ChatWindow() {
       teaMode: isTeaSend,
       teaRound,
       teaPersona: isTeaSend ? teaPersona : undefined,
+      // ✅ 재테크 탭 고급 질문 — 4명 페르소나 LLM 병렬 응답 트리거
+      isAdvancedQuestion: isAdvanced,
     };
 
     // 🔍 차 한잔 모드 요청 body 진단 로그 — teaPersona 전달 여부 확인
@@ -1815,6 +1819,26 @@ export default function ChatWindow() {
               </div>
             ) : (
               <div style={{ marginBottom: 12 }}>
+                {/* ✅ 고급 질문 응답일 때 상단 라벨 — 4명 페르소나 투자 철학 기반 답변 */}
+                {msg.personas?.isAdvancedAnswer && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    margin: '4px 12px 10px',
+                    padding: '6px 10px',
+                    background: 'linear-gradient(90deg, #fef3c7 0%, #fce7f3 100%)',
+                    border: '1px solid #fbbf24',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: '#92400e',
+                    width: 'fit-content',
+                  }}>
+                    <span>💡</span>
+                    <span>전략 분석</span>
+                  </div>
+                )}
                 {msg.personas ? (() => {
                   // ✅ 갈등 감지 — JACK 텍스트에 "\n↳ " 포함 시 토론 순서로 재배치
                   //    RAY → JACK(주장) → LUCIA(반박) → JACK(재반박) → ECHO
@@ -2038,7 +2062,7 @@ export default function ChatWindow() {
                         {section} ({items.length})
                         <span style={{ flex: 1, height: 1, background: `${sectionColor}22`, marginLeft: 4 }} />
                       </div>
-                      {/* 섹션 내 질문들 */}
+                      {/* 섹션 내 질문들 — 고급 탭은 isAdvanced=true 로 서버에 4명 LLM 응답 요청 */}
                       {items.map((q, i) => (
                         <button
                           key={`${section}-${i}`}
@@ -2046,7 +2070,7 @@ export default function ChatWindow() {
                             setInput(q.text);
                             setShowQuickQ(false);
                             setTimeout(() => {
-                              handleSendWithPosition(q.text, null);
+                              handleSendWithPosition(q.text, null, true);
                               setInput('');
                             }, 50);
                           }}
