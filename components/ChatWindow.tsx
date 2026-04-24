@@ -1183,8 +1183,8 @@ const OnboardingTabs = ({
             lineHeight: 1.6,
             margin: '0 0 8px',
           }}>
-            AI가 답을 드리지 않습니다.<br />
-            당신의 판단을 만들어드립니다.
+            AI와 다른 길.<br />
+            당신의 판단이 답입니다.
           </p>
           <p style={{
             fontSize: 12,
@@ -1193,8 +1193,8 @@ const OnboardingTabs = ({
             lineHeight: 1.6,
             margin: 0,
           }}>
-            4개의 관점이 충돌할 때,<br />
-            비로소 당신만의 기준이 생깁니다.
+            범용 AI가 아닙니다.<br />
+            투자 판단 + 감정 나눔, 두 가지를 함께합니다.
           </p>
         </div>
         <div
