@@ -1502,10 +1502,14 @@ export default function ChatWindow() {
       }
     }
     if (!lastUserId) return;
-    const el = document.querySelector(`[data-msg-id="${lastUserId}"]`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const el = container.querySelector(`[data-msg-id="${lastUserId}"]`) as HTMLElement | null;
+    if (!el) return;
+    const containerRect = container.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const offsetTop = elRect.top - containerRect.top + container.scrollTop;
+    container.scrollTo({ top: offsetTop, behavior: 'smooth' });
   }, [messages]);
 
   useEffect(() => {
