@@ -252,6 +252,13 @@ const cleanTeaText = (text: string): string =>
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/\n{3,}/g, '\n\n');
 
+// JACK 전용 정리 — 빈 줄 완전 제거. JACK 은 촘촘하게 흘러야 묵직함이 산다.
+// 프롬프트에서 "빈 줄 금지" 지시해도 모델이 간헐적으로 \n\n 을 내보내는 경우 차단.
+const cleanJackText = (text: string): string =>
+  text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\n{2,}/g, '\n');
+
 const PersonaBubble = memo(function PersonaBubble({
   personaKey,
   text,
@@ -1786,7 +1793,7 @@ export default function ChatWindow() {
                 {msg.teaJack && (
                   <PersonaBubble
                     personaKey="jack"
-                    text={cleanTeaText(msg.teaJack)}
+                    text={cleanJackText(msg.teaJack)}
                     timestamp={msg.timestamp}
                   />
                 )}
