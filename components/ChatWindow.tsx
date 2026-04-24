@@ -2150,6 +2150,49 @@ export default function ChatWindow() {
           ✅ 차 한잔 탭은 teaPersona 가 선택된 후에만 입력창 노출. */}
       {(onboardingTab !== null || hasUserSent) && !(onboardingTab === 'tea' && teaPersona === null) && (
       <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
+        {/* ✅ 탭 전환 캡슐 — 재테크 ↔ 차 한잔 자연스럽게 이동. 입력창 바로 위에 배치. */}
+        {onboardingTab === 'finance' && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+            <button
+              type="button"
+              onClick={() => setOnboardingTab('tea')}
+              style={{
+                background: '#fff8f0',
+                border: '1px solid #fbbf24',
+                borderRadius: 999,
+                padding: '6px 14px',
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#92400e',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              🍵 마음이 복잡하다면 차 한잔 어때요?
+            </button>
+          </div>
+        )}
+        {onboardingTab === 'tea' && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+            <button
+              type="button"
+              onClick={() => setOnboardingTab('finance')}
+              style={{
+                background: '#f0f4ff',
+                border: '1px solid #93c5fd',
+                borderRadius: 999,
+                padding: '6px 14px',
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#1e40af',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              📊 이제 실전으로 가볼까요?
+            </button>
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {/* 사전 질문 토글 버튼 — 재테크 탭일 때만 표시.
               차 한잔 탭(onboardingTab === 'tea')에서는 hasUserSent 여부와 무관하게 항상 숨김. */}
