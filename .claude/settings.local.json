@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(npx tsc *)",
+      "Bash(npx next *)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(npm run *)",
+      "Bash(awk 'NR==597,NR==720' \"D:\\\\0 비지니스\\\\0-PersonaX MVP\\\\20260331-persona--x\\\\app\\\\api\\\\chat\\\\route.ts\")",
+      "Bash(NODE_OPTIONS=--max-old-space-size=4096 npx tsc --noEmit)",
+      "Bash(export NODE_OPTIONS=--max-old-space-size=8192)",
+      "Bash(npx --no-install vercel --version)",
+      "Bash(npx --no-install vercel ls --yes)"
+    ]
+  }
+}
