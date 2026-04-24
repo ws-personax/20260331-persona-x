@@ -1233,17 +1233,17 @@ const OnboardingTabs = ({
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 4,
-                aspectRatio: '1 / 1',
+                gap: 2,
+                aspectRatio: '1.4 / 1',
                 background: p.bg,
                 border: `1px solid ${p.border}`,
-                borderRadius: 12,
-                padding: '8px 6px',
+                borderRadius: 10,
+                padding: '6px 6px',
                 cursor: 'default',
               }}>
-                <span style={{ fontSize: 28, lineHeight: 1 }}>{p.icon}</span>
-                <span style={{ fontWeight: 800, fontSize: 14, color: p.color }}>{p.name}</span>
-                <span style={{ fontSize: 11, color: p.color, textAlign: 'center', lineHeight: 1.3, padding: '0 2px' }}>{p.quote}</span>
+                <span style={{ fontSize: 22, lineHeight: 1 }}>{p.icon}</span>
+                <span style={{ fontWeight: 800, fontSize: 13, color: p.color }}>{p.name}</span>
+                <span style={{ fontSize: 10.5, color: p.color, textAlign: 'center', lineHeight: 1.25, padding: '0 2px' }}>{p.quote}</span>
               </div>
             ))}
           </div>
