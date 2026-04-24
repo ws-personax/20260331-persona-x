@@ -2072,6 +2072,7 @@ export default function ChatWindow() {
             placeholder={onboardingTab === 'tea' ? '마음을 꺼내보세요' : '종목명을 입력하세요 (예: 삼성전자, 테슬라)'}
             style={{
               flex: 1,
+              minWidth: 0,
               border: '1px solid #d1d5db',
               borderRadius: 12,
               padding: '10px',
@@ -2082,6 +2083,7 @@ export default function ChatWindow() {
               height: 56,
               maxHeight: 160,
               overflowY: 'hidden',
+              boxSizing: 'border-box',
             }}
             rows={1}
           />
@@ -2092,9 +2094,11 @@ export default function ChatWindow() {
               background: '#FAE100',
               border: 'none',
               borderRadius: 12,
-              padding: '0 20px',
+              padding: '0 18px',
+              minWidth: 72,
               minHeight: 56,
               height: 56,
+              flexShrink: 0,
               boxSizing: 'border-box',
               fontWeight: 800,
               cursor: !input.trim() || isLoading ? 'not-allowed' : 'pointer',
