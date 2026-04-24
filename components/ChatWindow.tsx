@@ -1109,30 +1109,24 @@ const TeaTabContent = ({
         <br />
         마음을 꺼내보세요
       </h2>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'row', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
         {TEA_CARDS.map(card => (
           <button
             key={card.title}
             type="button"
             onClick={() => onCardClick(card.prompt)}
             style={{
-              background: 'linear-gradient(180deg, #fff8eb 0%, #fffaf0 100%)',
-              border: '1px solid #fcd9a8',
-              borderRadius: 14,
-              padding: '14px 16px',
+              background: '#fff8f0',
+              border: '1px solid #e8a87c',
+              borderRadius: 20,
+              padding: '8px 16px',
+              fontSize: 13,
+              color: '#7c2d12',
               cursor: 'pointer',
-              textAlign: 'left',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 14,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              whiteSpace: 'nowrap',
             }}
           >
-            <span style={{ fontSize: 28, lineHeight: 1 }}>{card.emoji}</span>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span style={{ fontSize: 15, fontWeight: 800, color: '#7c2d12' }}>{card.title}</span>
-              <span style={{ fontSize: 12, color: '#92400e' }}>{card.sub}</span>
-            </div>
+            {card.emoji} {card.title}
           </button>
         ))}
       </div>
