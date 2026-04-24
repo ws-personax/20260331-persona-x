@@ -981,7 +981,7 @@ const TeaTabContent = ({
         >
           오늘 누구와 이야기하시겠어요?
         </h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 440, margin: '0 auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 440, margin: '0 auto', overflowY: 'visible' }}>
           {TEA_PERSONAS_INFO.map(p => (
             <button
               key={p.key}
@@ -996,7 +996,7 @@ const TeaTabContent = ({
                 background: p.bg,
                 border: `2px solid ${p.border}`,
                 borderRadius: 14,
-                padding: '16px 18px',
+                padding: '10px 14px',
                 cursor: 'pointer',
                 textAlign: 'left',
                 display: 'flex',
