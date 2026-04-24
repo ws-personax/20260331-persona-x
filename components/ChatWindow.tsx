@@ -1171,6 +1171,32 @@ const OnboardingTabs = ({
         `}</style>
         {/* 카드 2개 — PC 는 가로 나란히, 모바일(< 600px) 은 세로 스택
             (media query .px-intro-cards-row). 세로 중앙정렬은 부모 담당. */}
+        <div style={{
+          textAlign: 'center',
+          marginBottom: 24,
+          padding: '0 8px',
+        }}>
+          <p style={{
+            fontSize: 15,
+            fontWeight: 800,
+            color: '#1f2937',
+            lineHeight: 1.6,
+            margin: '0 0 8px',
+          }}>
+            AI가 답을 드리지 않습니다.<br />
+            당신의 판단을 만들어드립니다.
+          </p>
+          <p style={{
+            fontSize: 12,
+            fontWeight: 500,
+            color: '#6b7280',
+            lineHeight: 1.6,
+            margin: 0,
+          }}>
+            4개의 관점이 충돌할 때,<br />
+            비로소 당신만의 기준이 생깁니다.
+          </p>
+        </div>
         <div
           className="px-intro-cards-row"
           style={{
