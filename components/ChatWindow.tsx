@@ -981,17 +981,27 @@ const TeaTabContent = ({
         >
           오늘 누구와 이야기하시겠어요?
         </h2>
-        <p style={{
+        <div style={{
+          maxWidth: 360,
+          margin: '0 auto 20px',
+          background: '#fff8f0',
+          border: '1.5px solid #fb923c',
+          borderRadius: 14,
+          padding: '14px 18px',
           textAlign: 'center',
-          color: '#78350f',
-          fontSize: 14,
-          fontWeight: 600,
-          lineHeight: 1.6,
-          margin: '0 0 16px',
+          boxShadow: '0 2px 8px rgba(251, 146, 60, 0.12)',
         }}>
-          오늘 하루, 마음이 무거운가요?<br />
-          여기서 먼저 털어놓으세요.
-        </p>
+          <p style={{
+            color: '#78350f',
+            fontSize: 15,
+            fontWeight: 700,
+            lineHeight: 1.6,
+            margin: 0,
+          }}>
+            오늘 하루, 마음이 무거운가요?<br />
+            여기서 먼저 털어놓으세요.
+          </p>
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 440, margin: '0 auto', overflowY: 'visible' }}>
           {TEA_PERSONAS_INFO.map(p => (
             <button
@@ -1206,10 +1216,10 @@ const OnboardingTabs = ({
             4명이 충돌하고, 당신이 결정합니다.
           </p>
           <div style={{
-            display: 'flex',
-            flexDirection: 'column',
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
             gap: 8,
-            maxWidth: 320,
+            maxWidth: 360,
             margin: '0 auto',
           }}>
             {[
@@ -1220,16 +1230,20 @@ const OnboardingTabs = ({
             ].map(p => (
               <div key={p.name} style={{
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
-                gap: 10,
+                justifyContent: 'center',
+                gap: 4,
+                aspectRatio: '1 / 1',
                 background: p.bg,
                 border: `1px solid ${p.border}`,
-                borderRadius: 10,
-                padding: '8px 12px',
+                borderRadius: 12,
+                padding: '8px 6px',
+                cursor: 'default',
               }}>
-                <span style={{ fontSize: 18, lineHeight: 1 }}>{p.icon}</span>
-                <span style={{ fontWeight: 800, fontSize: 13, color: p.color, minWidth: 50, textAlign: 'left' }}>{p.name}</span>
-                <span style={{ fontSize: 12, color: p.color, flex: 1, textAlign: 'left' }}>{p.quote}</span>
+                <span style={{ fontSize: 28, lineHeight: 1 }}>{p.icon}</span>
+                <span style={{ fontWeight: 800, fontSize: 14, color: p.color }}>{p.name}</span>
+                <span style={{ fontSize: 11, color: p.color, textAlign: 'center', lineHeight: 1.3, padding: '0 2px' }}>{p.quote}</span>
               </div>
             ))}
           </div>
