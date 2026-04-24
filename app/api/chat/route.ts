@@ -466,6 +466,19 @@ export async function POST(req: Request) {
       if (selectedPersona === 'jack') {
         const jackLLM = await callTeaPersona('jack', TEA_SYSTEM_JACK, jackHistory);
         console.log(`[tea] round=${round} persona=jack 결과 — ${jackLLM ? 'LLM' : 'FALLBACK'}`);
+        try {
+          const supabase = getSupabase();
+          if (supabase) {
+            await supabase.from('tea_logs').insert({
+              persona: selectedPersona,
+              turn_count: round,
+              first_message: lastMsg.slice(0, 100),
+              user_id: null,
+            });
+          }
+        } catch (e) {
+          console.warn('[tea] 로그 저장 실패 (무시)', e);
+        }
         return Response.json({
           teaMode: true,
           teaRound: round,
@@ -477,6 +490,19 @@ export async function POST(req: Request) {
       if (selectedPersona === 'echo') {
         const echoLLM = await callTeaPersona('echo', TEA_SYSTEM_ECHO, echoHistory);
         console.log(`[tea] round=${round} persona=echo 결과 — ${echoLLM ? 'LLM' : 'FALLBACK'}`);
+        try {
+          const supabase = getSupabase();
+          if (supabase) {
+            await supabase.from('tea_logs').insert({
+              persona: selectedPersona,
+              turn_count: round,
+              first_message: lastMsg.slice(0, 100),
+              user_id: null,
+            });
+          }
+        } catch (e) {
+          console.warn('[tea] 로그 저장 실패 (무시)', e);
+        }
         return Response.json({
           teaMode: true,
           teaRound: round,
@@ -488,6 +514,19 @@ export async function POST(req: Request) {
       // lucia 기본
       const luciaLLM = await callTeaPersona('lucia', TEA_SYSTEM_LUCIA, luciaHistory);
       console.log(`[tea] round=${round} persona=lucia 결과 — ${luciaLLM ? 'LLM' : 'FALLBACK'}`);
+      try {
+        const supabase = getSupabase();
+        if (supabase) {
+          await supabase.from('tea_logs').insert({
+            persona: selectedPersona,
+            turn_count: round,
+            first_message: lastMsg.slice(0, 100),
+            user_id: null,
+          });
+        }
+      } catch (e) {
+        console.warn('[tea] 로그 저장 실패 (무시)', e);
+      }
       return Response.json({
         teaMode: true,
         teaRound: round,
