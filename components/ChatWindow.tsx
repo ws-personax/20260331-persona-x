@@ -1459,6 +1459,12 @@ export default function ChatWindow() {
     // ✅ 차 한잔 탭에서 보낼 때는 LUCIA 단독 응답 루트
     const isTeaSend = onboardingTab === 'tea';
 
+    // 🔍 디버그 — 클로저가 최신 teaPersona 를 캡처하고 있는지 확인
+    // eslint-disable-next-line no-console
+    console.log('[debug] teaPersona state:', teaPersona);
+    // eslint-disable-next-line no-console
+    console.log('[debug] isTeaSend:', isTeaSend);
+
     // ✅ 차 한잔 대화 턴 수 — 이번 전송 포함 (1 = 첫 메시지)
     //    기존에 보낸 user 메시지 중 teaMode=true 인 것 +1
     const teaRound = isTeaSend
@@ -1555,7 +1561,7 @@ export default function ChatWindow() {
     } finally {
       setIsLoading(false);
     }
-  }, [onboardingTab]);
+  }, [onboardingTab, teaPersona]);
 
   const handleSend = useCallback(() => {
     const content = input.trim();
