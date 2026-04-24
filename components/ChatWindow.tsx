@@ -981,6 +981,17 @@ const TeaTabContent = ({
         >
           오늘 누구와 이야기하시겠어요?
         </h2>
+        <p style={{
+          textAlign: 'center',
+          color: '#78350f',
+          fontSize: 14,
+          fontWeight: 600,
+          lineHeight: 1.6,
+          margin: '0 0 16px',
+        }}>
+          오늘 하루, 마음이 무거운가요?<br />
+          여기서 먼저 털어놓으세요.
+        </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 440, margin: '0 auto', overflowY: 'visible' }}>
           {TEA_PERSONAS_INFO.map(p => (
             <button
@@ -1177,25 +1188,51 @@ const OnboardingTabs = ({
           padding: '0 8px',
         }}>
           <p style={{
-            fontSize: 15,
-            fontWeight: 800,
-            color: '#1f2937',
-            lineHeight: 1.6,
-            margin: '0 0 8px',
-          }}>
-            AI와 다른 길.<br />
-            당신의 판단이 답입니다.
-          </p>
-          <p style={{
             fontSize: 12,
             fontWeight: 500,
-            color: '#6b7280',
-            lineHeight: 1.6,
-            margin: 0,
+            color: '#9ca3af',
+            letterSpacing: 0.3,
+            margin: '0 0 6px',
           }}>
-            범용 AI가 아닙니다.<br />
-            투자 판단 + 감정 나눔, 두 가지를 함께합니다.
+            AI와 다른 길
           </p>
+          <p style={{
+            fontSize: 17,
+            fontWeight: 800,
+            color: '#1f2937',
+            lineHeight: 1.4,
+            margin: '0 0 16px',
+          }}>
+            4명이 충돌하고, 당신이 결정합니다.
+          </p>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            maxWidth: 320,
+            margin: '0 auto',
+          }}>
+            {[
+              { icon: '📊', name: 'RAY',   quote: '데이터는 매수 신호입니다', bg: '#e0f2fe', border: '#7dd3fc', color: '#0369a1' },
+              { icon: '⚔️', name: 'JACK',  quote: '지금은 관망이 맞습니다',   bg: '#f3f4f6', border: '#9ca3af', color: '#374151' },
+              { icon: '💜', name: 'LUCIA', quote: '마음이 준비됐나요?',       bg: '#f3e8ff', border: '#c4b5fd', color: '#6b21a8' },
+              { icon: '🎯', name: 'ECHO',  quote: '원칙이 먼저입니다',        bg: '#fef9c3', border: '#fde047', color: '#713f12' },
+            ].map(p => (
+              <div key={p.name} style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                background: p.bg,
+                border: `1px solid ${p.border}`,
+                borderRadius: 10,
+                padding: '8px 12px',
+              }}>
+                <span style={{ fontSize: 18, lineHeight: 1 }}>{p.icon}</span>
+                <span style={{ fontWeight: 800, fontSize: 13, color: p.color, minWidth: 50, textAlign: 'left' }}>{p.name}</span>
+                <span style={{ fontSize: 12, color: p.color, flex: 1, textAlign: 'left' }}>{p.quote}</span>
+              </div>
+            ))}
+          </div>
         </div>
         <div
           className="px-intro-cards-row"
