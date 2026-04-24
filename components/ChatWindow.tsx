@@ -1477,6 +1477,7 @@ export default function ChatWindow() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesRef = useRef<Message[]>([]);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -1492,7 +1493,19 @@ export default function ChatWindow() {
   const scrollPadding = hasUserSent ? '20px 0 140px' : '16px 0 140px';
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length === 0) return;
+    let lastUserId: string | null = null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        lastUserId = messages[i].id;
+        break;
+      }
+    }
+    if (!lastUserId) return;
+    const el = document.querySelector(`[data-msg-id="${lastUserId}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }, [messages]);
 
   useEffect(() => {
@@ -1752,7 +1765,7 @@ export default function ChatWindow() {
 
       {/* ✅ 탭 선택 후(onboardingTab !== null) OR 사용자가 메시지 전송 후(hasUserSent) — 기존 스크롤 컨테이너 */}
       {(hasUserSent || onboardingTab !== null) && (
-      <div style={{ flex: 1, overflowY: 'auto', padding: scrollPadding }}>
+      <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', padding: scrollPadding }}>
         {!hasUserSent && (
           <div className="px-onboarding-wrap">
             <OnboardingTabs
@@ -1800,7 +1813,7 @@ export default function ChatWindow() {
         {messages.map(msg => (
           <div key={msg.id}>
             {msg.role === 'user' ? (
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16, padding: '0 12px' }}>
+              <div data-msg-id={msg.id} style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16, padding: '0 12px' }}>
                 <div style={{ background: '#FAE100', borderRadius: '15px 0 15px 15px', padding: '10px 15px', maxWidth: '75%', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
                   <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>
                     {msg.content.includes('약 10초') ? (
@@ -2187,6 +2200,10 @@ export default function ChatWindow() {
                 setMessages([]);
                 messagesRef.current = [];
                 setInput('');
+                requestAnimationFrame(() => {
+                  scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+                  window.scrollTo({ top: 0, behavior: 'auto' });
+                });
               }}
               style={{
                 background: '#fff8f0',
@@ -2214,6 +2231,10 @@ export default function ChatWindow() {
                 setMessages([]);
                 messagesRef.current = [];
                 setInput('');
+                requestAnimationFrame(() => {
+                  scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+                  window.scrollTo({ top: 0, behavior: 'auto' });
+                });
               }}
               style={{
                 background: '#f0f4ff',
