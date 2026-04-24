@@ -1479,24 +1479,32 @@ export default function ChatWindow() {
     setIsLoading(true);
     setInput('');
 
+    const requestBody = {
+      // 차 한잔 모드 페르소나별 이력 재구성을 위해 assistant 메시지의
+      // teaJack/teaEcho 를 함께 전송. 재테크 탭은 서버에서 무시됨.
+      messages: nextMessages.slice(-10).map(m => ({
+        role: m.role,
+        content: m.content,
+        ...(m.role === 'assistant' && m.teaJack ? { teaJack: m.teaJack } : {}),
+        ...(m.role === 'assistant' && m.teaEcho ? { teaEcho: m.teaEcho } : {}),
+      })),
+      positionContext: buildPositionContext(position),
+      teaMode: isTeaSend,
+      teaRound,
+      teaPersona: isTeaSend ? teaPersona : undefined,
+    };
+
+    // 🔍 차 한잔 모드 요청 body 진단 로그 — teaPersona 전달 여부 확인
+    if (isTeaSend) {
+      // eslint-disable-next-line no-console
+      console.debug('[tea] request body — teaPersona:', requestBody.teaPersona, '/ teaMode:', requestBody.teaMode, '/ teaRound:', requestBody.teaRound, '/ messages count:', requestBody.messages.length);
+    }
+
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          // 차 한잔 모드 페르소나별 이력 재구성을 위해 assistant 메시지의
-          // teaJack/teaEcho 를 함께 전송. 재테크 탭은 서버에서 무시됨.
-          messages: nextMessages.slice(-10).map(m => ({
-            role: m.role,
-            content: m.content,
-            ...(m.role === 'assistant' && m.teaJack ? { teaJack: m.teaJack } : {}),
-            ...(m.role === 'assistant' && m.teaEcho ? { teaEcho: m.teaEcho } : {}),
-          })),
-          positionContext: buildPositionContext(position),
-          teaMode: isTeaSend,
-          teaRound,
-          teaPersona: isTeaSend ? teaPersona : undefined,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();

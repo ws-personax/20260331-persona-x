@@ -621,6 +621,8 @@ export async function POST(req: Request) {
       const selectedPersona: 'lucia' | 'jack' | 'echo' =
         teaPersona === 'jack' ? 'jack' : teaPersona === 'echo' ? 'echo' : 'lucia';
 
+      console.log(`[tea] received teaPersona="${teaPersona}" → selectedPersona="${selectedPersona}"`);
+
       if (selectedPersona === 'jack') {
         const jackLLM = await callTeaPersona('jack', TEA_SYSTEM_JACK, jackHistory);
         console.log(`[tea] round=${round} persona=jack 결과 — ${jackLLM ? 'LLM' : 'FALLBACK'}`);
