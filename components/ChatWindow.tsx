@@ -244,12 +244,13 @@ const NoticeBox = ({
   </div>
 );
 
-// 차 한잔 탭 LLM 응답 정리 — 마크다운 볼드/불필요한 빈 줄 제거.
-// LLM이 프롬프트 지시를 어기고 **볼드** 나 빈 줄을 내보내는 경우를 렌더 직전 차단.
+// 차 한잔 탭 LLM 응답 정리 — 마크다운 볼드 제거 + 과도한 빈 줄 축소.
+// LLM이 프롬프트 지시를 어기고 **볼드** 나 3줄 이상 연속 줄바꿈을 내보내는 경우 차단.
+// 단락 사이 빈 줄(\n\n)은 유지해서 주제 전환의 호흡을 살린다.
 const cleanTeaText = (text: string): string =>
   text
     .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\n{2,}/g, '\n');
+    .replace(/\n{3,}/g, '\n\n');
 
 const PersonaBubble = memo(function PersonaBubble({
   personaKey,
@@ -1497,7 +1498,9 @@ export default function ChatWindow() {
     // 🔍 차 한잔 모드 요청 body 진단 로그 — teaPersona 전달 여부 확인
     if (isTeaSend) {
       // eslint-disable-next-line no-console
-      console.debug('[tea] request body — teaPersona:', requestBody.teaPersona, '/ teaMode:', requestBody.teaMode, '/ teaRound:', requestBody.teaRound, '/ messages count:', requestBody.messages.length);
+      console.log('[tea] sending teaPersona:', teaPersona);
+      // eslint-disable-next-line no-console
+      console.debug('[tea] request body —', '/ teaMode:', requestBody.teaMode, '/ teaRound:', requestBody.teaRound, '/ messages count:', requestBody.messages.length);
     }
 
     try {
