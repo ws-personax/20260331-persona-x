@@ -843,16 +843,6 @@ const ErrorCard = ({
 //   역할: "ChatGPT랑 뭐가 달라?" 방지 + 서비스 정체성 전달
 //   구조: [재테크 / 차 한잔] 2개 탭 + 각 탭 콘텐츠
 
-// ─── 차 한잔 탭 — 명언 로테이션 (5개, 하루 단위 순환) ───
-const QUOTES = [
-  { text: '혼자가 아니라는 것을 아는 것만으로도\n우리는 버틸 수 있다.', author: '헬렌 켈러' },
-  { text: '슬픔을 나누면 절반이 되고\n기쁨을 나누면 두 배가 된다.', author: '스웨덴 속담' },
-  { text: '괜찮지 않아도 괜찮아요.', author: '' },
-  { text: '가장 어두운 밤도\n반드시 끝이 있다.', author: '빅토르 위고' },
-  { text: '말하지 않은 감정은\n사라지지 않고 쌓인다.', author: '' },
-];
-const getTodayQuote = () => QUOTES[Math.floor(Date.now() / 86400000) % QUOTES.length];
-
 // ─── 탭 선택 버튼 — 아이콘 + 제목만 (compact pill 스타일) ───
 const TabButton = ({
   active,
@@ -957,6 +947,13 @@ const TEA_PERSONAS_INFO: { key: 'lucia' | 'jack' | 'echo'; emoji: string; name: 
   { key: 'echo',  emoji: '🎯', name: 'ECHO',  desc: '핵심을 짚어드릴게요',     border: '#b45309', bg: '#fefce8', fg: '#78350f' },
 ];
 
+// ✅ 차 한잔 — 페르소나별 헤드라인/명언
+const TEA_PERSONA_HEADLINES: Record<'lucia' | 'jack' | 'echo', { line1: string; line2: string; quote: string }> = {
+  lucia: { line1: '판단은 잠시 내려놓으시고', line2: '마음을 꺼내보세요',        quote: '괜찮지 않아도 괜찮아요.' },
+  jack:  { line1: '솔직하게 털어놓으세요.',  line2: '방향을 잡아드리겠습니다.', quote: '망설임이 가장 큰 적입니다.' },
+  echo:  { line1: '핵심만 말씀해주세요.',    line2: '판단해드리겠습니다.',      quote: '핵심을 보면 답이 보입니다.' },
+};
+
 const TeaTabContent = ({
   onCardClick,
   teaPersona,
@@ -966,8 +963,6 @@ const TeaTabContent = ({
   teaPersona: 'lucia' | 'jack' | 'echo' | null;
   onPersonaChange: (p: 'lucia' | 'jack' | 'echo' | null) => void;
 }) => {
-  const quote = useMemo(() => getTodayQuote(), []);
-
   // ── 페르소나 미선택 — 선택 UI 만 표시 ──
   if (teaPersona === null) {
     return (
@@ -1021,6 +1016,7 @@ const TeaTabContent = ({
   }
 
   const selected = TEA_PERSONAS_INFO.find(p => p.key === teaPersona)!;
+  const headline = TEA_PERSONA_HEADLINES[teaPersona];
 
   return (
     <div style={{ padding: '20px 12px 200px' }}>
@@ -1064,7 +1060,7 @@ const TeaTabContent = ({
         </button>
       </div>
 
-      {/* 오늘의 명언 */}
+      {/* 페르소나 명언 카드 */}
       <div
         style={{
           margin: '0 auto 22px',
@@ -1086,13 +1082,8 @@ const TeaTabContent = ({
             whiteSpace: 'pre-line',
           }}
         >
-          “{quote.text}”
+          “{headline.quote}”
         </p>
-        {quote.author && (
-          <p style={{ margin: '6px 0 0', fontSize: 11, color: '#92400e', fontWeight: 600 }}>
-            — {quote.author}
-          </p>
-        )}
       </div>
 
       <h2
@@ -1105,9 +1096,9 @@ const TeaTabContent = ({
           margin: '0 0 20px',
         }}
       >
-        판단은 잠시 내려놓으시고
+        {headline.line1}
         <br />
-        마음을 꺼내보세요
+        {headline.line2}
       </h2>
       <div style={{ display: 'flex', flexDirection: 'row', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
         {TEA_CARDS.map(card => (
