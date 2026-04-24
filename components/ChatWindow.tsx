@@ -2146,16 +2146,16 @@ export default function ChatWindow() {
       )}
 
       {/* 첫 화면(탭 미선택 & 대화 전) 에서는 footer 전체 숨김.
-          탭(재테크/차 한잔) 을 클릭하거나 한 번이라도 보낸 후에만 입력창 표시.
-          ✅ 차 한잔 탭은 teaPersona 가 선택된 후에만 입력창 노출. */}
-      {(onboardingTab !== null || hasUserSent) && !(onboardingTab === 'tea' && teaPersona === null) && (
+          탭(재테크/차 한잔) 을 클릭하거나 한 번이라도 보낸 후에만 footer 표시.
+          ✅ 차 한잔 탭에서 teaPersona 가 null 이어도 탭 이동 버튼은 노출 — 입력창만 숨김. */}
+      {(onboardingTab !== null || hasUserSent) && (
       <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
         {/* ✅ 탭 전환 캡슐 — 재테크 ↔ 차 한잔 자연스럽게 이동. 입력창 바로 위에 배치. */}
         {onboardingTab === 'finance' && (
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
             <button
               type="button"
-              onClick={() => setOnboardingTab('tea')}
+              onClick={() => { setOnboardingTab('tea'); setTeaPersona(null); }}
               style={{
                 background: '#fff8f0',
                 border: '1px solid #fbbf24',
@@ -2176,7 +2176,7 @@ export default function ChatWindow() {
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
             <button
               type="button"
-              onClick={() => setOnboardingTab('finance')}
+              onClick={() => { setOnboardingTab('finance'); setTeaPersona(null); }}
               style={{
                 background: '#f0f4ff',
                 border: '1px solid #93c5fd',
@@ -2193,6 +2193,8 @@ export default function ChatWindow() {
             </button>
           </div>
         )}
+        {/* ✅ 차 한잔 탭에서 teaPersona 가 null 일 때는 입력창 숨김 — 탭 이동 버튼만 노출 */}
+        {!(onboardingTab === 'tea' && teaPersona === null) && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {/* 사전 질문 토글 버튼 — 재테크 탭일 때만 표시.
               차 한잔 탭(onboardingTab === 'tea')에서는 hasUserSent 여부와 무관하게 항상 숨김. */}
@@ -2270,6 +2272,7 @@ export default function ChatWindow() {
             Send
           </button>
         </div>
+        )}
       </footer>
       )}
     </div>
