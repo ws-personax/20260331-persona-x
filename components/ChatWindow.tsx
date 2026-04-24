@@ -982,7 +982,12 @@ const TeaTabContent = ({
             <button
               key={p.key}
               type="button"
-              onClick={() => onPersonaChange(p.key)}
+              onClick={() => {
+                // 🔍 디버그 — 페르소나 카드 클릭 시 실제 전달되는 키 값 확인
+                // eslint-disable-next-line no-console
+                console.log('[debug] persona card clicked — key:', p.key);
+                onPersonaChange(p.key);
+              }}
               style={{
                 background: p.bg,
                 border: `2px solid ${p.border}`,
@@ -1309,6 +1314,12 @@ export default function ChatWindow() {
   const [onboardingTab, setOnboardingTab] = useState<'finance' | 'tea' | null>(null);
   // ✅ 차 한잔 — 선택된 페르소나. null 이면 선택 화면만 표시
   const [teaPersona, setTeaPersona] = useState<'lucia' | 'jack' | 'echo' | null>(null);
+
+  // 🔍 디버그 — teaPersona state 변경 추적
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log('[debug] teaPersona state changed →', teaPersona);
+  }, [teaPersona]);
 
   // ✅ 시장 상황 + 시간대 기반 동적 추천 질문
   // ✅ 탭 타입 정의
