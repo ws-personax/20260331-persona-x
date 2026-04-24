@@ -1441,6 +1441,8 @@ export default function ChatWindow() {
   }, []);
 
   const [isLoading, setIsLoading] = useState(false);
+  // ✅ 고급 질문 로딩 여부 — LLM 4명 병렬 호출 대기 중 상단에 안내 문구 노출
+  const [isAdvancedLoading, setIsAdvancedLoading] = useState(false);
   const [showPosition, setShowPosition] = useState(false);
   const [pendingText, setPendingText] = useState('');
   const [pendingKeyword, setPendingKeyword] = useState('');
@@ -1511,6 +1513,7 @@ export default function ChatWindow() {
     messagesRef.current = nextMessages;
     setMessages(nextMessages);
     setIsLoading(true);
+    if (isAdvanced) setIsAdvancedLoading(true);
     setInput('');
 
     const requestBody = {
@@ -1589,6 +1592,7 @@ export default function ChatWindow() {
       setMessages(updated);
     } finally {
       setIsLoading(false);
+      setIsAdvancedLoading(false);
     }
   }, [onboardingTab, teaPersona]);
 
@@ -1896,6 +1900,25 @@ export default function ChatWindow() {
             )}
           </div>
         ))}
+        {/* ✅ 고급 질문 로딩 안내 — 4명 페르소나 병렬 호출 대기 시간 (~20-30초) 사전 고지 */}
+        {isLoading && isAdvancedLoading && (
+          <div style={{
+            margin: '8px 12px',
+            padding: '10px 14px',
+            background: 'linear-gradient(90deg, #fef3c7 0%, #fce7f3 100%)',
+            border: '1px solid #fbbf24',
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: 700,
+            color: '#92400e',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}>
+            <span>🔍</span>
+            <span>AI 참모진이 분석 중입니다. 약 20~30초 소요됩니다.</span>
+          </div>
+        )}
         {isLoading && <TypingIndicator teaMode={onboardingTab === 'tea'} teaPersona={teaPersona} />}
         <div ref={bottomRef} />
       </div>

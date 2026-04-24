@@ -511,10 +511,30 @@ export async function POST(req: Request) {
         callTeaPersona('echo', ADVANCED_SYSTEM_ECHO, advancedHistory),
       ]);
 
-      const rayText = rayLLM || '데이터 기반 분석이 필요합니다.\n지금 구간의 통계적 특성을 먼저 확인하시고\n과거 유사 상황의 패턴을 비교해 보시는 걸 권합니다.';
-      const jackText = jackLLM || '판단 기준을 먼저 정하세요.\n추세가 살아있는지, 꺾였는지 확인부터.\n손절선 없이는 진입도 없습니다.';
-      const luciaText = luciaLLM || '이 질문에 답하기 전에 먼저 본인 심리 상태를 점검하세요.\n손실 회피 편향이 작동하는 구간입니다.\n최악의 시나리오를 가정하고 그때 어떻게 할지 먼저 정해두세요.';
-      const echoText = echoLLM || '핵심만 보겠습니다.\n원칙 없이 답하면 매번 다른 결론이 나옵니다.\n먼저 본인의 판단 기준을 종이에 적으세요.\n그게 출발점입니다.';
+      // ✅ 빈 줄 완전 제거 + 볼드 마크다운 제거 (연속 \n{2,} → \n)
+      const cleanAdvanced = (text: string): string =>
+        text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\n{2,}/g, '\n').trim();
+
+      // ✅ summary(첫 2줄) / details(나머지) 분리 — "자세히 보기" 버튼용
+      const splitForBubble = (text: string): { summary: string; details: string } => {
+        const clean = cleanAdvanced(text);
+        const lines = clean.split('\n').filter(l => l.trim());
+        if (lines.length <= 2) return { summary: clean, details: '' };
+        return {
+          summary: lines.slice(0, 2).join('\n'),
+          details: lines.slice(2).join('\n'),
+        };
+      };
+
+      const rayText = cleanAdvanced(rayLLM || '데이터 기반 분석이 필요합니다.\n지금 구간의 통계적 특성을 먼저 확인하시고 과거 유사 상황의 패턴을 비교해 보시는 걸 권합니다.');
+      const jackText = cleanAdvanced(jackLLM || '판단 기준을 먼저 정하세요.\n추세가 살아있는지, 꺾였는지 확인부터.\n손절선 없이는 진입도 없습니다.');
+      const luciaText = cleanAdvanced(luciaLLM || '이 질문에 답하기 전에 먼저 본인 심리 상태를 점검하세요.\n손실 회피 편향이 작동하는 구간입니다.\n최악의 시나리오를 가정하고 그때 어떻게 할지 먼저 정해두세요.');
+      const echoText = cleanAdvanced(echoLLM || '한 가지만 짚겠습니다.\n원칙 없이 답하면 매번 다른 결론이 나옵니다.\n먼저 본인의 판단 기준을 종이에 적으세요.\n그게 출발점입니다.');
+
+      const ray = splitForBubble(rayText);
+      const jack = splitForBubble(jackText);
+      const lucia = splitForBubble(luciaText);
+      const echo = splitForBubble(echoText);
 
       console.log(
         `[advanced] 결과 — RAY:${rayLLM ? 'LLM' : 'FB'} / JACK:${jackLLM ? 'LLM' : 'FB'} / LUCIA:${luciaLLM ? 'LLM' : 'FB'} / ECHO:${echoLLM ? 'LLM' : 'FB'}`,
@@ -523,10 +543,14 @@ export async function POST(req: Request) {
       return Response.json({
         reply: [rayText, jackText, luciaText, echoText].join('\n\n'),
         personas: {
-          jack: jackText,
-          lucia: luciaText,
-          ray: rayText,
-          echo: echoText,
+          jack: jack.summary,
+          lucia: lucia.summary,
+          ray: ray.summary,
+          echo: echo.summary,
+          jackDetails: jack.details || null,
+          luciaDetails: lucia.details || null,
+          rayDetails: ray.details || null,
+          echoDetails: echo.details || null,
           verdict: '관망' as Verdict,
           confidence: 0,
           breakdown: '전략 분석',
