@@ -1,7 +1,7 @@
 ﻿import { fetchInvestmentNews } from '@/lib/news';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, type GenerationConfig } from '@google/generative-ai';
 
 // ✅ 분리된 모듈 import
 import type { Verdict } from '@/lib/personax/types';
@@ -148,7 +148,11 @@ const callTeaPersona = async (
       });
       const result = await model.generateContent({
         contents,
-        generationConfig: { maxOutputTokens: 1200, temperature: 0.9 },
+        generationConfig: {
+          maxOutputTokens: 1200,
+          temperature: 0.9,
+          thinkingConfig: { thinkingBudget: 0 },
+        } as GenerationConfig,
       });
       const blockReason = result?.response?.promptFeedback?.blockReason;
       if (blockReason) {
@@ -512,7 +516,14 @@ export async function POST(req: Request) {
       }
 
       // lucia 기본
-      const luciaLLM = await callTeaPersona('lucia', TEA_SYSTEM_LUCIA, luciaHistory);
+      let luciaLLM = await callTeaPersona('lucia', TEA_SYSTEM_LUCIA, luciaHistory);
+      if (luciaLLM) {
+        luciaLLM = luciaLLM
+          .replace(/생각:[\s\S]*?\n\n/g, '')
+          .replace(/\(생각:[\s\S]*?\)/g, '')
+          .replace(/분석:[\s\S]*?\n\n/g, '')
+          .trim();
+      }
       console.log(`[tea] round=${round} persona=lucia 결과 — ${luciaLLM ? 'LLM' : 'FALLBACK'}`);
       try {
         const supabase = getSupabase();
