@@ -1754,23 +1754,38 @@ export default function ChatWindow() {
   }, []);
 
   // ✅ 고급 질문 — 정적 리스트 (시장 상황 무관)
-  // 전략형 (분홍) / 시장분석형 (초록) / 심리판단형 (보라)
+  // 전략형 (분홍) / 시장분석형 (초록) / 심리판단형 (보라) / 40-50대 특화형 (주황)
   const ADVANCED_QUESTIONS = useMemo(() => {
-    type AQ = { level: '전략형' | '시장분석형' | '심리판단형'; color: string; bg: string; text: string };
-    const P = '#db2777'; const PB = '#fce7f3';   // 분홍
-    const G = '#16a34a'; const GB = '#dcfce7';   // 초록
-    const V = '#9333ea'; const VB = '#f3e8ff';   // 보라
+    type AQ = { level: '전략형' | '시장분석형' | '심리판단형' | '40-50대 특화형'; color: string; bg: string; text: string };
+    const P = '#db2777'; const PB = '#fce7f3';   // 분홍 — 전략형
+    const G = '#16a34a'; const GB = '#dcfce7';   // 초록 — 시장분석형
+    const V = '#9333ea'; const VB = '#f3e8ff';   // 보라 — 심리판단형
+    const O = '#ea580c'; const OB = '#ffedd5';   // 주황 — 40-50대 특화형
     return [
-      { level: '전략형', color: P, bg: PB, text: '상승 추세에서 눌림 매수 vs 돌파 매수, 어떤 상황에서 유리한가요?' },
-      { level: '전략형', color: P, bg: PB, text: '손절을 가격 기준으로 할지, 시간 기준으로 할지 어떻게 정하나요?' },
-      { level: '전략형', color: P, bg: PB, text: '수익 중일 때 계속 들고 갈지, 일부 익절할지 기준은?' },
-      { level: '전략형', color: P, bg: PB, text: '시장이 불확실할 때 현금 비중 늘리는 타이밍은?' },
-      { level: '시장분석형', color: G, bg: GB, text: '지금 구간이 상승 초입인지 끝물인지 어떻게 구분하나요?' },
-      { level: '시장분석형', color: G, bg: GB, text: '지금 시장이 유동성 장인지 실적 장인지 어떻게 구분하나요?' },
+      // 전략형
+      { level: '전략형', color: P, bg: PB, text: '워런 버핏이라면 지금 삼성전자를 샀을까?' },
+      { level: '전략형', color: P, bg: PB, text: '하락장에서 돈 버는 유일한 방법은 무엇인가?' },
+      { level: '전략형', color: P, bg: PB, text: '지금 현금이 최고의 투자인 이유는?' },
+      { level: '전략형', color: P, bg: PB, text: '상승 추세에서 눌림 매수 vs 돌파 매수, 어떤 상황에서 유리한가?' },
+      { level: '전략형', color: P, bg: PB, text: '손절을 가격 기준으로 할지, 시간 기준으로 할지 어떻게 정하나?' },
+      // 시장분석형
+      { level: '시장분석형', color: G, bg: GB, text: '지금 시장에서 개미는 절대 이길 수 없는 구간인가?' },
+      { level: '시장분석형', color: G, bg: GB, text: '공매도 세력이 노리는 종목의 특징은?' },
+      { level: '시장분석형', color: G, bg: GB, text: 'AI가 투자를 대체하면 기술적 분석은 죽는가?' },
+      { level: '시장분석형', color: G, bg: GB, text: '지금 구간이 상승 초입인지 끝물인지 어떻게 구분하나?' },
       { level: '시장분석형', color: G, bg: GB, text: '외국인 매수와 기관 매수가 동시에 들어올 때 신뢰도는?' },
+      // 심리판단형
       { level: '심리판단형', color: V, bg: VB, text: '공포에 팔고 욕심에 사는 패턴을 끊는 방법은?' },
-      { level: '심리판단형', color: V, bg: VB, text: '확신과 과신의 차이를 어떻게 구분하나요?' },
+      { level: '심리판단형', color: V, bg: VB, text: '확신과 과신의 차이를 어떻게 구분하나?' },
       { level: '심리판단형', color: V, bg: VB, text: '손실 후 복구 매매를 하면 안 되는 이유는?' },
+      { level: '심리판단형', color: V, bg: VB, text: '수익 중일 때 계속 들고 갈지, 일부 익절할지 기준은?' },
+      { level: '심리판단형', color: V, bg: VB, text: '시장이 불확실할 때 현금 비중 늘리는 타이밍은?' },
+      // 40-50대 특화형
+      { level: '40-50대 특화형', color: O, bg: OB, text: '교육비와 노후 준비, 어떻게 균형을 잡나?' },
+      { level: '40-50대 특화형', color: O, bg: OB, text: '부모님 요양비가 생겼을 때 투자를 줄여야 하나?' },
+      { level: '40-50대 특화형', color: O, bg: OB, text: '이직 고민 중인데 지금 투자를 계속해도 될까?' },
+      { level: '40-50대 특화형', color: O, bg: OB, text: '부부가 소비 스타일이 달라서 싸워요. 어떻게 해결하나?' },
+      { level: '40-50대 특화형', color: O, bg: OB, text: '50대에 처음 투자 시작해도 늦지 않았나?' },
     ] as AQ[];
   }, []);
 
@@ -2402,10 +2417,14 @@ export default function ChatWindow() {
 
             {activeTab === '고급' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {(['전략형', '시장분석형', '심리판단형'] as const).map(section => {
+                {(['전략형', '시장분석형', '심리판단형', '40-50대 특화형'] as const).map(section => {
                   const items = ADVANCED_QUESTIONS.filter(q => q.level === section);
                   if (items.length === 0) return null;
-                  const sectionColor = section === '전략형' ? '#db2777' : section === '시장분석형' ? '#16a34a' : '#9333ea';
+                  const sectionColor =
+                    section === '전략형' ? '#db2777'
+                    : section === '시장분석형' ? '#16a34a'
+                    : section === '심리판단형' ? '#9333ea'
+                    : '#ea580c';
                   return (
                     <div key={section} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {/* 섹션 헤더 */}
