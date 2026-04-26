@@ -297,10 +297,28 @@ const PERSONA_VOICE: Record<'ray' | 'jack' | 'lucia' | 'echo', VoiceProfile> = {
 // currentSeqId 를 증가시켜 진행 중인 시퀀스를 무효화 → 콜백 체인 차단.
 let currentSeqId = 0;
 
+// ─── 발화 중 여부 전역 구독 ───
+// 모듈 전역 set 으로 리스너를 관리해 ChatWindow / SpeakerButton 양쪽이 동기 상태를 본다.
+type SpeakingListener = (speaking: boolean) => void;
+const speakingListeners = new Set<SpeakingListener>();
+const notifySpeaking = (speaking: boolean) => {
+  speakingListeners.forEach(fn => fn(speaking));
+};
+
+const useIsSpeaking = (): boolean => {
+  const [speaking, setSpeaking] = useState(false);
+  useEffect(() => {
+    speakingListeners.add(setSpeaking);
+    return () => { speakingListeners.delete(setSpeaking); };
+  }, []);
+  return speaking;
+};
+
 const stopSpeaking = (): void => {
   currentSeqId++;
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   try { window.speechSynthesis.cancel(); } catch {}
+  notifySpeaking(false);
 };
 
 const speakOne = (
@@ -337,7 +355,11 @@ const speakText = (
   if (!isTTSSupported()) return false;
   stopSpeaking();
   const profile = personaKey ? PERSONA_VOICE[personaKey] : { rate: 0.9, pitch: 1.0 };
-  return speakOne(text, profile, onEnd);
+  notifySpeaking(true);
+  return speakOne(text, profile, () => {
+    notifySpeaking(false);
+    onEnd?.();
+  });
 };
 
 // 시퀀스 발화 — RAY → JACK → LUCIA → ECHO 등 순서대로 읽기.
@@ -348,10 +370,14 @@ const speakSequence = (
   if (!isTTSSupported() || items.length === 0) return;
   stopSpeaking();
   const seqId = ++currentSeqId;
+  notifySpeaking(true);
   let i = 0;
   const next = () => {
     if (seqId !== currentSeqId) return; // stopSpeaking 또는 새 시퀀스 시작 시 중단
-    if (i >= items.length) return;
+    if (i >= items.length) {
+      notifySpeaking(false);
+      return;
+    }
     const item = items[i++];
     speakOne(item.text, PERSONA_VOICE[item.personaKey], next);
   };
@@ -369,10 +395,16 @@ const SpeakerButton = memo(function SpeakerButton({
 }) {
   const [supported, setSupported] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const globalSpeaking = useIsSpeaking();
 
   useEffect(() => {
     setSupported(isTTSSupported());
   }, []);
+
+  // 전역 발화가 멈추면 (다른 곳에서 stopSpeaking 호출 등) 이 버튼의 로컬 상태도 reset
+  useEffect(() => {
+    if (!globalSpeaking && speaking) setSpeaking(false);
+  }, [globalSpeaking, speaking]);
 
   // 컴포넌트 언마운트 시 자기 발화 중이면 정리
   useEffect(() => () => { if (speaking) stopSpeaking(); }, [speaking]);
@@ -2289,6 +2321,17 @@ export default function ChatWindow() {
   // 자동 전송 타이머가 항상 최신 handleSend 를 호출하도록 ref 동기화
   useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
 
+  // ✅ 자동 읽기 중 화면 아무 곳이나 탭 → 즉시 중지.
+  //   capture phase 로 등록해 다른 onClick (SpeakerButton 등) 보다 먼저 실행.
+  //   click 이벤트만 사용 — 모바일 스크롤(touchstart) 시 실수로 멈추지 않도록.
+  const isSpeakingGlobal = useIsSpeaking();
+  useEffect(() => {
+    if (!ttsSupported || !isSpeakingGlobal) return;
+    const handler = () => stopSpeaking();
+    document.addEventListener('click', handler, true);
+    return () => document.removeEventListener('click', handler, true);
+  }, [ttsSupported, isSpeakingGlobal]);
+
   if (!mounted) return null;
 
   return (
@@ -2354,6 +2397,38 @@ export default function ChatWindow() {
           </Link>
         </div>
       </header>
+
+      {/* ✅ 자동 읽기 중 상단 알림 — 화면 아무 곳이나 탭하면 stopSpeaking 으로 중지됨.
+           pointerEvents: none — 배너 자체는 클릭 가로채지 않도록 (아래 콘텐츠가 그대로 클릭됨). */}
+      {isSpeakingGlobal && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            top: 60,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 60,
+            padding: '6px 14px',
+            background: '#dbeafe',
+            border: '1px solid #93c5fd',
+            borderRadius: 999,
+            fontSize: 12,
+            fontWeight: 700,
+            color: '#1e40af',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            boxShadow: '0 2px 8px rgba(30,64,175,0.18)',
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <span>🔊 읽는 중... (탭하면 중지)</span>
+        </div>
+      )}
 
       {/* ✅ 첫 화면(hasUserSent=false & onboardingTab=null) — 카드 전용 스크롤 컨테이너.
           헤더 바로 아래에 자연스럽게 카드 배치 (spacer/특수 패딩 없이 단순 padding 만). */}
