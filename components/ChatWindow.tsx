@@ -1126,27 +1126,29 @@ const INTRO_PERSONA_STYLES: Record<IntroPersonaKey, { bg: string; border: string
 type IntroSlide = {
   id: 'finance' | 'tea';
   question: string;
+  layout: '2x2' | 'row3';
   cards: { persona: IntroPersonaKey; name: string; role: string; text: string }[];
 };
 const INTRO_SLIDES: IntroSlide[] = [
   {
     id: 'finance',
     question: '삼성전자 지금 사야 할까요?',
+    layout: '2x2',
     cards: [
-      { persona: 'lucia', name: 'LUCIA', role: '감정 · 공감',  text: '그 고민 뒤에 뭔가 더 있는 것 같아요.\n요즘 투자가 불안하게 느껴지는 이유가 있어요?' },
-      { persona: 'jack',  name: 'JACK',  role: '결단 · 전략',  text: '선택지 두 가지입니다.\n1. 지금 분할 매수\n2. 실적 확인 후 진입\n어느 쪽입니까?' },
-      { persona: 'echo',  name: 'ECHO',  role: '구조 · 원칙',  text: '결론: 타이밍 판단 불가 상태입니다.\n지금 필요한 건 매수 결정이 아니라\n본인의 투자 원칙입니다.' },
       { persona: 'ray',   name: 'RAY',   role: '데이터 · 분석', text: '외국인 순매도 3주 연속.\n52주 최저가 대비 +18%.\n데이터는 아직 매수 신호 아닙니다.' },
+      { persona: 'jack',  name: 'JACK',  role: '결단 · 전략',  text: '선택지 두 가지입니다.\n1. 지금 분할 매수\n2. 실적 확인 후 진입\n어느 쪽입니까?' },
+      { persona: 'lucia', name: 'LUCIA', role: '감정 · 공감',  text: '그 고민 뒤에 뭔가 더 있는 것 같아요.\n요즘 투자가 불안하게 느껴지는\n이유가 있어요?' },
+      { persona: 'echo',  name: 'ECHO',  role: '구조 · 원칙',  text: '결론: 타이밍 판단 불가 상태입니다.\n지금 필요한 건 매수 결정이 아니라\n본인의 투자 원칙입니다.' },
     ],
   },
   {
     id: 'tea',
     question: '남편이랑 싸웠어요',
+    layout: 'row3',
     cards: [
-      { persona: 'lucia', name: 'LUCIA', role: '감정 · 공감',  text: '아… 많이 속상하셨겠다.\n가까운 사람이랑 다투고 나면\n그 감정이 오래 남잖아요.' },
-      { persona: 'jack',  name: 'JACK',  role: '결단 · 전략',  text: '지금 할 수 있는 건 두 가지입니다.\n1. 본인이 먼저 사과\n2. 남편 사과 기다리기\n관계를 원한다면 1번입니다.' },
-      { persona: 'echo',  name: 'ECHO',  role: '구조 · 원칙',  text: '결론: 감정 충돌이 아닙니다.\n소통 구조의 문제입니다.\n먼저 손 내미는 쪽이\n관계를 가져갑니다.' },
-      { persona: 'ray',   name: 'RAY',   role: '데이터 · 분석', text: '부부 갈등 연구에 따르면\n먼저 화해를 시도한 쪽이\n관계 만족도 73% 더 높습니다.' },
+      { persona: 'lucia', name: 'LUCIA', role: '감정 · 공감', text: '아… 많이 속상하셨겠다.\n가까운 사람이랑 다투고 나면\n그 감정이 오래 남잖아요.' },
+      { persona: 'jack',  name: 'JACK',  role: '결단 · 전략', text: '지금 할 수 있는 건 두 가지입니다.\n1. 본인이 먼저 사과\n2. 남편 사과 기다리기\n관계를 원한다면 1번입니다.' },
+      { persona: 'echo',  name: 'ECHO',  role: '구조 · 원칙', text: '결론: 감정 충돌이 아닙니다.\n소통 구조의 문제입니다.\n먼저 손 내미는 쪽이\n관계를 가져갑니다.' },
     ],
   },
 ];
@@ -1196,14 +1198,17 @@ const IntroSlider = () => {
           “{slide.question}”
         </p>
 
-        {/* 4개 카드 2x2 */}
+        {/* 카드 그리드 — 레이아웃 분기:
+            2x2 (재테크): 가로 2 × 세로 2
+            row3 (차 한잔): 가로 3 × 세로 1, 모바일에서도 3개 나란히 */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 6,
+          gridTemplateColumns: slide.layout === 'row3' ? '1fr 1fr 1fr' : '1fr 1fr',
+          gap: slide.layout === 'row3' ? 5 : 6,
         }}>
           {slide.cards.map(c => {
             const st = INTRO_PERSONA_STYLES[c.persona];
+            const isRow3 = slide.layout === 'row3';
             return (
               <div
                 key={c.name}
@@ -1211,32 +1216,35 @@ const IntroSlider = () => {
                   background: st.bg,
                   border: `1px solid ${st.border}`,
                   borderRadius: 11,
-                  padding: '7px 9px',
+                  padding: isRow3 ? '7px 7px' : '7px 9px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 4,
-                  minHeight: 86,
+                  minHeight: isRow3 ? 130 : 86,
+                  minWidth: 0,
                 }}
               >
                 <div style={{
-                  fontSize: 10.5,
+                  fontSize: isRow3 ? 9.5 : 10.5,
                   fontWeight: 800,
                   color: st.title,
                   letterSpacing: 0.2,
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: 5,
+                  alignItems: 'baseline',
+                  gap: 4,
                   flexWrap: 'wrap',
+                  lineHeight: 1.2,
                 }}>
                   <span>{c.name}</span>
-                  <span style={{ fontWeight: 600, opacity: 0.8 }}>· {c.role}</span>
+                  <span style={{ fontWeight: 600, opacity: 0.8, fontSize: isRow3 ? 8.5 : 10 }}>· {c.role}</span>
                 </div>
                 <p style={{
                   margin: 0,
-                  fontSize: 10.5,
+                  fontSize: isRow3 ? 9.5 : 10.5,
                   lineHeight: 1.4,
                   color: st.body,
                   whiteSpace: 'pre-line',
+                  wordBreak: 'keep-all',
                 }}>
                   {c.text}
                 </p>
