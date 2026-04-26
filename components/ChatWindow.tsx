@@ -934,14 +934,6 @@ const FinanceTabContent = ({ onExample }: { onExample: (keyword: string) => void
   </div>
 );
 
-// ─── 차 한잔 탭 본문 — 감정 카드 3개 ───
-//   클릭 시 자동 전송이 아닌, 입력창에 템플릿 텍스트를 채워준다 (onCardClick).
-const TEA_CARDS: { emoji: string; title: string; sub: string; prompt: string }[] = [
-  { emoji: '😔', title: '속상해요',   sub: '털어놓고 싶어요',    prompt: '속상한 일이 있어요' },
-  { emoji: '🎉', title: '자랑할래요', sub: '기쁜 일이 있어요',    prompt: '자랑하고 싶어요' },
-  { emoji: '💭', title: '복잡해요',   sub: '돈 문제가 얽혀있어요', prompt: '복잡한 문제가 있어요' },
-];
-
 // ✅ 차 한잔 페르소나 선택 — 카드 데이터
 const TEA_PERSONAS_INFO: { key: 'lucia' | 'jack' | 'echo'; emoji: string; name: string; desc: string; border: string; bg: string; fg: string }[] = [
   { key: 'lucia', emoji: '☕', name: 'LUCIA', desc: '따뜻하게 들어드릴게요',   border: '#fb923c', bg: '#fff7ed', fg: '#7c2d12' },
@@ -1036,11 +1028,11 @@ function pickLuciaGreeting(): string | null {
 }
 
 const TeaTabContent = ({
-  onCardClick,
   teaPersona,
+  luciaGreeting,
 }: {
-  onCardClick: (text: string) => void;
   teaPersona: 'lucia' | 'jack' | 'echo';
+  luciaGreeting: string | null;
 }) => {
   const headline = TEA_PERSONA_HEADLINES[teaPersona];
 
@@ -1060,27 +1052,64 @@ const TeaTabContent = ({
         <br />
         {headline.line2}
       </h2>
-      <div style={{ display: 'flex', flexDirection: 'row', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-        {TEA_CARDS.map(card => (
-          <button
-            key={card.title}
-            type="button"
-            onClick={() => onCardClick(card.prompt)}
-            style={{
-              background: '#fff8f0',
-              border: '1px solid #e8a87c',
-              borderRadius: 20,
-              padding: '8px 16px',
-              fontSize: 13,
-              color: '#7c2d12',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {card.emoji} {card.title}
-          </button>
-        ))}
-      </div>
+      {/* ✅ LUCIA 선톡 — 슬로건 바로 아래, 입력창 위.
+           앱 시작 시 1번만 픽 (마운트 시 결정). 22:00~08:59 비활성. */}
+      {teaPersona === 'lucia' && luciaGreeting && (
+        <div style={{ maxWidth: 440, margin: '0 auto', padding: '0 4px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <div
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: '50%',
+                background: PERSONAS.lucia.iconBg,
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 15,
+                fontWeight: 800,
+                flexShrink: 0,
+                boxShadow: '0 2px 6px rgba(168, 85, 247, 0.25)',
+              }}
+            >
+              {PERSONAS.lucia.initial}
+            </div>
+            <div
+              style={{
+                background: PERSONAS.lucia.bubbleBg,
+                border: `1px solid ${PERSONAS.lucia.bubbleBorder}`,
+                borderRadius: '4px 18px 18px 18px',
+                padding: '12px 16px',
+                maxWidth: '85%',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: PERSONAS.lucia.iconBg,
+                  marginBottom: 5,
+                  letterSpacing: 0.3,
+                }}
+              >
+                LUCIA
+              </div>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 14.5,
+                  lineHeight: 1.6,
+                  color: PERSONAS.lucia.textColor,
+                }}
+              >
+                {luciaGreeting}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -1090,16 +1119,16 @@ const TeaTabContent = ({
 //   activeTab!=null → 기존 pill TabButton 2개 + 활성 탭 콘텐츠
 const OnboardingTabs = ({
   onExample,
-  onCardClick,
   activeTab,
   onTabChange,
   teaPersona,
+  luciaGreeting,
 }: {
   onExample: (keyword: string) => void;
-  onCardClick: (text: string) => void;
   activeTab: 'finance' | 'tea' | null;
   onTabChange: (tab: 'finance' | 'tea') => void;
   teaPersona: 'lucia' | 'jack' | 'echo';
+  luciaGreeting: string | null;
 }) => {
   // ─ 첫 화면 — 큰 카드 2개 (flex-wrap 으로 모바일은 자동 세로 스택) ─
   if (activeTab === null) {
@@ -1301,8 +1330,8 @@ const OnboardingTabs = ({
       {activeTab === 'finance' && <FinanceTabContent onExample={onExample} />}
       {activeTab === 'tea' && (
         <TeaTabContent
-          onCardClick={onCardClick}
           teaPersona={teaPersona}
+          luciaGreeting={luciaGreeting}
         />
       )}
     </div>
@@ -1319,7 +1348,8 @@ export default function ChatWindow() {
   const [onboardingTab, setOnboardingTab] = useState<'finance' | 'tea' | null>(null);
   // ✅ 차 한잔 — 진입 시 LUCIA 기본. 하단 소환 버튼으로 JACK/ECHO 전환.
   const [teaPersona, setTeaPersona] = useState<'lucia' | 'jack' | 'echo'>('lucia');
-  // ✅ LUCIA 선톡 — 차 한잔 탭 진입 시 시간대별 랜덤 1개 (22:00~08:59 비활성)
+  // ✅ LUCIA 선톡 — 앱 시작 시 1번만 픽 (22:00~08:59 시간대는 null).
+  //    SSR 하이드레이션 미스매치 방지를 위해 마운트 후 client 에서만 결정.
   const [luciaGreeting, setLuciaGreeting] = useState<string | null>(null);
 
   // 🔍 디버그 — teaPersona state 변경 추적
@@ -1328,14 +1358,9 @@ export default function ChatWindow() {
     console.log('[debug] teaPersona state changed →', teaPersona);
   }, [teaPersona]);
 
-  // ✅ 차 한잔 탭 진입 시 LUCIA 선톡 1개 픽 — 다른 탭에서는 비움
   useEffect(() => {
-    if (onboardingTab === 'tea') {
-      setLuciaGreeting(pickLuciaGreeting());
-    } else {
-      setLuciaGreeting(null);
-    }
-  }, [onboardingTab]);
+    setLuciaGreeting(pickLuciaGreeting());
+  }, []);
 
   // ✅ 시장 상황 + 시간대 기반 동적 추천 질문
   // ✅ 탭 타입 정의
@@ -1751,13 +1776,10 @@ export default function ChatWindow() {
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
           <OnboardingTabs
             onExample={(name) => handleSendWithPosition(name, null)}
-            onCardClick={(text) => {
-              setInput(text);
-              textareaRef.current?.focus();
-            }}
             activeTab={onboardingTab}
             onTabChange={setOnboardingTab}
             teaPersona={teaPersona}
+            luciaGreeting={luciaGreeting}
           />
         </div>
       )}
@@ -1769,13 +1791,10 @@ export default function ChatWindow() {
           <div className="px-onboarding-wrap">
             <OnboardingTabs
               onExample={(name) => handleSendWithPosition(name, null)}
-              onCardClick={(text) => {
-                setInput(text);
-                textareaRef.current?.focus();
-              }}
               activeTab={onboardingTab}
               onTabChange={setOnboardingTab}
               teaPersona={teaPersona}
+              luciaGreeting={luciaGreeting}
             />
           </div>
         )}
@@ -1808,42 +1827,6 @@ export default function ChatWindow() {
             </div>
           );
         })()}
-        {/* ✅ LUCIA 선톡 — 차 한잔 진입 시 시간대별 1개 (22:00~08:59 비활성).
-             LUCIA 페르소나일 때만 노출, JACK/ECHO 소환 시 자동 숨김. */}
-        {onboardingTab === 'tea' && teaPersona === 'lucia' && luciaGreeting && (
-          <div style={{ padding: '0 12px 14px' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-              <div style={{
-                width: 32,
-                height: 32,
-                borderRadius: '50%',
-                background: PERSONAS.lucia.iconBg,
-                color: '#fff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 13,
-                fontWeight: 800,
-                flexShrink: 0,
-              }}>
-                {PERSONAS.lucia.initial}
-              </div>
-              <div style={{
-                background: PERSONAS.lucia.bubbleBg,
-                border: `1px solid ${PERSONAS.lucia.bubbleBorder}`,
-                borderRadius: '0 14px 14px 14px',
-                padding: '10px 14px',
-                maxWidth: '78%',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-              }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: PERSONAS.lucia.iconBg, marginBottom: 4 }}>LUCIA</div>
-                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: PERSONAS.lucia.textColor }}>
-                  {luciaGreeting}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
         {messages.map(msg => (
           <div key={msg.id}>
             {msg.role === 'user' ? (
