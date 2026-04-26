@@ -1114,6 +1114,167 @@ const TeaTabContent = ({
   );
 };
 
+// ─── 첫 화면 자동 전환 슬라이드 ───
+// 5초 간격으로 [재테크 / 차 한잔] 예시 답변(4명) 자동 순환. 인디케이터 점으로 수동 전환 가능.
+type IntroPersonaKey = 'lucia' | 'jack' | 'echo' | 'ray';
+const INTRO_PERSONA_STYLES: Record<IntroPersonaKey, { bg: string; border: string; title: string; body: string }> = {
+  lucia: { bg: '#f3e8ff', border: '#c4b5fd', title: '#6b21a8', body: '#581c87' },
+  jack:  { bg: '#1f2937', border: '#0f172a', title: '#f9fafb', body: '#e5e7eb' },
+  echo:  { bg: '#064e3b', border: '#022c22', title: '#d1fae5', body: '#a7f3d0' },
+  ray:   { bg: '#dbeafe', border: '#7dd3fc', title: '#0369a1', body: '#075985' },
+};
+type IntroSlide = {
+  id: 'finance' | 'tea';
+  question: string;
+  cards: { persona: IntroPersonaKey; name: string; role: string; text: string }[];
+};
+const INTRO_SLIDES: IntroSlide[] = [
+  {
+    id: 'finance',
+    question: '삼성전자 지금 사야 할까요?',
+    cards: [
+      { persona: 'lucia', name: 'LUCIA', role: '감정 · 공감',  text: '그 고민 뒤에 뭔가 더 있는 것 같아요.\n요즘 투자가 불안하게 느껴지는 이유가 있어요?' },
+      { persona: 'jack',  name: 'JACK',  role: '결단 · 전략',  text: '선택지 두 가지입니다.\n1. 지금 분할 매수\n2. 실적 확인 후 진입\n어느 쪽입니까?' },
+      { persona: 'echo',  name: 'ECHO',  role: '구조 · 원칙',  text: '결론: 타이밍 판단 불가 상태입니다.\n지금 필요한 건 매수 결정이 아니라\n본인의 투자 원칙입니다.' },
+      { persona: 'ray',   name: 'RAY',   role: '데이터 · 분석', text: '외국인 순매도 3주 연속.\n52주 최저가 대비 +18%.\n데이터는 아직 매수 신호 아닙니다.' },
+    ],
+  },
+  {
+    id: 'tea',
+    question: '남편이랑 싸웠어요',
+    cards: [
+      { persona: 'lucia', name: 'LUCIA', role: '감정 · 공감',  text: '아… 많이 속상하셨겠다.\n가까운 사람이랑 다투고 나면\n그 감정이 오래 남잖아요.' },
+      { persona: 'jack',  name: 'JACK',  role: '결단 · 전략',  text: '지금 할 수 있는 건 두 가지입니다.\n1. 본인이 먼저 사과\n2. 남편 사과 기다리기\n관계를 원한다면 1번입니다.' },
+      { persona: 'echo',  name: 'ECHO',  role: '구조 · 원칙',  text: '결론: 감정 충돌이 아닙니다.\n소통 구조의 문제입니다.\n먼저 손 내미는 쪽이\n관계를 가져갑니다.' },
+      { persona: 'ray',   name: 'RAY',   role: '데이터 · 분석', text: '부부 갈등 연구에 따르면\n먼저 화해를 시도한 쪽이\n관계 만족도 73% 더 높습니다.' },
+    ],
+  },
+];
+
+const IntroSlider = () => {
+  const [idx, setIdx] = useState(0);
+  // 5초 자동 전환
+  useEffect(() => {
+    const t = setInterval(() => {
+      setIdx(i => (i + 1) % INTRO_SLIDES.length);
+    }, 5000);
+    return () => clearInterval(t);
+  }, []);
+
+  const slide = INTRO_SLIDES[idx];
+
+  return (
+    <div style={{ width: '100%', maxWidth: 420, margin: '0 auto 18px' }}>
+      <style>{`
+        @keyframes pxIntroFade {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .px-intro-slide {
+          animation: pxIntroFade 0.45s ease both;
+        }
+      `}</style>
+
+      {/* 슬라이드 본체 — key 변경 시 페이드 인 재실행 */}
+      <div key={slide.id} className="px-intro-slide">
+        {/* 상단 질문 */}
+        <p style={{
+          fontSize: 14,
+          fontWeight: 700,
+          color: '#1f2937',
+          textAlign: 'center',
+          margin: '0 0 12px',
+          padding: '8px 14px',
+          background: '#ffffff',
+          border: '1px solid #e5e7eb',
+          borderRadius: 999,
+          display: 'inline-block',
+          width: 'auto',
+          maxWidth: '100%',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+        }}>
+          “{slide.question}”
+        </p>
+
+        {/* 4개 카드 2x2 */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 8,
+        }}>
+          {slide.cards.map(c => {
+            const st = INTRO_PERSONA_STYLES[c.persona];
+            return (
+              <div
+                key={c.name}
+                style={{
+                  background: st.bg,
+                  border: `1px solid ${st.border}`,
+                  borderRadius: 12,
+                  padding: '10px 11px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                  minHeight: 110,
+                }}
+              >
+                <div style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: st.title,
+                  letterSpacing: 0.2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}>
+                  <span>{c.name}</span>
+                  <span style={{ fontWeight: 600, opacity: 0.8 }}>· {c.role}</span>
+                </div>
+                <p style={{
+                  margin: 0,
+                  fontSize: 11.5,
+                  lineHeight: 1.5,
+                  color: st.body,
+                  whiteSpace: 'pre-line',
+                }}>
+                  {c.text}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 하단 인디케이터 점 */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        gap: 8,
+        marginTop: 12,
+      }}>
+        {INTRO_SLIDES.map((s, i) => (
+          <button
+            key={s.id}
+            type="button"
+            aria-label={`슬라이드 ${i + 1}`}
+            onClick={() => setIdx(i)}
+            style={{
+              width: i === idx ? 22 : 8,
+              height: 8,
+              borderRadius: 999,
+              border: 'none',
+              padding: 0,
+              background: i === idx ? '#1f2937' : '#d1d5db',
+              cursor: 'pointer',
+              transition: 'width 0.25s ease, background 0.25s ease',
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // ─── 탭 2개 + 활성 탭 내용 통합 컴포넌트 (controlled — state는 부모가 보유) ───
 //   activeTab=null → 큰 카드 2개로 안내 (첫 화면)
 //   activeTab!=null → 기존 pill TabButton 2개 + 활성 탭 콘텐츠
@@ -1158,7 +1319,7 @@ const OnboardingTabs = ({
             (media query .px-intro-cards-row). 세로 중앙정렬은 부모 담당. */}
         <div style={{
           textAlign: 'center',
-          marginBottom: 24,
+          marginBottom: 18,
           padding: '0 8px',
         }}>
           <p style={{
@@ -1166,51 +1327,29 @@ const OnboardingTabs = ({
             fontWeight: 500,
             color: '#9ca3af',
             letterSpacing: 0.3,
-            margin: '0 0 6px',
+            margin: '0 0 4px',
           }}>
-            AI와 다른 길
+            범용 AI는 답을 드리지만,
           </p>
           <p style={{
             fontSize: 17,
             fontWeight: 800,
             color: '#1f2937',
             lineHeight: 1.4,
-            margin: '0 0 16px',
+            margin: '0 0 6px',
           }}>
             4명이 충돌하고, 당신이 결정합니다.
           </p>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 8,
-            maxWidth: 360,
-            margin: '0 auto',
+          <p style={{
+            fontSize: 12,
+            fontWeight: 500,
+            color: '#6b7280',
+            lineHeight: 1.5,
+            margin: '0 0 16px',
           }}>
-            {[
-              { icon: '📊', name: 'RAY',   quote: '데이터는 매수 신호입니다', bg: '#e0f2fe', border: '#7dd3fc', color: '#0369a1' },
-              { icon: '⚔️', name: 'JACK',  quote: '지금은 관망이 맞습니다',   bg: '#f3f4f6', border: '#9ca3af', color: '#374151' },
-              { icon: '💜', name: 'LUCIA', quote: '마음이 준비됐나요?',       bg: '#f3e8ff', border: '#c4b5fd', color: '#6b21a8' },
-              { icon: '🎯', name: 'ECHO',  quote: '원칙이 먼저입니다',        bg: '#fef9c3', border: '#fde047', color: '#713f12' },
-            ].map(p => (
-              <div key={p.name} style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 2,
-                aspectRatio: '1.4 / 1',
-                background: p.bg,
-                border: `1px solid ${p.border}`,
-                borderRadius: 10,
-                padding: '6px 6px',
-                cursor: 'default',
-              }}>
-                <span style={{ fontSize: 22, lineHeight: 1 }}>{p.icon}</span>
-                <span style={{ fontWeight: 800, fontSize: 13, color: p.color }}>{p.name}</span>
-                <span style={{ fontSize: 10.5, color: p.color, textAlign: 'center', lineHeight: 1.25, padding: '0 2px' }}>{p.quote}</span>
-              </div>
-            ))}
-          </div>
+            투자 고민도, 마음 고민도 — 주식 몰라도 괜찮아요
+          </p>
+          <IntroSlider />
         </div>
         <div
           className="px-intro-cards-row"
