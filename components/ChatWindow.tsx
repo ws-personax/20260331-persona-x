@@ -882,13 +882,14 @@ const TabButton = ({
 );
 
 // ─── 재테크 탭 본문 ───
-const FINANCE_SUGGESTED_QUESTIONS: { emoji: string; text: string }[] = [
-  { emoji: '💰', text: '교육비 때문에 노후 준비가 밀려요' },
-  { emoji: '📉', text: '손절해야 할지 버텨야 할지 모르겠어요' },
-  { emoji: '🏠', text: '지금 부동산 사도 될까요?' },
+type FinanceQuickPanel = '뉴스' | '추천' | '고급';
+const FINANCE_TOP_BUTTONS: { panel: FinanceQuickPanel; emoji: string; label: string; color: string; bg: string; border: string }[] = [
+  { panel: '뉴스', emoji: '📰', label: '주요 뉴스', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
+  { panel: '추천', emoji: '💡', label: '추천 질문', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
+  { panel: '고급', emoji: '🎯', label: '고급 질문', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
 ];
 
-const FinanceTabContent = ({ onPickQuestion }: { onPickQuestion: (text: string) => void }) => {
+const FinanceTabContent = ({ onOpenQuickPanel }: { onOpenQuickPanel: (panel: FinanceQuickPanel) => void }) => {
   // 온보딩 힌트 — 첫 진입 1회만 (localStorage 'px_finance_hint_v1')
   const [showHint, setShowHint] = useState(false);
   useEffect(() => {
@@ -916,6 +917,57 @@ const FinanceTabContent = ({ onPickQuestion }: { onPickQuestion: (text: string) 
         <br />
         4개의 관점이 충돌합니다
       </h2>
+
+      {/* 상단 액션 버튼 3개 — 주요 뉴스 / 추천 질문 / 고급 질문 (가로 균등 배치) */}
+      <style>{`
+        .px-fin-top {
+          transition: transform 0.1s ease, box-shadow 0.15s ease, filter 0.15s ease;
+        }
+        .px-fin-top:hover {
+          filter: brightness(1.02);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        .px-fin-top:active { transform: scale(0.98); }
+      `}</style>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr 1fr',
+        gap: 8,
+        maxWidth: 460,
+        margin: '0 auto 12px',
+        padding: '0 8px',
+      }}>
+        {FINANCE_TOP_BUTTONS.map(b => (
+          <button
+            key={b.panel}
+            type="button"
+            className="px-fin-top"
+            onClick={() => onOpenQuickPanel(b.panel)}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4,
+              padding: '10px 6px',
+              background: b.bg,
+              border: `1px solid ${b.border}`,
+              borderRadius: 12,
+              cursor: 'pointer',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+              boxSizing: 'border-box',
+              minHeight: 64,
+              minWidth: 0,
+            }}
+          >
+            <span style={{ fontSize: 20, lineHeight: 1 }}>{b.emoji}</span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: b.color, whiteSpace: 'nowrap' }}>
+              {b.label}
+            </span>
+          </button>
+        ))}
+      </div>
+
       {showHint && (
         <p
           style={{
@@ -924,62 +976,12 @@ const FinanceTabContent = ({ onPickQuestion }: { onPickQuestion: (text: string) 
             fontSize: 12,
             fontWeight: 500,
             lineHeight: 1.5,
-            margin: '0 0 14px',
+            margin: '0 0 4px',
           }}
         >
           종목명이나 재테크 고민을 입력하면 4명이 분석해드려요
         </p>
       )}
-
-      {/* 추천 질문 카드 3개 — 클릭 시 입력창에 자동 입력 */}
-      <style>{`
-        .px-fin-suggest {
-          transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
-        }
-        .px-fin-suggest:hover {
-          background: #ffffff !important;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        }
-        .px-fin-suggest:active {
-          transform: scale(0.99);
-        }
-      `}</style>
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        maxWidth: 460,
-        margin: '0 auto',
-        padding: '0 8px',
-      }}>
-        {FINANCE_SUGGESTED_QUESTIONS.map(q => (
-          <button
-            key={q.text}
-            type="button"
-            className="px-fin-suggest"
-            onClick={() => onPickQuestion(q.text)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              width: '100%',
-              padding: '12px 14px',
-              background: 'rgba(255,255,255,0.85)',
-              border: '1px solid #e5e7eb',
-              borderRadius: 12,
-              cursor: 'pointer',
-              textAlign: 'left',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-              boxSizing: 'border-box',
-            }}
-          >
-            <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{q.emoji}</span>
-            <span style={{ fontSize: 13.5, fontWeight: 600, color: '#1f2937', lineHeight: 1.4 }}>
-              {q.text}
-            </span>
-          </button>
-        ))}
-      </div>
     </div>
   );
 };
@@ -1429,13 +1431,13 @@ const OnboardingTabs = ({
   onTabChange,
   teaPersona,
   luciaGreeting,
-  onPickQuestion,
+  onOpenQuickPanel,
 }: {
   activeTab: 'finance' | 'tea' | null;
   onTabChange: (tab: 'finance' | 'tea') => void;
   teaPersona: 'lucia' | 'jack' | 'echo';
   luciaGreeting: string | null;
-  onPickQuestion: (text: string) => void;
+  onOpenQuickPanel: (panel: FinanceQuickPanel) => void;
 }) => {
   // ─ 첫 화면 — 큰 카드 2개 (flex-wrap 으로 모바일은 자동 세로 스택) ─
   if (activeTab === null) {
@@ -1586,7 +1588,7 @@ const OnboardingTabs = ({
         />
       </div>
 
-      {activeTab === 'finance' && <FinanceTabContent onPickQuestion={onPickQuestion} />}
+      {activeTab === 'finance' && <FinanceTabContent onOpenQuickPanel={onOpenQuickPanel} />}
       {activeTab === 'tea' && (
         <TeaTabContent
           teaPersona={teaPersona}
@@ -2081,7 +2083,7 @@ export default function ChatWindow() {
             onTabChange={setOnboardingTab}
             teaPersona={teaPersona}
             luciaGreeting={luciaGreeting}
-            onPickQuestion={setInput}
+            onOpenQuickPanel={(panel) => { setActiveTab(panel); setShowQuickQ(true); }}
           />
         </div>
       )}
@@ -2096,7 +2098,7 @@ export default function ChatWindow() {
               onTabChange={setOnboardingTab}
               teaPersona={teaPersona}
               luciaGreeting={luciaGreeting}
-              onPickQuestion={setInput}
+              onOpenQuickPanel={(panel) => { setActiveTab(panel); setShowQuickQ(true); }}
             />
           </div>
         )}
@@ -2612,38 +2614,6 @@ export default function ChatWindow() {
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {/* 사전 질문 토글 버튼 — 재테크 탭일 때만 표시.
-              차 한잔 탭(onboardingTab === 'tea')에서는 hasUserSent 여부와 무관하게 항상 숨김. */}
-          {onboardingTab === 'finance' && (
-            <button
-              onClick={() => setShowQuickQ(prev => !prev)}
-              title="추천 질문 / 주요 뉴스"
-              style={{
-                background: showQuickQ ? '#FAE100' : '#f3f4f6',
-                border: 'none',
-                borderRadius: 12,
-                padding: '6px 12px',
-                minHeight: 56,
-                height: 56,
-                boxSizing: 'border-box',
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: 'pointer',
-                flexShrink: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 2,
-                whiteSpace: 'nowrap',
-                color: '#374151',
-                lineHeight: 1.2,
-              }}
-            >
-              <span>💡 추천 질문</span>
-              <span>📰 주요 뉴스</span>
-            </button>
-          )}
           <textarea
             ref={textareaRef}
             value={input}
