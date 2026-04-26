@@ -283,15 +283,39 @@ const sanitizeForTTS = (text: string): string =>
     .replace(/\s+/g, ' ')
     .trim();
 
-const speakText = (text: string, onEnd?: () => void): boolean => {
+// ─── 페르소나별 음성 프로필 ───
+// 모두 ko-KR. RAY 표준, JACK 묵직(낮고 빠르게), LUCIA 따뜻(천천히), ECHO 분석가(천천히 낮게).
+type VoiceProfile = { rate: number; pitch: number };
+const PERSONA_VOICE: Record<'ray' | 'jack' | 'lucia' | 'echo', VoiceProfile> = {
+  ray:   { rate: 1.0,  pitch: 1.0 },
+  jack:  { rate: 1.0,  pitch: 0.8 },
+  lucia: { rate: 0.85, pitch: 1.0 },
+  echo:  { rate: 0.8,  pitch: 0.7 },
+};
+
+// ─── 발화 시퀀스 — 순서대로 한 명씩 읽기. 중간에 stopSpeaking 호출 시 즉시 중단. ───
+// currentSeqId 를 증가시켜 진행 중인 시퀀스를 무효화 → 콜백 체인 차단.
+let currentSeqId = 0;
+
+const stopSpeaking = (): void => {
+  currentSeqId++;
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+  try { window.speechSynthesis.cancel(); } catch {}
+};
+
+const speakOne = (
+  text: string,
+  profile: VoiceProfile,
+  onEnd?: () => void,
+): boolean => {
   if (!isTTSSupported()) return false;
   const clean = sanitizeForTTS(text);
-  if (!clean) return false;
+  if (!clean) { onEnd?.(); return false; }
   try {
-    window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(clean);
     u.lang = 'ko-KR';
-    u.rate = 0.9;
+    u.rate = profile.rate;
+    u.pitch = profile.pitch;
     if (onEnd) {
       u.onend = onEnd;
       u.onerror = onEnd;
@@ -299,17 +323,50 @@ const speakText = (text: string, onEnd?: () => void): boolean => {
     window.speechSynthesis.speak(u);
     return true;
   } catch {
+    onEnd?.();
     return false;
   }
 };
 
-const stopSpeaking = (): void => {
-  if (!isTTSSupported()) return;
-  try { window.speechSynthesis.cancel(); } catch {}
+// 단일 텍스트 발화 — SpeakerButton 수동 재생 경로용. 페르소나 선택 가능.
+const speakText = (
+  text: string,
+  personaKey?: 'ray' | 'jack' | 'lucia' | 'echo',
+  onEnd?: () => void,
+): boolean => {
+  if (!isTTSSupported()) return false;
+  stopSpeaking();
+  const profile = personaKey ? PERSONA_VOICE[personaKey] : { rate: 0.9, pitch: 1.0 };
+  return speakOne(text, profile, onEnd);
+};
+
+// 시퀀스 발화 — RAY → JACK → LUCIA → ECHO 등 순서대로 읽기.
+// 각 페르소나 끝나면 자동으로 다음 페르소나로 진행. 중도 중지 시 currentSeqId 변동으로 차단.
+const speakSequence = (
+  items: { text: string; personaKey: 'ray' | 'jack' | 'lucia' | 'echo' }[],
+): void => {
+  if (!isTTSSupported() || items.length === 0) return;
+  stopSpeaking();
+  const seqId = ++currentSeqId;
+  let i = 0;
+  const next = () => {
+    if (seqId !== currentSeqId) return; // stopSpeaking 또는 새 시퀀스 시작 시 중단
+    if (i >= items.length) return;
+    const item = items[i++];
+    speakOne(item.text, PERSONA_VOICE[item.personaKey], next);
+  };
+  next();
 };
 
 // ─── 답변 말풍선 우상단 🔊 버튼 — 클릭 시 해당 답변 재생/중지 ───
-const SpeakerButton = memo(function SpeakerButton({ text }: { text: string }) {
+//   personaKey 전달 시 해당 페르소나 목소리(rate/pitch)로 재생.
+const SpeakerButton = memo(function SpeakerButton({
+  text,
+  personaKey,
+}: {
+  text: string;
+  personaKey?: 'ray' | 'jack' | 'lucia' | 'echo';
+}) {
   const [supported, setSupported] = useState(false);
   const [speaking, setSpeaking] = useState(false);
 
@@ -332,7 +389,7 @@ const SpeakerButton = memo(function SpeakerButton({ text }: { text: string }) {
           setSpeaking(false);
           return;
         }
-        const ok = speakText(text, () => setSpeaking(false));
+        const ok = speakText(text, personaKey, () => setSpeaking(false));
         if (ok) setSpeaking(true);
       }}
       title={speaking ? '읽기 중지' : '소리로 듣기'}
@@ -427,7 +484,7 @@ const PersonaBubble = memo(function PersonaBubble({
             >
               {p.label}
             </span>
-            <SpeakerButton text={`${p.name}. ${content}${rebuttal ? '. ' + rebuttal : ''}`} />
+            <SpeakerButton text={`${p.name}. ${content}${rebuttal ? '. ' + rebuttal : ''}`} personaKey={personaKey} />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
@@ -635,7 +692,7 @@ const EchoBubble = memo(function EchoBubble({
             >
               {p.label}
             </span>
-            <SpeakerButton text={`${p.name}. ${summaryText}${detailsText ? '. ' + detailsText : ''}`} />
+            <SpeakerButton text={`${p.name}. ${summaryText}${detailsText ? '. ' + detailsText : ''}`} personaKey="echo" />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
@@ -1777,6 +1834,8 @@ export default function ChatWindow() {
       setIsRecording(false);
       return;
     }
+    // 녹음 시작 전 자동 읽기 중단 (마이크에 TTS 음성이 섞이지 않도록)
+    stopSpeaking();
     const w = window as unknown as { SpeechRecognition?: new () => unknown; webkitSpeechRecognition?: new () => unknown };
     const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!SR) return;
@@ -1804,8 +1863,9 @@ export default function ChatWindow() {
     }
   }, [sttSupported, isRecording]);
 
-  // 자동 읽기 — 새 assistant 메시지 도착 시 1회 발화. autoRead OFF 면 동작 안 함.
-  // 재테크: ray + jack + lucia + echo 순서로 이어 읽기. 차 한잔: 활성 페르소나 텍스트.
+  // 자동 읽기 — 새 assistant 메시지 도착 시 페르소나별 목소리로 순서대로 발화.
+  // 재테크: RAY → JACK → LUCIA → ECHO. 차 한잔: 등장 페르소나 순서대로.
+  // 한 명 끝나면 자동으로 다음 페르소나. 새 사용자 입력 시 stopSpeaking 으로 즉시 중단.
   useEffect(() => {
     if (!autoRead || !ttsSupported) return;
     const last = messages[messages.length - 1];
@@ -1814,16 +1874,22 @@ export default function ChatWindow() {
     if (lastAutoReadIdRef.current === last.id) return;
     lastAutoReadIdRef.current = last.id;
 
-    let textToRead = '';
+    type Item = { text: string; personaKey: 'ray' | 'jack' | 'lucia' | 'echo' };
+    const queue: Item[] = [];
     if (last.teaMode) {
-      textToRead = [last.teaLucia, last.teaJack, last.teaEcho].filter(Boolean).join('. ');
+      if (last.teaLucia) queue.push({ text: last.teaLucia, personaKey: 'lucia' });
+      if (last.teaJack)  queue.push({ text: last.teaJack,  personaKey: 'jack' });
+      if (last.teaEcho)  queue.push({ text: last.teaEcho,  personaKey: 'echo' });
     } else if (last.personas) {
       const { ray, jack, lucia, echo } = last.personas;
-      textToRead = [ray, jack, lucia, echo].filter(Boolean).join('. ');
-    } else {
-      textToRead = last.content || '';
+      if (ray)   queue.push({ text: ray,   personaKey: 'ray' });
+      if (jack)  queue.push({ text: jack,  personaKey: 'jack' });
+      if (lucia) queue.push({ text: lucia, personaKey: 'lucia' });
+      if (echo)  queue.push({ text: echo,  personaKey: 'echo' });
+    } else if (last.content) {
+      queue.push({ text: last.content, personaKey: 'jack' });
     }
-    if (textToRead.trim()) speakText(textToRead);
+    if (queue.length) speakSequence(queue);
   }, [messages, autoRead, ttsSupported]);
 
   const QUICK_QUESTIONS = useMemo(() => {
@@ -2022,6 +2088,8 @@ export default function ChatWindow() {
   }, [input]);
 
   const handleSendWithPosition = useCallback(async (text: string, position: Position | null, isAdvanced: boolean = false) => {
+    // ✅ 새 입력이 들어오면 진행 중인 자동 읽기 즉시 중지
+    stopSpeaking();
     setShowPosition(false);
 
     // ✅ 차 한잔 탭에서 보낼 때는 LUCIA 단독 응답 루트
@@ -2869,18 +2937,18 @@ export default function ChatWindow() {
               }}
               title={autoRead ? '자동 읽기 끄기' : '자동 읽기 켜기'}
               style={{
-                background: autoRead ? '#dcfce7' : '#f3f4f6',
-                border: `1px solid ${autoRead ? '#86efac' : '#d1d5db'}`,
+                background: autoRead ? '#dbeafe' : '#f3f4f6',
+                border: `1px solid ${autoRead ? '#93c5fd' : '#d1d5db'}`,
                 borderRadius: 999,
                 padding: '4px 10px',
                 fontSize: 11,
                 fontWeight: 700,
-                color: autoRead ? '#166534' : '#6b7280',
+                color: autoRead ? '#1e40af' : '#6b7280',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
               }}
             >
-              🔊 자동 읽기 {autoRead ? 'ON' : 'OFF'}
+              {autoRead ? '🔊 자동읽기 ON' : '🔇 자동읽기 OFF'}
             </button>
           </div>
         )}
