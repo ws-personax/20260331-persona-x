@@ -7,15 +7,11 @@ export const maxDuration = 15;
 type Persona = 'ray' | 'jack' | 'lucia' | 'echo';
 
 // 페르소나별 CLOVA 화자/속도 매핑.
-//   LUCIA: nara      (여성, 따뜻한 목소리)        speed=-2 (조금 천천히)
-//   JACK : njoonseo  (남성, 낮고 묵직한 목소리)   speed= 0
-//   ECHO : ndeepio   (남성, 차분하고 깊은 목소리) speed=-3 (많이 천천히)
-//   RAY  : njonghyun (남성, 명확한 목소리)        speed= 0
 const VOICE_MAP: Record<Persona, { speaker: string; speed: number }> = {
-  lucia: { speaker: 'nara',      speed: -2 },
-  jack:  { speaker: 'njoonseo',  speed:  0 },
-  echo:  { speaker: 'ndeepio',   speed: -3 },
-  ray:   { speaker: 'njonghyun', speed:  0 },
+  lucia: { speaker: 'nbora',     speed: -2 },
+  jack:  { speaker: 'nminsang',  speed:  0 },
+  echo:  { speaker: 'nmetallic', speed: -3 },
+  ray:   { speaker: 'nkyunglee', speed:  0 },
 };
 
 const CLOVA_ENDPOINT = 'https://naveropenapi.apigw.ntruss.com/tts-premium/v1/tts';

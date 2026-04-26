@@ -1879,7 +1879,6 @@ export default function ChatWindow() {
   // ✅ STT 발화 종료 후 2초 카운트다운 → 자동 전송. null 이면 비활성, 2/1 은 남은 초.
   const [autoSendCountdown, setAutoSendCountdown] = useState<number | null>(null);
   const recognitionRef = useRef<{ start: () => void; stop: () => void; abort: () => void } | null>(null);
-  const lastAutoReadIdRef = useRef<string | null>(null);
   const autoSendStepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // handleSend는 input 의존성 때문에 useCallback identity 가 자주 바뀜 →
   // ref 로 항상 최신 handleSend 를 가리키게 해서 setTimeout 안에서 호출.
@@ -1968,13 +1967,13 @@ export default function ChatWindow() {
   // 자동 읽기 — 새 assistant 메시지 도착 시 페르소나별 목소리로 순서대로 발화.
   // 재테크: RAY → JACK → LUCIA → ECHO. 차 한잔: 등장 페르소나 순서대로.
   // 한 명 끝나면 자동으로 다음 페르소나. 새 사용자 입력 시 stopSpeaking 으로 즉시 중단.
+  // ⚠️ 재테크 4페르소나 응답은 ray/jack/lucia/echo 네 개가 모두 도착했을 때만 시퀀스 시작.
+  //    (일부만 먼저 들어와서 큐가 잘리는 문제 방지)
   useEffect(() => {
     if (!autoRead || !ttsSupported) return;
     const last = messages[messages.length - 1];
     if (!last || last.role !== 'assistant') return;
     if (last.errorType) return;
-    if (lastAutoReadIdRef.current === last.id) return;
-    lastAutoReadIdRef.current = last.id;
 
     type Item = { text: string; personaKey: 'ray' | 'jack' | 'lucia' | 'echo' };
     const queue: Item[] = [];
@@ -1984,10 +1983,12 @@ export default function ChatWindow() {
       if (last.teaEcho)  queue.push({ text: last.teaEcho,  personaKey: 'echo' });
     } else if (last.personas) {
       const { ray, jack, lucia, echo } = last.personas;
-      if (ray)   queue.push({ text: ray,   personaKey: 'ray' });
-      if (jack)  queue.push({ text: jack,  personaKey: 'jack' });
-      if (lucia) queue.push({ text: lucia, personaKey: 'lucia' });
-      if (echo)  queue.push({ text: echo,  personaKey: 'echo' });
+      // 네 명 모두 준비됐을 때만 재생 — 부분 도착 상태에서는 대기.
+      if (!(ray && jack && lucia && echo)) return;
+      queue.push({ text: ray,   personaKey: 'ray'   });
+      queue.push({ text: jack,  personaKey: 'jack'  });
+      queue.push({ text: lucia, personaKey: 'lucia' });
+      queue.push({ text: echo,  personaKey: 'echo'  });
     } else if (last.content) {
       queue.push({ text: last.content, personaKey: 'jack' });
     }
