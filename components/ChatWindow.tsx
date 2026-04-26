@@ -70,7 +70,7 @@ const PERSONAS: Record<
 > = {
   jack: {
     name: 'JACK',
-    label: 'Strategy (INTJ)',
+    label: '결단 · 전략',
     initial: 'J',
     iconBg: '#374151',
     bubbleBg: '#f3f4f6',
@@ -79,7 +79,7 @@ const PERSONAS: Record<
   },
   lucia: {
     name: 'LUCIA',
-    label: 'Risk (ENFP)',
+    label: '감정 · 공감',
     initial: 'L',
     iconBg: '#a855f7',
     bubbleBg: '#fdf4ff',
@@ -88,7 +88,7 @@ const PERSONAS: Record<
   },
   ray: {
     name: 'RAY',
-    label: 'Data (INTP)',
+    label: '데이터 · 분석',
     initial: 'R',
     iconBg: '#06b6d4',
     bubbleBg: '#ecfeff',
@@ -97,7 +97,7 @@ const PERSONAS: Record<
   },
   echo: {
     name: 'ECHO',
-    label: 'Commander',
+    label: '구조 · 원칙',
     initial: 'E',
     iconBg: '#d4a017',
     bubbleBg: '#fff8d6',
