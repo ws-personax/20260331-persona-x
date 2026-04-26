@@ -2238,37 +2238,6 @@ export default function ChatWindow() {
             </button>
           </div>
         )}
-        {onboardingTab === 'tea' && (
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-            <button
-              type="button"
-              onClick={() => {
-                setOnboardingTab('finance');
-                setTeaPersona('lucia');
-                setMessages([]);
-                messagesRef.current = [];
-                setInput('');
-                requestAnimationFrame(() => {
-                  scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'auto' });
-                  window.scrollTo({ top: 0, behavior: 'auto' });
-                });
-              }}
-              style={{
-                background: '#f0f4ff',
-                border: '1px solid #93c5fd',
-                borderRadius: 999,
-                padding: '6px 14px',
-                fontSize: 12,
-                fontWeight: 700,
-                color: '#1e40af',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              📊 이제 실전으로 가볼까요?
-            </button>
-          </div>
-        )}
         {/* ✅ 차 한잔 — 입력창 위에 작은 소환 버튼 (보조 역할).
              현재 페르소나는 비활성, 나머지는 클릭 시 전환. */}
         {onboardingTab === 'tea' && (
