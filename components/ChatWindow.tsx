@@ -276,19 +276,33 @@ const isSTTSupported = (): boolean => {
 };
 
 // TTS 발화 정리용 — "📰 뉴스보기 →" 같은 마크업/이모지 잡음 최소 제거.
-const sanitizeForTTS = (text: string): string =>
-  (text || '')
+//   · 괄호 안 보조 정보 — 예: "거래량 2,066만주 (3일 평균 ..., 보통)" → "거래량 2,066만주" — 통째로 제거.
+//   · "자세히 보기" 표시가 있으면 해당 텍스트 제거 후 끝에 안내 멘트 추가.
+const sanitizeForTTS = (text: string): string => {
+  const raw = text || '';
+  const hasDetailLink = /자세히\s*보기/.test(raw);
+  let t = raw
+    .replace(/자세히\s*보기/g, '')
+    .replace(/\([^)]*\)/g, '')
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/[📰📊📡🎯💡🔍⚔️↳→▲▼💜☕💪]/g, '')
     .replace(/\n+/g, '. ')
     .replace(/\s+/g, ' ')
     .trim();
+  if (hasDetailLink) {
+    t = t.replace(/[.\s]+$/, '') + '. 자세한 내용은 화면을 확인하세요.';
+  }
+  return t;
+};
 
 type PersonaVoice = 'ray' | 'jack' | 'lucia' | 'echo';
 
-// ─── 발화 시퀀스 — 순서대로 한 명씩 읽기. 중간에 stopSpeaking 호출 시 즉시 중단. ───
-// currentSeqId 를 증가시켜 진행 중인 시퀀스를 무효화 → 콜백 체인 차단.
-let currentSeqId = 0;
+// ─── 동적 발화 큐 — 도착 순서대로 푸시하면 알아서 순차 재생. ───
+// stopSpeaking 호출 시 sequenceStopId 가 증가하여 진행 중 루프 + 콜백 체인을 차단.
+type SequenceItem = { text: string; personaKey: PersonaVoice };
+const sequenceQueue: SequenceItem[] = [];
+let sequenceRunning = false;
+let sequenceStopId = 0;
 // 활성 요청 ID — fetch 응답이 stopSpeaking 이후 도착했을 때 재생을 막기 위함.
 let activeRequestId = 0;
 // 현재 재생 중 Audio — stopSpeaking 시 pause + src 해제.
@@ -313,8 +327,10 @@ const useIsSpeaking = (): boolean => {
 };
 
 const stopSpeaking = (): void => {
-  currentSeqId++;
+  sequenceStopId++;
   activeRequestId++;
+  sequenceQueue.length = 0;
+  sequenceRunning = false;
   if (currentAudio) {
     try {
       currentAudio.onended = null;
@@ -393,23 +409,27 @@ const speakText = (
   });
 };
 
-// 시퀀스 발화 — RAY → JACK → LUCIA → ECHO 등 순서대로 읽기.
-// 각 페르소나 끝나면 자동으로 다음 페르소나로 진행. 중도 중지 시 currentSeqId 변동으로 차단.
-const speakSequence = (
-  items: { text: string; personaKey: PersonaVoice }[],
-): void => {
+// 동적 시퀀스 — 들어오는 순서대로 큐에 쌓고, 비어있을 때만 새 루프 시작.
+// 이미 재생 중이면 항목만 추가 → 현재 루프가 자연스럽게 픽업한다.
+// 도중 stopSpeaking 호출 시 sequenceStopId 가 변동되어 루프가 종료됨.
+const enqueueSpeak = (items: SequenceItem[]): void => {
   if (!isTTSSupported() || items.length === 0) return;
-  stopSpeaking();
-  const seqId = ++currentSeqId;
+  sequenceQueue.push(...items);
+  if (sequenceRunning) return;
+
+  sequenceRunning = true;
   notifySpeaking(true);
-  let i = 0;
+  const myStopId = sequenceStopId;
+
   const next = () => {
-    if (seqId !== currentSeqId) return; // stopSpeaking 또는 새 시퀀스 시작 시 중단
-    if (i >= items.length) {
+    // 다른 stop 또는 새 시퀀스가 시작된 상태 → 우리는 sequenceRunning 을 건드리지 않고 종료.
+    if (myStopId !== sequenceStopId) return;
+    const item = sequenceQueue.shift();
+    if (!item) {
+      sequenceRunning = false;
       notifySpeaking(false);
       return;
     }
-    const item = items[i++];
     speakOne(item.text, item.personaKey, next);
   };
   next();
@@ -1879,6 +1899,8 @@ export default function ChatWindow() {
   // ✅ STT 발화 종료 후 2초 카운트다운 → 자동 전송. null 이면 비활성, 2/1 은 남은 초.
   const [autoSendCountdown, setAutoSendCountdown] = useState<number | null>(null);
   const recognitionRef = useRef<{ start: () => void; stop: () => void; abort: () => void } | null>(null);
+  // 자동 읽기 — 메시지별로 어떤 페르소나를 이미 큐잉했는지 추적해서 중복 재생 방지.
+  const queuedPersonasRef = useRef<{ msgId: string; set: Set<'ray' | 'jack' | 'lucia' | 'echo'> }>({ msgId: '', set: new Set() });
   const autoSendStepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // handleSend는 input 의존성 때문에 useCallback identity 가 자주 바뀜 →
   // ref 로 항상 최신 handleSend 를 가리키게 해서 setTimeout 안에서 호출.
@@ -1965,34 +1987,56 @@ export default function ChatWindow() {
   }, [sttSupported, isRecording, autoSendCountdown, cancelAutoSend, startAutoSendCountdown]);
 
   // 자동 읽기 — 새 assistant 메시지 도착 시 페르소나별 목소리로 순서대로 발화.
-  // 재테크: RAY → JACK → LUCIA → ECHO. 차 한잔: 등장 페르소나 순서대로.
-  // 한 명 끝나면 자동으로 다음 페르소나. 새 사용자 입력 시 stopSpeaking 으로 즉시 중단.
-  // ⚠️ 재테크 4페르소나 응답은 ray/jack/lucia/echo 네 개가 모두 도착했을 때만 시퀀스 시작.
-  //    (일부만 먼저 들어와서 큐가 잘리는 문제 방지)
+  // 재테크: RAY → JACK → LUCIA → ECHO. 차 한잔: LUCIA → JACK → ECHO.
+  // ⚠️ 4개 동시 도착을 기다리지 않는다 — 도착하는 순서대로 큐에 추가.
+  //    RAY 도착 → 바로 RAY 재생, JACK 도착 → RAY 끝나면 JACK 재생, ...
+  //    페르소나 순서를 깨뜨리지 않기 위해 앞 자리가 비어 있으면 거기서 멈추고 다음 업데이트를 기다림.
+  //    이미 큐에 넣은 페르소나는 queuedPersonasRef 로 추적해 중복 큐잉 방지.
   useEffect(() => {
     if (!autoRead || !ttsSupported) return;
     const last = messages[messages.length - 1];
     if (!last || last.role !== 'assistant') return;
     if (last.errorType) return;
 
-    type Item = { text: string; personaKey: 'ray' | 'jack' | 'lucia' | 'echo' };
-    const queue: Item[] = [];
-    if (last.teaMode) {
-      if (last.teaLucia) queue.push({ text: last.teaLucia, personaKey: 'lucia' });
-      if (last.teaJack)  queue.push({ text: last.teaJack,  personaKey: 'jack' });
-      if (last.teaEcho)  queue.push({ text: last.teaEcho,  personaKey: 'echo' });
-    } else if (last.personas) {
-      const { ray, jack, lucia, echo } = last.personas;
-      // 네 명 모두 준비됐을 때만 재생 — 부분 도착 상태에서는 대기.
-      if (!(ray && jack && lucia && echo)) return;
-      queue.push({ text: ray,   personaKey: 'ray'   });
-      queue.push({ text: jack,  personaKey: 'jack'  });
-      queue.push({ text: lucia, personaKey: 'lucia' });
-      queue.push({ text: echo,  personaKey: 'echo'  });
-    } else if (last.content) {
-      queue.push({ text: last.content, personaKey: 'jack' });
+    // 메시지가 바뀌면 추적 리셋 + 진행 중이던 발화 정지.
+    if (queuedPersonasRef.current.msgId !== last.id) {
+      stopSpeaking();
+      queuedPersonasRef.current = { msgId: last.id, set: new Set() };
     }
-    if (queue.length) speakSequence(queue);
+    const queued = queuedPersonasRef.current.set;
+
+    type Item = { text: string; personaKey: 'ray' | 'jack' | 'lucia' | 'echo' };
+    const newItems: Item[] = [];
+
+    // 순서 + 텍스트 페어를 돌며: 이미 큐잉된 건 skip, 아직 도착 안 한 건 break(순서 보장).
+    const addInOrder = (order: { key: 'ray' | 'jack' | 'lucia' | 'echo'; text?: string | null }[]) => {
+      for (const o of order) {
+        if (queued.has(o.key)) continue;
+        if (!o.text) break;
+        newItems.push({ text: o.text, personaKey: o.key });
+        queued.add(o.key);
+      }
+    };
+
+    if (last.teaMode) {
+      addInOrder([
+        { key: 'lucia', text: last.teaLucia },
+        { key: 'jack',  text: last.teaJack  },
+        { key: 'echo',  text: last.teaEcho  },
+      ]);
+    } else if (last.personas) {
+      addInOrder([
+        { key: 'ray',   text: last.personas.ray   },
+        { key: 'jack',  text: last.personas.jack  },
+        { key: 'lucia', text: last.personas.lucia },
+        { key: 'echo',  text: last.personas.echo  },
+      ]);
+    } else if (last.content && !queued.has('jack')) {
+      newItems.push({ text: last.content, personaKey: 'jack' });
+      queued.add('jack');
+    }
+
+    if (newItems.length) enqueueSpeak(newItems);
   }, [messages, autoRead, ttsSupported]);
 
   const QUICK_QUESTIONS = useMemo(() => {
