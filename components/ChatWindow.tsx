@@ -1561,6 +1561,9 @@ export default function ChatWindow() {
   //    SSR 하이드레이션 미스매치 방지를 위해 마운트 후 client 에서만 결정.
   const [luciaGreeting, setLuciaGreeting] = useState<string | null>(null);
 
+  // ✅ 첫 진입 3초 온보딩 — localStorage 플래그 미존재 시 1회만 표시
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
   // 🔍 디버그 — teaPersona state 변경 추적
   useEffect(() => {
     // eslint-disable-next-line no-console
@@ -1570,6 +1573,31 @@ export default function ChatWindow() {
   useEffect(() => {
     setLuciaGreeting(pickLuciaGreeting());
   }, []);
+
+  // 첫 진입 시 1회만 온보딩 노출 — 마운트 후 client 에서만 체크 (SSR 안전)
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem('px_onboarded_v1')) {
+        setShowOnboarding(true);
+      }
+    } catch { /* localStorage 비활성 환경 — 그냥 표시 안 함 */ }
+  }, []);
+
+  const handleOnboardingPick = (tab: 'finance' | 'tea', persona: 'lucia' | 'echo' | null) => {
+    if (tab === 'tea') {
+      setOnboardingTab('tea');
+      if (persona) setTeaPersona(persona);
+    } else {
+      setOnboardingTab('finance');
+    }
+    try { localStorage.setItem('px_onboarded_v1', '1'); } catch {}
+    setShowOnboarding(false);
+  };
+
+  const handleOnboardingSkip = () => {
+    try { localStorage.setItem('px_onboarded_v1', '1'); } catch {}
+    setShowOnboarding(false);
+  };
 
   // ✅ 시장 상황 + 시간대 기반 동적 추천 질문
   // ✅ 탭 타입 정의
@@ -2592,6 +2620,106 @@ export default function ChatWindow() {
           </button>
         </div>
       </footer>
+      )}
+
+      {/* ✅ 첫 진입 3초 온보딩 오버레이 — 1회만 (localStorage 'px_onboarded_v1') */}
+      {showOnboarding && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+            zIndex: 9999,
+            animation: 'pxOnbBg 0.35s ease both',
+          }}
+        >
+          <style>{`
+            @keyframes pxOnbBg   { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes pxOnbCard { from { opacity: 0; transform: translateY(10px) scale(0.97); }
+                                  to   { opacity: 1; transform: translateY(0)    scale(1); } }
+            .px-onb-btn:hover { background: #f3f4f6 !important; }
+            .px-onb-btn:active { transform: scale(0.98); }
+          `}</style>
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: 18,
+              padding: '24px 22px 16px',
+              width: '100%',
+              maxWidth: 360,
+              boxShadow: '0 16px 40px rgba(0,0,0,0.22)',
+              animation: 'pxOnbCard 0.4s ease both',
+              boxSizing: 'border-box',
+            }}
+          >
+            <p style={{
+              textAlign: 'center',
+              fontSize: 17,
+              fontWeight: 800,
+              color: '#1f2937',
+              margin: '0 0 18px',
+            }}>
+              지금 어떤 상태인가요?
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {([
+                { emoji: '😔', text: '감정이 너무 힘들어요', tab: 'tea',     persona: 'lucia' },
+                { emoji: '📊', text: '투자 고민이에요',     tab: 'finance', persona: null    },
+                { emoji: '🤔', text: '결정을 못 하겠어요',  tab: 'tea',     persona: 'echo'  },
+              ] as const).map((opt, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className="px-onb-btn"
+                  onClick={() => handleOnboardingPick(opt.tab, opt.persona)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '14px 16px',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 12,
+                    background: '#f9fafb',
+                    fontSize: 14.5,
+                    fontWeight: 700,
+                    color: '#1f2937',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    width: '100%',
+                    transition: 'background 0.15s ease, transform 0.1s ease',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <span style={{ fontSize: 22, lineHeight: 1 }}>{opt.emoji}</span>
+                  <span style={{ flex: 1 }}>{opt.text}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={handleOnboardingSkip}
+              style={{
+                marginTop: 14,
+                background: 'transparent',
+                border: 'none',
+                color: '#9ca3af',
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: 'pointer',
+                width: '100%',
+                padding: '8px 0 4px',
+              }}
+            >
+              건너뛰기
+            </button>
+          </div>
+        </div>
       )}
     </div>
     </>
