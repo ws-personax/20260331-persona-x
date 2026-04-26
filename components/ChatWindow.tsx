@@ -1135,10 +1135,10 @@ const INTRO_SLIDES: IntroSlide[] = [
     question: '삼성전자 지금 사야 할까요?',
     layout: '2x2',
     cards: [
-      { persona: 'ray',   name: 'RAY',   role: '데이터 · 분석', text: '외국인 순매도 3주 연속.\n52주 최저가 대비 +18%.\n데이터는 아직 매수 신호 아닙니다.' },
-      { persona: 'jack',  name: 'JACK',  role: '결단 · 전략',  text: '선택지 두 가지입니다.\n1. 지금 분할 매수\n2. 실적 확인 후 진입\n어느 쪽입니까?' },
+      { persona: 'ray',   name: 'RAY',   role: '데이터 · 분석', text: '외국인 순매도 3주 연속.\n52주 최저가 대비 +18%.\n지표들을 종합적으로 살펴볼 필요가 있습니다.' },
+      { persona: 'jack',  name: 'JACK',  role: '결단 · 전략',  text: '방향이 결정되기 전엔 기다리는 것도 전략.\n분할 접근과 관망,\n두 가지 시각이 있습니다.' },
       { persona: 'lucia', name: 'LUCIA', role: '감정 · 공감',  text: '그 고민 뒤에 뭔가 더 있는 것 같아요.\n요즘 투자가 불안하게 느껴지는\n이유가 있어요?' },
-      { persona: 'echo',  name: 'ECHO',  role: '구조 · 원칙',  text: '결론: 타이밍 판단 불가 상태입니다.\n지금 필요한 건 매수 결정이 아니라\n본인의 투자 원칙입니다.' },
+      { persona: 'echo',  name: 'ECHO',  role: '구조 · 원칙',  text: '타이밍보다 원칙이 먼저입니다.\n지금 필요한 건 매수 결정이 아니라\n본인만의 투자 기준입니다.' },
     ],
   },
   {
@@ -1280,6 +1280,19 @@ const IntroSlider = () => {
           />
         ))}
       </div>
+
+      {/* 법적 고지 — 슬라이드 맨 아래, 작고 옅게 */}
+      <p style={{
+        marginTop: 10,
+        marginBottom: 0,
+        textAlign: 'center',
+        fontSize: 9.5,
+        lineHeight: 1.5,
+        color: '#9ca3af',
+        whiteSpace: 'pre-line',
+      }}>
+        {'본 서비스는 투자 권유가 아닌 참고용 콘텐츠입니다.\n투자 판단과 책임은 본인에게 있습니다.\n차 한잔 탭은 심리상담을 대체하지 않습니다.'}
+      </p>
     </div>
   );
 };
