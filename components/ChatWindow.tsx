@@ -1164,7 +1164,7 @@ const IntroSlider = () => {
   const slide = INTRO_SLIDES[idx];
 
   return (
-    <div style={{ width: '100%', maxWidth: 420, margin: '0 auto 18px' }}>
+    <div style={{ width: '100%', maxWidth: 380, margin: '0 auto 10px' }}>
       <style>{`
         @keyframes pxIntroFade {
           from { opacity: 0; transform: translateY(6px); }
@@ -1179,12 +1179,12 @@ const IntroSlider = () => {
       <div key={slide.id} className="px-intro-slide">
         {/* 상단 질문 */}
         <p style={{
-          fontSize: 14,
+          fontSize: 13,
           fontWeight: 700,
           color: '#1f2937',
           textAlign: 'center',
-          margin: '0 0 12px',
-          padding: '8px 14px',
+          margin: '0 0 8px',
+          padding: '5px 12px',
           background: '#ffffff',
           border: '1px solid #e5e7eb',
           borderRadius: 999,
@@ -1200,7 +1200,7 @@ const IntroSlider = () => {
         <div style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
-          gap: 8,
+          gap: 6,
         }}>
           {slide.cards.map(c => {
             const st = INTRO_PERSONA_STYLES[c.persona];
@@ -1210,30 +1210,31 @@ const IntroSlider = () => {
                 style={{
                   background: st.bg,
                   border: `1px solid ${st.border}`,
-                  borderRadius: 12,
-                  padding: '10px 11px',
+                  borderRadius: 11,
+                  padding: '7px 9px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 6,
-                  minHeight: 110,
+                  gap: 4,
+                  minHeight: 86,
                 }}
               >
                 <div style={{
-                  fontSize: 11,
+                  fontSize: 10.5,
                   fontWeight: 800,
                   color: st.title,
                   letterSpacing: 0.2,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 6,
+                  gap: 5,
+                  flexWrap: 'wrap',
                 }}>
                   <span>{c.name}</span>
                   <span style={{ fontWeight: 600, opacity: 0.8 }}>· {c.role}</span>
                 </div>
                 <p style={{
                   margin: 0,
-                  fontSize: 11.5,
-                  lineHeight: 1.5,
+                  fontSize: 10.5,
+                  lineHeight: 1.4,
                   color: st.body,
                   whiteSpace: 'pre-line',
                 }}>
@@ -1250,7 +1251,7 @@ const IntroSlider = () => {
         display: 'flex',
         justifyContent: 'center',
         gap: 8,
-        marginTop: 12,
+        marginTop: 8,
       }}>
         {INTRO_SLIDES.map((s, i) => (
           <button
@@ -1319,33 +1320,34 @@ const OnboardingTabs = ({
             (media query .px-intro-cards-row). 세로 중앙정렬은 부모 담당. */}
         <div style={{
           textAlign: 'center',
-          marginBottom: 18,
+          marginBottom: 10,
           padding: '0 8px',
+          width: '100%',
         }}>
           <p style={{
-            fontSize: 12,
+            fontSize: 11.5,
             fontWeight: 500,
             color: '#9ca3af',
             letterSpacing: 0.3,
-            margin: '0 0 4px',
+            margin: '0 0 3px',
           }}>
             범용 AI는 답을 드리지만,
           </p>
           <p style={{
-            fontSize: 17,
+            fontSize: 16,
             fontWeight: 800,
             color: '#1f2937',
-            lineHeight: 1.4,
-            margin: '0 0 6px',
+            lineHeight: 1.35,
+            margin: '0 0 4px',
           }}>
             4명이 충돌하고, 당신이 결정합니다.
           </p>
           <p style={{
-            fontSize: 12,
+            fontSize: 11.5,
             fontWeight: 500,
             color: '#6b7280',
-            lineHeight: 1.5,
-            margin: '0 0 16px',
+            lineHeight: 1.45,
+            margin: '0 0 10px',
           }}>
             투자 고민도, 마음 고민도 — 주식 몰라도 괜찮아요
           </p>
@@ -1356,7 +1358,7 @@ const OnboardingTabs = ({
           style={{
             display: 'flex',
             flexWrap: 'wrap',
-            gap: 16,
+            gap: 10,
             justifyContent: 'center',
             alignItems: 'stretch',
             width: '100%',
@@ -1369,30 +1371,30 @@ const OnboardingTabs = ({
             className="px-intro-card"
             onClick={() => onTabChange('finance')}
             style={{
-              flex: '1 1 280px',
-              minWidth: '280px',
-              minHeight: 120,
-              height: 120,
-              padding: '14px 16px',
+              flex: '1 1 260px',
+              minWidth: '260px',
+              minHeight: 84,
+              height: 84,
+              padding: '10px 14px',
               background: '#ffffff',
               border: '2px solid #1f2937',
-              borderRadius: 14,
+              borderRadius: 12,
               cursor: 'pointer',
               textAlign: 'left',
               display: 'flex',
               flexDirection: 'column',
-              gap: 8,
+              gap: 3,
               boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
               boxSizing: 'border-box',
             }}
           >
-            <span style={{ fontSize: 24, lineHeight: 1 }}>📊</span>
-            <span style={{ fontSize: 14, fontWeight: 800, color: '#111827' }}>재테크</span>
+            <span style={{ fontSize: 20, lineHeight: 1 }}>📊</span>
+            <span style={{ fontSize: 13.5, fontWeight: 800, color: '#111827' }}>재테크</span>
             <span
               style={{
-                fontSize: 12,
+                fontSize: 11.5,
                 color: '#4b5563',
-                lineHeight: 1.5,
+                lineHeight: 1.4,
                 whiteSpace: 'nowrap',
               }}
             >
@@ -1406,30 +1408,30 @@ const OnboardingTabs = ({
             className="px-intro-card"
             onClick={() => onTabChange('tea')}
             style={{
-              flex: '1 1 280px',
-              minWidth: '280px',
-              minHeight: 120,
-              height: 120,
-              padding: '14px 16px',
+              flex: '1 1 260px',
+              minWidth: '260px',
+              minHeight: 84,
+              height: 84,
+              padding: '10px 14px',
               background: '#fffaf0',
               border: '2px solid #fb923c',
-              borderRadius: 14,
+              borderRadius: 12,
               cursor: 'pointer',
               textAlign: 'left',
               display: 'flex',
               flexDirection: 'column',
-              gap: 8,
+              gap: 3,
               boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
               boxSizing: 'border-box',
             }}
           >
-            <span style={{ fontSize: 24, lineHeight: 1 }}>☕</span>
-            <span style={{ fontSize: 14, fontWeight: 800, color: '#7c2d12' }}>차 한잔 하실래요?</span>
+            <span style={{ fontSize: 20, lineHeight: 1 }}>☕</span>
+            <span style={{ fontSize: 13.5, fontWeight: 800, color: '#7c2d12' }}>차 한잔 하실래요?</span>
             <span
               style={{
-                fontSize: 12,
+                fontSize: 11.5,
                 color: '#92400e',
-                lineHeight: 1.5,
+                lineHeight: 1.4,
                 whiteSpace: 'nowrap',
               }}
             >
@@ -1912,7 +1914,7 @@ export default function ChatWindow() {
       {/* ✅ 첫 화면(hasUserSent=false & onboardingTab=null) — 카드 전용 스크롤 컨테이너.
           헤더 바로 아래에 자연스럽게 카드 배치 (spacer/특수 패딩 없이 단순 padding 만). */}
       {!hasUserSent && onboardingTab === null && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center' }}>
           <OnboardingTabs
             onExample={(name) => handleSendWithPosition(name, null)}
             activeTab={onboardingTab}
