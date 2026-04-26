@@ -2311,9 +2311,28 @@ export default function ChatWindow() {
           display: 'flex',
           flexDirection: 'column',
         }}>
-          {/* 탭 헤더 */}
+          {/* ← 처음으로 (재테크 첫 화면으로 복귀) — 모든 탭 상단에 노출 */}
+          <button
+            type="button"
+            onClick={() => setShowQuickQ(false)}
+            style={{
+              alignSelf: 'flex-start',
+              background: 'none',
+              border: 'none',
+              padding: '8px 12px',
+              fontSize: 12.5,
+              fontWeight: 700,
+              color: '#6b7280',
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            ← 처음으로
+          </button>
+
+          {/* 탭 헤더 — 상단 카드 버튼 순서와 동일: 📰 주요 뉴스 / 💡 추천 질문 / 🎯 고급 질문 */}
           <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
-            {(['추천', '고급', '뉴스'] as const).map(tab => (
+            {(['뉴스', '추천', '고급'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -2333,7 +2352,7 @@ export default function ChatWindow() {
                   gap: 4,
                 }}
               >
-                {tab === '추천' ? '💡 추천' : tab === '고급' ? '🔒 고급' : '📰 뉴스'}
+                {tab === '뉴스' ? '📰 주요 뉴스' : tab === '추천' ? '💡 추천 질문' : '🎯 고급 질문'}
               </button>
             ))}
           </div>
@@ -2499,10 +2518,63 @@ export default function ChatWindow() {
             )}
 
             {activeTab === '뉴스' && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 0', gap: 8 }}>
-                <span style={{ fontSize: 28 }}>📰</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: '#374151' }}>오늘의 주요 경제 뉴스</span>
-                <span style={{ fontSize: 12, color: '#6b7280' }}>페르소나 토론 기능 — 준비 중</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {[
+                  {
+                    title: '美 관세 협상 재개...코스피 반등 기대',
+                    summary: '미중 협상 재개 소식에 외국인 매수세 유입 예상',
+                    prompt: '美 관세 협상 재개 소식이 있어요. 코스피에 어떤 영향을 줄까요?',
+                  },
+                  {
+                    title: '삼성전자 2분기 실적 전망 상향',
+                    summary: '반도체 업황 회복으로 영업이익 개선 기대',
+                    prompt: '삼성전자 2분기 실적 전망이 상향됐어요. 지금 어떻게 봐야 할까요?',
+                  },
+                  {
+                    title: '부동산 PF 리스크 완화...건설주 강세',
+                    summary: '정부 지원책 발표로 건설사 유동성 우려 완화',
+                    prompt: '부동산 PF 리스크 완화 소식이에요. 건설주 지금 들어가도 될까요?',
+                  },
+                ].map((news, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setInput(news.prompt);
+                      setShowQuickQ(false);
+                      setTimeout(() => {
+                        handleSendWithPosition(news.prompt, null);
+                        setInput('');
+                      }, 50);
+                    }}
+                    disabled={isLoading}
+                    style={{
+                      background: '#fff',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: 12,
+                      padding: '12px 14px',
+                      textAlign: 'left',
+                      cursor: isLoading ? 'not-allowed' : 'pointer',
+                      opacity: isLoading ? 0.5 : 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                      <span style={{ fontSize: 14, lineHeight: 1.3 }}>📰</span>
+                      <span style={{ fontSize: 13.5, fontWeight: 800, color: '#111827', lineHeight: 1.4 }}>
+                        {news.title}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5, paddingLeft: 22 }}>
+                      {news.summary}
+                    </span>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: '#1d4ed8', alignSelf: 'flex-end', marginTop: 2 }}>
+                      4명에게 물어보기 →
+                    </span>
+                  </button>
+                ))}
               </div>
             )}
           </div>
