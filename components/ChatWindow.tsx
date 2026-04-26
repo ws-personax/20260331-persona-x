@@ -1813,22 +1813,59 @@ export default function ChatWindow() {
   const [ttsSupported, setTtsSupported] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [autoRead, setAutoRead] = useState(false);
+  // ✅ STT 발화 종료 후 2초 카운트다운 → 자동 전송. null 이면 비활성, 2/1 은 남은 초.
+  const [autoSendCountdown, setAutoSendCountdown] = useState<number | null>(null);
   const recognitionRef = useRef<{ start: () => void; stop: () => void; abort: () => void } | null>(null);
   const lastAutoReadIdRef = useRef<string | null>(null);
+  const autoSendStepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // handleSend는 input 의존성 때문에 useCallback identity 가 자주 바뀜 →
+  // ref 로 항상 최신 handleSend 를 가리키게 해서 setTimeout 안에서 호출.
+  const handleSendRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     setSttSupported(isSTTSupported());
     setTtsSupported(isTTSSupported());
   }, []);
 
-  // 언마운트 시 발화/녹음 정리
+  // 언마운트 시 발화/녹음/자동전송 타이머 정리
   useEffect(() => () => {
     stopSpeaking();
     try { recognitionRef.current?.abort(); } catch {}
+    if (autoSendStepTimerRef.current) clearTimeout(autoSendStepTimerRef.current);
+  }, []);
+
+  const cancelAutoSend = useCallback(() => {
+    if (autoSendStepTimerRef.current) {
+      clearTimeout(autoSendStepTimerRef.current);
+      autoSendStepTimerRef.current = null;
+    }
+    setAutoSendCountdown(null);
+  }, []);
+
+  const startAutoSendCountdown = useCallback(() => {
+    if (autoSendStepTimerRef.current) {
+      clearTimeout(autoSendStepTimerRef.current);
+      autoSendStepTimerRef.current = null;
+    }
+    setAutoSendCountdown(2);
+    autoSendStepTimerRef.current = setTimeout(() => {
+      setAutoSendCountdown(1);
+      autoSendStepTimerRef.current = setTimeout(() => {
+        autoSendStepTimerRef.current = null;
+        setAutoSendCountdown(null);
+        // 최신 handleSend 호출 — 입력창에 STT 결과가 반영된 상태로 전송
+        handleSendRef.current();
+      }, 1000);
+    }, 1000);
   }, []);
 
   const toggleRecording = useCallback(() => {
     if (!sttSupported) return;
+    // 자동 전송 카운트다운 중에 마이크 누르면 즉시 취소 (재녹음 시작 X)
+    if (autoSendCountdown !== null) {
+      cancelAutoSend();
+      return;
+    }
     if (isRecording) {
       try { recognitionRef.current?.stop(); } catch {}
       setIsRecording(false);
@@ -1850,6 +1887,8 @@ export default function ChatWindow() {
       const transcript = e?.results?.[0]?.[0]?.transcript || '';
       if (transcript) {
         setInput(prev => (prev ? prev.trimEnd() + ' ' + transcript : transcript));
+        // 발화 인식 직후 2초 카운트다운 시작 → 자동 전송
+        startAutoSendCountdown();
       }
     };
     rec.onend = () => setIsRecording(false);
@@ -1861,7 +1900,7 @@ export default function ChatWindow() {
     } catch {
       setIsRecording(false);
     }
-  }, [sttSupported, isRecording]);
+  }, [sttSupported, isRecording, autoSendCountdown, cancelAutoSend, startAutoSendCountdown]);
 
   // 자동 읽기 — 새 assistant 메시지 도착 시 페르소나별 목소리로 순서대로 발화.
   // 재테크: RAY → JACK → LUCIA → ECHO. 차 한잔: 등장 페르소나 순서대로.
@@ -2246,6 +2285,9 @@ export default function ChatWindow() {
 
     handleSendWithPosition(content, null);
   }, [input, isLoading, handleSendWithPosition, onboardingTab]);
+
+  // 자동 전송 타이머가 항상 최신 handleSend 를 호출하도록 ref 동기화
+  useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
 
   if (!mounted) return null;
 
@@ -2952,11 +2994,37 @@ export default function ChatWindow() {
             </button>
           </div>
         )}
+        {/* ✅ 음성 입력 후 자동 전송 카운트다운 — 입력창 바로 위 노란 배너 */}
+        {autoSendCountdown !== null && (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              background: '#fef3c7',
+              border: '1px solid #fbbf24',
+              borderRadius: 10,
+              padding: '8px 12px',
+              marginBottom: 6,
+              fontSize: 12.5,
+              fontWeight: 700,
+              color: '#92400e',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+            }}
+          >
+            <span>⏱ {autoSendCountdown}초 후 자동 전송...</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#b45309' }}>
+              취소하려면 마이크 클릭
+            </span>
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <textarea
             ref={textareaRef}
             value={input}
-            onChange={e => setInput(e.target.value)}
+            onChange={e => { setInput(e.target.value); cancelAutoSend(); }}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
             placeholder={onboardingTab === 'tea' ? '마음을 꺼내보세요' : '삼성전자, 테슬라, 비트코인, 부동산...'}
             style={{
@@ -2976,35 +3044,42 @@ export default function ChatWindow() {
             }}
             rows={1}
           />
-          {/* ✅ 음성 입력 (STT) — Web Speech API 미지원 시 숨김. 녹음 중 빨간색. */}
-          {sttSupported && (
-            <button
-              type="button"
-              onClick={toggleRecording}
-              disabled={isLoading}
-              title={isRecording ? '녹음 중지' : '음성 입력'}
-              style={{
-                background: isRecording ? '#fee2e2' : '#f3f4f6',
-                border: `1px solid ${isRecording ? '#dc2626' : '#d1d5db'}`,
-                borderRadius: 12,
-                width: 56,
-                minHeight: 56,
-                height: 56,
-                flexShrink: 0,
-                boxSizing: 'border-box',
-                fontSize: 22,
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                opacity: isLoading ? 0.5 : 1,
-                color: isRecording ? '#dc2626' : '#374151',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              aria-label={isRecording ? '녹음 중지' : '음성 입력'}
-            >
-              🎤
-            </button>
-          )}
+          {/* ✅ 음성 입력 (STT) — 녹음 중 빨강, 자동 전송 카운트다운 중 노랑(취소 대기). */}
+          {sttSupported && (() => {
+            const inCountdown = autoSendCountdown !== null;
+            const bg = inCountdown ? '#fef3c7' : isRecording ? '#fee2e2' : '#f3f4f6';
+            const borderColor = inCountdown ? '#f59e0b' : isRecording ? '#dc2626' : '#d1d5db';
+            const fg = inCountdown ? '#92400e' : isRecording ? '#dc2626' : '#374151';
+            const label = inCountdown ? '자동 전송 취소' : isRecording ? '녹음 중지' : '음성 입력';
+            return (
+              <button
+                type="button"
+                onClick={toggleRecording}
+                disabled={isLoading}
+                title={label}
+                style={{
+                  background: bg,
+                  border: `1px solid ${borderColor}`,
+                  borderRadius: 12,
+                  width: 56,
+                  minHeight: 56,
+                  height: 56,
+                  flexShrink: 0,
+                  boxSizing: 'border-box',
+                  fontSize: 22,
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  opacity: isLoading ? 0.5 : 1,
+                  color: fg,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                aria-label={label}
+              >
+                🎤
+              </button>
+            );
+          })()}
           <button
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
