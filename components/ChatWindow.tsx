@@ -1123,10 +1123,21 @@ const INTRO_PERSONA_STYLES: Record<IntroPersonaKey, { bg: string; border: string
   echo:  { bg: '#064e3b', border: '#022c22', title: '#d1fae5', body: '#a7f3d0' },
   ray:   { bg: '#dbeafe', border: '#7dd3fc', title: '#0369a1', body: '#075985' },
 };
+type IntroSlogan = {
+  topIcon: string;
+  topText: string;
+  mainIcon: string;
+  mainText: string;
+  highlightWord: string;
+  highlightColor: string;
+  subIcon: string;
+  subText: string;
+};
 type IntroSlide = {
   id: 'finance' | 'tea';
   question: string;
   layout: '2x2' | 'row3';
+  slogan: IntroSlogan;
   cards: { persona: IntroPersonaKey; name: string; role: string; text: string }[];
 };
 const INTRO_SLIDES: IntroSlide[] = [
@@ -1134,6 +1145,16 @@ const INTRO_SLIDES: IntroSlide[] = [
     id: 'finance',
     question: '삼성전자 지금 사야 할까요?',
     layout: '2x2',
+    slogan: {
+      topIcon: '📊',
+      topText: '범용 AI는 답을 드리지만,',
+      mainIcon: '⚡',
+      mainText: '4명이 충돌하고, 당신이 결정합니다.',
+      highlightWord: '충돌',
+      highlightColor: '#E85D4A',
+      subIcon: '📚',
+      subText: '재테크 고민, 함께 공부해요',
+    },
     cards: [
       { persona: 'ray',   name: 'RAY',   role: '데이터 · 분석', text: '외국인 순매도 3주 연속.\n52주 최저가 대비 +18%.\n지표들을 종합적으로 살펴볼 필요가 있습니다.' },
       { persona: 'jack',  name: 'JACK',  role: '결단 · 전략',  text: '방향이 결정되기 전엔 기다리는 것도 전략.\n분할 접근과 관망,\n두 가지 시각이 있습니다.' },
@@ -1145,6 +1166,16 @@ const INTRO_SLIDES: IntroSlide[] = [
     id: 'tea',
     question: '남편이랑 싸웠어요',
     layout: 'row3',
+    slogan: {
+      topIcon: '☕',
+      topText: '판단은 잠시 내려놓으시고,',
+      mainIcon: '💜',
+      mainText: 'AI 참모진이 마음을 함께 나눕니다.',
+      highlightWord: '함께',
+      highlightColor: '#9B59B6',
+      subIcon: '🤝',
+      subText: '마음 고민, 저희가 함께해요',
+    },
     cards: [
       { persona: 'lucia', name: 'LUCIA', role: '감정 · 공감', text: '아… 많이 속상하셨겠다.\n가까운 사람이랑 다투고 나면\n그 감정이 오래 남잖아요.' },
       { persona: 'jack',  name: 'JACK',  role: '결단 · 전략', text: '지금 할 수 있는 건 두 가지입니다.\n1. 본인이 먼저 사과\n2. 남편 사과 기다리기\n관계를 원한다면 1번입니다.' },
@@ -1152,6 +1183,17 @@ const INTRO_SLIDES: IntroSlide[] = [
     ],
   },
 ];
+
+// 메인 슬로건에서 highlightWord 만 색 강조 (단어 전후로 split)
+const renderSloganHighlight = (text: string, word: string, color: string) => {
+  if (!word || !text.includes(word)) return text;
+  const parts = text.split(word);
+  return parts.flatMap((part, i) =>
+    i < parts.length - 1
+      ? [<span key={`p${i}`}>{part}</span>, <span key={`h${i}`} style={{ color, fontWeight: 900 }}>{word}</span>]
+      : [<span key={`p${i}`}>{part}</span>],
+  );
+};
 
 const IntroSlider = () => {
   const [idx, setIdx] = useState(0);
@@ -1177,8 +1219,40 @@ const IntroSlider = () => {
         }
       `}</style>
 
-      {/* 슬라이드 본체 — key 변경 시 페이드 인 재실행 */}
+      {/* 슬라이드 본체 — key 변경 시 페이드 인 재실행 (슬로건도 함께 전환) */}
       <div key={slide.id} className="px-intro-slide">
+        {/* 슬라이드별 슬로건 — 상단 작은 / 메인(하이라이트) / 서브 */}
+        <div style={{ textAlign: 'center', marginBottom: 10 }}>
+          <p style={{
+            fontSize: 11.5,
+            fontWeight: 500,
+            color: '#9ca3af',
+            letterSpacing: 0.3,
+            margin: '0 0 3px',
+          }}>
+            {slide.slogan.topIcon} {slide.slogan.topText}
+          </p>
+          <p style={{
+            fontSize: 16,
+            fontWeight: 800,
+            color: '#1f2937',
+            lineHeight: 1.35,
+            margin: '0 0 4px',
+          }}>
+            {slide.slogan.mainIcon}{' '}
+            {renderSloganHighlight(slide.slogan.mainText, slide.slogan.highlightWord, slide.slogan.highlightColor)}
+          </p>
+          <p style={{
+            fontSize: 11.5,
+            fontWeight: 500,
+            color: '#6b7280',
+            lineHeight: 1.45,
+            margin: '0 0 10px',
+          }}>
+            {slide.slogan.subIcon} {slide.slogan.subText}
+          </p>
+        </div>
+
         {/* 상단 질문 */}
         <p style={{
           fontSize: 13,
@@ -1345,33 +1419,6 @@ const OnboardingTabs = ({
           padding: '0 8px',
           width: '100%',
         }}>
-          <p style={{
-            fontSize: 11.5,
-            fontWeight: 500,
-            color: '#9ca3af',
-            letterSpacing: 0.3,
-            margin: '0 0 3px',
-          }}>
-            범용 AI는 답을 드리지만,
-          </p>
-          <p style={{
-            fontSize: 16,
-            fontWeight: 800,
-            color: '#1f2937',
-            lineHeight: 1.35,
-            margin: '0 0 4px',
-          }}>
-            4명이 충돌하고, 당신이 결정합니다.
-          </p>
-          <p style={{
-            fontSize: 11.5,
-            fontWeight: 500,
-            color: '#6b7280',
-            lineHeight: 1.45,
-            margin: '0 0 10px',
-          }}>
-            투자 고민도, 마음 고민도 — 주식 몰라도 괜찮아요
-          </p>
           <IntroSlider />
         </div>
         <div
