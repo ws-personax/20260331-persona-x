@@ -882,57 +882,51 @@ const TabButton = ({
 );
 
 // ─── 재테크 탭 본문 ───
-const FinanceTabContent = ({ onExample }: { onExample: (keyword: string) => void }) => (
-  <div style={{ padding: '24px 4px 0' }}>
-    <h2
-      style={{
-        fontSize: 21,
-        fontWeight: 800,
-        lineHeight: 1.4,
-        color: '#111827',
-        textAlign: 'center',
-        margin: '0 0 22px',
-      }}
-    >
-      지금 이 순간의 데이터로
-      <br />
-      4개의 관점이 충돌합니다
-    </h2>
-    <p
-      style={{
-        textAlign: 'center',
-        color: '#92400e',
-        fontSize: 13,
-        fontWeight: 700,
-        margin: '0 0 12px',
-      }}
-    >
-      종목명을 입력하세요
-    </p>
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
-      {['삼성전자', '테슬라', 'SK하이닉스', '비트코인'].map(name => (
-        <button
-          key={name}
-          type="button"
-          onClick={() => onExample(name)}
+const FinanceTabContent = () => {
+  // 온보딩 힌트 — 첫 진입 1회만 (localStorage 'px_finance_hint_v1')
+  const [showHint, setShowHint] = useState(false);
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem('px_finance_hint_v1')) {
+        setShowHint(true);
+        localStorage.setItem('px_finance_hint_v1', '1');
+      }
+    } catch { /* localStorage 비활성 — 그냥 노출하지 않음 */ }
+  }, []);
+
+  return (
+    <div style={{ padding: '24px 4px 0' }}>
+      <h2
+        style={{
+          fontSize: 21,
+          fontWeight: 800,
+          lineHeight: 1.4,
+          color: '#111827',
+          textAlign: 'center',
+          margin: '0 0 12px',
+        }}
+      >
+        지금 이 순간의 데이터로
+        <br />
+        4개의 관점이 충돌합니다
+      </h2>
+      {showHint && (
+        <p
           style={{
-            background: '#ffffff',
-            border: '1px solid #d4a017',
-            borderRadius: 20,
-            padding: '7px 16px',
-            fontSize: 13,
-            color: '#92400e',
-            fontWeight: 700,
-            cursor: 'pointer',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+            textAlign: 'center',
+            color: '#9ca3af',
+            fontSize: 12,
+            fontWeight: 500,
+            lineHeight: 1.5,
+            margin: '0 0 4px',
           }}
         >
-          {name}
-        </button>
-      ))}
+          종목명이나 재테크 고민을 입력하면 4명이 분석해드려요
+        </p>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 // ✅ 차 한잔 페르소나 선택 — 카드 데이터
 const TEA_PERSONAS_INFO: { key: 'lucia' | 'jack' | 'echo'; emoji: string; name: string; desc: string; border: string; bg: string; fg: string }[] = [
@@ -1375,13 +1369,11 @@ const IntroSlider = () => {
 //   activeTab=null → 큰 카드 2개로 안내 (첫 화면)
 //   activeTab!=null → 기존 pill TabButton 2개 + 활성 탭 콘텐츠
 const OnboardingTabs = ({
-  onExample,
   activeTab,
   onTabChange,
   teaPersona,
   luciaGreeting,
 }: {
-  onExample: (keyword: string) => void;
   activeTab: 'finance' | 'tea' | null;
   onTabChange: (tab: 'finance' | 'tea') => void;
   teaPersona: 'lucia' | 'jack' | 'echo';
@@ -1536,7 +1528,7 @@ const OnboardingTabs = ({
         />
       </div>
 
-      {activeTab === 'finance' && <FinanceTabContent onExample={onExample} />}
+      {activeTab === 'finance' && <FinanceTabContent />}
       {activeTab === 'tea' && (
         <TeaTabContent
           teaPersona={teaPersona}
@@ -2012,7 +2004,6 @@ export default function ChatWindow() {
       {!hasUserSent && onboardingTab === null && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center' }}>
           <OnboardingTabs
-            onExample={(name) => handleSendWithPosition(name, null)}
             activeTab={onboardingTab}
             onTabChange={setOnboardingTab}
             teaPersona={teaPersona}
@@ -2027,7 +2018,6 @@ export default function ChatWindow() {
         {!hasUserSent && (
           <div className="px-onboarding-wrap">
             <OnboardingTabs
-              onExample={(name) => handleSendWithPosition(name, null)}
               activeTab={onboardingTab}
               onTabChange={setOnboardingTab}
               teaPersona={teaPersona}
@@ -2580,7 +2570,7 @@ export default function ChatWindow() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
-            placeholder={onboardingTab === 'tea' ? '마음을 꺼내보세요' : '종목명을 입력하세요 (예: 삼성전자, 테슬라)'}
+            placeholder={onboardingTab === 'tea' ? '마음을 꺼내보세요' : '삼성전자, 테슬라, 비트코인, 부동산...'}
             style={{
               flex: 1,
               minWidth: 0,
