@@ -956,159 +956,96 @@ const TEA_PERSONA_HEADLINES: Record<'lucia' | 'jack' | 'echo', { line1: string; 
   echo:  { line1: '핵심만 말씀해주세요.',    line2: '판단해드리겠습니다.',      quote: '핵심을 보면 답이 보입니다.' },
 };
 
+// ✅ 시간대별 LUCIA 선톡 (KST 기준)
+//    22:00 ~ 08:59 사이는 선톡 없음 (조용한 시간 존중)
+const LUCIA_GREETINGS: Record<'morning' | 'lunch' | 'afternoon' | 'evening' | 'night', string[]> = {
+  morning: [
+    '좋은 아침이에요. 오늘 하루도 잘 버텨봐요.',
+    '아침부터 뭔가 묵직한 게 있으면 말해요. 들을게요.',
+    '오늘 하루 어떤 마음으로 시작하고 있어요?',
+    '잘 잤어요? 요즘 잠은 좀 어때요?',
+    '오늘 하루 제일 먼저 해결하고 싶은 게 있어요?',
+    '아침부터 이미 지쳐있으면 말해요. 같이 생각해봐요.',
+    '오늘 하루도 잘 부탁해요. 뭐든 털어놔도 돼요.',
+    '좋은 아침. 오늘 마음 상태는 어때요?',
+    '아침에 일어나자마자 든 생각이 뭐였어요?',
+    '오늘도 바쁜 하루 시작이죠. 잠깐 숨 고르고 가요.',
+  ],
+  lunch: [
+    '밥은 먹었어요? 밥 먹으면서도 머릿속이 복잡하면 말해요.',
+    '점심시간에 잠깐 숨 고르고 있어요. 오전 어땠어요?',
+    '밥 먹고 잠깐 여기 들렀어요? 뭔가 있으면 털어놔요.',
+    '점심 먹었어요? 오늘 오전에 제일 힘들었던 게 뭐예요?',
+    '잠깐 쉬는 시간에 왔군요. 오늘 어때요?',
+    '점심 먹으면서도 생각나는 게 있으면 말해요.',
+    '밥은 챙겨먹고 있어요? 요즘 입맛은 어때요?',
+    '점심시간에 혼자 있고 싶을 때 여기 와요. 뭐든 괜찮아요.',
+    '오전에 뭔가 있었어요? 얼굴이 좀 피곤해 보이는 것 같아서요.',
+    '오늘 오전, 별일 없었어요?',
+  ],
+  afternoon: [
+    '오후가 되면 왠지 더 지치죠. 지금 어때요?',
+    '오늘 하루 반쯤 왔어요. 지금 기분은요?',
+    '오후 3시면 제일 힘든 시간이에요. 뭔가 있으면 말해요.',
+    '오후에 문득 생각나는 게 있으면 털어놔요.',
+    '지금 어디서 이걸 보고 있어요? 잠깐 쉬는 중이에요?',
+    '오늘 하루 어떻게 흘러가고 있어요?',
+    '오후에 갑자기 기운이 빠질 때 여기 와도 돼요.',
+    '지금 제일 머릿속에 맴도는 게 뭐예요?',
+    '오후엔 왠지 감정이 더 예민해지는 것 같아요. 지금 어때요?',
+    '퇴근까지 얼마 남았어요? 오늘 하루 버틸 만해요?',
+  ],
+  evening: [
+    '오늘 하루 수고했어요. 뭔가 털어놓고 싶은 거 있어요?',
+    '저녁 먹었어요? 오늘 어땠어요?',
+    '퇴근하고 나면 그제야 감정이 올라올 때가 있죠. 지금 어때요?',
+    '오늘 제일 힘들었던 순간이 언제였어요?',
+    '저녁엔 하루를 돌아보게 되더라고요. 오늘 어떤 하루였어요?',
+    '퇴근길에 뭔가 계속 생각났으면 말해요.',
+    '오늘 잘 버텼어요. 뭔가 있었으면 털어놔요.',
+    '저녁 시간에 여기 왔군요. 오늘 많이 힘들었어요?',
+    '하루 마무리하면서 뭔가 정리가 안 되면 말해요.',
+    '오늘 하루, 본인한테 수고했다고 말해줬어요?',
+  ],
+  night: [
+    '하루 마무리할 시간이에요. 오늘 어땠어요?',
+    '오늘 하루 잘 버텼어요. 뭔가 털어놓고 싶은 거 있어요?',
+    '저녁 먹고 좀 쉬고 있어요? 오늘 어떤 하루였어요?',
+    '하루 끝자락에 문득 떠오르는 게 있으면 말해요.',
+    '오늘 제일 힘들었던 순간이 언제였어요?',
+    '밤 되면 하루가 정리되는 것 같죠. 오늘 어땠어요?',
+    '오늘 본인한테 수고했다고 말해줬어요?',
+    '하루 돌아보면서 뭔가 걸리는 게 있으면 말해요.',
+    '오늘 하루 중에 제일 기억에 남는 순간이 뭐예요?',
+    '오늘도 잘 버텼어요. 잠들기 전에 잠깐 얘기해요.',
+  ],
+};
+
+function pickLuciaGreeting(): string | null {
+  const nowKST = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const hour = nowKST.getUTCHours();
+  let bucket: keyof typeof LUCIA_GREETINGS | null = null;
+  if (hour >= 9 && hour < 12) bucket = 'morning';
+  else if (hour >= 12 && hour < 14) bucket = 'lunch';
+  else if (hour >= 14 && hour < 18) bucket = 'afternoon';
+  else if (hour >= 18 && hour < 20) bucket = 'evening';
+  else if (hour >= 20 && hour < 22) bucket = 'night';
+  if (!bucket) return null;
+  const list = LUCIA_GREETINGS[bucket];
+  return list[Math.floor(Math.random() * list.length)];
+}
+
 const TeaTabContent = ({
   onCardClick,
   teaPersona,
-  onPersonaChange,
 }: {
   onCardClick: (text: string) => void;
-  teaPersona: 'lucia' | 'jack' | 'echo' | null;
-  onPersonaChange: (p: 'lucia' | 'jack' | 'echo' | null) => void;
+  teaPersona: 'lucia' | 'jack' | 'echo';
 }) => {
-  // ── 페르소나 미선택 — 선택 UI 만 표시 ──
-  if (teaPersona === null) {
-    return (
-      <div style={{ padding: '20px 12px 200px' }}>
-        <h2
-          style={{
-            fontSize: 21,
-            fontWeight: 800,
-            lineHeight: 1.4,
-            color: '#111827',
-            textAlign: 'center',
-            margin: '0 0 20px',
-          }}
-        >
-          오늘 누구와 이야기하시겠어요?
-        </h2>
-        <div style={{
-          maxWidth: 360,
-          margin: '0 auto 20px',
-          background: '#fff8f0',
-          border: '1.5px solid #fb923c',
-          borderRadius: 14,
-          padding: '14px 18px',
-          textAlign: 'center',
-          boxShadow: '0 2px 8px rgba(251, 146, 60, 0.12)',
-        }}>
-          <p style={{
-            color: '#78350f',
-            fontSize: 15,
-            fontWeight: 700,
-            lineHeight: 1.6,
-            margin: 0,
-          }}>
-            오늘 하루, 마음이 무거운가요?<br />
-            여기서 먼저 털어놓으세요.
-          </p>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 440, margin: '0 auto', overflowY: 'visible' }}>
-          {TEA_PERSONAS_INFO.map(p => (
-            <button
-              key={p.key}
-              type="button"
-              onClick={() => {
-                // 🔍 디버그 — 페르소나 카드 클릭 시 실제 전달되는 키 값 확인
-                // eslint-disable-next-line no-console
-                console.log('[debug] persona card clicked — key:', p.key);
-                onPersonaChange(p.key);
-              }}
-              style={{
-                background: p.bg,
-                border: `2px solid ${p.border}`,
-                borderRadius: 14,
-                padding: '10px 14px',
-                cursor: 'pointer',
-                textAlign: 'left',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 14,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-              }}
-            >
-              <span style={{ fontSize: 30, lineHeight: 1 }}>{p.emoji}</span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 16, fontWeight: 800, color: p.fg }}>{p.name}</span>
-                <span style={{ fontSize: 12, color: p.fg, opacity: 0.85 }}>{p.desc}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  const selected = TEA_PERSONAS_INFO.find(p => p.key === teaPersona)!;
   const headline = TEA_PERSONA_HEADLINES[teaPersona];
 
   return (
     <div style={{ padding: '20px 12px 200px' }}>
-      {/* 선택된 페르소나 안내 + 변경 */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          maxWidth: 440,
-          margin: '0 auto 18px',
-          padding: '10px 14px',
-          background: selected.bg,
-          border: `1px solid ${selected.border}`,
-          borderRadius: 12,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 22 }}>{selected.emoji}</span>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: 14, fontWeight: 800, color: selected.fg }}>{selected.name}</span>
-            <span style={{ fontSize: 11, color: selected.fg, opacity: 0.85 }}>{selected.desc}</span>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => onPersonaChange(null)}
-          style={{
-            background: '#fff',
-            border: `1px solid ${selected.border}`,
-            borderRadius: 8,
-            padding: '5px 10px',
-            fontSize: 11,
-            fontWeight: 700,
-            color: selected.fg,
-            cursor: 'pointer',
-          }}
-        >
-          변경
-        </button>
-      </div>
-
-      {/* 페르소나 명언 카드 */}
-      <div
-        style={{
-          margin: '0 auto 22px',
-          maxWidth: 440,
-          padding: '14px 18px',
-          background: '#fffaf0',
-          border: '1px solid #fcd9a8',
-          borderRadius: 12,
-          textAlign: 'center',
-        }}
-      >
-        <p
-          style={{
-            margin: 0,
-            fontSize: 13,
-            lineHeight: 1.7,
-            color: '#7c2d12',
-            fontStyle: 'italic',
-            whiteSpace: 'pre-line',
-          }}
-        >
-          “{headline.quote}”
-        </p>
-      </div>
-
       <h2
         style={{
           fontSize: 21,
@@ -1157,14 +1094,12 @@ const OnboardingTabs = ({
   activeTab,
   onTabChange,
   teaPersona,
-  onTeaPersonaChange,
 }: {
   onExample: (keyword: string) => void;
   onCardClick: (text: string) => void;
   activeTab: 'finance' | 'tea' | null;
   onTabChange: (tab: 'finance' | 'tea') => void;
-  teaPersona: 'lucia' | 'jack' | 'echo' | null;
-  onTeaPersonaChange: (p: 'lucia' | 'jack' | 'echo' | null) => void;
+  teaPersona: 'lucia' | 'jack' | 'echo';
 }) => {
   // ─ 첫 화면 — 큰 카드 2개 (flex-wrap 으로 모바일은 자동 세로 스택) ─
   if (activeTab === null) {
@@ -1368,7 +1303,6 @@ const OnboardingTabs = ({
         <TeaTabContent
           onCardClick={onCardClick}
           teaPersona={teaPersona}
-          onPersonaChange={onTeaPersonaChange}
         />
       )}
     </div>
@@ -1383,14 +1317,25 @@ export default function ChatWindow() {
   // ✅ 온보딩 탭 상태를 부모로 끌어올림 — footer/placeholder와 연동
   //   첫 화면은 null — 탭을 클릭해야 콘텐츠가 표시되도록 (중복 체감 방지)
   const [onboardingTab, setOnboardingTab] = useState<'finance' | 'tea' | null>(null);
-  // ✅ 차 한잔 — 선택된 페르소나. null 이면 선택 화면만 표시
-  const [teaPersona, setTeaPersona] = useState<'lucia' | 'jack' | 'echo' | null>(null);
+  // ✅ 차 한잔 — 진입 시 LUCIA 기본. 하단 소환 버튼으로 JACK/ECHO 전환.
+  const [teaPersona, setTeaPersona] = useState<'lucia' | 'jack' | 'echo'>('lucia');
+  // ✅ LUCIA 선톡 — 차 한잔 탭 진입 시 시간대별 랜덤 1개 (22:00~08:59 비활성)
+  const [luciaGreeting, setLuciaGreeting] = useState<string | null>(null);
 
   // 🔍 디버그 — teaPersona state 변경 추적
   useEffect(() => {
     // eslint-disable-next-line no-console
     console.log('[debug] teaPersona state changed →', teaPersona);
   }, [teaPersona]);
+
+  // ✅ 차 한잔 탭 진입 시 LUCIA 선톡 1개 픽 — 다른 탭에서는 비움
+  useEffect(() => {
+    if (onboardingTab === 'tea') {
+      setLuciaGreeting(pickLuciaGreeting());
+    } else {
+      setLuciaGreeting(null);
+    }
+  }, [onboardingTab]);
 
   // ✅ 시장 상황 + 시간대 기반 동적 추천 질문
   // ✅ 탭 타입 정의
@@ -1813,7 +1758,6 @@ export default function ChatWindow() {
             activeTab={onboardingTab}
             onTabChange={setOnboardingTab}
             teaPersona={teaPersona}
-            onTeaPersonaChange={setTeaPersona}
           />
         </div>
       )}
@@ -1832,18 +1776,17 @@ export default function ChatWindow() {
               activeTab={onboardingTab}
               onTabChange={setOnboardingTab}
               teaPersona={teaPersona}
-              onTeaPersonaChange={setTeaPersona}
             />
           </div>
         )}
-        {/* ✅ 차 한잔 대화 중 — 선택된 페르소나 표시 바. 클릭 시 페르소나 재선택. */}
-        {hasUserSent && onboardingTab === 'tea' && teaPersona && (() => {
+        {/* ✅ 차 한잔 — JACK/ECHO 소환 후에만 상단 인디케이터. 클릭 시 LUCIA 복귀. */}
+        {onboardingTab === 'tea' && teaPersona !== 'lucia' && (() => {
           const p = TEA_PERSONAS_INFO.find(x => x.key === teaPersona)!;
           return (
             <div style={{ display: 'flex', justifyContent: 'center', padding: '0 12px 10px' }}>
               <button
                 type="button"
-                onClick={() => setTeaPersona(null)}
+                onClick={() => setTeaPersona('lucia')}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1857,14 +1800,50 @@ export default function ChatWindow() {
                   color: p.fg,
                   cursor: 'pointer',
                 }}
-                title="페르소나 변경"
+                title="LUCIA로 돌아가기"
               >
                 <span style={{ fontSize: 14 }}>{p.emoji}</span>
-                <span>{p.name}와 대화 중 · 변경</span>
+                <span>{p.name}와 대화 중 · 💜 LUCIA로 돌아가기</span>
               </button>
             </div>
           );
         })()}
+        {/* ✅ LUCIA 선톡 — 차 한잔 진입 시 시간대별 1개 (22:00~08:59 비활성).
+             LUCIA 페르소나일 때만 노출, JACK/ECHO 소환 시 자동 숨김. */}
+        {onboardingTab === 'tea' && teaPersona === 'lucia' && luciaGreeting && (
+          <div style={{ padding: '0 12px 14px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <div style={{
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                background: PERSONAS.lucia.iconBg,
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 13,
+                fontWeight: 800,
+                flexShrink: 0,
+              }}>
+                {PERSONAS.lucia.initial}
+              </div>
+              <div style={{
+                background: PERSONAS.lucia.bubbleBg,
+                border: `1px solid ${PERSONAS.lucia.bubbleBorder}`,
+                borderRadius: '0 14px 14px 14px',
+                padding: '10px 14px',
+                maxWidth: '78%',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: PERSONAS.lucia.iconBg, marginBottom: 4 }}>LUCIA</div>
+                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: PERSONAS.lucia.textColor }}>
+                  {luciaGreeting}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         {messages.map(msg => (
           <div key={msg.id}>
             {msg.role === 'user' ? (
@@ -2251,7 +2230,7 @@ export default function ChatWindow() {
               type="button"
               onClick={() => {
                 setOnboardingTab('tea');
-                setTeaPersona(null);
+                setTeaPersona('lucia');
                 setMessages([]);
                 messagesRef.current = [];
                 setInput('');
@@ -2282,7 +2261,7 @@ export default function ChatWindow() {
               type="button"
               onClick={() => {
                 setOnboardingTab('finance');
-                setTeaPersona(null);
+                setTeaPersona('lucia');
                 setMessages([]);
                 messagesRef.current = [];
                 setInput('');
@@ -2307,8 +2286,73 @@ export default function ChatWindow() {
             </button>
           </div>
         )}
-        {/* ✅ 차 한잔 탭에서 teaPersona 가 null 일 때는 입력창 숨김 — 탭 이동 버튼만 노출 */}
-        {!(onboardingTab === 'tea' && teaPersona === null) && (
+        {/* ✅ 차 한잔 — 입력창 위에 작은 소환 버튼 (보조 역할).
+             현재 페르소나는 비활성, 나머지는 클릭 시 전환. */}
+        {onboardingTab === 'tea' && (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
+            {teaPersona !== 'lucia' && (
+              <button
+                type="button"
+                onClick={() => setTeaPersona('lucia')}
+                style={{
+                  background: '#fdf4ff',
+                  border: '1px solid #e9d5ff',
+                  borderRadius: 999,
+                  padding: '4px 10px',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: '#6b21a8',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  opacity: 0.85,
+                }}
+                title="LUCIA로 돌아가기"
+              >
+                💜 LUCIA
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setTeaPersona('jack')}
+              disabled={teaPersona === 'jack'}
+              style={{
+                background: teaPersona === 'jack' ? '#e5e7eb' : '#f3f4f6',
+                border: '1px solid #d1d5db',
+                borderRadius: 999,
+                padding: '4px 10px',
+                fontSize: 11,
+                fontWeight: 700,
+                color: '#374151',
+                cursor: teaPersona === 'jack' ? 'default' : 'pointer',
+                whiteSpace: 'nowrap',
+                opacity: teaPersona === 'jack' ? 0.5 : 0.85,
+              }}
+              title="JACK 소환 — 결정 중심"
+            >
+              ⚡ JACK 소환
+            </button>
+            <button
+              type="button"
+              onClick={() => setTeaPersona('echo')}
+              disabled={teaPersona === 'echo'}
+              style={{
+                background: teaPersona === 'echo' ? '#fef9c3' : '#fffbeb',
+                border: '1px solid #fde68a',
+                borderRadius: 999,
+                padding: '4px 10px',
+                fontSize: 11,
+                fontWeight: 700,
+                color: '#78350f',
+                cursor: teaPersona === 'echo' ? 'default' : 'pointer',
+                whiteSpace: 'nowrap',
+                opacity: teaPersona === 'echo' ? 0.5 : 0.85,
+              }}
+              title="ECHO 소환 — 판단 구조"
+            >
+              🔍 ECHO 소환
+            </button>
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {/* 사전 질문 토글 버튼 — 재테크 탭일 때만 표시.
               차 한잔 탭(onboardingTab === 'tea')에서는 hasUserSent 여부와 무관하게 항상 숨김. */}
@@ -2386,7 +2430,6 @@ export default function ChatWindow() {
             Send
           </button>
         </div>
-        )}
       </footer>
       )}
     </div>

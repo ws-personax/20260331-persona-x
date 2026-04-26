@@ -12,7 +12,8 @@
       "Bash(export NODE_OPTIONS=--max-old-space-size=8192)",
       "Bash(npx --no-install vercel --version)",
       "Bash(npx --no-install vercel ls --yes)",
-      "PowerShell(Get-Content *)"
+      "PowerShell(Get-Content *)",
+      "Bash(echo \"Exit: $?\")"
     ]
   }
 }
