@@ -261,10 +261,11 @@ const cleanJackText = (text: string): string =>
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/\n{2,}/g, '\n');
 
-// ─── Web Speech API 유틸 (STT 입력 / TTS 출력) ───
+// ─── 음성 유틸 (STT 입력: Web Speech API / TTS 출력: 네이버 CLOVA Voice via /api/tts) ───
 // SSR 안전: window 접근은 호출 시점에만. 미지원 브라우저에서는 false 반환하여 UI에서 숨김.
+// TTS 는 서버 라우트로 위임하므로 HTMLAudioElement 만 있으면 동작.
 const isTTSSupported = (): boolean =>
-  typeof window !== 'undefined' && 'speechSynthesis' in window;
+  typeof window !== 'undefined' && typeof Audio !== 'undefined';
 
 const isSTTSupported = (): boolean => {
   if (typeof window !== 'undefined') {
@@ -283,19 +284,16 @@ const sanitizeForTTS = (text: string): string =>
     .replace(/\s+/g, ' ')
     .trim();
 
-// ─── 페르소나별 음성 프로필 ───
-// 모두 ko-KR. RAY 표준, JACK 묵직(낮고 빠르게), LUCIA 따뜻(천천히), ECHO 분석가(천천히 낮게).
-type VoiceProfile = { rate: number; pitch: number };
-const PERSONA_VOICE: Record<'ray' | 'jack' | 'lucia' | 'echo', VoiceProfile> = {
-  ray:   { rate: 1.0,  pitch: 1.0 },
-  jack:  { rate: 1.0,  pitch: 0.8 },
-  lucia: { rate: 0.85, pitch: 1.0 },
-  echo:  { rate: 0.8,  pitch: 0.7 },
-};
+type PersonaVoice = 'ray' | 'jack' | 'lucia' | 'echo';
 
 // ─── 발화 시퀀스 — 순서대로 한 명씩 읽기. 중간에 stopSpeaking 호출 시 즉시 중단. ───
 // currentSeqId 를 증가시켜 진행 중인 시퀀스를 무효화 → 콜백 체인 차단.
 let currentSeqId = 0;
+// 활성 요청 ID — fetch 응답이 stopSpeaking 이후 도착했을 때 재생을 막기 위함.
+let activeRequestId = 0;
+// 현재 재생 중 Audio — stopSpeaking 시 pause + src 해제.
+let currentAudio: HTMLAudioElement | null = null;
+let currentAudioUrl: string | null = null;
 
 // ─── 발화 중 여부 전역 구독 ───
 // 모듈 전역 set 으로 리스너를 관리해 ChatWindow / SpeakerButton 양쪽이 동기 상태를 본다.
@@ -316,47 +314,80 @@ const useIsSpeaking = (): boolean => {
 
 const stopSpeaking = (): void => {
   currentSeqId++;
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  try { window.speechSynthesis.cancel(); } catch {}
+  activeRequestId++;
+  if (currentAudio) {
+    try {
+      currentAudio.onended = null;
+      currentAudio.onerror = null;
+      currentAudio.pause();
+      currentAudio.src = '';
+    } catch {}
+    currentAudio = null;
+  }
+  if (currentAudioUrl) {
+    try { URL.revokeObjectURL(currentAudioUrl); } catch {}
+    currentAudioUrl = null;
+  }
   notifySpeaking(false);
 };
 
+// CLOVA TTS 호출 + 오디오 재생. 비동기지만 호출 즉시 true 반환(시작 가능 여부).
+// onEnd 는 자연 종료/에러/중단 어떤 경로로든 1회만 호출.
 const speakOne = (
   text: string,
-  profile: VoiceProfile,
+  personaKey: PersonaVoice,
   onEnd?: () => void,
 ): boolean => {
   if (!isTTSSupported()) return false;
   const clean = sanitizeForTTS(text);
   if (!clean) { onEnd?.(); return false; }
-  try {
-    const u = new SpeechSynthesisUtterance(clean);
-    u.lang = 'ko-KR';
-    u.rate = profile.rate;
-    u.pitch = profile.pitch;
-    if (onEnd) {
-      u.onend = onEnd;
-      u.onerror = onEnd;
-    }
-    window.speechSynthesis.speak(u);
-    return true;
-  } catch {
-    onEnd?.();
-    return false;
-  }
+
+  const reqId = ++activeRequestId;
+  let ended = false;
+  const finish = () => { if (!ended) { ended = true; onEnd?.(); } };
+
+  fetch('/api/tts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: clean, persona: personaKey }),
+  })
+    .then(res => {
+      if (!res.ok) throw new Error('tts ' + res.status);
+      return res.blob();
+    })
+    .then(blob => {
+      // 응답 도착 전에 stopSpeaking 호출됨 → 재생하지 않음.
+      if (reqId !== activeRequestId) { finish(); return; }
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      currentAudio = audio;
+      currentAudioUrl = url;
+      const cleanup = () => {
+        if (currentAudio === audio) currentAudio = null;
+        if (currentAudioUrl === url) {
+          try { URL.revokeObjectURL(url); } catch {}
+          currentAudioUrl = null;
+        }
+      };
+      audio.onended = () => { cleanup(); finish(); };
+      audio.onerror = () => { cleanup(); finish(); };
+      audio.play().catch(() => { cleanup(); finish(); });
+    })
+    .catch(() => { finish(); });
+
+  return true;
 };
 
 // 단일 텍스트 발화 — SpeakerButton 수동 재생 경로용. 페르소나 선택 가능.
 const speakText = (
   text: string,
-  personaKey?: 'ray' | 'jack' | 'lucia' | 'echo',
+  personaKey?: PersonaVoice,
   onEnd?: () => void,
 ): boolean => {
   if (!isTTSSupported()) return false;
   stopSpeaking();
-  const profile = personaKey ? PERSONA_VOICE[personaKey] : { rate: 0.9, pitch: 1.0 };
   notifySpeaking(true);
-  return speakOne(text, profile, () => {
+  return speakOne(text, personaKey || 'ray', () => {
     notifySpeaking(false);
     onEnd?.();
   });
@@ -365,7 +396,7 @@ const speakText = (
 // 시퀀스 발화 — RAY → JACK → LUCIA → ECHO 등 순서대로 읽기.
 // 각 페르소나 끝나면 자동으로 다음 페르소나로 진행. 중도 중지 시 currentSeqId 변동으로 차단.
 const speakSequence = (
-  items: { text: string; personaKey: 'ray' | 'jack' | 'lucia' | 'echo' }[],
+  items: { text: string; personaKey: PersonaVoice }[],
 ): void => {
   if (!isTTSSupported() || items.length === 0) return;
   stopSpeaking();
@@ -379,7 +410,7 @@ const speakSequence = (
       return;
     }
     const item = items[i++];
-    speakOne(item.text, PERSONA_VOICE[item.personaKey], next);
+    speakOne(item.text, item.personaKey, next);
   };
   next();
 };
