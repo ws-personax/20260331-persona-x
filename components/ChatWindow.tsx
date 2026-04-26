@@ -275,14 +275,25 @@ const isSTTSupported = (): boolean => {
   return false;
 };
 
+type PersonaVoice = 'ray' | 'jack' | 'lucia' | 'echo';
+
 // TTS 발화 정리용 — "📰 뉴스보기 →" 같은 마크업/이모지 잡음 최소 제거.
 //   · 괄호 안 보조 정보 — 예: "거래량 2,066만주 (3일 평균 ..., 보통)" → "거래량 2,066만주" — 통째로 제거.
-//   · "자세히 보기" 표시가 있으면 해당 텍스트 제거 후 끝에 안내 멘트 추가.
-const sanitizeForTTS = (text: string): string => {
+//   · "자세히 보기" 표시가 RAY/JACK/LUCIA 텍스트에 있으면: 그 위치부터 끝까지 잘라내고
+//     "자세한 내용은 화면을 확인하세요" 안내 멘트로 교체.
+//     ECHO 는 본문에 details 가 통합돼 있으므로 잘라내지 않고 그대로 읽는다.
+const sanitizeForTTS = (text: string, personaKey?: PersonaVoice): string => {
   const raw = text || '';
-  const hasDetailLink = /자세히\s*보기/.test(raw);
-  let t = raw
-    .replace(/자세히\s*보기/g, '')
+  let body = raw;
+  let hasDetailLink = false;
+  if (personaKey !== 'echo') {
+    const m = /자세히\s*보기/.exec(body);
+    if (m) {
+      hasDetailLink = true;
+      body = body.slice(0, m.index);
+    }
+  }
+  let t = body
     .replace(/\([^)]*\)/g, '')
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/[📰📊📡🎯💡🔍⚔️↳→▲▼💜☕💪]/g, '')
@@ -294,8 +305,6 @@ const sanitizeForTTS = (text: string): string => {
   }
   return t;
 };
-
-type PersonaVoice = 'ray' | 'jack' | 'lucia' | 'echo';
 
 // ─── 동적 발화 큐 — 도착 순서대로 푸시하면 알아서 순차 재생. ───
 // stopSpeaking 호출 시 sequenceStopId 가 증가하여 진행 중 루프 + 콜백 체인을 차단.
@@ -355,7 +364,7 @@ const speakOne = (
   onEnd?: () => void,
 ): boolean => {
   if (!isTTSSupported()) return false;
-  const clean = sanitizeForTTS(text);
+  const clean = sanitizeForTTS(text, personaKey);
   if (!clean) { onEnd?.(); return false; }
 
   const reqId = ++activeRequestId;
@@ -1896,6 +1905,9 @@ export default function ChatWindow() {
   const [ttsSupported, setTtsSupported] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [autoRead, setAutoRead] = useState(false);
+  // ✅ 음성 입력 시작 시 자동읽기를 자동 ON 으로 바꿨음을 알리는 토스트. 3초 후 자동 사라짐.
+  const [voiceToast, setVoiceToast] = useState(false);
+  const voiceToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // ✅ STT 발화 종료 후 2초 카운트다운 → 자동 전송. null 이면 비활성, 2/1 은 남은 초.
   const [autoSendCountdown, setAutoSendCountdown] = useState<number | null>(null);
   const recognitionRef = useRef<{ start: () => void; stop: () => void; abort: () => void } | null>(null);
@@ -1911,11 +1923,12 @@ export default function ChatWindow() {
     setTtsSupported(isTTSSupported());
   }, []);
 
-  // 언마운트 시 발화/녹음/자동전송 타이머 정리
+  // 언마운트 시 발화/녹음/자동전송/토스트 타이머 정리
   useEffect(() => () => {
     stopSpeaking();
     try { recognitionRef.current?.abort(); } catch {}
     if (autoSendStepTimerRef.current) clearTimeout(autoSendStepTimerRef.current);
+    if (voiceToastTimerRef.current) clearTimeout(voiceToastTimerRef.current);
   }, []);
 
   const cancelAutoSend = useCallback(() => {
@@ -1957,6 +1970,14 @@ export default function ChatWindow() {
     }
     // 녹음 시작 전 자동 읽기 중단 (마이크에 TTS 음성이 섞이지 않도록)
     stopSpeaking();
+    // ✅ 음성 입력을 시작했다는 건 사용자가 음성 UX 를 사용하겠다는 신호 →
+    //   자동읽기가 OFF 였다면 자동으로 ON 으로 켜고 토스트 안내(3초).
+    if (!autoRead) {
+      setAutoRead(true);
+      setVoiceToast(true);
+      if (voiceToastTimerRef.current) clearTimeout(voiceToastTimerRef.current);
+      voiceToastTimerRef.current = setTimeout(() => setVoiceToast(false), 3000);
+    }
     const w = window as unknown as { SpeechRecognition?: new () => unknown; webkitSpeechRecognition?: new () => unknown };
     const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!SR) return;
@@ -1984,7 +2005,7 @@ export default function ChatWindow() {
     } catch {
       setIsRecording(false);
     }
-  }, [sttSupported, isRecording, autoSendCountdown, cancelAutoSend, startAutoSendCountdown]);
+  }, [sttSupported, isRecording, autoSendCountdown, autoRead, cancelAutoSend, startAutoSendCountdown]);
 
   // 자동 읽기 — 새 assistant 메시지 도착 시 페르소나별 목소리로 순서대로 발화.
   // 재테크: RAY → JACK → LUCIA → ECHO. 차 한잔: LUCIA → JACK → ECHO.
@@ -2503,6 +2524,32 @@ export default function ChatWindow() {
           }}
         >
           <span>🔊 읽는 중... (탭하면 중지)</span>
+        </div>
+      )}
+
+      {/* ✅ 음성 입력 시작 시 자동읽기 자동 ON 안내 토스트 — 3초 후 자동 사라짐. */}
+      {voiceToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            top: 60,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 70,
+            padding: '8px 16px',
+            background: '#1e3a8a',
+            color: '#ffffff',
+            borderRadius: 999,
+            fontSize: 12.5,
+            fontWeight: 700,
+            boxShadow: '0 4px 12px rgba(30,58,138,0.35)',
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          🔊 음성 입력 감지 — 자동읽기가 켜졌어요
         </div>
       )}
 
