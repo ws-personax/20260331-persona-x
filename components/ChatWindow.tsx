@@ -882,7 +882,13 @@ const TabButton = ({
 );
 
 // ─── 재테크 탭 본문 ───
-const FinanceTabContent = () => {
+const FINANCE_SUGGESTED_QUESTIONS: { emoji: string; text: string }[] = [
+  { emoji: '💰', text: '교육비 때문에 노후 준비가 밀려요' },
+  { emoji: '📉', text: '손절해야 할지 버텨야 할지 모르겠어요' },
+  { emoji: '🏠', text: '지금 부동산 사도 될까요?' },
+];
+
+const FinanceTabContent = ({ onPickQuestion }: { onPickQuestion: (text: string) => void }) => {
   // 온보딩 힌트 — 첫 진입 1회만 (localStorage 'px_finance_hint_v1')
   const [showHint, setShowHint] = useState(false);
   useEffect(() => {
@@ -918,12 +924,62 @@ const FinanceTabContent = () => {
             fontSize: 12,
             fontWeight: 500,
             lineHeight: 1.5,
-            margin: '0 0 4px',
+            margin: '0 0 14px',
           }}
         >
           종목명이나 재테크 고민을 입력하면 4명이 분석해드려요
         </p>
       )}
+
+      {/* 추천 질문 카드 3개 — 클릭 시 입력창에 자동 입력 */}
+      <style>{`
+        .px-fin-suggest {
+          transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+        }
+        .px-fin-suggest:hover {
+          background: #ffffff !important;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        .px-fin-suggest:active {
+          transform: scale(0.99);
+        }
+      `}</style>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        maxWidth: 460,
+        margin: '0 auto',
+        padding: '0 8px',
+      }}>
+        {FINANCE_SUGGESTED_QUESTIONS.map(q => (
+          <button
+            key={q.text}
+            type="button"
+            className="px-fin-suggest"
+            onClick={() => onPickQuestion(q.text)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              width: '100%',
+              padding: '12px 14px',
+              background: 'rgba(255,255,255,0.85)',
+              border: '1px solid #e5e7eb',
+              borderRadius: 12,
+              cursor: 'pointer',
+              textAlign: 'left',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+              boxSizing: 'border-box',
+            }}
+          >
+            <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{q.emoji}</span>
+            <span style={{ fontSize: 13.5, fontWeight: 600, color: '#1f2937', lineHeight: 1.4 }}>
+              {q.text}
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 };
@@ -1373,11 +1429,13 @@ const OnboardingTabs = ({
   onTabChange,
   teaPersona,
   luciaGreeting,
+  onPickQuestion,
 }: {
   activeTab: 'finance' | 'tea' | null;
   onTabChange: (tab: 'finance' | 'tea') => void;
   teaPersona: 'lucia' | 'jack' | 'echo';
   luciaGreeting: string | null;
+  onPickQuestion: (text: string) => void;
 }) => {
   // ─ 첫 화면 — 큰 카드 2개 (flex-wrap 으로 모바일은 자동 세로 스택) ─
   if (activeTab === null) {
@@ -1528,7 +1586,7 @@ const OnboardingTabs = ({
         />
       </div>
 
-      {activeTab === 'finance' && <FinanceTabContent />}
+      {activeTab === 'finance' && <FinanceTabContent onPickQuestion={onPickQuestion} />}
       {activeTab === 'tea' && (
         <TeaTabContent
           teaPersona={teaPersona}
@@ -2008,6 +2066,7 @@ export default function ChatWindow() {
             onTabChange={setOnboardingTab}
             teaPersona={teaPersona}
             luciaGreeting={luciaGreeting}
+            onPickQuestion={setInput}
           />
         </div>
       )}
@@ -2022,6 +2081,7 @@ export default function ChatWindow() {
               onTabChange={setOnboardingTab}
               teaPersona={teaPersona}
               luciaGreeting={luciaGreeting}
+              onPickQuestion={setInput}
             />
           </div>
         )}
