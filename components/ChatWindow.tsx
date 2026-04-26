@@ -2029,12 +2029,13 @@ export default function ChatWindow() {
     type Item = { text: string; personaKey: 'ray' | 'jack' | 'lucia' | 'echo' };
     const newItems: Item[] = [];
 
-    // 순서 + 텍스트 페어를 돌며: 이미 큐잉된 건 skip, 아직 도착 안 한 건 break(순서 보장).
+    // 순서 + 텍스트 페어를 돌며: 이미 큐잉된 건 skip, 아직 도착 안 한 건 skip(다음 렌더에서 픽업).
+    // ⚠️ break 가 아닌 continue — 중간 페르소나가 끝까지 비어 있어도 뒤(ECHO 등) 누락 방지.
     const addInOrder = (order: { key: 'ray' | 'jack' | 'lucia' | 'echo'; text?: string | null }[]) => {
       for (const o of order) {
         if (queued.has(o.key)) continue;
-        if (!o.text) break;
-        newItems.push({ text: o.text, personaKey: o.key });
+        if (!o.text) continue;
+        newItems.push({ text: sanitizeForTTS(o.text, o.key), personaKey: o.key });
         queued.add(o.key);
       }
     };
@@ -2053,7 +2054,7 @@ export default function ChatWindow() {
         { key: 'echo',  text: last.personas.echo  },
       ]);
     } else if (last.content && !queued.has('jack')) {
-      newItems.push({ text: last.content, personaKey: 'jack' });
+      newItems.push({ text: sanitizeForTTS(last.content, 'jack'), personaKey: 'jack' });
       queued.add('jack');
     }
 
