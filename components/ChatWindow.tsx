@@ -261,6 +261,99 @@ const cleanJackText = (text: string): string =>
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/\n{2,}/g, '\n');
 
+// ─── Web Speech API 유틸 (STT 입력 / TTS 출력) ───
+// SSR 안전: window 접근은 호출 시점에만. 미지원 브라우저에서는 false 반환하여 UI에서 숨김.
+const isTTSSupported = (): boolean =>
+  typeof window !== 'undefined' && 'speechSynthesis' in window;
+
+const isSTTSupported = (): boolean => {
+  if (typeof window !== 'undefined') {
+    const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
+    return !!(w.SpeechRecognition || w.webkitSpeechRecognition);
+  }
+  return false;
+};
+
+// TTS 발화 정리용 — "📰 뉴스보기 →" 같은 마크업/이모지 잡음 최소 제거.
+const sanitizeForTTS = (text: string): string =>
+  (text || '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/[📰📊📡🎯💡🔍⚔️↳→▲▼💜☕💪]/g, '')
+    .replace(/\n+/g, '. ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const speakText = (text: string, onEnd?: () => void): boolean => {
+  if (!isTTSSupported()) return false;
+  const clean = sanitizeForTTS(text);
+  if (!clean) return false;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(clean);
+    u.lang = 'ko-KR';
+    u.rate = 0.9;
+    if (onEnd) {
+      u.onend = onEnd;
+      u.onerror = onEnd;
+    }
+    window.speechSynthesis.speak(u);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const stopSpeaking = (): void => {
+  if (!isTTSSupported()) return;
+  try { window.speechSynthesis.cancel(); } catch {}
+};
+
+// ─── 답변 말풍선 우상단 🔊 버튼 — 클릭 시 해당 답변 재생/중지 ───
+const SpeakerButton = memo(function SpeakerButton({ text }: { text: string }) {
+  const [supported, setSupported] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+
+  useEffect(() => {
+    setSupported(isTTSSupported());
+  }, []);
+
+  // 컴포넌트 언마운트 시 자기 발화 중이면 정리
+  useEffect(() => () => { if (speaking) stopSpeaking(); }, [speaking]);
+
+  if (!supported || !text?.trim()) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (speaking) {
+          stopSpeaking();
+          setSpeaking(false);
+          return;
+        }
+        const ok = speakText(text, () => setSpeaking(false));
+        if (ok) setSpeaking(true);
+      }}
+      title={speaking ? '읽기 중지' : '소리로 듣기'}
+      style={{
+        marginLeft: 'auto',
+        background: speaking ? '#fee2e2' : 'transparent',
+        border: speaking ? '1px solid #fca5a5' : '1px solid transparent',
+        borderRadius: 6,
+        padding: '2px 6px',
+        fontSize: 13,
+        lineHeight: 1,
+        cursor: 'pointer',
+        color: speaking ? '#b91c1c' : '#6b7280',
+      }}
+      aria-label={speaking ? '읽기 중지' : '소리로 듣기'}
+    >
+      {speaking ? '⏹' : '🔊'}
+    </button>
+  );
+});
+
 const PersonaBubble = memo(function PersonaBubble({
   personaKey,
   text,
@@ -334,6 +427,7 @@ const PersonaBubble = memo(function PersonaBubble({
             >
               {p.label}
             </span>
+            <SpeakerButton text={`${p.name}. ${content}${rebuttal ? '. ' + rebuttal : ''}`} />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
@@ -541,6 +635,7 @@ const EchoBubble = memo(function EchoBubble({
             >
               {p.label}
             </span>
+            <SpeakerButton text={`${p.name}. ${summaryText}${detailsText ? '. ' + detailsText : ''}`} />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
@@ -1655,6 +1750,82 @@ export default function ChatWindow() {
   // ✅ 탭 타입 정의
   const [activeTab, setActiveTab] = useState<'추천'|'고급'|'뉴스'>('추천');
 
+  // ─── 음성 입력 (STT) / 음성 출력 자동 읽기 (TTS) ───
+  // 미지원 브라우저(Firefox 등)에서는 마이크/토글 버튼 자체를 숨김.
+  const [sttSupported, setSttSupported] = useState(false);
+  const [ttsSupported, setTtsSupported] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [autoRead, setAutoRead] = useState(false);
+  const recognitionRef = useRef<{ start: () => void; stop: () => void; abort: () => void } | null>(null);
+  const lastAutoReadIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    setSttSupported(isSTTSupported());
+    setTtsSupported(isTTSSupported());
+  }, []);
+
+  // 언마운트 시 발화/녹음 정리
+  useEffect(() => () => {
+    stopSpeaking();
+    try { recognitionRef.current?.abort(); } catch {}
+  }, []);
+
+  const toggleRecording = useCallback(() => {
+    if (!sttSupported) return;
+    if (isRecording) {
+      try { recognitionRef.current?.stop(); } catch {}
+      setIsRecording(false);
+      return;
+    }
+    const w = window as unknown as { SpeechRecognition?: new () => unknown; webkitSpeechRecognition?: new () => unknown };
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!SR) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rec: any = new SR();
+    rec.lang = 'ko-KR';
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onresult = (e: any) => {
+      const transcript = e?.results?.[0]?.[0]?.transcript || '';
+      if (transcript) {
+        setInput(prev => (prev ? prev.trimEnd() + ' ' + transcript : transcript));
+      }
+    };
+    rec.onend = () => setIsRecording(false);
+    rec.onerror = () => setIsRecording(false);
+    recognitionRef.current = rec;
+    try {
+      rec.start();
+      setIsRecording(true);
+    } catch {
+      setIsRecording(false);
+    }
+  }, [sttSupported, isRecording]);
+
+  // 자동 읽기 — 새 assistant 메시지 도착 시 1회 발화. autoRead OFF 면 동작 안 함.
+  // 재테크: ray + jack + lucia + echo 순서로 이어 읽기. 차 한잔: 활성 페르소나 텍스트.
+  useEffect(() => {
+    if (!autoRead || !ttsSupported) return;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== 'assistant') return;
+    if (last.errorType) return;
+    if (lastAutoReadIdRef.current === last.id) return;
+    lastAutoReadIdRef.current = last.id;
+
+    let textToRead = '';
+    if (last.teaMode) {
+      textToRead = [last.teaLucia, last.teaJack, last.teaEcho].filter(Boolean).join('. ');
+    } else if (last.personas) {
+      const { ray, jack, lucia, echo } = last.personas;
+      textToRead = [ray, jack, lucia, echo].filter(Boolean).join('. ');
+    } else {
+      textToRead = last.content || '';
+    }
+    if (textToRead.trim()) speakText(textToRead);
+  }, [messages, autoRead, ttsSupported]);
+
   const QUICK_QUESTIONS = useMemo(() => {
     const nowKST = new Date(Date.now() + 9 * 60 * 60 * 1000);
     const hour = nowKST.getUTCHours();
@@ -2685,6 +2856,34 @@ export default function ChatWindow() {
             </button>
           </div>
         )}
+        {/* ✅ 음성 자동 읽기 토글 — 입력창 위. 기본 OFF. ko-KR TTS 미지원 시 숨김. */}
+        {ttsSupported && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+            <button
+              type="button"
+              onClick={() => {
+                setAutoRead(v => {
+                  if (v) stopSpeaking();
+                  return !v;
+                });
+              }}
+              title={autoRead ? '자동 읽기 끄기' : '자동 읽기 켜기'}
+              style={{
+                background: autoRead ? '#dcfce7' : '#f3f4f6',
+                border: `1px solid ${autoRead ? '#86efac' : '#d1d5db'}`,
+                borderRadius: 999,
+                padding: '4px 10px',
+                fontSize: 11,
+                fontWeight: 700,
+                color: autoRead ? '#166534' : '#6b7280',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              🔊 자동 읽기 {autoRead ? 'ON' : 'OFF'}
+            </button>
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <textarea
             ref={textareaRef}
@@ -2709,6 +2908,35 @@ export default function ChatWindow() {
             }}
             rows={1}
           />
+          {/* ✅ 음성 입력 (STT) — Web Speech API 미지원 시 숨김. 녹음 중 빨간색. */}
+          {sttSupported && (
+            <button
+              type="button"
+              onClick={toggleRecording}
+              disabled={isLoading}
+              title={isRecording ? '녹음 중지' : '음성 입력'}
+              style={{
+                background: isRecording ? '#fee2e2' : '#f3f4f6',
+                border: `1px solid ${isRecording ? '#dc2626' : '#d1d5db'}`,
+                borderRadius: 12,
+                width: 56,
+                minHeight: 56,
+                height: 56,
+                flexShrink: 0,
+                boxSizing: 'border-box',
+                fontSize: 22,
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                opacity: isLoading ? 0.5 : 1,
+                color: isRecording ? '#dc2626' : '#374151',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              aria-label={isRecording ? '녹음 중지' : '음성 입력'}
+            >
+              🎤
+            </button>
+          )}
           <button
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
