@@ -8,7 +8,7 @@ type Persona = 'ray' | 'jack' | 'lucia' | 'echo';
 
 // 페르소나별 CLOVA 화자/속도 매핑.
 const VOICE_MAP: Record<Persona, { speaker: string; speed: number }> = {
-  lucia: { speaker: 'njiyun',    speed: -3 },
+  lucia: { speaker: 'njiyun',    speed: -5 },
   jack:  { speaker: 'nminsang',  speed:  0 },
   echo:  { speaker: 'nmetallic', speed: -3 },
   ray:   { speaker: 'nkyunglee', speed:  0 },
