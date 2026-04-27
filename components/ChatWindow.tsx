@@ -2068,6 +2068,8 @@ export default function ChatWindow() {
       ]);
     } else if (last.personas) {
       console.log('personas:', JSON.stringify(last.personas));
+      console.log('echo text:', last.personas?.echo);
+      console.log('echo length:', last.personas?.echo?.length);
       addInOrder([
         { key: 'ray',   text: last.personas.ray   },
         { key: 'jack',  text: last.personas.jack  },
