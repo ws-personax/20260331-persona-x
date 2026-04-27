@@ -417,6 +417,7 @@ const speakText = (
   onEnd?: () => void,
 ): boolean => {
   if (!isTTSSupported()) return false;
+  console.log('speakText 호출:', personaKey, text.slice(0, 30));
   stopSpeaking();
   notifySpeaking(true);
   return speakOne(text, personaKey || 'ray', () => {
