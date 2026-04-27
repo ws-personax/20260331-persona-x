@@ -371,7 +371,7 @@ const speakOne = (
   onEnd?: () => void,
 ): boolean => {
   if (!isTTSSupported()) return false;
-  const clean = sanitizeForTTS(text, personaKey);
+  const clean = text.trim();
   if (!clean) { onEnd?.(); return false; }
 
   const reqId = ++activeRequestId;
