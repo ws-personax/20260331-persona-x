@@ -792,7 +792,7 @@ const EchoBubble = memo(function EchoBubble({
             >
               {p.label}
             </span>
-            <SpeakerButton text={`${p.name}. ${summaryText}${detailsText ? '. ' + detailsText : ''}`} personaKey="echo" />
+            <SpeakerButton text={summary || ''} personaKey="echo" />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
