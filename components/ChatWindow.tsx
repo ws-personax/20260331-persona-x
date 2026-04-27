@@ -2035,23 +2035,29 @@ export default function ChatWindow() {
     type Item = { text: string; personaKey: 'ray' | 'jack' | 'lucia' | 'echo' };
     const newItems: Item[] = [];
 
-    let order: { key: 'ray' | 'jack' | 'lucia' | 'echo'; text?: string | null }[] = [];
     if (last.teaMode) {
-      order = [
+      // 차 한잔: 자세히 보기 멘트 없음 — 본문만 그대로 재생.
+      const order: { key: 'lucia' | 'jack' | 'echo'; text?: string | null }[] = [
         { key: 'lucia', text: last.teaLucia },
         { key: 'jack',  text: last.teaJack  },
         { key: 'echo',  text: last.teaEcho  },
       ];
+      for (const o of order) {
+        if (queued.has(o.key) || !o.text) continue;
+        newItems.push({
+          text: sanitizeForTTS(o.text, o.key),
+          personaKey: o.key,
+        });
+        queued.add(o.key);
+      }
     } else if (last.personas) {
-      order = [
+      // 재테크: ECHO 외 페르소나에 "자세한 내용은 화면을 확인하세요." 멘트 부착.
+      const order: { key: 'ray' | 'jack' | 'lucia' | 'echo'; text?: string | null }[] = [
         { key: 'ray',   text: last.personas.ray   },
         { key: 'jack',  text: last.personas.jack  },
         { key: 'lucia', text: last.personas.lucia },
         { key: 'echo',  text: last.personas.echo  },
       ];
-    }
-
-    if (order.length > 0) {
       for (const o of order) {
         if (queued.has(o.key) || !o.text) continue;
         const suffix = o.key !== 'echo' ? ' 자세한 내용은 화면을 확인하세요.' : '';
@@ -2075,7 +2081,20 @@ export default function ChatWindow() {
         else notifySpeaking(false);
       });
     }
-  }, [messages, autoRead, ttsSupported]);
+  }, [
+    messages,
+    autoRead,
+    ttsSupported,
+    // 스트리밍 중간 도착도 트리거되도록 마지막 메시지 텍스트 길이 의존성 추가.
+    messages[messages.length - 1]?.content?.length,
+    messages[messages.length - 1]?.teaLucia?.length,
+    messages[messages.length - 1]?.teaJack?.length,
+    messages[messages.length - 1]?.teaEcho?.length,
+    messages[messages.length - 1]?.personas?.ray?.length,
+    messages[messages.length - 1]?.personas?.jack?.length,
+    messages[messages.length - 1]?.personas?.lucia?.length,
+    messages[messages.length - 1]?.personas?.echo?.length,
+  ]);
 
   const QUICK_QUESTIONS = useMemo(() => {
     const nowKST = new Date(Date.now() + 9 * 60 * 60 * 1000);
