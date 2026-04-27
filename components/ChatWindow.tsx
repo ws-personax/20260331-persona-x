@@ -384,6 +384,7 @@ const speakOne = (
     body: JSON.stringify({ text: clean, persona: personaKey }),
   })
     .then(res => {
+      console.log('TTS 응답:', res.status, res.headers.get('content-type'));
       if (!res.ok) throw new Error('tts ' + res.status);
       return res.blob();
     })
@@ -403,7 +404,11 @@ const speakOne = (
       };
       audio.onended = () => { cleanup(); finish(); };
       audio.onerror = () => { cleanup(); finish(); };
-      audio.play().catch(() => { cleanup(); finish(); });
+      audio.play().catch((err) => {
+        console.error('audio.play 실패:', err.name, err.message);
+        cleanup();
+        finish();
+      });
     })
     .catch(() => { finish(); });
 
