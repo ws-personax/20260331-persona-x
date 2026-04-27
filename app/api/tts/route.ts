@@ -70,6 +70,7 @@ export async function POST(req: Request) {
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
+      console.error('CLOVA 에러:', res.status, errText);
       return Response.json(
         { error: 'CLOVA TTS failed', status: res.status, detail: errText.slice(0, 500) },
         { status: 502 },
