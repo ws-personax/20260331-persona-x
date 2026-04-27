@@ -2075,10 +2075,16 @@ export default function ChatWindow() {
 
     if (newItems.length > 0) {
       // RAY 딜레이 단축 — 첫 아이템은 speakOne 으로 즉시 시작, 나머지는 끝난 뒤 enqueueSpeak.
+      // speakOne 자체는 notifySpeaking 을 건드리지 않으므로 직접 켜고 끔.
       const first = newItems[0];
       const rest = newItems.slice(1);
+      notifySpeaking(true);
       speakOne(first.text, first.personaKey, () => {
-        if (rest.length > 0) enqueueSpeak(rest);
+        if (rest.length > 0) {
+          enqueueSpeak(rest);
+        } else {
+          notifySpeaking(false);
+        }
       });
     }
   }, [messages, autoRead, ttsSupported]);
