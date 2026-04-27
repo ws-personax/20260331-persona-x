@@ -10,7 +10,7 @@ type Persona = 'ray' | 'jack' | 'lucia' | 'echo';
 const VOICE_MAP: Record<Persona, { speaker: string; speed: number }> = {
   lucia: { speaker: 'njiyun',    speed:  0 },
   jack:  { speaker: 'nminsang',  speed: -1 },
-  echo:  { speaker: 'ndeepio',   speed: -1 },
+  echo:  { speaker: 'njoonseo',  speed: -1 },
   ray:   { speaker: 'nkyunglee', speed: -1 },
 };
 
