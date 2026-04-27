@@ -2026,7 +2026,6 @@ export default function ChatWindow() {
     if (!last || last.role !== 'assistant') return;
     if (last.errorType) return;
 
-    // 메시지가 바뀌면 추적 리셋 + 진행 중이던 발화 정지.
     if (queuedPersonasRef.current.msgId !== last.id) {
       stopSpeaking();
       queuedPersonasRef.current = { msgId: last.id, set: new Set() };
@@ -2036,72 +2035,44 @@ export default function ChatWindow() {
     type Item = { text: string; personaKey: 'ray' | 'jack' | 'lucia' | 'echo' };
     const newItems: Item[] = [];
 
-    // 순서 + 텍스트 페어를 돌며: 이미 큐잉된 건 skip, 아직 도착 안 한 건 break(순서 보장).
-    // 단 ECHO 는 앞 페르소나가 비어 있어도 도착 즉시 재생되도록 continue 로 예외 처리.
-    const addInOrder = (order: { key: 'ray' | 'jack' | 'lucia' | 'echo'; text?: string | null }[]) => {
-      for (const o of order) {
-        if (queued.has(o.key)) continue;
-        if (o.key === 'echo') {
-          if (o.text) {
-            newItems.push({
-              text: sanitizeForTTS(o.text, o.key),
-              personaKey: o.key,
-            });
-            queued.add(o.key);
-          }
-          continue;
-        }
-        if (!o.text) break;
-        newItems.push({
-          text: sanitizeForTTS(o.text, o.key) + ' 자세한 내용은 화면을 확인하세요.',
-          personaKey: o.key,
-        });
-        queued.add(o.key);
-      }
-    };
-
+    let order: { key: 'ray' | 'jack' | 'lucia' | 'echo'; text?: string | null }[] = [];
     if (last.teaMode) {
-      addInOrder([
+      order = [
         { key: 'lucia', text: last.teaLucia },
         { key: 'jack',  text: last.teaJack  },
         { key: 'echo',  text: last.teaEcho  },
-      ]);
+      ];
     } else if (last.personas) {
-      console.log('personas:', JSON.stringify(last.personas));
-      console.log('echo text:', last.personas?.echo);
-      if (process.env.NODE_ENV === 'development') {
-        // 개발용 — 화면에 ECHO 데이터 표시 (나중에 삭제)
-      } else {
-        // 프로덕션에서 alert로 확인
-        if (last.personas) {
-          const echoData = last.personas.echo;
-          alert('ECHO 데이터: ' + (echoData ? echoData.slice(0, 50) : 'null/undefined'));
-        }
-      }
-      console.log('echo length:', last.personas?.echo?.length);
-      addInOrder([
+      order = [
         { key: 'ray',   text: last.personas.ray   },
         { key: 'jack',  text: last.personas.jack  },
         { key: 'lucia', text: last.personas.lucia },
         { key: 'echo',  text: last.personas.echo  },
-      ]);
+      ];
+    }
+
+    if (order.length > 0) {
+      for (const o of order) {
+        if (queued.has(o.key) || !o.text) continue;
+        const suffix = o.key !== 'echo' ? ' 자세한 내용은 화면을 확인하세요.' : '';
+        newItems.push({
+          text: sanitizeForTTS(o.text, o.key) + suffix,
+          personaKey: o.key,
+        });
+        queued.add(o.key);
+      }
     } else if (last.content && !queued.has('jack')) {
       newItems.push({ text: sanitizeForTTS(last.content, 'jack'), personaKey: 'jack' });
       queued.add('jack');
     }
 
     if (newItems.length > 0) {
-      // RAY 딜레이 단축 — 첫 아이템은 speakOne 으로 즉시 시작, 나머지는 끝난 뒤 enqueueSpeak.
-      // speakOne 자체는 notifySpeaking 을 건드리지 않으므로 직접 켜고 끔.
+      notifySpeaking(true);
       const first = newItems[0];
       const rest = newItems.slice(1);
-      notifySpeaking(true);
       speakOne(first.text, first.personaKey, () => {
-        if (rest.length > 0) {
-          enqueueSpeak(rest);
-        } else {
-          notifySpeaking(false);
-        }
+        if (rest.length > 0) enqueueSpeak(rest);
+        else notifySpeaking(false);
       });
     }
   }, [messages, autoRead, ttsSupported]);
