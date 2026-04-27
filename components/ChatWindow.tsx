@@ -286,10 +286,10 @@ const sanitizeForTTS = (text: string, personaKey?: PersonaVoice): string => {
   const raw = text || '';
   let body = raw;
   let hasDetailLink = false;
-  if (personaKey !== 'echo') {
+  if (personaKey && personaKey !== 'echo') {
+    hasDetailLink = true;
     const m = /자세히\s*보기/.exec(body);
     if (m) {
-      hasDetailLink = true;
       body = body.slice(0, m.index);
     }
   }
@@ -2029,12 +2029,15 @@ export default function ChatWindow() {
     type Item = { text: string; personaKey: 'ray' | 'jack' | 'lucia' | 'echo' };
     const newItems: Item[] = [];
 
-    // 순서 + 텍스트 페어를 돌며: 이미 큐잉된 건 skip, 아직 도착 안 한 건 skip(다음 렌더에서 픽업).
-    // ⚠️ break 가 아닌 continue — 중간 페르소나가 끝까지 비어 있어도 뒤(ECHO 등) 누락 방지.
+    // 순서 + 텍스트 페어를 돌며: 이미 큐잉된 건 skip, 아직 도착 안 한 건 break(순서 보장).
+    // 단 ECHO 는 앞 페르소나가 비어 있어도 도착 즉시 재생되도록 continue 로 예외 처리.
     const addInOrder = (order: { key: 'ray' | 'jack' | 'lucia' | 'echo'; text?: string | null }[]) => {
       for (const o of order) {
         if (queued.has(o.key)) continue;
-        if (!o.text) continue;
+        if (!o.text) {
+          if (o.key === 'echo') continue;
+          break;
+        }
         newItems.push({ text: sanitizeForTTS(o.text, o.key), personaKey: o.key });
         queued.add(o.key);
       }
