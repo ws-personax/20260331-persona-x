@@ -287,9 +287,9 @@ const sanitizeForTTS = (text: string, personaKey?: PersonaVoice): string => {
   let body = raw;
   let hasDetailLink = false;
   if (personaKey && personaKey !== 'echo') {
-    hasDetailLink = true;
     const m = /자세히\s*보기/.exec(body);
     if (m) {
+      hasDetailLink = true;
       body = body.slice(0, m.index);
     }
   } else if (!personaKey) {
@@ -2061,6 +2061,7 @@ export default function ChatWindow() {
         { key: 'ray',   text: last.personas.ray   },
         { key: 'jack',  text: last.personas.jack  },
         { key: 'lucia', text: last.personas.lucia },
+        { key: 'echo',  text: last.personas.echo  },
       ]);
     } else if (last.content && !queued.has('jack')) {
       newItems.push({ text: sanitizeForTTS(last.content, 'jack'), personaKey: 'jack' });
@@ -2078,21 +2079,6 @@ export default function ChatWindow() {
         }),
       }).catch(() => {});
       enqueueSpeak(newItems);
-    }
-
-    // ECHO 누락 방지 — RAY/JACK/LUCIA 큐잉 후 2초 뒤 ECHO 강제 추가.
-    if (last.personas?.echo && !queued.has('echo')) {
-      const echoText = last.personas.echo;
-      const echoMsgId = last.id;
-      setTimeout(() => {
-        if (queuedPersonasRef.current.msgId !== echoMsgId) return;
-        if (queuedPersonasRef.current.set.has('echo')) return;
-        enqueueSpeak([{
-          text: sanitizeForTTS(echoText, 'echo'),
-          personaKey: 'echo',
-        }]);
-        queuedPersonasRef.current.set.add('echo');
-      }, 2000);
     }
   }, [messages, autoRead, ttsSupported]);
 
