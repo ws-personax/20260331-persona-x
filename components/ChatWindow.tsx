@@ -2069,6 +2069,15 @@ export default function ChatWindow() {
     } else if (last.personas) {
       console.log('personas:', JSON.stringify(last.personas));
       console.log('echo text:', last.personas?.echo);
+      if (process.env.NODE_ENV === 'development') {
+        // 개발용 — 화면에 ECHO 데이터 표시 (나중에 삭제)
+      } else {
+        // 프로덕션에서 alert로 확인
+        if (last.personas) {
+          const echoData = last.personas.echo;
+          alert('ECHO 데이터: ' + (echoData ? echoData.slice(0, 50) : 'null/undefined'));
+        }
+      }
       console.log('echo length:', last.personas?.echo?.length);
       addInOrder([
         { key: 'ray',   text: last.personas.ray   },
