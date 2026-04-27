@@ -1525,8 +1525,6 @@ ${DISCLAIMER}`;
     let finalEcho: string;
     let finalEchoDetails: string | null = null;
 
-    console.log('ECHO 생성 시작');
-
     if (isMarketIndex) {
       const marketTrendDesc = trendCtx.trendSummary
         ? trendCtx.trendSummary
@@ -1623,8 +1621,6 @@ ${DISCLAIMER}`;
       finalEcho = echoBuilt.summary;
       finalEchoDetails = `${echoBuilt.details}\n\n${dataSourceLabel}${marketClosedNote}${DISCLAIMER}`;
     }
-
-    console.log('ECHO 생성 완료:', finalEcho?.slice(0, 50));
 
     // ─── RAY/JACK/LUCIA 자세히 보기 상세 ───
     let finalRayDetails: string | null = null;
