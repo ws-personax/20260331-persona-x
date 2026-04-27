@@ -289,9 +289,10 @@ const sanitizeForTTS = (text: string, personaKey?: PersonaVoice): string => {
   if (personaKey && personaKey !== 'echo') {
     const m = /자세히\s*보기/.exec(body);
     if (m) {
-      hasDetailLink = true;
       body = body.slice(0, m.index);
     }
+    // personaKey 있을 때는 멘트 추가 안 함 (autoRead useEffect 에서 직접 append)
+    hasDetailLink = false;
   } else if (!personaKey) {
     const m = /자세히\s*보기/.exec(body);
     if (m) {
@@ -2044,7 +2045,11 @@ export default function ChatWindow() {
           if (o.key === 'echo') continue;
           break;
         }
-        newItems.push({ text: sanitizeForTTS(o.text, o.key), personaKey: o.key });
+        newItems.push({
+          text: sanitizeForTTS(o.text, o.key) +
+            (o.key !== 'echo' ? ' 자세한 내용은 화면을 확인하세요.' : ''),
+          personaKey: o.key,
+        });
         queued.add(o.key);
       }
     };
@@ -2069,16 +2074,12 @@ export default function ChatWindow() {
     }
 
     if (newItems.length > 0) {
-      // RAY 첫 발화 딜레이 단축 — 첫 아이템 TTS prefetch.
-      fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: newItems[0].text,
-          persona: newItems[0].personaKey,
-        }),
-      }).catch(() => {});
-      enqueueSpeak(newItems);
+      // RAY 딜레이 단축 — 첫 아이템은 speakOne 으로 즉시 시작, 나머지는 끝난 뒤 enqueueSpeak.
+      const first = newItems[0];
+      const rest = newItems.slice(1);
+      speakOne(first.text, first.personaKey, () => {
+        if (rest.length > 0) enqueueSpeak(rest);
+      });
     }
   }, [messages, autoRead, ttsSupported]);
 
