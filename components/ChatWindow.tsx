@@ -2041,13 +2041,19 @@ export default function ChatWindow() {
     const addInOrder = (order: { key: 'ray' | 'jack' | 'lucia' | 'echo'; text?: string | null }[]) => {
       for (const o of order) {
         if (queued.has(o.key)) continue;
-        if (!o.text) {
-          if (o.key === 'echo') continue;
-          break;
+        if (o.key === 'echo') {
+          if (o.text) {
+            newItems.push({
+              text: sanitizeForTTS(o.text, o.key),
+              personaKey: o.key,
+            });
+            queued.add(o.key);
+          }
+          continue;
         }
+        if (!o.text) break;
         newItems.push({
-          text: sanitizeForTTS(o.text, o.key) +
-            (o.key !== 'echo' ? ' 자세한 내용은 화면을 확인하세요.' : ''),
+          text: sanitizeForTTS(o.text, o.key) + ' 자세한 내용은 화면을 확인하세요.',
           personaKey: o.key,
         });
         queued.add(o.key);
