@@ -9,9 +9,9 @@ type Persona = 'ray' | 'jack' | 'lucia' | 'echo';
 // 페르소나별 CLOVA 화자/속도 매핑.
 const VOICE_MAP: Record<Persona, { speaker: string; speed: number }> = {
   lucia: { speaker: 'njiyun',    speed:  0 },
-  jack:  { speaker: 'nminsang',  speed: -3 },
-  echo:  { speaker: 'nmetallic', speed: -3 },
-  ray:   { speaker: 'nkyunglee', speed: -3 },
+  jack:  { speaker: 'nminsang',  speed: -1 },
+  echo:  { speaker: 'ndeepio',   speed: -1 },
+  ray:   { speaker: 'nkyunglee', speed: -1 },
 };
 
 const CLOVA_ENDPOINT = 'https://naveropenapi.apigw.ntruss.com/tts-premium/v1/tts';
