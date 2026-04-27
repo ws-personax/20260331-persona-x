@@ -292,6 +292,12 @@ const sanitizeForTTS = (text: string, personaKey?: PersonaVoice): string => {
     if (m) {
       body = body.slice(0, m.index);
     }
+  } else if (!personaKey) {
+    const m = /자세히\s*보기/.exec(body);
+    if (m) {
+      hasDetailLink = true;
+      body = body.slice(0, m.index);
+    }
   }
   let t = body
     .replace(/\([^)]*\)/g, '')
@@ -2050,18 +2056,44 @@ export default function ChatWindow() {
         { key: 'echo',  text: last.teaEcho  },
       ]);
     } else if (last.personas) {
+      console.log('personas:', JSON.stringify(last.personas));
       addInOrder([
         { key: 'ray',   text: last.personas.ray   },
         { key: 'jack',  text: last.personas.jack  },
         { key: 'lucia', text: last.personas.lucia },
-        { key: 'echo',  text: last.personas.echo  },
       ]);
     } else if (last.content && !queued.has('jack')) {
       newItems.push({ text: sanitizeForTTS(last.content, 'jack'), personaKey: 'jack' });
       queued.add('jack');
     }
 
-    if (newItems.length) enqueueSpeak(newItems);
+    if (newItems.length > 0) {
+      // RAY 첫 발화 딜레이 단축 — 첫 아이템 TTS prefetch.
+      fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: newItems[0].text,
+          persona: newItems[0].personaKey,
+        }),
+      }).catch(() => {});
+      enqueueSpeak(newItems);
+    }
+
+    // ECHO 누락 방지 — RAY/JACK/LUCIA 큐잉 후 2초 뒤 ECHO 강제 추가.
+    if (last.personas?.echo && !queued.has('echo')) {
+      const echoText = last.personas.echo;
+      const echoMsgId = last.id;
+      setTimeout(() => {
+        if (queuedPersonasRef.current.msgId !== echoMsgId) return;
+        if (queuedPersonasRef.current.set.has('echo')) return;
+        enqueueSpeak([{
+          text: sanitizeForTTS(echoText, 'echo'),
+          personaKey: 'echo',
+        }]);
+        queuedPersonasRef.current.set.add('echo');
+      }, 2000);
+    }
   }, [messages, autoRead, ttsSupported]);
 
   const QUICK_QUESTIONS = useMemo(() => {
