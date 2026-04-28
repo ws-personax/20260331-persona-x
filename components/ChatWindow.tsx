@@ -1687,12 +1687,18 @@ const OnboardingTabs = ({
   teaPersona,
   luciaGreeting,
   onOpenQuickPanel,
+  onSetInput,
+  onStartRecording,
+  sttSupported,
 }: {
   activeTab: 'finance' | 'tea' | null;
   onTabChange: (tab: 'finance' | 'tea') => void;
   teaPersona: 'lucia' | 'jack' | 'echo';
   luciaGreeting: string | null;
   onOpenQuickPanel: (panel: FinanceQuickPanel) => void;
+  onSetInput?: (text: string) => void;
+  onStartRecording?: () => void;
+  sttSupported?: boolean;
 }) => {
   // ─ 첫 화면 — 통합 진입 UI (질문 입력 or 버튼 3개) ─
   const [introInput, setIntroInput] = useState('');
@@ -1700,6 +1706,16 @@ const OnboardingTabs = ({
   const classifyAndEnter = (text: string) => {
     const t = text.trim();
     if (!t) return;
+
+    // onSetInput이 있으면 하단 입력창에 텍스트 채우고 자동 분류는 route.ts에서 처리
+    if (onSetInput) {
+      onSetInput(t);
+      // 재테크 키워드면 재테크 탭, 아니면 차 한잔 탭
+      const financeKw = /주식|펀드|ETF|부동산|투자|재테크|종목|삼성|코스피|코스닥|달러|금|채권|포트폴리오|수익|손절|매수|매도|배당|금리|환율|가상화폐|비트코인|저축|예금|적금|퇴직금|연금/;
+      onTabChange(financeKw.test(t) ? 'finance' : 'tea');
+      return;
+    }
+
     // 재테크 키워드
     const financeKw = /주식|펀드|ETF|부동산|투자|재테크|종목|삼성|코스피|코스닥|달러|금|채권|포트폴리오|수익|손절|매수|매도|배당|금리|환율|가상화폐|비트코인|저축|예금|적금|퇴직금|연금/;
     if (financeKw.test(t)) {
@@ -1764,15 +1780,21 @@ const OnboardingTabs = ({
           {/* 버튼 3개 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 12 }}>
             {[
-              { emoji: '😔', label: '마음이 너무 힘들어요', tab: 'tea' as const },
-              { emoji: '📈', label: '재테크가 고민이에요', tab: 'finance' as const },
-              { emoji: '🤔', label: '결정을 못 하겠어요', tab: 'tea' as const },
-            ].map(({ emoji, label, tab }) => (
+              { emoji: '😔', label: '마음이 너무 힘들어요' },
+              { emoji: '📈', label: '재테크가 고민이에요' },
+              { emoji: '🤔', label: '결정을 못 하겠어요' },
+            ].map(({ emoji, label }) => (
               <button
                 key={label}
                 type="button"
                 className="px-intro-btn"
-                onClick={() => onTabChange(tab)}
+                onClick={() => {
+                  if (onSetInput) {
+                    onSetInput(label);
+                  } else {
+                    setIntroInput(label);
+                  }
+                }}
                 style={{
                   width: '100%',
                   padding: '11px 14px',
@@ -1803,13 +1825,14 @@ const OnboardingTabs = ({
             <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
           </div>
 
-          {/* 직접 입력창 */}
+          {/* 직접 입력창 + 마이크 */}
           <div style={{ display: 'flex', gap: 8 }}>
             <input
               className="px-intro-input"
               type="text"
-              value={introInput}
-              onChange={e => setIntroInput(e.target.value)}
+              value={onSetInput ? undefined : introInput}
+              defaultValue={onSetInput ? '' : undefined}
+              onChange={e => { if (!onSetInput) setIntroInput(e.target.value); }}
               onKeyDown={e => { if (e.key === 'Enter') classifyAndEnter(introInput); }}
               placeholder="고민을 자유롭게 입력하세요"
               style={{
@@ -1823,6 +1846,25 @@ const OnboardingTabs = ({
                 boxSizing: 'border-box',
               }}
             />
+            {sttSupported && onStartRecording && (
+              <button
+                type="button"
+                onClick={onStartRecording}
+                style={{
+                  padding: '10px 12px',
+                  background: '#f3f4f6',
+                  border: '1px solid #d1d5db',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  fontSize: 18,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                🎤
+              </button>
+            )}
             <button
               type="button"
               onClick={() => classifyAndEnter(introInput)}
@@ -2627,11 +2669,10 @@ export default function ChatWindow() {
             teaPersona={teaPersona}
             luciaGreeting={luciaGreeting}
             onOpenQuickPanel={(panel) => { setActiveTab(panel); setShowQuickQ(true); }}
+            onSetInput={(text) => { setInput(text); }}
+            onStartRecording={toggleRecording}
+            sttSupported={sttSupported}
           />
-        </div>
-      )}
-
-      {/* ✅ 탭 선택 후(onboardingTab !== null) OR 사용자가 메시지 전송 후(hasUserSent) — 기존 스크롤 컨테이너 */}
       {(hasUserSent || onboardingTab !== null) && (
       <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', padding: scrollPadding }}>
         {!hasUserSent && (
@@ -2642,6 +2683,9 @@ export default function ChatWindow() {
               teaPersona={teaPersona}
               luciaGreeting={luciaGreeting}
               onOpenQuickPanel={(panel) => { setActiveTab(panel); setShowQuickQ(true); }}
+              onSetInput={(text) => { setInput(text); }}
+              onStartRecording={toggleRecording}
+              sttSupported={sttSupported}
             />
           </div>
         )}
