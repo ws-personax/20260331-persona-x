@@ -7,6 +7,11 @@ import { PositionInput, buildPositionContext } from './PositionInput';
 import type { Position } from './PositionInput';
 import { inferCurrency, detectKeyword, shouldShowPosition } from '@/lib/maps';
 
+// 재테크 키워드 — 매칭되면 자동으로 4명 동시 답변(RAY/JACK/LUCIA/ECHO) 모드로 라우팅
+const FINANCE_KEYWORD_RE = /주식|펀드|ETF|부동산|투자|재테크|종목|삼성|코스피|코스닥|달러|금|채권|포트폴리오|수익|손절|매수|매도|배당|금리|환율|가상화폐|비트코인|저축|예금|적금|퇴직금|연금/;
+const isFinanceQuery = (text: string): boolean =>
+  FINANCE_KEYWORD_RE.test(text) || detectKeyword(text) !== null;
+
 interface NewsLink {
   title: string;
   url: string;
@@ -1596,20 +1601,12 @@ const IntroSlider = () => {
 };
 
 const OnboardingTabs = ({
-  activeTab,
-  onTabChange,
-  teaPersona,
-  luciaGreeting,
-  onOpenQuickPanel,
+  onSubmit,
   onSetInput,
   onStartRecording,
   sttSupported,
 }: {
-  activeTab: 'finance' | 'tea' | null;
-  onTabChange: (tab: 'finance' | 'tea') => void;
-  teaPersona: 'lucia' | 'jack' | 'echo';
-  luciaGreeting: string | null;
-  onOpenQuickPanel: (panel: FinanceQuickPanel) => void;
+  onSubmit: (text: string) => void;
   onSetInput?: (text: string) => void;
   onStartRecording?: () => void;
   sttSupported?: boolean;
@@ -1619,25 +1616,12 @@ const OnboardingTabs = ({
   const classifyAndEnter = (text: string) => {
     const t = text.trim();
     if (!t) return;
-
-    if (onSetInput) {
-      onSetInput(t);
-      const financeKw = /주식|펀드|ETF|부동산|투자|재테크|종목|삼성|코스피|코스닥|달러|금|채권|포트폴리오|수익|손절|매수|매도|배당|금리|환율|가상화폐|비트코인|저축|예금|적금|퇴직금|연금/;
-      onTabChange(financeKw.test(t) ? 'finance' : 'tea');
-      return;
-    }
-
-    const financeKw = /주식|펀드|ETF|부동산|투자|재테크|종목|삼성|코스피|코스닥|달러|금|채권|포트폴리오|수익|손절|매수|매도|배당|금리|환율|가상화폐|비트코인|저축|예금|적금|퇴직금|연금/;
-    if (financeKw.test(t)) {
-      onTabChange('finance');
-    } else {
-      onTabChange('tea');
-    }
+    if (onSetInput) onSetInput(t);
+    onSubmit(t);
   };
 
-  if (activeTab === null) {
-    return (
-      <>
+  return (
+    <>
         <style>{`
           .px-intro-btn {
             transition: transform 0.12s ease, box-shadow 0.12s ease;
@@ -1792,41 +1776,6 @@ const OnboardingTabs = ({
         </div>
       </>
     );
-  }
-
-  return (
-    <div style={{ padding: '0 12px' }}>
-      <div
-        style={{
-          display: 'flex',
-          gap: 8,
-          paddingBottom: 12,
-          borderBottom: '1px solid #e5e7eb',
-        }}
-      >
-        <TabButton
-          active={activeTab === 'finance'}
-          icon="📊"
-          title="재테크"
-          onClick={() => onTabChange('finance')}
-        />
-        <TabButton
-          active={activeTab === 'tea'}
-          icon="☕"
-          title="차 한잔 하실래요?"
-          onClick={() => onTabChange('tea')}
-        />
-      </div>
-
-      {activeTab === 'finance' && <FinanceTabContent onOpenQuickPanel={onOpenQuickPanel} />}
-      {activeTab === 'tea' && (
-        <TeaTabContent
-          teaPersona={teaPersona}
-          luciaGreeting={luciaGreeting}
-        />
-      )}
-    </div>
-  );
 };
 
 export default function ChatWindow() {
@@ -1834,7 +1783,6 @@ export default function ChatWindow() {
   const [mounted, setMounted] = useState(false);
   const [input, setInput] = useState('');
   const [showQuickQ, setShowQuickQ] = useState(false);
-  const [onboardingTab, setOnboardingTab] = useState<'finance' | 'tea' | null>(null);
   const [teaPersona, setTeaPersona] = useState<'lucia' | 'jack' | 'echo'>('lucia');
   const [luciaGreeting, setLuciaGreeting] = useState<string | null>(null);
 
@@ -1856,13 +1804,8 @@ export default function ChatWindow() {
     } catch {  }
   }, []);
 
-  const handleOnboardingPick = (tab: 'finance' | 'tea', persona: 'lucia' | 'echo' | null) => {
-    if (tab === 'tea') {
-      setOnboardingTab('tea');
-      if (persona) setTeaPersona(persona);
-    } else {
-      setOnboardingTab('finance');
-    }
+  const handleOnboardingPick = (persona: 'lucia' | 'echo' | null) => {
+    if (persona) setTeaPersona(persona);
     try { localStorage.setItem('px_onboarded_v1', '1'); } catch {}
     setShowOnboarding(false);
   };
@@ -2224,7 +2167,8 @@ export default function ChatWindow() {
     stopSpeaking();
     setShowPosition(false);
 
-    const isTeaSend = onboardingTab === 'tea';
+    // 재테크 키워드가 포함되면 4명 동시 답변, 아니면 단일 페르소나(LUCIA/JACK/ECHO)
+    const isTeaSend = !isFinanceQuery(text);
 
     // eslint-disable-next-line no-console
     // eslint-disable-next-line no-console
@@ -2319,10 +2263,10 @@ export default function ChatWindow() {
       setIsLoading(false);
       setIsAdvancedLoading(false);
     }
-  }, [onboardingTab, teaPersona]);
+  }, [teaPersona]);
 
-  const handleSend = useCallback(() => {
-    const content = input.trim();
+  const handleSend = useCallback((override?: string) => {
+    const content = (override ?? input).trim();
     if (!content || isLoading) return;
 
     const matched = detectKeyword(content);
@@ -2346,7 +2290,6 @@ export default function ChatWindow() {
     const hasInlinePosition = !!(inlineAvg || inlineBuy || inlineQty);
 
     const showModal =
-      onboardingTab === 'finance' &&
       matched &&
       (hasInlinePosition || shouldShowPosition(content, matched));
     if (showModal) {
@@ -2360,7 +2303,7 @@ export default function ChatWindow() {
     }
 
     handleSendWithPosition(content, null);
-  }, [input, isLoading, handleSendWithPosition, onboardingTab]);
+  }, [input, isLoading, handleSendWithPosition]);
 
   useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
 
@@ -2490,38 +2433,19 @@ export default function ChatWindow() {
         </div>
       )}
 
-      {/* 헤더 바로 아래에 자연스럽게 카드 배치 (spacer/특수 패딩 없이 단순 padding 만). */}
-      {!hasUserSent && onboardingTab === null && (
+      {!hasUserSent && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center' }}>
           <OnboardingTabs
-            activeTab={onboardingTab}
-            onTabChange={setOnboardingTab}
-            teaPersona={teaPersona}
-            luciaGreeting={luciaGreeting}
-            onOpenQuickPanel={(panel) => { setActiveTab(panel); setShowQuickQ(true); }}
+            onSubmit={(text) => handleSend(text)}
             onSetInput={(text) => { setInput(text); }}
             onStartRecording={toggleRecording}
             sttSupported={sttSupported}
           />
         </div>
       )}
-      {(hasUserSent || onboardingTab !== null) && (
+      {hasUserSent && (
       <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', padding: scrollPadding }}>
-        {!hasUserSent && (
-          <div className="px-onboarding-wrap">
-            <OnboardingTabs
-              activeTab={onboardingTab}
-              onTabChange={setOnboardingTab}
-              teaPersona={teaPersona}
-              luciaGreeting={luciaGreeting}
-              onOpenQuickPanel={(panel) => { setActiveTab(panel); setShowQuickQ(true); }}
-              onSetInput={(text) => { setInput(text); }}
-              onStartRecording={toggleRecording}
-              sttSupported={sttSupported}
-            />
-          </div>
-        )}
-        {onboardingTab === 'tea' && teaPersona !== 'lucia' && (() => {
+        {teaPersona !== 'lucia' && (() => {
           const p = TEA_PERSONAS_INFO.find(x => x.key === teaPersona)!;
           return (
             <div style={{ display: 'flex', justifyContent: 'center', padding: '0 12px 10px' }}>
@@ -2691,7 +2615,7 @@ export default function ChatWindow() {
             <span>AI 참모진이 분석 중입니다. 약 20~30초 소요됩니다.</span>
           </div>
         )}
-        {isLoading && <TypingIndicator teaMode={onboardingTab === 'tea'} teaPersona={teaPersona} />}
+        {isLoading && <TypingIndicator teaMode={messages.slice().reverse().find(m => m.role === 'user')?.teaMode === true} teaPersona={teaPersona} />}
         <div ref={bottomRef} />
       </div>
       )}
@@ -2708,7 +2632,7 @@ export default function ChatWindow() {
         </div>
       )}
 
-      {showQuickQ && onboardingTab !== 'tea' && (
+      {showQuickQ && (
         <div style={{
           background: '#fff',
           borderTop: '1px solid #e5e7eb',
@@ -2985,44 +2909,10 @@ export default function ChatWindow() {
         </div>
       )}
 
-      {/* 탭(재테크/차 한잔) 을 클릭하거나 한 번이라도 보낸 후에만 footer 표시.
-          ✅ 차 한잔 탭에서 teaPersona 가 null 이어도 탭 이동 버튼은 노출 — 입력창만 숨김. */}
-      {(onboardingTab !== null || hasUserSent) && (
+      {hasUserSent && (
       <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
-        {onboardingTab === 'finance' && (
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-            <button
-              type="button"
-              onClick={() => {
-                setOnboardingTab('tea');
-                setTeaPersona('lucia');
-                setMessages([]);
-                messagesRef.current = [];
-                setInput('');
-                requestAnimationFrame(() => {
-                  scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'auto' });
-                  window.scrollTo({ top: 0, behavior: 'auto' });
-                });
-              }}
-              style={{
-                background: '#fff8f0',
-                border: '1px solid #fbbf24',
-                borderRadius: 999,
-                padding: '6px 14px',
-                fontSize: 12,
-                fontWeight: 700,
-                color: '#92400e',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              🍵 마음이 복잡하다면 차 한잔 어때요?
-            </button>
-          </div>
-        )}
-        {/* 현재 페르소나는 비활성, 나머지는 클릭 시 전환. */}
-        {onboardingTab === 'tea' && (
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
+        {/* LUCIA 허브 — 필요 시 JACK/ECHO 소환. 비활성 페르소나는 disabled. */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
             {teaPersona !== 'lucia' && (
               <button
                 type="button"
@@ -3085,7 +2975,6 @@ export default function ChatWindow() {
               🔍 ECHO 소환
             </button>
           </div>
-        )}
         {ttsSupported && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
             <button
@@ -3144,7 +3033,7 @@ export default function ChatWindow() {
             value={input}
             onChange={e => { setInput(e.target.value); cancelAutoSend(); }}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
-            placeholder={onboardingTab === 'tea' ? '마음을 꺼내보세요' : '삼성전자, 테슬라, 비트코인, 부동산...'}
+            placeholder="무엇이든 물어보세요 (재테크 키워드는 4명이 동시 답변)"
             style={{
               flex: 1,
               minWidth: 0,
@@ -3267,15 +3156,15 @@ export default function ChatWindow() {
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {([
-                { emoji: '😔', text: '감정이 너무 힘들어요', tab: 'tea',     persona: 'lucia' },
-                { emoji: '📊', text: '투자 고민이에요',     tab: 'finance', persona: null    },
-                { emoji: '🤔', text: '결정을 못 하겠어요',  tab: 'tea',     persona: 'echo'  },
+                { emoji: '😔', text: '감정이 너무 힘들어요', persona: 'lucia' },
+                { emoji: '📊', text: '투자 고민이에요',     persona: null    },
+                { emoji: '🤔', text: '결정을 못 하겠어요',  persona: 'echo'  },
               ] as const).map((opt, i) => (
                 <button
                   key={i}
                   type="button"
                   className="px-onb-btn"
-                  onClick={() => handleOnboardingPick(opt.tab, opt.persona)}
+                  onClick={() => handleOnboardingPick(opt.persona)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
