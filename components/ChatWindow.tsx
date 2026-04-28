@@ -1287,7 +1287,7 @@ const TeaTabContent = ({
         <br />
         {headline.line2}
       </h2>
-           앱 시작 시 1번만 픽 (마운트 시 결정). 22:00~08:59 비활성. */}
+      {/* 앱 시작 시 1번만 픽 (마운트 시 결정). 22:00~08:59 비활성. */}
       {teaPersona === 'lucia' && luciaGreeting && (
         <div style={{ maxWidth: 440, margin: '0 auto', padding: '0 4px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -1499,7 +1499,7 @@ const IntroSlider = () => {
           “{slide.question}”
         </p>
 
-            2x2 (재테크): 가로 2 × 세로 2
+        {/* 2x2 (재테크): 가로 2 × 세로 2
             row3 (차 한잔): 가로 3 × 세로 1, 모바일에서도 3개 나란히 */}
         <div style={{
           display: 'grid',
@@ -1680,6 +1680,9 @@ const OnboardingTabs = ({
           boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
           boxSizing: 'border-box',
         }}>
+          <p style={{ fontSize: 22, fontWeight: 900, color: '#111827', textAlign: 'center', margin: '0 0 6px', lineHeight: 1.3 }}>
+            무엇이든 물어보세요!
+          </p>
           <p style={{ fontSize: 16, fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 12px', lineHeight: 1.4 }}>
             지금 어떤 고민이 있으세요?
           </p>
@@ -1783,6 +1786,9 @@ const OnboardingTabs = ({
               시작
             </button>
           </div>
+          <p style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center', margin: '10px 0 0', lineHeight: 1.4 }}>
+            투자 권유·불법·욕설은 답변이 제한될 수 있어요
+          </p>
         </div>
       </>
     );
@@ -2428,7 +2434,7 @@ export default function ChatWindow() {
         </div>
       </header>
 
-           pointerEvents: none — 배너 자체는 클릭 가로채지 않도록 (아래 콘텐츠가 그대로 클릭됨). */}
+      {/* pointerEvents: none — 배너 자체는 클릭 가로채지 않도록 (아래 콘텐츠가 그대로 클릭됨). */}
       {isSpeakingGlobal && (
         <div
           role="status"
@@ -2484,7 +2490,7 @@ export default function ChatWindow() {
         </div>
       )}
 
-          헤더 바로 아래에 자연스럽게 카드 배치 (spacer/특수 패딩 없이 단순 padding 만). */}
+      {/* 헤더 바로 아래에 자연스럽게 카드 배치 (spacer/특수 패딩 없이 단순 padding 만). */}
       {!hasUserSent && onboardingTab === null && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center' }}>
           <OnboardingTabs
@@ -2497,6 +2503,8 @@ export default function ChatWindow() {
             onStartRecording={toggleRecording}
             sttSupported={sttSupported}
           />
+        </div>
+      )}
       {(hasUserSent || onboardingTab !== null) && (
       <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', padding: scrollPadding }}>
         {!hasUserSent && (
@@ -2977,7 +2985,7 @@ export default function ChatWindow() {
         </div>
       )}
 
-          탭(재테크/차 한잔) 을 클릭하거나 한 번이라도 보낸 후에만 footer 표시.
+      {/* 탭(재테크/차 한잔) 을 클릭하거나 한 번이라도 보낸 후에만 footer 표시.
           ✅ 차 한잔 탭에서 teaPersona 가 null 이어도 탭 이동 버튼은 노출 — 입력창만 숨김. */}
       {(onboardingTab !== null || hasUserSent) && (
       <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
@@ -3012,7 +3020,7 @@ export default function ChatWindow() {
             </button>
           </div>
         )}
-             현재 페르소나는 비활성, 나머지는 클릭 시 전환. */}
+        {/* 현재 페르소나는 비활성, 나머지는 클릭 시 전환. */}
         {onboardingTab === 'tea' && (
           <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
             {teaPersona !== 'lucia' && (

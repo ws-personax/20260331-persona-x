@@ -452,36 +452,11 @@ export async function POST(req: Request) {
         fallbackEcho = '';
       }
 
-      // ── 🆕 카테고리 자동 분류 — 질문 내용 기반 페르소나 자동 배치 ──
-      // teaPersona가 'lucia'(기본값)일 때만 자동 분류 적용
-      // 유저가 명시적으로 JACK/ECHO 소환한 경우는 그대로 유지
-      const autoClassify = (text: string): 'lucia' | 'jack' | 'echo' => {
-        // 테크/IT/자동차/소비/구매 → JACK
-        const isJackQ = /(노트북|맥북|아이폰|갤럭시|스마트폰|컴퓨터|태블릿|에어컨|냉장고|세탁기|TV|텔레비전|자동차|현대차|기아|테슬라|BMW|벤츠|중고차|가전|제품|살까요|구매|추천해|어때요|어떨까요|어느 게|어떤 게|비교|장단점)/.test(text);
-        // 결정/선택/진로 → ECHO
-        const isEchoQ = /(어떻게 해야|어떻게 할까|결정을|선택을|해야 할지|할까요|말까요|이직|창업|퇴직|진로|방향|원칙|기준)/.test(text);
-
-        if (isJackQ) return 'jack';
-        if (isEchoQ) return 'echo';
-        return 'lucia';
-      };
-
-      // 첫 번째 메시지(질문)로 카테고리 판단
-      const firstUserMsg = Array.isArray(messages)
-        ? (messages.find((m: { role?: string }) => m?.role === 'user') as { content?: string })?.content || ''
-        : '';
-
-      // teaPersona가 lucia(기본)이고 첫 메시지가 있을 때만 자동 분류
-      const effectivePersona: 'lucia' | 'jack' | 'echo' =
-        (!teaPersona || teaPersona === 'lucia') && firstUserMsg
-          ? autoClassify(firstUserMsg)
-          : teaPersona === 'jack' ? 'jack'
-          : teaPersona === 'echo' ? 'echo'
-          : 'lucia';
-
-      // ── 단일 페르소나 1:1 응답 (teaPersona 값에 따라 해당 페르소나만 호출) ──
-      //   teaPersona 누락 시 기본 'lucia' 로 폴백 (구버전 클라이언트 호환).
-      const selectedPersona: 'lucia' | 'jack' | 'echo' = effectivePersona;
+      // ── 단일 페르소나 1:1 응답 — 기본 lucia, JACK/ECHO 는 명시적 소환 시에만 ──
+      const selectedPersona: 'lucia' | 'jack' | 'echo' =
+        teaPersona === 'jack' ? 'jack'
+        : teaPersona === 'echo' ? 'echo'
+        : 'lucia';
 
       if (selectedPersona === 'jack') {
         const jackLLM = await callTeaPersona('jack', TEA_SYSTEM_JACK, jackHistory);
