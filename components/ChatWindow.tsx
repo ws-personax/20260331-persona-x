@@ -1789,11 +1789,8 @@ const OnboardingTabs = ({
                 type="button"
                 className="px-intro-btn"
                 onClick={() => {
-                  if (onSetInput) {
-                    onSetInput(label);
-                  } else {
-                    setIntroInput(label);
-                  }
+                  setIntroInput(label);
+                  if (onSetInput) onSetInput(label);
                 }}
                 style={{
                   width: '100%',
@@ -1830,9 +1827,8 @@ const OnboardingTabs = ({
             <input
               className="px-intro-input"
               type="text"
-              value={onSetInput ? undefined : introInput}
-              defaultValue={onSetInput ? '' : undefined}
-              onChange={e => { if (!onSetInput) setIntroInput(e.target.value); }}
+              value={introInput}
+              onChange={e => setIntroInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') classifyAndEnter(introInput); }}
               placeholder="고민을 자유롭게 입력하세요"
               style={{
