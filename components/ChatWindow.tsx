@@ -103,7 +103,7 @@ const PERSONAS: Record<
     bubbleBg: '#fff8d6',
     bubbleBorder: '#d4a017',
     textColor: '#111827',
-    echoTag: 'FINAL COMMAND',
+    echoTag: 'ECHO SUMMARY',
   },
 };
 
@@ -384,7 +384,6 @@ const speakOne = (
     body: JSON.stringify({ text: clean, persona: personaKey }),
   })
     .then(res => {
-      console.log('TTS 응답:', res.status, res.headers.get('content-type'));
       if (!res.ok) throw new Error('tts ' + res.status);
       return res.blob();
     })
@@ -422,7 +421,6 @@ const speakText = (
   onEnd?: () => void,
 ): boolean => {
   if (!isTTSSupported()) return false;
-  console.log('speakText 호출:', personaKey, text.slice(0, 30));
   stopSpeaking();
   notifySpeaking(true);
   return speakOne(text, personaKey || 'ray', () => {
@@ -1458,7 +1456,7 @@ const INTRO_SLIDES: IntroSlide[] = [
       topIcon: '📊',
       topText: '범용 AI는 답을 드리지만,',
       mainIcon: '⚡',
-      mainText: '4명이 충돌하고, 당신이 결정합니다.',
+      mainText: 'AI들이 충돌하고, 당신이 결정합니다.',
       highlightWord: '충돌',
       highlightColor: '#E85D4A',
       subIcon: '📚',
@@ -1476,19 +1474,60 @@ const INTRO_SLIDES: IntroSlide[] = [
     question: '남편이랑 싸웠어요',
     layout: 'row3',
     slogan: {
-      topIcon: '☕',
-      topText: '판단은 잠시 내려놓으시고,',
-      mainIcon: '💜',
-      mainText: 'AI 참모진이 마음을 함께 나눕니다.',
-      highlightWord: '함께',
-      highlightColor: '#9B59B6',
-      subIcon: '🤝',
+      topIcon: '💜',
+      topText: 'AI들이 충돌하고,',
+      mainIcon: '🌱',
+      mainText: '당신이 결정하고, 마침내 성장합니다.',
+      highlightWord: '성장',
+      highlightColor: '#059669',
+      subIcon: '☕',
       subText: '마음 고민, 저희가 함께해요',
     },
     cards: [
       { persona: 'lucia', name: 'LUCIA', role: '감정 · 공감', text: '아… 많이 속상하셨겠다.\n가까운 사람이랑 다투고 나면\n그 감정이 오래 남잖아요.' },
       { persona: 'jack',  name: 'JACK',  role: '결단 · 전략', text: '지금 할 수 있는 건 두 가지입니다.\n1. 본인이 먼저 사과\n2. 남편 사과 기다리기\n관계를 원한다면 1번입니다.' },
       { persona: 'echo',  name: 'ECHO',  role: '구조 · 원칙', text: '결론: 감정 충돌이 아닙니다.\n소통 구조의 문제입니다.\n먼저 손 내미는 쪽이\n관계를 가져갑니다.' },
+    ],
+  },
+  {
+    id: 'finance',
+    question: '아들 대학 입학, 노트북 뭐 사줄까요?',
+    layout: '2x2',
+    slogan: {
+      topIcon: '🤔',
+      topText: '정보가 아니라,',
+      mainIcon: '💡',
+      mainText: '관점이 충돌합니다.',
+      highlightWord: '충돌',
+      highlightColor: '#E85D4A',
+      subIcon: '✨',
+      subText: '결정 못 하는 순간, 저희가 함께해요',
+    },
+    cards: [
+      { persona: 'ray',   name: 'RAY',   role: '데이터 · 분석', text: '맥북 M3 중고 잔존가치 70%.\nLG 그램 배터리 17시간.\n전공 확인 후 선택 권장.' },
+      { persona: 'jack',  name: 'JACK',  role: '결단 · 전략',  text: '맥북 사세요.\n4년 투자예요.\n싸게 샀다가 두 번 사는 게\n더 비쌉니다.' },
+      { persona: 'lucia', name: 'LUCIA', role: '감정 · 공감',  text: '아들이 원하는 게\n뭔지 물어봤어요?\n부모 마음엔 좋은 걸\n사주고 싶지만요.' },
+      { persona: 'echo',  name: 'ECHO',  role: '구조 · 원칙',  text: '전공이 먼저예요.\n디자인이면 맥북.\n이공계면 윈도우.\n노트북보다 전공이 중요합니다.' },
+    ],
+  },
+  {
+    id: 'tea',
+    question: '요즘 왜 이렇게 의욕이 없지',
+    layout: 'row3',
+    slogan: {
+      topIcon: '💜',
+      topText: 'AI들이 충돌하고,',
+      mainIcon: '🌱',
+      mainText: '당신이 결정하고, 마침내 성장합니다.',
+      highlightWord: '성장',
+      highlightColor: '#059669',
+      subIcon: '☕',
+      subText: '마음 고민, 저희가 함께해요',
+    },
+    cards: [
+      { persona: 'lucia', name: 'LUCIA', role: '감정 · 공감', text: '언제부터 그랬어요?\n갑자기 온 건지,\n서서히 온 건지에 따라\n달라요.' },
+      { persona: 'jack',  name: 'JACK',  role: '결단 · 전략', text: '몸이 먼저예요.\n오늘 일찍 자세요.\n의욕은 생각으로\n안 생겨요.' },
+      { persona: 'echo',  name: 'ECHO',  role: '구조 · 원칙', text: '의욕이 없는 게 아니라\n방향이 없는 걸 수 있어요.\n왜 이걸 하는지\n모르겠다는 느낌, 있어요?' },
     ],
   },
 ];
@@ -1510,7 +1549,7 @@ const IntroSlider = () => {
   useEffect(() => {
     const t = setInterval(() => {
       setIdx(i => (i + 1) % INTRO_SLIDES.length);
-    }, 5000);
+    }, 4000);
     return () => clearInterval(t);
   }, []);
 
@@ -1696,125 +1735,143 @@ const OnboardingTabs = ({
   luciaGreeting: string | null;
   onOpenQuickPanel: (panel: FinanceQuickPanel) => void;
 }) => {
-  // ─ 첫 화면 — 큰 카드 2개 (flex-wrap 으로 모바일은 자동 세로 스택) ─
+  // ─ 첫 화면 — 통합 진입 UI (질문 입력 or 버튼 3개) ─
+  const [introInput, setIntroInput] = useState('');
+
+  const classifyAndEnter = (text: string) => {
+    const t = text.trim();
+    if (!t) return;
+    // 재테크 키워드
+    const financeKw = /주식|펀드|ETF|부동산|투자|재테크|종목|삼성|코스피|코스닥|달러|금|채권|포트폴리오|수익|손절|매수|매도|배당|금리|환율|가상화폐|비트코인|저축|예금|적금|퇴직금|연금/;
+    if (financeKw.test(t)) {
+      onTabChange('finance');
+    } else {
+      onTabChange('tea');
+    }
+  };
+
   if (activeTab === null) {
     return (
       <>
         <style>{`
-          .px-intro-card {
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
+          .px-intro-btn {
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
           }
-          .px-intro-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.10);
+          .px-intro-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.10);
           }
-          /* 모바일(< 600px): 카드 2개 세로 스택, 각 카드 100% 너비 */
-          @media (max-width: 599px) {
-            .px-intro-cards-row {
-              flex-direction: column !important;
-              flex-wrap: nowrap !important;
-            }
-            .px-intro-card {
-              flex: 0 0 auto !important;
-              width: 100% !important;
-            }
+          .px-intro-input:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
           }
         `}</style>
-        {/* 카드 2개 — PC 는 가로 나란히, 모바일(< 600px) 은 세로 스택
-            (media query .px-intro-cards-row). 세로 중앙정렬은 부모 담당. */}
-        <div style={{
-          textAlign: 'center',
-          marginBottom: 10,
-          padding: '0 8px',
-          width: '100%',
-        }}>
+
+        {/* 슬라이드 — 기존 유지 */}
+        <div style={{ textAlign: 'center', marginBottom: 16, padding: '0 8px', width: '100%' }}>
           <IntroSlider />
         </div>
-        <div
-          className="px-intro-cards-row"
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 10,
-            justifyContent: 'center',
-            alignItems: 'stretch',
-            width: '100%',
-            maxWidth: 560,
-          }}
-        >
-          {/* 재테크 카드 — 흰색 배경 + 진한 테두리 */}
-          <button
-            type="button"
-            className="px-intro-card"
-            onClick={() => onTabChange('finance')}
-            style={{
-              flex: '1 1 260px',
-              minWidth: '260px',
-              minHeight: 84,
-              height: 84,
-              padding: '10px 14px',
-              background: '#ffffff',
-              border: '2px solid #1f2937',
-              borderRadius: 12,
-              cursor: 'pointer',
-              textAlign: 'left',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 3,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-              boxSizing: 'border-box',
-            }}
-          >
-            <span style={{ fontSize: 20, lineHeight: 1 }}>📊</span>
-            <span style={{ fontSize: 13.5, fontWeight: 800, color: '#111827' }}>재테크</span>
-            <span
-              style={{
-                fontSize: 11.5,
-                color: '#4b5563',
-                lineHeight: 1.4,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              실시간 데이터로 4명의 참모가 분석합니다
-            </span>
-          </button>
 
-          {/* 차 한잔 카드 — 크림색 배경 + 주황 테두리 */}
-          <button
-            type="button"
-            className="px-intro-card"
-            onClick={() => onTabChange('tea')}
-            style={{
-              flex: '1 1 260px',
-              minWidth: '260px',
-              minHeight: 84,
-              height: 84,
-              padding: '10px 14px',
-              background: '#fffaf0',
-              border: '2px solid #fb923c',
-              borderRadius: 12,
-              cursor: 'pointer',
-              textAlign: 'left',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 3,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-              boxSizing: 'border-box',
-            }}
-          >
-            <span style={{ fontSize: 20, lineHeight: 1 }}>☕</span>
-            <span style={{ fontSize: 13.5, fontWeight: 800, color: '#7c2d12' }}>차 한잔 하실래요?</span>
-            <span
+        {/* 메인 카드 */}
+        <div style={{
+          width: '100%',
+          maxWidth: 480,
+          background: '#ffffff',
+          border: '1px solid #e5e7eb',
+          borderRadius: 16,
+          padding: '24px 20px 20px',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+          boxSizing: 'border-box',
+        }}>
+          {/* 질문 */}
+          <p style={{ fontSize: 17, fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 6px', lineHeight: 1.4 }}>
+            지금 어떤 고민이 있으세요?
+          </p>
+          <p style={{ fontSize: 12, color: '#6b7280', textAlign: 'center', margin: '0 0 18px', lineHeight: 1.5 }}>
+            재테크든, 마음이 힘든 일이든, 결정 못 한 것이든<br/>그냥 말씀해 보세요
+          </p>
+
+          {/* 버튼 3개 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+            {[
+              { emoji: '😔', label: '마음이 너무 힘들어요', tab: 'tea' as const },
+              { emoji: '📈', label: '재테크가 고민이에요', tab: 'finance' as const },
+              { emoji: '🤔', label: '결정을 못 하겠어요', tab: 'tea' as const },
+            ].map(({ emoji, label, tab }) => (
+              <button
+                key={label}
+                type="button"
+                className="px-intro-btn"
+                onClick={() => onTabChange(tab)}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: '#374151',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <span style={{ fontSize: 18 }}>{emoji}</span>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* 구분선 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
+            <span style={{ fontSize: 12, color: '#9ca3af' }}>또는 직접 입력</span>
+            <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
+          </div>
+
+          {/* 직접 입력창 */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              className="px-intro-input"
+              type="text"
+              value={introInput}
+              onChange={e => setIntroInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') classifyAndEnter(introInput); }}
+              placeholder="고민을 자유롭게 입력하세요"
               style={{
-                fontSize: 11.5,
-                color: '#92400e',
-                lineHeight: 1.4,
+                flex: 1,
+                padding: '10px 14px',
+                fontSize: 14,
+                border: '1px solid #d1d5db',
+                borderRadius: 10,
+                background: '#ffffff',
+                color: '#111827',
+                boxSizing: 'border-box',
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => classifyAndEnter(introInput)}
+              style={{
+                padding: '10px 16px',
+                background: '#FAE100',
+                border: 'none',
+                borderRadius: 10,
+                cursor: 'pointer',
+                fontSize: 13,
+                fontWeight: 700,
+                color: '#111827',
                 whiteSpace: 'nowrap',
               }}
             >
-              고민과 감정을 참모진과 나눠보세요
-            </span>
-          </button>
+              시작
+            </button>
+          </div>
         </div>
       </>
     );
@@ -1876,7 +1933,6 @@ export default function ChatWindow() {
   // 🔍 디버그 — teaPersona state 변경 추적
   useEffect(() => {
     // eslint-disable-next-line no-console
-    console.log('[debug] teaPersona state changed →', teaPersona);
   }, [teaPersona]);
 
   useEffect(() => {
@@ -2307,9 +2363,7 @@ export default function ChatWindow() {
 
     // 🔍 디버그 — 클로저가 최신 teaPersona 를 캡처하고 있는지 확인
     // eslint-disable-next-line no-console
-    console.log('[debug] teaPersona state:', teaPersona);
     // eslint-disable-next-line no-console
-    console.log('[debug] isTeaSend:', isTeaSend);
 
     // ✅ 차 한잔 대화 턴 수 — 이번 전송 포함 (1 = 첫 메시지)
     //    기존에 보낸 user 메시지 중 teaMode=true 인 것 +1
@@ -2353,7 +2407,6 @@ export default function ChatWindow() {
     // 🔍 차 한잔 모드 요청 body 진단 로그 — teaPersona 전달 여부 확인
     if (isTeaSend) {
       // eslint-disable-next-line no-console
-      console.log('[tea] sending teaPersona:', teaPersona);
       // eslint-disable-next-line no-console
       console.debug('[tea] request body —', '/ teaMode:', requestBody.teaMode, '/ teaRound:', requestBody.teaRound, '/ messages count:', requestBody.messages.length);
     }
@@ -2746,7 +2799,7 @@ export default function ChatWindow() {
                         <PersonaBubble personaKey="lucia" text={luciaMain} timestamp={msg.timestamp} newsItem={msg.personas.luciaNews} details={msg.personas.luciaDetails} />
                         <PersonaBubble personaKey="jack" text={jackRebuttalText} timestamp={msg.timestamp} isRebuttal />
                         <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>
-                          ── ECHO COMMAND ──
+                          ── ECHO SUMMARY ──
                         </div>
                         <EchoBubble
                           summary={msg.personas.echo}
@@ -2764,7 +2817,7 @@ export default function ChatWindow() {
                       <PersonaBubble personaKey="jack" text={jackText} timestamp={msg.timestamp} newsItem={msg.personas.jackNews} details={msg.personas.jackDetails} />
                       <PersonaBubble personaKey="lucia" text={luciaText} timestamp={msg.timestamp} newsItem={msg.personas.luciaNews} details={msg.personas.luciaDetails} />
                       <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>
-                        ── ECHO COMMAND ──
+                        ── ECHO SUMMARY ──
                       </div>
                       <EchoBubble
                         summary={msg.personas.echo}

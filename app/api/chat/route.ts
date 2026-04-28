@@ -134,13 +134,9 @@ const callTeaPersona = async (
     console.warn(`${tag} contents 무효 (length=${contents.length}) → 템플릿 폴백`);
     return null;
   }
-  console.log(
-    `${tag} Gemini 호출 시작 — history=${history.length}턴, contents=${contents.length}턴, chain=[${TEA_GEMINI_FALLBACK_CHAIN.join(' → ')}]`,
-  );
   for (let i = 0; i < TEA_GEMINI_FALLBACK_CHAIN.length; i++) {
     const modelName = TEA_GEMINI_FALLBACK_CHAIN[i];
     const nextModel = TEA_GEMINI_FALLBACK_CHAIN[i + 1];
-    console.log(`${tag} ${modelName} 시도 중`);
     try {
       const model = teaGenAI.getGenerativeModel({
         model: modelName,
@@ -174,7 +170,6 @@ const callTeaPersona = async (
         console.warn(`${tag} ${modelName} 빈 응답 (finishReason=${finishReason}) → 템플릿 폴백`);
         return null;
       }
-      console.log(`${tag} ${modelName} 성공 — ${text.trim().length}자 (finishReason=${finishReason})`);
       return text.trim();
     } catch (err) {
       const retriable = isRetriableModelError(err);
@@ -418,9 +413,6 @@ export async function POST(req: Request) {
       const jackHistory = buildTeaHistory(messages, 'jack');
       const echoHistory = buildTeaHistory(messages, 'echo');
 
-      console.log(
-        `[tea] round=${round} / userTurns=${userTurns} / history lucia=${luciaHistory.length} jack=${jackHistory.length} echo=${echoHistory.length} / key=${process.env.GOOGLE_GENERATIVE_AI_API_KEY ? 'OK' : 'MISSING'}`,
-      );
 
       // ── 폴백 템플릿 (LLM 실패 시 per-persona 사용) ──
       let fallbackLucia: string;
@@ -462,14 +454,11 @@ export async function POST(req: Request) {
 
       // ── 단일 페르소나 1:1 응답 (teaPersona 값에 따라 해당 페르소나만 호출) ──
       //   teaPersona 누락 시 기본 'lucia' 로 폴백 (구버전 클라이언트 호환).
-      console.log('[tea] received teaPersona:', teaPersona);
       const selectedPersona: 'lucia' | 'jack' | 'echo' =
         teaPersona === 'jack' ? 'jack' : teaPersona === 'echo' ? 'echo' : 'lucia';
-      console.log(`[tea] → selectedPersona="${selectedPersona}"`);
 
       if (selectedPersona === 'jack') {
         const jackLLM = await callTeaPersona('jack', TEA_SYSTEM_JACK, jackHistory);
-        console.log(`[tea] round=${round} persona=jack 결과 — ${jackLLM ? 'LLM' : 'FALLBACK'}`);
         try {
           const supabase = getSupabase();
           if (supabase) {
@@ -493,7 +482,6 @@ export async function POST(req: Request) {
 
       if (selectedPersona === 'echo') {
         const echoLLM = await callTeaPersona('echo', TEA_SYSTEM_ECHO, echoHistory);
-        console.log(`[tea] round=${round} persona=echo 결과 — ${echoLLM ? 'LLM' : 'FALLBACK'}`);
         try {
           const supabase = getSupabase();
           if (supabase) {
@@ -524,7 +512,6 @@ export async function POST(req: Request) {
           .replace(/분석:[\s\S]*?\n\n/g, '')
           .trim();
       }
-      console.log(`[tea] round=${round} persona=lucia 결과 — ${luciaLLM ? 'LLM' : 'FALLBACK'}`);
       try {
         const supabase = getSupabase();
         if (supabase) {
@@ -551,7 +538,6 @@ export async function POST(req: Request) {
     //   종목 데이터 없이 순수 전략·철학 답변.
     //   LLM 실패 시 폴백 텍스트 반환.
     if (isAdvancedQuestion) {
-      console.log('[advanced] 고급 질문 감지 — 4명 페르소나 병렬 호출 시작');
       const advancedHistory: TeaMsg[] = [{ role: 'user', content: lastMsg }];
 
       const [rayLLM, jackLLM, luciaLLM, echoLLM] = await Promise.all([
@@ -586,9 +572,6 @@ export async function POST(req: Request) {
       const lucia = splitForBubble(luciaText);
       const echo = splitForBubble(echoText);
 
-      console.log(
-        `[advanced] 결과 — RAY:${rayLLM ? 'LLM' : 'FB'} / JACK:${jackLLM ? 'LLM' : 'FB'} / LUCIA:${luciaLLM ? 'LLM' : 'FB'} / ECHO:${echoLLM ? 'LLM' : 'FB'}`,
-      );
 
       return Response.json({
         reply: [rayText, jackText, luciaText, echoText].join('\n\n'),
@@ -1791,7 +1774,6 @@ ${DISCLAIMER}`;
       ].join('\n');
     }
 
-    console.log(`✅ ${keyword}(${assetType}) | ${verdict}(${total}점) | 신뢰도:${confidence}% | 에코:템플릿`);
 
     // ✅ MBTI 강화 문구 — 상승/하락 풀로 분리 (각 10개)
 
@@ -1914,13 +1896,9 @@ ${DISCLAIMER}`;
     const echoPick = scoredNews.find(n => !usedUrls.has(getUrl(n))) ?? null;
     const echoNews = echoPick ? cleanNewsItem(echoPick) : null;
 
-    console.log(
-      `[News 배정] total=${scoredNews.length} ray=${rayNews ? '✅' : '∅'} jack=${jackNews ? '✅' : '∅'} lucia=${luciaNews ? '✅' : '∅'} echo=${echoNews ? '✅' : '∅'}`
-    );
 
     // ─── 히스토리 저장 ───
     const isIndexKeyword = INDEX_KEYWORDS.has(keyword);
-    console.log(`[saveHistory] userId=${userId} keyword=${keyword} isIndex=${isIndexKeyword}`);
     if (userId && !isIndexKeyword) {
       void Promise.race([
         saveHistory({
@@ -1933,7 +1911,6 @@ ${DISCLAIMER}`;
     } else if (!userId) {
       console.warn('[saveHistory] 저장 스킵 — userId null');
     } else if (isIndexKeyword) {
-      console.log(`[saveHistory] 저장 스킵 — 지수: ${keyword}`);
     }
 
     // ✅ 자세히 보기 전용 후처리 — 지시형 표현 완화 + 이모지 허용 셋 통일
