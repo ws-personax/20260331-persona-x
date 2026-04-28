@@ -217,7 +217,7 @@ const NoticeBox = ({
   dataSource: string;
   marketClosedNote: string;
 }) => (
-  <div style={{ marginTop: 8, padding: '0 12px 0 58px' }}>
+  <div style={{ marginTop: 5, padding: '0 12px 0 58px' }}>
     <div
       style={{
         background: 'rgba(0,0,0,0.04)',
@@ -663,7 +663,7 @@ const PersonaBubble = memo(function PersonaBubble({
               {hasDetails && open && (
                 <div
                   style={{
-                    marginTop: 8,
+                    marginTop: 5,
                     paddingTop: 8,
                     borderTop: `1px dashed ${p.bubbleBorder}`,
                   }}
@@ -872,7 +872,7 @@ const EchoBubble = memo(function EchoBubble({
               {open && hasDetails && (
                 <div
                   style={{
-                    marginTop: 10,
+                    marginTop: 6,
                     paddingTop: 10,
                     borderTop: `1px dashed ${p.bubbleBorder}`,
                   }}
@@ -1048,7 +1048,7 @@ const ErrorCard = ({
   showRetry: boolean;
   onRetry?: () => void;
 }) => (
-  <div style={{ padding: '0 12px', marginBottom: 10 }}>
+  <div style={{ padding: '0 12px', marginBottom: 14 }}>
     <div
       style={{
         background: '#f9fafb',
@@ -1231,7 +1231,7 @@ const FinanceTabContent = ({ onOpenQuickPanel }: { onOpenQuickPanel: (panel: Fin
             fontSize: 12,
             fontWeight: 500,
             lineHeight: 1.5,
-            margin: '0 0 4px',
+            margin: '0 0 3px',
           }}
         >
           종목명이나 재테크 고민을 입력하면 4명이 분석해드려요
@@ -1387,7 +1387,7 @@ const TeaTabContent = ({
                 background: PERSONAS.lucia.bubbleBg,
                 border: `1px solid ${PERSONAS.lucia.bubbleBorder}`,
                 borderRadius: '4px 18px 18px 18px',
-                padding: '10px 14px',
+                padding: '12px 16px',
                 maxWidth: '85%',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
               }}
@@ -1515,7 +1515,7 @@ const IntroSlider = () => {
   const slide = INTRO_SLIDES[idx];
 
   return (
-    <div style={{ width: '100%', maxWidth: 380, margin: '0 auto 6px' }}>
+    <div style={{ width: '100%', maxWidth: 380, margin: '0 auto 10px' }}>
       <style>{`
         @keyframes pxIntroFade {
           from { opacity: 0; transform: translateY(6px); }
@@ -1529,9 +1529,9 @@ const IntroSlider = () => {
       {/* 슬라이드 본체 — key 변경 시 페이드 인 재실행 (슬로건도 함께 전환) */}
       <div key={slide.id} className="px-intro-slide">
         {/* 슬라이드별 슬로건 — 상단 작은 / 메인(하이라이트) / 서브 */}
-        <div style={{ textAlign: 'center', marginBottom: 6 }}>
+        <div style={{ textAlign: 'center', marginBottom: 10 }}>
           <p style={{
-            fontSize: 11,
+            fontSize: 11.5,
             fontWeight: 500,
             color: '#9ca3af',
             letterSpacing: 0.3,
@@ -1540,21 +1540,21 @@ const IntroSlider = () => {
             {slide.slogan.topIcon} {slide.slogan.topText}
           </p>
           <p style={{
-            fontSize: 15,
+            fontSize: 16,
             fontWeight: 800,
             color: '#1f2937',
-            lineHeight: 1.35,
-            margin: '0 0 4px',
+            lineHeight: 1.3,
+            margin: '0 0 3px',
           }}>
             {slide.slogan.mainIcon}{' '}
             {renderSloganHighlight(slide.slogan.mainText, slide.slogan.highlightWord, slide.slogan.highlightColor)}
           </p>
           <p style={{
-            fontSize: 11,
+            fontSize: 11.5,
             fontWeight: 500,
-            color: "#6b7280",
-            lineHeight: 1.4,
-            margin: "0 0 6px",
+            color: '#6b7280',
+            lineHeight: 1.45,
+            margin: '0 0 10px',
           }}>
             {slide.slogan.subIcon} {slide.slogan.subText}
           </p>
@@ -1562,12 +1562,12 @@ const IntroSlider = () => {
 
         {/* 상단 질문 */}
         <p style={{
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: 700,
-          color: "#1f2937",
-          textAlign: "center",
-          margin: "0 0 6px",
-          padding: "4px 10px",
+          color: '#1f2937',
+          textAlign: 'center',
+          margin: '0 0 8px',
+          padding: '5px 12px',
           background: '#ffffff',
           border: '1px solid #e5e7eb',
           borderRadius: 999,
@@ -1596,17 +1596,17 @@ const IntroSlider = () => {
                 style={{
                   background: st.bg,
                   border: `1px solid ${st.border}`,
-                  borderRadius: 10,
-                  padding: isRow3 ? '6px 6px' : '6px 8px',
+                  borderRadius: 11,
+                  padding: isRow3 ? '7px 7px' : '7px 9px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 3,
-                  minHeight: isRow3 ? 100 : 72,
+                  gap: 4,
+                  minHeight: isRow3 ? 130 : 86,
                   minWidth: 0,
                 }}
               >
                 <div style={{
-                  fontSize: isRow3 ? 9 : 10,
+                  fontSize: isRow3 ? 9.5 : 10.5,
                   fontWeight: 800,
                   color: st.title,
                   letterSpacing: 0.2,
@@ -1617,12 +1617,12 @@ const IntroSlider = () => {
                   lineHeight: 1.2,
                 }}>
                   <span>{c.name}</span>
-                  <span style={{ fontWeight: 600, opacity: 0.8, fontSize: isRow3 ? 8 : 9.5 }}>· {c.role}</span>
+                  <span style={{ fontWeight: 600, opacity: 0.8, fontSize: isRow3 ? 8.5 : 10 }}>· {c.role}</span>
                 </div>
                 <p style={{
                   margin: 0,
-                  fontSize: isRow3 ? 9 : 10,
-                  lineHeight: 1.35,
+                  fontSize: isRow3 ? 9.5 : 10.5,
+                  lineHeight: 1.4,
                   color: st.body,
                   whiteSpace: 'pre-line',
                   wordBreak: 'keep-all',
@@ -1640,7 +1640,7 @@ const IntroSlider = () => {
         display: 'flex',
         justifyContent: 'center',
         gap: 8,
-        marginTop: 8,
+        marginTop: 5,
       }}>
         {INTRO_SLIDES.map((s, i) => (
           <button
@@ -1664,10 +1664,10 @@ const IntroSlider = () => {
 
       {/* 법적 고지 — 슬라이드 맨 아래, 작고 옅게 */}
       <p style={{
-        marginTop: 10,
+        marginTop: 6,
         marginBottom: 0,
         textAlign: 'center',
-        fontSize: 9.5,
+        fontSize: 8.5,
         lineHeight: 1.5,
         color: '#9ca3af',
         whiteSpace: 'pre-line',
@@ -1728,7 +1728,7 @@ const OnboardingTabs = ({
         `}</style>
 
         {/* 슬라이드 — 기존 유지 */}
-        <div style={{ textAlign: 'center', marginBottom: 10, padding: '0 8px', width: '100%' }}>
+        <div style={{ textAlign: 'center', marginBottom: 16, padding: '0 8px', width: '100%' }}>
           <IntroSlider />
         </div>
 
@@ -1739,17 +1739,17 @@ const OnboardingTabs = ({
           background: '#ffffff',
           border: '1px solid #e5e7eb',
           borderRadius: 16,
-          padding: '14px 14px 14px',
+          padding: '24px 20px 20px',
           boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
           boxSizing: 'border-box',
         }}>
           {/* 질문 */}
-          <p style={{ fontSize: 15, fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 12px', lineHeight: 1.4 }}>
+          <p style={{ fontSize: 17, fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 18px', lineHeight: 1.5 }}>
             지금 어떤 고민이 있으세요?
           </p>
 
           {/* 버튼 3개 */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
             {[
               { emoji: '😔', label: '마음이 너무 힘들어요', tab: 'tea' as const },
               { emoji: '📈', label: '재테크가 고민이에요', tab: 'finance' as const },
@@ -1762,7 +1762,7 @@ const OnboardingTabs = ({
                 onClick={() => onTabChange(tab)}
                 style={{
                   width: '100%',
-                  padding: '10px 14px',
+                  padding: '12px 16px',
                   background: '#f9fafb',
                   border: '1px solid #e5e7eb',
                   borderRadius: 10,
@@ -1784,7 +1784,7 @@ const OnboardingTabs = ({
           </div>
 
           {/* 구분선 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
             <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
             <span style={{ fontSize: 12, color: '#9ca3af' }}>또는 직접 입력</span>
             <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
@@ -2513,7 +2513,7 @@ export default function ChatWindow() {
       <header
         style={{
           background: 'rgba(178,199,218,0.95)',
-          padding: '10px 14px',
+          padding: '12px 16px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -2607,7 +2607,7 @@ export default function ChatWindow() {
       {/* ✅ 첫 화면(hasUserSent=false & onboardingTab=null) — 카드 전용 스크롤 컨테이너.
           헤더 바로 아래에 자연스럽게 카드 배치 (spacer/특수 패딩 없이 단순 padding 만). */}
       {!hasUserSent && onboardingTab === null && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px 120px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center' }}>
           <OnboardingTabs
             activeTab={onboardingTab}
             onTabChange={setOnboardingTab}
