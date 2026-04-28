@@ -2541,8 +2541,6 @@ export default function ChatWindow() {
           height: 100vh;
           height: 100dvh;
         }
-        /* 첫 화면 온보딩 래퍼 — 기본은 탭 선택 후 콘텐츠용 (상단 정렬).
-           onboardingTab === null 일 때만 인라인 style 로 flex 중앙정렬 override. */
         .px-onboarding-wrap {
           padding: 0 0 20px;
           box-sizing: border-box;
