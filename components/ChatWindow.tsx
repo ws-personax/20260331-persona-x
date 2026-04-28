@@ -1173,7 +1173,6 @@ const FinanceTabContent = ({ onOpenQuickPanel }: { onOpenQuickPanel: (panel: Fin
         4개의 관점이 충돌합니다
       </h2>
 
-      {/* 상단 액션 버튼 3개 — 주요 뉴스 / 추천 질문 / 고급 질문 (가로 균등 배치) */}
       <style>{`
         .px-fin-top {
           transition: transform 0.1s ease, box-shadow 0.15s ease, filter 0.15s ease;
@@ -2535,7 +2534,6 @@ export default function ChatWindow() {
 
   return (
     <>
-      {/* ✅ iOS Safari 주소창 동적 높이 대응 + 온보딩 중앙 정렬 */}
       <style>{`
         .px-app-root {
           height: 100vh;
