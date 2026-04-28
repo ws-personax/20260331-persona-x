@@ -103,7 +103,7 @@ const PERSONAS: Record<
     bubbleBg: '#fff8d6',
     bubbleBorder: '#d4a017',
     textColor: '#111827',
-    echoTag: 'ECHO SUMMARY',
+    echoTag: 'FINAL COMMAND',
   },
 };
 
@@ -1048,7 +1048,7 @@ const ErrorCard = ({
   showRetry: boolean;
   onRetry?: () => void;
 }) => (
-  <div style={{ padding: '0 12px', marginBottom: 14 }}>
+  <div style={{ padding: '0 12px', marginBottom: 10 }}>
     <div
       style={{
         background: '#f9fafb',
@@ -1387,7 +1387,7 @@ const TeaTabContent = ({
                 background: PERSONAS.lucia.bubbleBg,
                 border: `1px solid ${PERSONAS.lucia.bubbleBorder}`,
                 borderRadius: '4px 18px 18px 18px',
-                padding: '12px 16px',
+                padding: '10px 14px',
                 maxWidth: '85%',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
               }}
@@ -1456,7 +1456,7 @@ const INTRO_SLIDES: IntroSlide[] = [
       topIcon: '📊',
       topText: '범용 AI는 답을 드리지만,',
       mainIcon: '⚡',
-      mainText: 'AI들이 충돌하고, 당신이 결정합니다.',
+      mainText: '4명이 충돌하고, 당신이 결정합니다.',
       highlightWord: '충돌',
       highlightColor: '#E85D4A',
       subIcon: '📚',
@@ -1474,60 +1474,19 @@ const INTRO_SLIDES: IntroSlide[] = [
     question: '남편이랑 싸웠어요',
     layout: 'row3',
     slogan: {
-      topIcon: '💜',
-      topText: 'AI들이 충돌하고,',
-      mainIcon: '🌱',
-      mainText: '당신이 결정하고, 마침내 성장합니다.',
-      highlightWord: '성장',
-      highlightColor: '#059669',
-      subIcon: '☕',
+      topIcon: '☕',
+      topText: '판단은 잠시 내려놓으시고,',
+      mainIcon: '💜',
+      mainText: 'AI 참모진이 마음을 함께 나눕니다.',
+      highlightWord: '함께',
+      highlightColor: '#9B59B6',
+      subIcon: '🤝',
       subText: '마음 고민, 저희가 함께해요',
     },
     cards: [
       { persona: 'lucia', name: 'LUCIA', role: '감정 · 공감', text: '아… 많이 속상하셨겠다.\n가까운 사람이랑 다투고 나면\n그 감정이 오래 남잖아요.' },
       { persona: 'jack',  name: 'JACK',  role: '결단 · 전략', text: '지금 할 수 있는 건 두 가지입니다.\n1. 본인이 먼저 사과\n2. 남편 사과 기다리기\n관계를 원한다면 1번입니다.' },
       { persona: 'echo',  name: 'ECHO',  role: '구조 · 원칙', text: '결론: 감정 충돌이 아닙니다.\n소통 구조의 문제입니다.\n먼저 손 내미는 쪽이\n관계를 가져갑니다.' },
-    ],
-  },
-  {
-    id: 'finance',
-    question: '아들 대학 입학, 노트북 뭐 사줄까요?',
-    layout: '2x2',
-    slogan: {
-      topIcon: '🤔',
-      topText: '정보가 아니라,',
-      mainIcon: '💡',
-      mainText: '관점이 충돌합니다.',
-      highlightWord: '충돌',
-      highlightColor: '#E85D4A',
-      subIcon: '✨',
-      subText: '결정 못 하는 순간, 저희가 함께해요',
-    },
-    cards: [
-      { persona: 'ray',   name: 'RAY',   role: '데이터 · 분석', text: '맥북 M3 중고 잔존가치 70%.\nLG 그램 배터리 17시간.\n전공 확인 후 선택 권장.' },
-      { persona: 'jack',  name: 'JACK',  role: '결단 · 전략',  text: '맥북 사세요.\n4년 투자예요.\n싸게 샀다가 두 번 사는 게\n더 비쌉니다.' },
-      { persona: 'lucia', name: 'LUCIA', role: '감정 · 공감',  text: '아들이 원하는 게\n뭔지 물어봤어요?\n부모 마음엔 좋은 걸\n사주고 싶지만요.' },
-      { persona: 'echo',  name: 'ECHO',  role: '구조 · 원칙',  text: '전공이 먼저예요.\n디자인이면 맥북.\n이공계면 윈도우.\n노트북보다 전공이 중요합니다.' },
-    ],
-  },
-  {
-    id: 'tea',
-    question: '요즘 왜 이렇게 의욕이 없지',
-    layout: 'row3',
-    slogan: {
-      topIcon: '💜',
-      topText: 'AI들이 충돌하고,',
-      mainIcon: '🌱',
-      mainText: '당신이 결정하고, 마침내 성장합니다.',
-      highlightWord: '성장',
-      highlightColor: '#059669',
-      subIcon: '☕',
-      subText: '마음 고민, 저희가 함께해요',
-    },
-    cards: [
-      { persona: 'lucia', name: 'LUCIA', role: '감정 · 공감', text: '언제부터 그랬어요?\n갑자기 온 건지,\n서서히 온 건지에 따라\n달라요.' },
-      { persona: 'jack',  name: 'JACK',  role: '결단 · 전략', text: '몸이 먼저예요.\n오늘 일찍 자세요.\n의욕은 생각으로\n안 생겨요.' },
-      { persona: 'echo',  name: 'ECHO',  role: '구조 · 원칙', text: '의욕이 없는 게 아니라\n방향이 없는 걸 수 있어요.\n왜 이걸 하는지\n모르겠다는 느낌, 있어요?' },
     ],
   },
 ];
@@ -1549,14 +1508,14 @@ const IntroSlider = () => {
   useEffect(() => {
     const t = setInterval(() => {
       setIdx(i => (i + 1) % INTRO_SLIDES.length);
-    }, 4000);
+    }, 5000);
     return () => clearInterval(t);
   }, []);
 
   const slide = INTRO_SLIDES[idx];
 
   return (
-    <div style={{ width: '100%', maxWidth: 380, margin: '0 auto 10px' }}>
+    <div style={{ width: '100%', maxWidth: 380, margin: '0 auto 6px' }}>
       <style>{`
         @keyframes pxIntroFade {
           from { opacity: 0; transform: translateY(6px); }
@@ -1570,18 +1529,18 @@ const IntroSlider = () => {
       {/* 슬라이드 본체 — key 변경 시 페이드 인 재실행 (슬로건도 함께 전환) */}
       <div key={slide.id} className="px-intro-slide">
         {/* 슬라이드별 슬로건 — 상단 작은 / 메인(하이라이트) / 서브 */}
-        <div style={{ textAlign: 'center', marginBottom: 10 }}>
+        <div style={{ textAlign: 'center', marginBottom: 6 }}>
           <p style={{
-            fontSize: 11.5,
+            fontSize: 11,
             fontWeight: 500,
             color: '#9ca3af',
             letterSpacing: 0.3,
-            margin: '0 0 3px',
+            margin: '0 0 2px',
           }}>
             {slide.slogan.topIcon} {slide.slogan.topText}
           </p>
           <p style={{
-            fontSize: 16,
+            fontSize: 15,
             fontWeight: 800,
             color: '#1f2937',
             lineHeight: 1.35,
@@ -1591,11 +1550,11 @@ const IntroSlider = () => {
             {renderSloganHighlight(slide.slogan.mainText, slide.slogan.highlightWord, slide.slogan.highlightColor)}
           </p>
           <p style={{
-            fontSize: 11.5,
+            fontSize: 11,
             fontWeight: 500,
-            color: '#6b7280',
-            lineHeight: 1.45,
-            margin: '0 0 10px',
+            color: "#6b7280",
+            lineHeight: 1.4,
+            margin: "0 0 6px",
           }}>
             {slide.slogan.subIcon} {slide.slogan.subText}
           </p>
@@ -1603,12 +1562,12 @@ const IntroSlider = () => {
 
         {/* 상단 질문 */}
         <p style={{
-          fontSize: 13,
+          fontSize: 12,
           fontWeight: 700,
-          color: '#1f2937',
-          textAlign: 'center',
-          margin: '0 0 8px',
-          padding: '5px 12px',
+          color: "#1f2937",
+          textAlign: "center",
+          margin: "0 0 6px",
+          padding: "4px 10px",
           background: '#ffffff',
           border: '1px solid #e5e7eb',
           borderRadius: 999,
@@ -1637,17 +1596,17 @@ const IntroSlider = () => {
                 style={{
                   background: st.bg,
                   border: `1px solid ${st.border}`,
-                  borderRadius: 11,
-                  padding: isRow3 ? '7px 7px' : '7px 9px',
+                  borderRadius: 10,
+                  padding: isRow3 ? '6px 6px' : '6px 8px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 4,
-                  minHeight: isRow3 ? 130 : 86,
+                  gap: 3,
+                  minHeight: isRow3 ? 100 : 72,
                   minWidth: 0,
                 }}
               >
                 <div style={{
-                  fontSize: isRow3 ? 9.5 : 10.5,
+                  fontSize: isRow3 ? 9 : 10,
                   fontWeight: 800,
                   color: st.title,
                   letterSpacing: 0.2,
@@ -1658,12 +1617,12 @@ const IntroSlider = () => {
                   lineHeight: 1.2,
                 }}>
                   <span>{c.name}</span>
-                  <span style={{ fontWeight: 600, opacity: 0.8, fontSize: isRow3 ? 8.5 : 10 }}>· {c.role}</span>
+                  <span style={{ fontWeight: 600, opacity: 0.8, fontSize: isRow3 ? 8 : 9.5 }}>· {c.role}</span>
                 </div>
                 <p style={{
                   margin: 0,
-                  fontSize: isRow3 ? 9.5 : 10.5,
-                  lineHeight: 1.4,
+                  fontSize: isRow3 ? 9 : 10,
+                  lineHeight: 1.35,
                   color: st.body,
                   whiteSpace: 'pre-line',
                   wordBreak: 'keep-all',
@@ -1769,7 +1728,7 @@ const OnboardingTabs = ({
         `}</style>
 
         {/* 슬라이드 — 기존 유지 */}
-        <div style={{ textAlign: 'center', marginBottom: 16, padding: '0 8px', width: '100%' }}>
+        <div style={{ textAlign: 'center', marginBottom: 10, padding: '0 8px', width: '100%' }}>
           <IntroSlider />
         </div>
 
@@ -1780,20 +1739,17 @@ const OnboardingTabs = ({
           background: '#ffffff',
           border: '1px solid #e5e7eb',
           borderRadius: 16,
-          padding: '24px 20px 20px',
+          padding: '14px 14px 14px',
           boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
           boxSizing: 'border-box',
         }}>
           {/* 질문 */}
-          <p style={{ fontSize: 17, fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 6px', lineHeight: 1.4 }}>
+          <p style={{ fontSize: 15, fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 12px', lineHeight: 1.4 }}>
             지금 어떤 고민이 있으세요?
-          </p>
-          <p style={{ fontSize: 12, color: '#6b7280', textAlign: 'center', margin: '0 0 18px', lineHeight: 1.5 }}>
-            재테크든, 마음이 힘든 일이든, 결정 못 한 것이든<br/>그냥 말씀해 보세요
           </p>
 
           {/* 버튼 3개 */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 12 }}>
             {[
               { emoji: '😔', label: '마음이 너무 힘들어요', tab: 'tea' as const },
               { emoji: '📈', label: '재테크가 고민이에요', tab: 'finance' as const },
@@ -1806,7 +1762,7 @@ const OnboardingTabs = ({
                 onClick={() => onTabChange(tab)}
                 style={{
                   width: '100%',
-                  padding: '12px 16px',
+                  padding: '10px 14px',
                   background: '#f9fafb',
                   border: '1px solid #e5e7eb',
                   borderRadius: 10,
@@ -1828,7 +1784,7 @@ const OnboardingTabs = ({
           </div>
 
           {/* 구분선 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
             <span style={{ fontSize: 12, color: '#9ca3af' }}>또는 직접 입력</span>
             <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
@@ -2557,7 +2513,7 @@ export default function ChatWindow() {
       <header
         style={{
           background: 'rgba(178,199,218,0.95)',
-          padding: '12px 16px',
+          padding: '10px 14px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -2651,7 +2607,7 @@ export default function ChatWindow() {
       {/* ✅ 첫 화면(hasUserSent=false & onboardingTab=null) — 카드 전용 스크롤 컨테이너.
           헤더 바로 아래에 자연스럽게 카드 배치 (spacer/특수 패딩 없이 단순 padding 만). */}
       {!hasUserSent && onboardingTab === null && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px 120px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center' }}>
           <OnboardingTabs
             activeTab={onboardingTab}
             onTabChange={setOnboardingTab}
@@ -2799,7 +2755,7 @@ export default function ChatWindow() {
                         <PersonaBubble personaKey="lucia" text={luciaMain} timestamp={msg.timestamp} newsItem={msg.personas.luciaNews} details={msg.personas.luciaDetails} />
                         <PersonaBubble personaKey="jack" text={jackRebuttalText} timestamp={msg.timestamp} isRebuttal />
                         <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>
-                          ── ECHO SUMMARY ──
+                          ── ECHO COMMAND ──
                         </div>
                         <EchoBubble
                           summary={msg.personas.echo}
@@ -2817,7 +2773,7 @@ export default function ChatWindow() {
                       <PersonaBubble personaKey="jack" text={jackText} timestamp={msg.timestamp} newsItem={msg.personas.jackNews} details={msg.personas.jackDetails} />
                       <PersonaBubble personaKey="lucia" text={luciaText} timestamp={msg.timestamp} newsItem={msg.personas.luciaNews} details={msg.personas.luciaDetails} />
                       <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>
-                        ── ECHO SUMMARY ──
+                        ── ECHO COMMAND ──
                       </div>
                       <EchoBubble
                         summary={msg.personas.echo}
