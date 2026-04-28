@@ -29,7 +29,6 @@ interface PersonaData {
   luciaNews?: NewsLink | null;
   rayNews?: NewsLink | null;
   echoNews?: NewsLink | null;
-  // ✅ 고급 질문 응답 플래그 — true 면 상단에 "💡 전략 분석" 헤더 표시
   isAdvancedAnswer?: boolean;
 }
 
@@ -45,8 +44,7 @@ interface Message {
   newsLinks?: NewsLink[];
   errorType?: ErrorType;
   errorMessage?: string;
-  retryText?: string; // 재시도 버튼이 다시 보낼 사용자 입력
-  // 차 한잔 탭 전용 — Round 1 LUCIA 단독 / Round 2+ LUCIA+JACK+ECHO
+  retryText?: string;
   teaMode?: boolean;
   teaLucia?: string;
   teaJack?: string;
@@ -111,7 +109,6 @@ const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)
 const formatTime = (d: Date) =>
   d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 
-// ✅ PersonaX 면책 고지 — 모든 종목 공통 (중앙 상수)
 const PERSONAX_DISCLAIMER = `⚠️ PersonaX는 AI 금융 콘텐츠 플랫폼입니다.
 제공되는 모든 분석은 참고용 시나리오이며
 투자 자문·매매 추천이 아닙니다.
@@ -119,7 +116,6 @@ const PERSONAX_DISCLAIMER = `⚠️ PersonaX는 AI 금융 콘텐츠 플랫폼입
 전적으로 투자자 본인에게 있습니다.`;
 
 const parseEchoParts = (text: string) => {
-  // ✅ 리터럴 \n 정규화
   const normalized = (text || '').replace(/\\n/g, '\n');
 
   const markers = ['📡', '─────────────────────────'];
@@ -138,7 +134,6 @@ const parseEchoParts = (text: string) => {
   const lines = remainder.split('\n');
   const dataLine = (lines.find(l => l.includes('📡')) || '').trim();
 
-  // ⚠️ 장 개장 전/마감 후/주말 휴장 — PersonaX 면책과 분리
   const marketClosedLine = (lines.find(l => {
     const t = l.trim();
     return t.startsWith('⚠️ 장') || t.startsWith('⚠️ 주말');
@@ -205,11 +200,6 @@ const EchoNewsChip = ({ news }: { news: NewsLink }) => (
   </div>
 );
 
-// ✅ 통일된 공지 박스 — 모든 종목 동일 순서/형식
-//   1. ⚠️ 장 개장 전/마감 후 (해당 시에만)
-//   2. 📡 데이터 출처
-//   3. 💡 컨플루언스 가이드
-//   4. ⚠️ PersonaX 면책 고지 (1번만, 중앙 상수 사용)
 const NoticeBox = ({
   dataSource,
   marketClosedNote,
@@ -246,24 +236,16 @@ const NoticeBox = ({
   </div>
 );
 
-// 차 한잔 탭 LLM 응답 정리 — 마크다운 볼드 제거 + 연속 빈 줄 완전 제거.
-// LLM이 프롬프트 지시를 어기고 **볼드** 나 연속 줄바꿈을 내보내는 경우 차단.
-// 연속 빈 줄(\n{2,}) → 단일 줄바꿈(\n) 으로 축소해 호흡을 촘촘하게 유지.
 const cleanTeaText = (text: string): string =>
   text
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/\n{2,}/g, '\n');
 
-// JACK 전용 정리 — 빈 줄 완전 제거. JACK 은 촘촘하게 흘러야 묵직함이 산다.
-// 프롬프트에서 "빈 줄 금지" 지시해도 모델이 간헐적으로 \n\n 을 내보내는 경우 차단.
 const cleanJackText = (text: string): string =>
   text
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/\n{2,}/g, '\n');
 
-// ─── 음성 유틸 (STT 입력: Web Speech API / TTS 출력: 네이버 CLOVA Voice via /api/tts) ───
-// SSR 안전: window 접근은 호출 시점에만. 미지원 브라우저에서는 false 반환하여 UI에서 숨김.
-// TTS 는 서버 라우트로 위임하므로 HTMLAudioElement 만 있으면 동작.
 const isTTSSupported = (): boolean =>
   typeof window !== 'undefined' && typeof Audio !== 'undefined';
 
@@ -277,11 +259,6 @@ const isSTTSupported = (): boolean => {
 
 type PersonaVoice = 'ray' | 'jack' | 'lucia' | 'echo';
 
-// TTS 발화 정리용 — "📰 뉴스보기 →" 같은 마크업/이모지 잡음 최소 제거.
-//   · 괄호 안 보조 정보 — 예: "거래량 2,066만주 (3일 평균 ..., 보통)" → "거래량 2,066만주" — 통째로 제거.
-//   · "자세히 보기" 표시가 RAY/JACK/LUCIA 텍스트에 있으면: 그 위치부터 끝까지 잘라내고
-//     "자세한 내용은 화면을 확인하세요" 안내 멘트로 교체.
-//     ECHO 는 본문에 details 가 통합돼 있으므로 잘라내지 않고 그대로 읽는다.
 const sanitizeForTTS = (text: string, personaKey?: PersonaVoice): string => {
   const raw = text || '';
   let body = raw;
@@ -291,7 +268,6 @@ const sanitizeForTTS = (text: string, personaKey?: PersonaVoice): string => {
     if (m) {
       body = body.slice(0, m.index);
     }
-    // personaKey 있을 때는 멘트 추가 안 함 (autoRead useEffect 에서 직접 append)
     hasDetailLink = false;
   } else if (!personaKey) {
     const m = /자세히\s*보기/.exec(body);
@@ -313,20 +289,14 @@ const sanitizeForTTS = (text: string, personaKey?: PersonaVoice): string => {
   return t;
 };
 
-// ─── 동적 발화 큐 — 도착 순서대로 푸시하면 알아서 순차 재생. ───
-// stopSpeaking 호출 시 sequenceStopId 가 증가하여 진행 중 루프 + 콜백 체인을 차단.
 type SequenceItem = { text: string; personaKey: PersonaVoice };
 const sequenceQueue: SequenceItem[] = [];
 let sequenceRunning = false;
 let sequenceStopId = 0;
-// 활성 요청 ID — fetch 응답이 stopSpeaking 이후 도착했을 때 재생을 막기 위함.
 let activeRequestId = 0;
-// 현재 재생 중 Audio — stopSpeaking 시 pause + src 해제.
 let currentAudio: HTMLAudioElement | null = null;
 let currentAudioUrl: string | null = null;
 
-// ─── 발화 중 여부 전역 구독 ───
-// 모듈 전역 set 으로 리스너를 관리해 ChatWindow / SpeakerButton 양쪽이 동기 상태를 본다.
 type SpeakingListener = (speaking: boolean) => void;
 const speakingListeners = new Set<SpeakingListener>();
 const notifySpeaking = (speaking: boolean) => {
@@ -363,8 +333,6 @@ const stopSpeaking = (): void => {
   notifySpeaking(false);
 };
 
-// CLOVA TTS 호출 + 오디오 재생. 비동기지만 호출 즉시 true 반환(시작 가능 여부).
-// onEnd 는 자연 종료/에러/중단 어떤 경로로든 1회만 호출.
 const speakOne = (
   text: string,
   personaKey: PersonaVoice,
@@ -388,7 +356,6 @@ const speakOne = (
       return res.blob();
     })
     .then(blob => {
-      // 응답 도착 전에 stopSpeaking 호출됨 → 재생하지 않음.
       if (reqId !== activeRequestId) { finish(); return; }
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
@@ -414,7 +381,6 @@ const speakOne = (
   return true;
 };
 
-// 단일 텍스트 발화 — SpeakerButton 수동 재생 경로용. 페르소나 선택 가능.
 const speakText = (
   text: string,
   personaKey?: PersonaVoice,
@@ -429,9 +395,6 @@ const speakText = (
   });
 };
 
-// 동적 시퀀스 — 들어오는 순서대로 큐에 쌓고, 비어있을 때만 새 루프 시작.
-// 이미 재생 중이면 항목만 추가 → 현재 루프가 자연스럽게 픽업한다.
-// 도중 stopSpeaking 호출 시 sequenceStopId 가 변동되어 루프가 종료됨.
 const enqueueSpeak = (items: SequenceItem[]): void => {
   if (!isTTSSupported() || items.length === 0) return;
   sequenceQueue.push(...items);
@@ -442,7 +405,6 @@ const enqueueSpeak = (items: SequenceItem[]): void => {
   const myStopId = sequenceStopId;
 
   const next = () => {
-    // 다른 stop 또는 새 시퀀스가 시작된 상태 → 우리는 sequenceRunning 을 건드리지 않고 종료.
     if (myStopId !== sequenceStopId) return;
     const item = sequenceQueue.shift();
     if (!item) {
@@ -455,8 +417,6 @@ const enqueueSpeak = (items: SequenceItem[]): void => {
   next();
 };
 
-// ─── 답변 말풍선 우상단 🔊 버튼 — 클릭 시 해당 답변 재생/중지 ───
-//   personaKey 전달 시 해당 페르소나 목소리(rate/pitch)로 재생.
 const SpeakerButton = memo(function SpeakerButton({
   text,
   personaKey,
@@ -472,12 +432,10 @@ const SpeakerButton = memo(function SpeakerButton({
     setSupported(isTTSSupported());
   }, []);
 
-  // 전역 발화가 멈추면 (다른 곳에서 stopSpeaking 호출 등) 이 버튼의 로컬 상태도 reset
   useEffect(() => {
     if (!globalSpeaking && speaking) setSpeaking(false);
   }, [globalSpeaking, speaking]);
 
-  // 컴포넌트 언마운트 시 자기 발화 중이면 정리
   useEffect(() => () => { if (speaking) stopSpeaking(); }, [speaking]);
 
   if (!supported || !text?.trim()) return null;
@@ -538,7 +496,6 @@ const PersonaBubble = memo(function PersonaBubble({
   const [open, setOpen] = useState(false);
   const normalizedDetails = useMemo(() => (details || '').replace(/\\n/g, '\n').trim(), [details]);
   const hasDetails = !isEcho && !isRebuttal && !!normalizedDetails;
-  // ✅ \n↳ 기준으로 본문과 반박 분리 — PersonaBubble(ray/jack/lucia)은 ECHO 메타 없음
   const { content, rebuttal } = useMemo(() => {
     const normalizedText = (text || '').replace(/\\n/g, '\n');
     if (isRebuttal) return { content: normalizedText, rebuttal: '' };
@@ -637,7 +594,6 @@ const PersonaBubble = memo(function PersonaBubble({
                 {content}
               </p>
 
-              {/* ✅ 자세히 보기 버튼 — RAY/JACK/LUCIA 공용 (말풍선 안) */}
               {hasDetails && (
                 <div style={{ marginTop: 8 }}>
                   <button
@@ -659,7 +615,6 @@ const PersonaBubble = memo(function PersonaBubble({
                 </div>
               )}
 
-              {/* details 본문 — 같은 말풍선 안에서 아래로 확장 */}
               {hasDetails && open && (
                 <div
                   style={{
@@ -688,7 +643,6 @@ const PersonaBubble = memo(function PersonaBubble({
             </span>
           </div>
 
-          {/* ✅ 반박 말풍선 — 같은 페르소나 색상, 점선 테두리 + 들여쓰기 */}
           {rebuttal && (
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginTop: 6, paddingLeft: 16 }}>
               <div
@@ -726,8 +680,6 @@ const PersonaBubble = memo(function PersonaBubble({
   );
 });
 
-// ✅ ECHO 초압축 말풍선 — summary 4줄 + [자세히 보기 ▼] 버튼을 한 버블 안에 통합.
-//    펼치면 details(ECHO 2 전체 + ⚔️ 충돌 블록)가 같은 버블 하단에 확장됨.
 const EchoBubble = memo(function EchoBubble({
   summary,
   details,
@@ -742,9 +694,6 @@ const EchoBubble = memo(function EchoBubble({
   const [open, setOpen] = useState(false);
   const p = PERSONAS.echo;
 
-  // ✅ summary / details 모두에서 📡 메타 분리
-  //    지수(나스닥/코스피) 모드는 summary에 메타가 인라인이고, 개별 종목은 details에 들어감.
-  //    메타는 본문에서 제거하고 항상-표시되는 통일된 NoticeBox로 렌더.
   const { summaryText, detailsText, dataSource, marketClosedNote } = useMemo(() => {
     const summaryParsed = parseEchoParts(summary || '');
     const detailsParsed = details
@@ -832,7 +781,6 @@ const EchoBubble = memo(function EchoBubble({
                 </div>
               )}
 
-              {/* 초압축 4줄 */}
               <p
                 style={{
                   fontSize: 14,
@@ -846,7 +794,6 @@ const EchoBubble = memo(function EchoBubble({
                 {summaryText}
               </p>
 
-              {/* 자세히 보기 버튼 — 말풍선 안 */}
               {hasDetails && (
                 <div style={{ marginTop: 10 }}>
                   <button
@@ -868,7 +815,6 @@ const EchoBubble = memo(function EchoBubble({
                 </div>
               )}
 
-              {/* details 본문 — 같은 말풍선 안에서 아래로 확장 */}
               {open && hasDetails && (
                 <div
                   style={{
@@ -901,21 +847,17 @@ const EchoBubble = memo(function EchoBubble({
 
       {echoNews?.url && <EchoNewsChip news={echoNews} />}
 
-      {/* ✅ 통일된 공지 박스 — 항상 1번만 표시 (장 마감 / 데이터 출처 / 가이드 / 면책 순) */}
       <NoticeBox dataSource={dataSource} marketClosedNote={marketClosedNote} />
     </div>
   );
 });
 
-// 차 한잔 탭 타이핑 인디케이터 문구 — 선택된 페르소나에 맞춰 분기
 const TEA_TYPING_TEXT: Record<'lucia' | 'jack' | 'echo', string> = {
   lucia: 'LUCIA가 마음을 모으고 있어요...',
   jack: 'JACK이 생각을 정리하고 있어요...',
   echo: 'ECHO가 핵심을 찾고 있어요...',
 };
 
-// ✅ 차 한잔 모드에서는 선택된 페르소나 1인의 말풍선에 문구 표시,
-//    재테크 모드에서는 RAY/JACK/LUCIA 3인의 점 3개 깜빡임.
 const TypingIndicator = ({ teaMode = false, teaPersona = null }: { teaMode?: boolean; teaPersona?: 'lucia' | 'jack' | 'echo' | null }) => {
   if (teaMode) {
     const personaKey = (teaPersona || 'lucia') as 'lucia' | 'jack' | 'echo';
@@ -1036,9 +978,6 @@ const TypingIndicator = ({ teaMode = false, teaPersona = null }: { teaMode?: boo
   );
 };
 
-// ✅ 에러/안내 카드 — 빨간 경고 대신 부드러운 안내 톤
-//   market_data_unavailable / analysis_failed → 재시도 버튼
-//   keyword_not_recognized                    → 안내만
 const ErrorCard = ({
   message,
   showRetry,
@@ -1096,11 +1035,7 @@ const ErrorCard = ({
   </div>
 );
 
-// ✅ 첫 진입 온보딩 카드 — 사용자가 아직 질의를 보내지 않았을 때만 표시
-//   역할: "ChatGPT랑 뭐가 달라?" 방지 + 서비스 정체성 전달
-//   구조: [재테크 / 차 한잔] 2개 탭 + 각 탭 콘텐츠
 
-// ─── 탭 선택 버튼 — 아이콘 + 제목만 (compact pill 스타일) ───
 const TabButton = ({
   active,
   icon,
@@ -1136,7 +1071,6 @@ const TabButton = ({
   </button>
 );
 
-// ─── 재테크 탭 본문 ───
 type FinanceQuickPanel = '뉴스' | '추천' | '고급';
 const FINANCE_TOP_BUTTONS: { panel: FinanceQuickPanel; emoji: string; label: string; color: string; bg: string; border: string }[] = [
   { panel: '뉴스', emoji: '📰', label: '주요 뉴스', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
@@ -1145,7 +1079,6 @@ const FINANCE_TOP_BUTTONS: { panel: FinanceQuickPanel; emoji: string; label: str
 ];
 
 const FinanceTabContent = ({ onOpenQuickPanel }: { onOpenQuickPanel: (panel: FinanceQuickPanel) => void }) => {
-  // 온보딩 힌트 — 첫 진입 1회만 (localStorage 'px_finance_hint_v1')
   const [showHint, setShowHint] = useState(false);
   useEffect(() => {
     try {
@@ -1153,7 +1086,7 @@ const FinanceTabContent = ({ onOpenQuickPanel }: { onOpenQuickPanel: (panel: Fin
         setShowHint(true);
         localStorage.setItem('px_finance_hint_v1', '1');
       }
-    } catch { /* localStorage 비활성 — 그냥 노출하지 않음 */ }
+    } catch {  }
   }, []);
 
   return (
@@ -1240,22 +1173,18 @@ const FinanceTabContent = ({ onOpenQuickPanel }: { onOpenQuickPanel: (panel: Fin
   );
 };
 
-// ✅ 차 한잔 페르소나 선택 — 카드 데이터
 const TEA_PERSONAS_INFO: { key: 'lucia' | 'jack' | 'echo'; emoji: string; name: string; desc: string; border: string; bg: string; fg: string }[] = [
   { key: 'lucia', emoji: '☕', name: 'LUCIA', desc: '따뜻하게 들어드릴게요',   border: '#fb923c', bg: '#fff7ed', fg: '#7c2d12' },
   { key: 'jack',  emoji: '💪', name: 'JACK',  desc: '직설적으로 얘기해드릴게요', border: '#1f2937', bg: '#f3f4f6', fg: '#111827' },
   { key: 'echo',  emoji: '🎯', name: 'ECHO',  desc: '핵심을 짚어드릴게요',     border: '#b45309', bg: '#fefce8', fg: '#78350f' },
 ];
 
-// ✅ 차 한잔 — 페르소나별 헤드라인/명언
 const TEA_PERSONA_HEADLINES: Record<'lucia' | 'jack' | 'echo', { line1: string; line2: string; quote: string }> = {
   lucia: { line1: '판단은 잠시 내려놓으시고', line2: '마음을 꺼내보세요',        quote: '괜찮지 않아도 괜찮아요.' },
   jack:  { line1: '솔직하게 털어놓으세요.',  line2: '방향을 잡아드리겠습니다.', quote: '망설임이 가장 큰 적입니다.' },
   echo:  { line1: '핵심만 말씀해주세요.',    line2: '판단해드리겠습니다.',      quote: '핵심을 보면 답이 보입니다.' },
 };
 
-// ✅ 시간대별 LUCIA 선톡 (KST 기준)
-//    22:00 ~ 08:59 사이는 선톡 없음 (조용한 시간 존중)
 const LUCIA_GREETINGS: Record<'morning' | 'lunch' | 'afternoon' | 'evening' | 'night', string[]> = {
   morning: [
     '좋은 아침이에요. 오늘 하루도 잘 버텨봐요.',
@@ -1358,7 +1287,6 @@ const TeaTabContent = ({
         <br />
         {headline.line2}
       </h2>
-      {/* ✅ LUCIA 선톡 — 슬로건 바로 아래, 입력창 위.
            앱 시작 시 1번만 픽 (마운트 시 결정). 22:00~08:59 비활성. */}
       {teaPersona === 'lucia' && luciaGreeting && (
         <div style={{ maxWidth: 440, margin: '0 auto', padding: '0 4px' }}>
@@ -1420,8 +1348,6 @@ const TeaTabContent = ({
   );
 };
 
-// ─── 첫 화면 자동 전환 슬라이드 ───
-// 5초 간격으로 [재테크 / 차 한잔] 예시 답변(4명) 자동 순환. 인디케이터 점으로 수동 전환 가능.
 type IntroPersonaKey = 'lucia' | 'jack' | 'echo' | 'ray';
 const INTRO_PERSONA_STYLES: Record<IntroPersonaKey, { bg: string; border: string; title: string; body: string }> = {
   lucia: { bg: '#f3e8ff', border: '#c4b5fd', title: '#6b21a8', body: '#581c87' },
@@ -1490,7 +1416,6 @@ const INTRO_SLIDES: IntroSlide[] = [
   },
 ];
 
-// 메인 슬로건에서 highlightWord 만 색 강조 (단어 전후로 split)
 const renderSloganHighlight = (text: string, word: string, color: string) => {
   if (!word || !text.includes(word)) return text;
   const parts = text.split(word);
@@ -1503,7 +1428,6 @@ const renderSloganHighlight = (text: string, word: string, color: string) => {
 
 const IntroSlider = () => {
   const [idx, setIdx] = useState(0);
-  // 5초 자동 전환
   useEffect(() => {
     const t = setInterval(() => {
       setIdx(i => (i + 1) % INTRO_SLIDES.length);
@@ -1525,9 +1449,7 @@ const IntroSlider = () => {
         }
       `}</style>
 
-      {/* 슬라이드 본체 — key 변경 시 페이드 인 재실행 (슬로건도 함께 전환) */}
       <div key={slide.id} className="px-intro-slide">
-        {/* 슬라이드별 슬로건 — 상단 작은 / 메인(하이라이트) / 서브 */}
         <div style={{ textAlign: 'center', marginBottom: 10 }}>
           <p style={{
             fontSize: 11.5,
@@ -1559,7 +1481,6 @@ const IntroSlider = () => {
           </p>
         </div>
 
-        {/* 상단 질문 */}
         <p style={{
           fontSize: 13,
           fontWeight: 700,
@@ -1578,7 +1499,6 @@ const IntroSlider = () => {
           “{slide.question}”
         </p>
 
-        {/* 카드 그리드 — 레이아웃 분기:
             2x2 (재테크): 가로 2 × 세로 2
             row3 (차 한잔): 가로 3 × 세로 1, 모바일에서도 3개 나란히 */}
         <div style={{
@@ -1634,7 +1554,6 @@ const IntroSlider = () => {
         </div>
       </div>
 
-      {/* 하단 인디케이터 점 */}
       <div style={{
         display: 'flex',
         justifyContent: 'center',
@@ -1661,7 +1580,6 @@ const IntroSlider = () => {
         ))}
       </div>
 
-      {/* 법적 고지 — 슬라이드 맨 아래, 작고 옅게 */}
       <p style={{
         marginTop: 10,
         marginBottom: 0,
@@ -1677,9 +1595,6 @@ const IntroSlider = () => {
   );
 };
 
-// ─── 탭 2개 + 활성 탭 내용 통합 컴포넌트 (controlled — state는 부모가 보유) ───
-//   activeTab=null → 큰 카드 2개로 안내 (첫 화면)
-//   activeTab!=null → 기존 pill TabButton 2개 + 활성 탭 콘텐츠
 const OnboardingTabs = ({
   activeTab,
   onTabChange,
@@ -1699,23 +1614,19 @@ const OnboardingTabs = ({
   onStartRecording?: () => void;
   sttSupported?: boolean;
 }) => {
-  // ─ 첫 화면 — 통합 진입 UI (질문 입력 or 버튼 3개) ─
   const [introInput, setIntroInput] = useState('');
 
   const classifyAndEnter = (text: string) => {
     const t = text.trim();
     if (!t) return;
 
-    // onSetInput이 있으면 하단 입력창에 텍스트 채우고 자동 분류는 route.ts에서 처리
     if (onSetInput) {
       onSetInput(t);
-      // 재테크 키워드면 재테크 탭, 아니면 차 한잔 탭
       const financeKw = /주식|펀드|ETF|부동산|투자|재테크|종목|삼성|코스피|코스닥|달러|금|채권|포트폴리오|수익|손절|매수|매도|배당|금리|환율|가상화폐|비트코인|저축|예금|적금|퇴직금|연금/;
       onTabChange(financeKw.test(t) ? 'finance' : 'tea');
       return;
     }
 
-    // 재테크 키워드
     const financeKw = /주식|펀드|ETF|부동산|투자|재테크|종목|삼성|코스피|코스닥|달러|금|채권|포트폴리오|수익|손절|매수|매도|배당|금리|환율|가상화폐|비트코인|저축|예금|적금|퇴직금|연금/;
     if (financeKw.test(t)) {
       onTabChange('finance');
@@ -1742,7 +1653,6 @@ const OnboardingTabs = ({
           }
         `}</style>
 
-        {/* 상단 슬로건 — 심플하게 */}
         <div style={{ textAlign: 'center', marginBottom: 20, padding: '0 8px', width: '100%' }}>
           <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 4px', fontWeight: 500 }}>
             📊 범용 AI는 답을 드리지만,
@@ -1760,7 +1670,6 @@ const OnboardingTabs = ({
           </p>
         </div>
 
-        {/* 메인 카드 */}
         <div style={{
           width: '100%',
           maxWidth: 480,
@@ -1771,12 +1680,10 @@ const OnboardingTabs = ({
           boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
           boxSizing: 'border-box',
         }}>
-          {/* 질문 */}
           <p style={{ fontSize: 16, fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 12px', lineHeight: 1.4 }}>
             지금 어떤 고민이 있으세요?
           </p>
 
-          {/* 버튼 3개 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 12 }}>
             {[
               { emoji: '😔', label: '마음이 너무 힘들어요' },
@@ -1814,14 +1721,12 @@ const OnboardingTabs = ({
             ))}
           </div>
 
-          {/* 구분선 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
             <span style={{ fontSize: 11.5, color: '#9ca3af' }}>또는 직접 입력</span>
             <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
           </div>
 
-          {/* 직접 입력창 + 마이크 */}
           <div style={{ display: 'flex', gap: 8 }}>
             <input
               className="px-intro-input"
@@ -1883,7 +1788,6 @@ const OnboardingTabs = ({
     );
   }
 
-  // ─ 탭 선택 후 — 기존 pill TabButton + 해당 탭 콘텐츠 ─
   return (
     <div style={{ padding: '0 12px' }}>
       <div
@@ -1924,19 +1828,12 @@ export default function ChatWindow() {
   const [mounted, setMounted] = useState(false);
   const [input, setInput] = useState('');
   const [showQuickQ, setShowQuickQ] = useState(false);
-  // ✅ 온보딩 탭 상태를 부모로 끌어올림 — footer/placeholder와 연동
-  //   첫 화면은 null — 탭을 클릭해야 콘텐츠가 표시되도록 (중복 체감 방지)
   const [onboardingTab, setOnboardingTab] = useState<'finance' | 'tea' | null>(null);
-  // ✅ 차 한잔 — 진입 시 LUCIA 기본. 하단 소환 버튼으로 JACK/ECHO 전환.
   const [teaPersona, setTeaPersona] = useState<'lucia' | 'jack' | 'echo'>('lucia');
-  // ✅ LUCIA 선톡 — 앱 시작 시 1번만 픽 (22:00~08:59 시간대는 null).
-  //    SSR 하이드레이션 미스매치 방지를 위해 마운트 후 client 에서만 결정.
   const [luciaGreeting, setLuciaGreeting] = useState<string | null>(null);
 
-  // ✅ 첫 진입 3초 온보딩 — localStorage 플래그 미존재 시 1회만 표시
   const [showOnboarding, setShowOnboarding] = useState(false);
 
-  // 🔍 디버그 — teaPersona state 변경 추적
   useEffect(() => {
     // eslint-disable-next-line no-console
   }, [teaPersona]);
@@ -1945,13 +1842,12 @@ export default function ChatWindow() {
     setLuciaGreeting(pickLuciaGreeting());
   }, []);
 
-  // 첫 진입 시 1회만 온보딩 노출 — 마운트 후 client 에서만 체크 (SSR 안전)
   useEffect(() => {
     try {
       if (!localStorage.getItem('px_onboarded_v1')) {
         setShowOnboarding(true);
       }
-    } catch { /* localStorage 비활성 환경 — 그냥 표시 안 함 */ }
+    } catch {  }
   }, []);
 
   const handleOnboardingPick = (tab: 'finance' | 'tea', persona: 'lucia' | 'echo' | null) => {
@@ -1970,27 +1866,18 @@ export default function ChatWindow() {
     setShowOnboarding(false);
   };
 
-  // ✅ 시장 상황 + 시간대 기반 동적 추천 질문
-  // ✅ 탭 타입 정의
   const [activeTab, setActiveTab] = useState<'추천'|'고급'|'뉴스'>('추천');
 
-  // ─── 음성 입력 (STT) / 음성 출력 자동 읽기 (TTS) ───
-  // 미지원 브라우저(Firefox 등)에서는 마이크/토글 버튼 자체를 숨김.
   const [sttSupported, setSttSupported] = useState(false);
   const [ttsSupported, setTtsSupported] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [autoRead, setAutoRead] = useState(false);
-  // ✅ 음성 입력 시작 시 자동읽기를 자동 ON 으로 바꿨음을 알리는 토스트. 3초 후 자동 사라짐.
   const [voiceToast, setVoiceToast] = useState(false);
   const voiceToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // ✅ STT 발화 종료 후 2초 카운트다운 → 자동 전송. null 이면 비활성, 2/1 은 남은 초.
   const [autoSendCountdown, setAutoSendCountdown] = useState<number | null>(null);
   const recognitionRef = useRef<{ start: () => void; stop: () => void; abort: () => void } | null>(null);
-  // 자동 읽기 — 메시지별로 어떤 페르소나를 이미 큐잉했는지 추적해서 중복 재생 방지.
   const queuedPersonasRef = useRef<{ msgId: string; set: Set<'ray' | 'jack' | 'lucia' | 'echo'> }>({ msgId: '', set: new Set() });
   const autoSendStepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // handleSend는 input 의존성 때문에 useCallback identity 가 자주 바뀜 →
-  // ref 로 항상 최신 handleSend 를 가리키게 해서 setTimeout 안에서 호출.
   const handleSendRef = useRef<() => void>(() => {});
 
   useEffect(() => {
@@ -1998,7 +1885,6 @@ export default function ChatWindow() {
     setTtsSupported(isTTSSupported());
   }, []);
 
-  // 언마운트 시 발화/녹음/자동전송/토스트 타이머 정리
   useEffect(() => () => {
     stopSpeaking();
     try { recognitionRef.current?.abort(); } catch {}
@@ -2025,7 +1911,6 @@ export default function ChatWindow() {
       autoSendStepTimerRef.current = setTimeout(() => {
         autoSendStepTimerRef.current = null;
         setAutoSendCountdown(null);
-        // 최신 handleSend 호출 — 입력창에 STT 결과가 반영된 상태로 전송
         handleSendRef.current();
       }, 1000);
     }, 1000);
@@ -2033,7 +1918,6 @@ export default function ChatWindow() {
 
   const toggleRecording = useCallback(() => {
     if (!sttSupported) return;
-    // 자동 전송 카운트다운 중에 마이크 누르면 즉시 취소 (재녹음 시작 X)
     if (autoSendCountdown !== null) {
       cancelAutoSend();
       return;
@@ -2043,10 +1927,7 @@ export default function ChatWindow() {
       setIsRecording(false);
       return;
     }
-    // 녹음 시작 전 자동 읽기 중단 (마이크에 TTS 음성이 섞이지 않도록)
     stopSpeaking();
-    // ✅ 음성 입력을 시작했다는 건 사용자가 음성 UX 를 사용하겠다는 신호 →
-    //   자동읽기가 OFF 였다면 자동으로 ON 으로 켜고 토스트 안내(3초).
     if (!autoRead) {
       setAutoRead(true);
       setVoiceToast(true);
@@ -2067,7 +1948,6 @@ export default function ChatWindow() {
       const transcript = e?.results?.[0]?.[0]?.transcript || '';
       if (transcript) {
         setInput(prev => (prev ? prev.trimEnd() + ' ' + transcript : transcript));
-        // 발화 인식 직후 2초 카운트다운 시작 → 자동 전송
         startAutoSendCountdown();
       }
     };
@@ -2082,12 +1962,6 @@ export default function ChatWindow() {
     }
   }, [sttSupported, isRecording, autoSendCountdown, autoRead, cancelAutoSend, startAutoSendCountdown]);
 
-  // 자동 읽기 — 새 assistant 메시지 도착 시 페르소나별 목소리로 순서대로 발화.
-  // 재테크: RAY → JACK → LUCIA → ECHO. 차 한잔: LUCIA → JACK → ECHO.
-  // ⚠️ 4개 동시 도착을 기다리지 않는다 — 도착하는 순서대로 큐에 추가.
-  //    RAY 도착 → 바로 RAY 재생, JACK 도착 → RAY 끝나면 JACK 재생, ...
-  //    페르소나 순서를 깨뜨리지 않기 위해 앞 자리가 비어 있으면 거기서 멈추고 다음 업데이트를 기다림.
-  //    이미 큐에 넣은 페르소나는 queuedPersonasRef 로 추적해 중복 큐잉 방지.
   useEffect(() => {
     if (!autoRead || !ttsSupported) return;
     const last = messages[messages.length - 1];
@@ -2104,7 +1978,6 @@ export default function ChatWindow() {
     const newItems: Item[] = [];
 
     if (last.teaMode) {
-      // 차 한잔: 자세히 보기 멘트 없음 — 본문만 그대로 재생.
       const order: { key: 'lucia' | 'jack' | 'echo'; text?: string | null }[] = [
         { key: 'lucia', text: last.teaLucia },
         { key: 'jack',  text: last.teaJack  },
@@ -2119,7 +1992,6 @@ export default function ChatWindow() {
         queued.add(o.key);
       }
     } else if (last.personas) {
-      // 재테크: ECHO 외 페르소나에 "자세한 내용은 화면을 확인하세요." 멘트 부착.
       const order: { key: 'ray' | 'jack' | 'lucia' | 'echo'; text?: string | null }[] = [
         { key: 'ray',   text: last.personas.ray   },
         { key: 'jack',  text: last.personas.jack  },
@@ -2153,7 +2025,6 @@ export default function ChatWindow() {
     messages,
     autoRead,
     ttsSupported,
-    // 스트리밍 중간 도착도 트리거되도록 마지막 메시지 텍스트 길이 의존성 추가.
     messages[messages.length - 1]?.content?.length,
     messages[messages.length - 1]?.teaLucia?.length,
     messages[messages.length - 1]?.teaJack?.length,
@@ -2180,7 +2051,6 @@ export default function ChatWindow() {
     const Y = '#d97706'; const YB = '#fef9c3';
     const R = '#dc2626'; const RB = '#fee2e2';
 
-    // ── 공통 질문 풀 ──
     const BASE: Q[] = [
       { level: '시장', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
       { level: '시장', color: G, bg: GB, text: '코인 지금 매수 vs 관망, 결론만' },
@@ -2190,7 +2060,6 @@ export default function ChatWindow() {
       { level: '전략', color: R, bg: RB, text: '지금 들어가면 손절 어디야?' },
     ];
 
-    // ── 시간대별 추가 질문 ──
     if (isWeekend) {
       return [
         { level: '시장', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
@@ -2207,7 +2076,6 @@ export default function ChatWindow() {
     }
 
     if (isKRBeforeOpen) {
-      // 개장 전 — 오늘 전략 준비 질문
       return [
         { level: '시장', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
         { level: '시장', color: G, bg: GB, text: '오늘 장 열리면 첫 번째로 봐야 할 종목은?' },
@@ -2223,7 +2091,6 @@ export default function ChatWindow() {
     }
 
     if (isKROpen) {
-      // 장 중 — 실시간 판단 질문
       return [
         { level: '시장', color: G, bg: GB, text: '지금 들어가도 되는 종목 1개만' },
         { level: '시장', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
@@ -2239,7 +2106,6 @@ export default function ChatWindow() {
     }
 
     if (isUSOpen) {
-      // 미국장 시간 — 미국 중심 질문
       return [
         { level: '시장', color: G, bg: GB, text: '오늘 한국/미국 시장 사도 되는 분위기야?' },
         { level: '시장', color: G, bg: GB, text: '지금 들어가도 되는 종목 1개만' },
@@ -2254,7 +2120,6 @@ export default function ChatWindow() {
       ] as Q[];
     }
 
-    // 기본 (장 마감 후)
     return [
       ...BASE,
       { level: '분석', color: Y, bg: YB, text: '지금 가장 강한 섹터에서 타이밍 맞는 종목은?' },
@@ -2264,34 +2129,28 @@ export default function ChatWindow() {
     ] as Q[];
   }, []);
 
-  // ✅ 고급 질문 — 정적 리스트 (시장 상황 무관)
-  // 전략형 (분홍) / 시장분석형 (초록) / 심리판단형 (보라) / 40-50대 특화형 (주황)
   const ADVANCED_QUESTIONS = useMemo(() => {
     type AQ = { level: '전략형' | '시장분석형' | '심리판단형' | '40-50대 특화형'; color: string; bg: string; text: string };
-    const P = '#db2777'; const PB = '#fce7f3';   // 분홍 — 전략형
-    const G = '#16a34a'; const GB = '#dcfce7';   // 초록 — 시장분석형
-    const V = '#9333ea'; const VB = '#f3e8ff';   // 보라 — 심리판단형
-    const O = '#ea580c'; const OB = '#ffedd5';   // 주황 — 40-50대 특화형
+    const P = '#db2777'; const PB = '#fce7f3';
+    const G = '#16a34a'; const GB = '#dcfce7';
+    const V = '#9333ea'; const VB = '#f3e8ff';
+    const O = '#ea580c'; const OB = '#ffedd5';
     return [
-      // 전략형
       { level: '전략형', color: P, bg: PB, text: '워런 버핏이라면 지금 삼성전자를 샀을까?' },
       { level: '전략형', color: P, bg: PB, text: '하락장에서 돈 버는 유일한 방법은 무엇인가?' },
       { level: '전략형', color: P, bg: PB, text: '지금 현금이 최고의 투자인 이유는?' },
       { level: '전략형', color: P, bg: PB, text: '상승 추세에서 눌림 매수 vs 돌파 매수, 어떤 상황에서 유리한가?' },
       { level: '전략형', color: P, bg: PB, text: '손절을 가격 기준으로 할지, 시간 기준으로 할지 어떻게 정하나?' },
-      // 시장분석형
       { level: '시장분석형', color: G, bg: GB, text: '지금 시장에서 개미는 절대 이길 수 없는 구간인가?' },
       { level: '시장분석형', color: G, bg: GB, text: '공매도 세력이 노리는 종목의 특징은?' },
       { level: '시장분석형', color: G, bg: GB, text: 'AI가 투자를 대체하면 기술적 분석은 죽는가?' },
       { level: '시장분석형', color: G, bg: GB, text: '지금 구간이 상승 초입인지 끝물인지 어떻게 구분하나?' },
       { level: '시장분석형', color: G, bg: GB, text: '외국인 매수와 기관 매수가 동시에 들어올 때 신뢰도는?' },
-      // 심리판단형
       { level: '심리판단형', color: V, bg: VB, text: '공포에 팔고 욕심에 사는 패턴을 끊는 방법은?' },
       { level: '심리판단형', color: V, bg: VB, text: '확신과 과신의 차이를 어떻게 구분하나?' },
       { level: '심리판단형', color: V, bg: VB, text: '손실 후 복구 매매를 하면 안 되는 이유는?' },
       { level: '심리판단형', color: V, bg: VB, text: '수익 중일 때 계속 들고 갈지, 일부 익절할지 기준은?' },
       { level: '심리판단형', color: V, bg: VB, text: '시장이 불확실할 때 현금 비중 늘리는 타이밍은?' },
-      // 40-50대 특화형
       { level: '40-50대 특화형', color: O, bg: OB, text: '교육비와 노후 준비, 어떻게 균형을 잡나?' },
       { level: '40-50대 특화형', color: O, bg: OB, text: '부모님 요양비가 생겼을 때 투자를 줄여야 하나?' },
       { level: '40-50대 특화형', color: O, bg: OB, text: '이직 고민 중인데 지금 투자를 계속해도 될까?' },
@@ -2301,7 +2160,6 @@ export default function ChatWindow() {
   }, []);
 
   const [isLoading, setIsLoading] = useState(false);
-  // ✅ 고급 질문 로딩 여부 — LLM 4명 병렬 호출 대기 중 상단에 안내 문구 노출
   const [isAdvancedLoading, setIsAdvancedLoading] = useState(false);
   const [showPosition, setShowPosition] = useState(false);
   const [pendingText, setPendingText] = useState('');
@@ -2315,15 +2173,12 @@ export default function ChatWindow() {
 
   useEffect(() => {
     setMounted(true);
-    // ✅ 첫 진입은 빈 상태 — OnboardingTabs가 SYSTEM ONLINE 안내를 대체
     messagesRef.current = [];
     setMessages([]);
   }, []);
 
-  // ✅ 온보딩 카드 표시 조건 — 사용자가 아직 질의를 보내지 않음
   const hasUserSent = useMemo(() => messages.some(m => m.role === 'user'), [messages]);
 
-  // ✅ 스크롤 컨테이너 상단 패딩 — spacer 대신 padding 으로만 관리
   const scrollPadding = hasUserSent ? '20px 0 140px' : '16px 0 140px';
 
   useEffect(() => {
@@ -2360,19 +2215,14 @@ export default function ChatWindow() {
   }, [input]);
 
   const handleSendWithPosition = useCallback(async (text: string, position: Position | null, isAdvanced: boolean = false) => {
-    // ✅ 새 입력이 들어오면 진행 중인 자동 읽기 즉시 중지
     stopSpeaking();
     setShowPosition(false);
 
-    // ✅ 차 한잔 탭에서 보낼 때는 LUCIA 단독 응답 루트
     const isTeaSend = onboardingTab === 'tea';
 
-    // 🔍 디버그 — 클로저가 최신 teaPersona 를 캡처하고 있는지 확인
     // eslint-disable-next-line no-console
     // eslint-disable-next-line no-console
 
-    // ✅ 차 한잔 대화 턴 수 — 이번 전송 포함 (1 = 첫 메시지)
-    //    기존에 보낸 user 메시지 중 teaMode=true 인 것 +1
     const teaRound = isTeaSend
       ? messagesRef.current.filter(m => m.role === 'user' && m.teaMode).length + 1
       : 0;
@@ -2394,8 +2244,6 @@ export default function ChatWindow() {
     setInput('');
 
     const requestBody = {
-      // 차 한잔 모드 페르소나별 이력 재구성을 위해 assistant 메시지의
-      // teaJack/teaEcho 를 함께 전송. 재테크 탭은 서버에서 무시됨.
       messages: nextMessages.slice(-10).map(m => ({
         role: m.role,
         content: m.content,
@@ -2406,11 +2254,9 @@ export default function ChatWindow() {
       teaMode: isTeaSend,
       teaRound,
       teaPersona: isTeaSend ? teaPersona : undefined,
-      // ✅ 재테크 탭 고급 질문 — 4명 페르소나 LLM 병렬 응답 트리거
       isAdvancedQuestion: isAdvanced,
     };
 
-    // 🔍 차 한잔 모드 요청 body 진단 로그 — teaPersona 전달 여부 확인
     if (isTeaSend) {
       // eslint-disable-next-line no-console
       // eslint-disable-next-line no-console
@@ -2426,8 +2272,6 @@ export default function ChatWindow() {
 
       const data = await response.json();
 
-      // 🔍 차 한잔 모드 응답 구조 진단 로그 — 브라우저 콘솔에서 확인
-      //    teaLucia / teaJack / teaEcho 필드 존재 여부와 teaRound 트래킹
       if (isTeaSend) {
         // eslint-disable-next-line no-console
         console.debug('[tea] request teaRound:', teaRound, '/ response keys:', Object.keys(data), '/ teaLucia?', !!data.teaLucia, '/ teaJack?', !!data.teaJack, '/ teaEcho?', !!data.teaEcho);
@@ -2442,7 +2286,6 @@ export default function ChatWindow() {
         newsLinks: data.newsLinks || [],
         errorType: data.errorType,
         errorMessage: data.errorMessage,
-        // 종목 미인식은 같은 텍스트로 재시도해도 결과 같으므로 retryText 미설정
         retryText: data.errorType === 'keyword_not_recognized' ? undefined : text,
         teaMode: data.teaMode,
         teaLucia: data.teaLucia,
@@ -2478,7 +2321,6 @@ export default function ChatWindow() {
 
     const matched = detectKeyword(content);
 
-    // ✅ 평단가/매수가/평균가/취득가 인라인 파싱 — "21만원", "210,000", "$150" 등
     const parseInlineValue = (m: RegExpMatchArray | null): string => {
       if (!m) return '';
       const numStr = m[1].replace(/,/g, '');
@@ -2497,8 +2339,6 @@ export default function ChatWindow() {
     const inlineQty = qtyMatch ? qtyMatch[1].replace(/,/g, '') : '';
     const hasInlinePosition = !!(inlineAvg || inlineBuy || inlineQty);
 
-    // ✅ 평단가 등이 인라인으로 있으면 종목명 매칭 + 모달 표시 강제 (트리거 강화)
-    // ⚠️ 차 한잔 탭(onboardingTab === 'tea')에서는 포지션 입력창 절대 표시 금지
     const showModal =
       onboardingTab === 'finance' &&
       matched &&
@@ -2516,12 +2356,8 @@ export default function ChatWindow() {
     handleSendWithPosition(content, null);
   }, [input, isLoading, handleSendWithPosition, onboardingTab]);
 
-  // 자동 전송 타이머가 항상 최신 handleSend 를 호출하도록 ref 동기화
   useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
 
-  // ✅ 자동 읽기 중 화면 아무 곳이나 탭 → 즉시 중지.
-  //   capture phase 로 등록해 다른 onClick (SpeakerButton 등) 보다 먼저 실행.
-  //   click 이벤트만 사용 — 모바일 스크롤(touchstart) 시 실수로 멈추지 않도록.
   const isSpeakingGlobal = useIsSpeaking();
   useEffect(() => {
     if (!ttsSupported || !isSpeakingGlobal) return;
@@ -2551,7 +2387,6 @@ export default function ChatWindow() {
         flexDirection: 'column',
         background: '#b2c7da',
         fontFamily: 'sans-serif',
-        // ✅ iPad/iPhone Safari notch/주소창 대응 — 상단 safe-area 패딩
         paddingTop: 'env(safe-area-inset-top, 0px)',
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         boxSizing: 'border-box',
@@ -2593,7 +2428,6 @@ export default function ChatWindow() {
         </div>
       </header>
 
-      {/* ✅ 자동 읽기 중 상단 알림 — 화면 아무 곳이나 탭하면 stopSpeaking 으로 중지됨.
            pointerEvents: none — 배너 자체는 클릭 가로채지 않도록 (아래 콘텐츠가 그대로 클릭됨). */}
       {isSpeakingGlobal && (
         <div
@@ -2625,7 +2459,6 @@ export default function ChatWindow() {
         </div>
       )}
 
-      {/* ✅ 음성 입력 시작 시 자동읽기 자동 ON 안내 토스트 — 3초 후 자동 사라짐. */}
       {voiceToast && (
         <div
           role="status"
@@ -2651,7 +2484,6 @@ export default function ChatWindow() {
         </div>
       )}
 
-      {/* ✅ 첫 화면(hasUserSent=false & onboardingTab=null) — 카드 전용 스크롤 컨테이너.
           헤더 바로 아래에 자연스럽게 카드 배치 (spacer/특수 패딩 없이 단순 padding 만). */}
       {!hasUserSent && onboardingTab === null && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center' }}>
@@ -2681,7 +2513,6 @@ export default function ChatWindow() {
             />
           </div>
         )}
-        {/* ✅ 차 한잔 — JACK/ECHO 소환 후에만 상단 인디케이터. 클릭 시 LUCIA 복귀. */}
         {onboardingTab === 'tea' && teaPersona !== 'lucia' && (() => {
           const p = TEA_PERSONAS_INFO.find(x => x.key === teaPersona)!;
           return (
@@ -2736,7 +2567,6 @@ export default function ChatWindow() {
               </div>
             ) : msg.teaMode ? (
               <div style={{ marginBottom: 12 }}>
-                {/* 선택된 페르소나만 렌더 (1:1 대화). 각 필드는 비어있으면 표시 안 함. */}
                 {msg.teaLucia && (
                   <PersonaBubble
                     personaKey="lucia"
@@ -2762,7 +2592,6 @@ export default function ChatWindow() {
               </div>
             ) : (
               <div style={{ marginBottom: 12 }}>
-                {/* ✅ 고급 질문 응답일 때 상단 라벨 — 4명 페르소나 투자 철학 기반 답변 */}
                 {msg.personas?.isAdvancedAnswer && (
                   <div style={{
                     display: 'flex',
@@ -2783,9 +2612,6 @@ export default function ChatWindow() {
                   </div>
                 )}
                 {msg.personas ? (() => {
-                  // ✅ 갈등 감지 — JACK 텍스트에 "\n↳ " 포함 시 토론 순서로 재배치
-                  //    RAY → JACK(주장) → LUCIA(반박) → JACK(재반박) → ECHO
-                  //    LUCIA의 ↳ 뒤 반박은 표시하지 않음 (JACK이 마지막 발언)
                   const jackText = msg.personas.jack;
                   const luciaText = msg.personas.lucia;
                   const jackSplitIdx = jackText.indexOf('\n↳ ');
@@ -2793,7 +2619,7 @@ export default function ChatWindow() {
 
                   if (hasConflict) {
                     const jackMain = jackText.slice(0, jackSplitIdx).trim();
-                    const jackRebuttalText = jackText.slice(jackSplitIdx + 1).trim(); // "↳ " 포함
+                    const jackRebuttalText = jackText.slice(jackSplitIdx + 1).trim();
                     const luciaSplitIdx = luciaText.indexOf('\n↳ ');
                     const luciaMain = luciaSplitIdx !== -1 ? luciaText.slice(0, luciaSplitIdx).trim() : luciaText;
 
@@ -2839,7 +2665,6 @@ export default function ChatWindow() {
             )}
           </div>
         ))}
-        {/* ✅ 고급 질문 로딩 안내 — 4명 페르소나 병렬 호출 대기 시간 (~20-30초) 사전 고지 */}
         {isLoading && isAdvancedLoading && (
           <div style={{
             margin: '8px 12px',
@@ -2875,22 +2700,20 @@ export default function ChatWindow() {
         </div>
       )}
 
-      {/* ✅ 추천 질문 탭 패널 — footer 바로 위에 고정. 차 한잔 탭에서는 절대 표시 안 함 */}
       {showQuickQ && onboardingTab !== 'tea' && (
         <div style={{
           background: '#fff',
           borderTop: '1px solid #e5e7eb',
           position: 'fixed',
-          bottom: 92,              // footer 높이(버튼 56px + 여백) 맞춤
+          bottom: 92,
           left: 0,
           right: 0,
-          zIndex: 40,              // footer(50)보다 낮게 두어 혹시 겹쳐도 footer가 위에
+          zIndex: 40,
           boxShadow: '0 -4px 12px rgba(0,0,0,0.08)',
-          maxHeight: '70vh',       // PC 대형 모니터 기준 충분한 높이 확보
+          maxHeight: '70vh',
           display: 'flex',
           flexDirection: 'column',
         }}>
-          {/* ← 처음으로 (재테크 첫 화면으로 복귀) — 모든 탭 상단에 노출 */}
           <button
             type="button"
             onClick={() => setShowQuickQ(false)}
@@ -2909,7 +2732,6 @@ export default function ChatWindow() {
             ← 처음으로
           </button>
 
-          {/* 탭 헤더 — 상단 카드 버튼 순서와 동일: 📰 주요 뉴스 / 💡 추천 질문 / 🎯 고급 질문 */}
           <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
             {(['뉴스', '추천', '고급'] as const).map(tab => (
               <button
@@ -2936,7 +2758,6 @@ export default function ChatWindow() {
             ))}
           </div>
 
-          {/* 탭 콘텐츠 */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px 32px 12px' }}>
             {activeTab === '추천' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -2946,7 +2767,6 @@ export default function ChatWindow() {
                   const sectionColor = section === '시장' ? '#16a34a' : section === '분석' ? '#d97706' : '#dc2626';
                   return (
                     <div key={section} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {/* 섹션 헤더 */}
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -2966,7 +2786,6 @@ export default function ChatWindow() {
                         {section} ({items.length})
                         <span style={{ flex: 1, height: 1, background: `${sectionColor}22`, marginLeft: 4 }} />
                       </div>
-                      {/* 섹션 내 질문들 */}
                       {items.map((q, i) => (
                         <button
                           key={`${section}-${i}`}
@@ -3027,7 +2846,6 @@ export default function ChatWindow() {
                     : '#ea580c';
                   return (
                     <div key={section} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {/* 섹션 헤더 */}
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -3047,7 +2865,6 @@ export default function ChatWindow() {
                         {section} ({items.length})
                         <span style={{ flex: 1, height: 1, background: `${sectionColor}22`, marginLeft: 4 }} />
                       </div>
-                      {/* 섹션 내 질문들 — 고급 탭은 isAdvanced=true 로 서버에 4명 LLM 응답 요청 */}
                       {items.map((q, i) => (
                         <button
                           key={`${section}-${i}`}
@@ -3160,12 +2977,10 @@ export default function ChatWindow() {
         </div>
       )}
 
-      {/* 첫 화면(탭 미선택 & 대화 전) 에서는 footer 전체 숨김.
           탭(재테크/차 한잔) 을 클릭하거나 한 번이라도 보낸 후에만 footer 표시.
           ✅ 차 한잔 탭에서 teaPersona 가 null 이어도 탭 이동 버튼은 노출 — 입력창만 숨김. */}
       {(onboardingTab !== null || hasUserSent) && (
       <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
-        {/* ✅ 탭 전환 캡슐 — 재테크 ↔ 차 한잔 자연스럽게 이동. 입력창 바로 위에 배치. */}
         {onboardingTab === 'finance' && (
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
             <button
@@ -3197,7 +3012,6 @@ export default function ChatWindow() {
             </button>
           </div>
         )}
-        {/* ✅ 차 한잔 — 입력창 위에 작은 소환 버튼 (보조 역할).
              현재 페르소나는 비활성, 나머지는 클릭 시 전환. */}
         {onboardingTab === 'tea' && (
           <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
@@ -3264,7 +3078,6 @@ export default function ChatWindow() {
             </button>
           </div>
         )}
-        {/* ✅ 음성 자동 읽기 토글 — 입력창 위. 기본 OFF. ko-KR TTS 미지원 시 숨김. */}
         {ttsSupported && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
             <button
@@ -3292,7 +3105,6 @@ export default function ChatWindow() {
             </button>
           </div>
         )}
-        {/* ✅ 음성 입력 후 자동 전송 카운트다운 — 입력창 바로 위 노란 배너 */}
         {autoSendCountdown !== null && (
           <div
             role="status"
@@ -3342,7 +3154,6 @@ export default function ChatWindow() {
             }}
             rows={1}
           />
-          {/* ✅ 음성 입력 (STT) — 녹음 중 빨강, 자동 전송 카운트다운 중 노랑(취소 대기). */}
           {sttSupported && (() => {
             const inCountdown = autoSendCountdown !== null;
             const bg = inCountdown ? '#fef3c7' : isRecording ? '#fee2e2' : '#f3f4f6';
@@ -3402,7 +3213,6 @@ export default function ChatWindow() {
       </footer>
       )}
 
-      {/* ✅ 첫 진입 3초 온보딩 오버레이 — 1회만 (localStorage 'px_onboarded_v1') */}
       {showOnboarding && (
         <div
           role="dialog"
