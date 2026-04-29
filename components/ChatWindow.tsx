@@ -1640,19 +1640,16 @@ const OnboardingTabs = ({
         `}</style>
 
         <div style={{ textAlign: 'center', marginBottom: 20, padding: '0 8px', width: '100%' }}>
-          <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 4px', fontWeight: 500 }}>
-            📊 범용 AI는 답을 드리지만,
+          <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 6px', fontWeight: 500 }}>
+            범용 AI는 1명이 답합니다.
           </p>
-          <p style={{ fontSize: 20, fontWeight: 900, color: '#1f2937', margin: '0 0 4px', lineHeight: 1.3 }}>
-            ⚡ AI들이{' '}
-            <span style={{ color: '#E85D4A' }}>충돌</span>
-            하고,
+          <p style={{ fontSize: 20, fontWeight: 900, color: '#1f2937', margin: '0 0 6px', lineHeight: 1.3 }}>
+            ⚡ PersonaX는{' '}
+            <span style={{ color: '#E85D4A' }}>4명이 충돌</span>
+            합니다.
           </p>
-          <p style={{ fontSize: 20, fontWeight: 900, color: '#1f2937', margin: '0 0 4px', lineHeight: 1.3 }}>
-            당신이 결정합니다.
-          </p>
-          <p style={{ fontSize: 12, color: '#6b7280', margin: '0', fontWeight: 500 }}>
-            🌱 그리고 마침내 성장합니다
+          <p style={{ fontSize: 13, color: '#6b7280', margin: '0', fontWeight: 500 }}>
+            당신이 결정하고, 마침내 성장합니다.
           </p>
         </div>
 
