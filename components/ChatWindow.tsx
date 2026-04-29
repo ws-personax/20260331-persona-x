@@ -1785,8 +1785,6 @@ export default function ChatWindow() {
   const [teaPersona, setTeaPersona] = useState<'lucia' | 'jack' | 'echo'>('lucia');
   const [luciaGreeting, setLuciaGreeting] = useState<string | null>(null);
 
-  const [showOnboarding, setShowOnboarding] = useState(false);
-
   useEffect(() => {
     // eslint-disable-next-line no-console
   }, [teaPersona]);
@@ -1794,25 +1792,6 @@ export default function ChatWindow() {
   useEffect(() => {
     setLuciaGreeting(pickLuciaGreeting());
   }, []);
-
-  useEffect(() => {
-    try {
-      if (!localStorage.getItem('px_onboarded_v1')) {
-        setShowOnboarding(true);
-      }
-    } catch {  }
-  }, []);
-
-  const handleOnboardingPick = (persona: 'lucia' | 'echo' | null) => {
-    if (persona) setTeaPersona(persona);
-    try { localStorage.setItem('px_onboarded_v1', '1'); } catch {}
-    setShowOnboarding(false);
-  };
-
-  const handleOnboardingSkip = () => {
-    try { localStorage.setItem('px_onboarded_v1', '1'); } catch {}
-    setShowOnboarding(false);
-  };
 
   const [activeTab, setActiveTab] = useState<'추천'|'고급'|'뉴스'>('추천');
 
@@ -2967,6 +2946,7 @@ export default function ChatWindow() {
         </div>
       )}
 
+      {hasUserSent && (
       <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
         {/* LUCIA 허브 — 필요 시 JACK/ECHO 소환. 비활성 페르소나는 disabled. */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
@@ -3165,104 +3145,6 @@ export default function ChatWindow() {
           </button>
         </div>
       </footer>
-
-      {showOnboarding && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.55)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 20,
-            zIndex: 9999,
-            animation: 'pxOnbBg 0.35s ease both',
-          }}
-        >
-          <style>{`
-            @keyframes pxOnbBg   { from { opacity: 0; } to { opacity: 1; } }
-            @keyframes pxOnbCard { from { opacity: 0; transform: translateY(10px) scale(0.97); }
-                                  to   { opacity: 1; transform: translateY(0)    scale(1); } }
-            .px-onb-btn:hover { background: #f3f4f6 !important; }
-            .px-onb-btn:active { transform: scale(0.98); }
-          `}</style>
-          <div
-            style={{
-              background: '#ffffff',
-              borderRadius: 18,
-              padding: '24px 22px 16px',
-              width: '100%',
-              maxWidth: 360,
-              boxShadow: '0 16px 40px rgba(0,0,0,0.22)',
-              animation: 'pxOnbCard 0.4s ease both',
-              boxSizing: 'border-box',
-            }}
-          >
-            <p style={{
-              textAlign: 'center',
-              fontSize: 17,
-              fontWeight: 800,
-              color: '#1f2937',
-              margin: '0 0 18px',
-            }}>
-              지금 어떤 상태인가요?
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {([
-                { emoji: '😔', text: '감정이 너무 힘들어요', persona: 'lucia' },
-                { emoji: '📊', text: '투자 고민이에요',     persona: null    },
-                { emoji: '🤔', text: '결정을 못 하겠어요',  persona: 'echo'  },
-              ] as const).map((opt, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className="px-onb-btn"
-                  onClick={() => handleOnboardingPick(opt.persona)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    padding: '14px 16px',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: 12,
-                    background: '#f9fafb',
-                    fontSize: 14.5,
-                    fontWeight: 700,
-                    color: '#1f2937',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    width: '100%',
-                    transition: 'background 0.15s ease, transform 0.1s ease',
-                    boxSizing: 'border-box',
-                  }}
-                >
-                  <span style={{ fontSize: 22, lineHeight: 1 }}>{opt.emoji}</span>
-                  <span style={{ flex: 1 }}>{opt.text}</span>
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={handleOnboardingSkip}
-              style={{
-                marginTop: 14,
-                background: 'transparent',
-                border: 'none',
-                color: '#9ca3af',
-                fontSize: 12,
-                fontWeight: 500,
-                cursor: 'pointer',
-                width: '100%',
-                padding: '8px 0 4px',
-              }}
-            >
-              건너뛰기
-            </button>
-          </div>
-        </div>
       )}
     </div>
     </>
