@@ -1674,7 +1674,7 @@ const OnboardingTabs = ({
             {[
               { emoji: '⚡', label: '삼성전자 지금 사도 될까?', desc: '4명이 다르게 답해요', send: '삼성전자 지금 사도 될까?' },
               { emoji: '💜', label: '요즘 너무 의욕이 없어', desc: 'LUCIA가 들어드려요', send: '요즘 너무 의욕이 없어' },
-              { emoji: '🔍', label: '지금 내 선택이 맞을까?', desc: 'ECHO가 구조를 잡아줘요', send: '지금 내 선택이 맞을까?' },
+              { emoji: '🔍', label: '요즘 결정을 못 하겠어', desc: 'ECHO가 구조를 잡아줘요', send: '요즘 결정을 못 하겠어' },
             ].map((item) => (
               <button
                 key={item.label}
