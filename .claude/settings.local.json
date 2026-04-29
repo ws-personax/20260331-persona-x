@@ -13,7 +13,12 @@
       "Bash(npx --no-install vercel --version)",
       "Bash(npx --no-install vercel ls --yes)",
       "PowerShell(Get-Content *)",
-      "Bash(echo \"Exit: $?\")"
+      "Bash(echo \"Exit: $?\")",
+      "Bash(grep -o '`' \"D:/0 비지니스/0-PersonaX MVP/20260331-persona--x/components/ChatWindow.tsx\")",
+      "Bash(npx --yes @babel/parser --version)",
+      "Bash(node -e ' *)",
+      "Bash(grep -iE \"^next$|^@next|swc|babel|acorn\")",
+      "Bash(node .tmp_jsx_check.js)"
     ]
   }
 }

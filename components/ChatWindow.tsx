@@ -54,6 +54,7 @@ interface Message {
   teaLucia?: string;
   teaJack?: string;
   teaEcho?: string;
+  luciaIntro?: string;
 }
 
 type PersonaKey = 'jack' | 'lucia' | 'ray' | 'echo';
@@ -106,7 +107,7 @@ const PERSONAS: Record<
     bubbleBg: '#fff8d6',
     bubbleBorder: '#d4a017',
     textColor: '#111827',
-    echoTag: 'FINAL COMMAND',
+    echoTag: 'SUMMARY',
   },
 };
 
@@ -858,7 +859,7 @@ const EchoBubble = memo(function EchoBubble({
 });
 
 const TEA_TYPING_TEXT: Record<'lucia' | 'jack' | 'echo', string> = {
-  lucia: 'LUCIA가 마음을 모으고 있어요...',
+  lucia: '💜 LUCIA가 당신의 마음을 읽고 있어요...',
   jack: 'JACK이 생각을 정리하고 있어요...',
   echo: 'ECHO가 핵심을 찾고 있어요...',
 };
@@ -906,7 +907,7 @@ const TypingIndicator = ({ teaMode = false, teaPersona = null }: { teaMode?: boo
                   fontSize: 13.5,
                   color: '#374151',
                   fontWeight: 500,
-                  animation: 'teaTypingPulse 1.4s ease-in-out infinite',
+                  animation: 'teaTypingPulse 1.0s ease-in-out infinite',
                 }}
               >
                 {text}
@@ -1854,13 +1855,19 @@ export default function ChatWindow() {
       clearTimeout(autoSendStepTimerRef.current);
       autoSendStepTimerRef.current = null;
     }
-    setAutoSendCountdown(2);
+    setAutoSendCountdown(4);
     autoSendStepTimerRef.current = setTimeout(() => {
-      setAutoSendCountdown(1);
+      setAutoSendCountdown(3);
       autoSendStepTimerRef.current = setTimeout(() => {
-        autoSendStepTimerRef.current = null;
-        setAutoSendCountdown(null);
-        handleSendRef.current();
+        setAutoSendCountdown(2);
+        autoSendStepTimerRef.current = setTimeout(() => {
+          setAutoSendCountdown(1);
+          autoSendStepTimerRef.current = setTimeout(() => {
+            autoSendStepTimerRef.current = null;
+            setAutoSendCountdown(null);
+            handleSendRef.current();
+          }, 1000);
+        }, 1000);
       }, 1000);
     }, 1000);
   }, []);
@@ -2241,6 +2248,7 @@ export default function ChatWindow() {
         teaLucia: data.teaLucia,
         teaJack: data.teaJack,
         teaEcho: data.teaEcho,
+        luciaIntro: typeof data.luciaIntro === 'string' && data.luciaIntro.trim() ? data.luciaIntro : undefined,
       };
 
       const updated = [...nextMessages, assistantMsg];
@@ -2499,6 +2507,13 @@ export default function ChatWindow() {
               </div>
             ) : msg.teaMode ? (
               <div style={{ marginBottom: 12 }}>
+                {msg.luciaIntro && (
+                  <PersonaBubble
+                    personaKey="lucia"
+                    text={msg.luciaIntro}
+                    timestamp={msg.timestamp}
+                  />
+                )}
                 {msg.teaLucia && (
                   <PersonaBubble
                     personaKey="lucia"
@@ -2524,6 +2539,13 @@ export default function ChatWindow() {
               </div>
             ) : (
               <div style={{ marginBottom: 12 }}>
+                {msg.luciaIntro && (
+                  <PersonaBubble
+                    personaKey="lucia"
+                    text={msg.luciaIntro}
+                    timestamp={msg.timestamp}
+                  />
+                )}
                 {msg.personas?.isAdvancedAnswer && (
                   <div style={{
                     display: 'flex',
