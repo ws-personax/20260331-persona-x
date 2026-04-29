@@ -54,6 +54,7 @@ interface Message {
   teaLucia?: string;
   teaJack?: string;
   teaEcho?: string;
+  teaRay?: string;
   luciaIntro?: string;
 }
 
@@ -1945,10 +1946,11 @@ export default function ChatWindow() {
     }
 
     if (last.teaMode) {
-      const order: { key: 'lucia' | 'jack' | 'echo'; text?: string | null }[] = [
+      const order: { key: 'lucia' | 'jack' | 'echo' | 'ray'; text?: string | null }[] = [
         { key: 'lucia', text: last.teaLucia },
         { key: 'jack',  text: last.teaJack  },
         { key: 'echo',  text: last.teaEcho  },
+        { key: 'ray',   text: last.teaRay   },
       ];
       for (const o of order) {
         if (queued.has(o.key) || !o.text) continue;
@@ -2001,6 +2003,7 @@ export default function ChatWindow() {
     messages[messages.length - 1]?.teaLucia?.length,
     messages[messages.length - 1]?.teaJack?.length,
     messages[messages.length - 1]?.teaEcho?.length,
+    messages[messages.length - 1]?.teaRay?.length,
     messages[messages.length - 1]?.personas?.ray?.length,
     messages[messages.length - 1]?.personas?.jack?.length,
     messages[messages.length - 1]?.personas?.lucia?.length,
@@ -2222,6 +2225,7 @@ export default function ChatWindow() {
         content: m.content,
         ...(m.role === 'assistant' && m.teaJack ? { teaJack: m.teaJack } : {}),
         ...(m.role === 'assistant' && m.teaEcho ? { teaEcho: m.teaEcho } : {}),
+        ...(m.role === 'assistant' && m.teaRay ? { teaRay: m.teaRay } : {}),
       })),
       positionContext: buildPositionContext(position),
       teaMode: isTeaSend,
@@ -2247,14 +2251,14 @@ export default function ChatWindow() {
 
       if (isTeaSend) {
         // eslint-disable-next-line no-console
-        console.debug('[tea] request teaRound:', teaRound, '/ response keys:', Object.keys(data), '/ teaLucia?', !!data.teaLucia, '/ teaJack?', !!data.teaJack, '/ teaEcho?', !!data.teaEcho);
+        console.debug('[tea] request teaRound:', teaRound, '/ response keys:', Object.keys(data), '/ teaLucia?', !!data.teaLucia, '/ teaJack?', !!data.teaJack, '/ teaEcho?', !!data.teaEcho, '/ teaRay?', !!data.teaRay);
       }
 
       const assistantMsg: Message = {
         id: generateId(),
         role: 'assistant',
         timestamp: new Date(),
-        content: data.reply || data.teaLucia || '',
+        content: data.reply || data.teaLucia || data.teaRay || '',
         personas: data.personas || null,
         newsLinks: data.newsLinks || [],
         errorType: data.errorType,
@@ -2264,6 +2268,7 @@ export default function ChatWindow() {
         teaLucia: data.teaLucia,
         teaJack: data.teaJack,
         teaEcho: data.teaEcho,
+        teaRay: data.teaRay,
         luciaIntro: typeof data.luciaIntro === 'string' && data.luciaIntro.trim() ? data.luciaIntro : undefined,
       };
 
@@ -2558,6 +2563,13 @@ export default function ChatWindow() {
                     text={cleanTeaText(msg.teaEcho)}
                     timestamp={msg.timestamp}
                     hideEchoTag
+                  />
+                )}
+                {msg.teaRay && (
+                  <PersonaBubble
+                    personaKey="ray"
+                    text={cleanTeaText(msg.teaRay)}
+                    timestamp={msg.timestamp}
                   />
                 )}
               </div>
