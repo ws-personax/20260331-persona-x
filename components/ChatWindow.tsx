@@ -2293,6 +2293,14 @@ export default function ChatWindow() {
     const content = (override ?? input).trim();
     if (!content || isLoading) return;
 
+    // ✅ 스포츠/감정/일반 쿼리 — 포지션 입력창 없이 바로 전송
+    const SPORTS_RE = /야구|축구|농구|배구|골프|올림픽|경기|이길|승부|우승|선수|리그|야구단|축구단|기아타이거즈|삼성라이온즈|두산베어스|LG트윈스|롯데자이언츠|한화이글스/;
+    const EMOTION_RE = /힘들|외로|슬프|우울|화나|기쁘|설레|불안|걱정|스트레스|피곤|지쳐|고민|마음|감정|위로|공감|바빠|바쁘|힘내|아파|아프/;
+    if (SPORTS_RE.test(content) || EMOTION_RE.test(content)) {
+      handleSendWithPosition(content, null);
+      return;
+    }
+
     const matched = detectKeyword(content);
 
     const parseInlineValue = (m: RegExpMatchArray | null): string => {
