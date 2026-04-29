@@ -415,10 +415,25 @@ export async function POST(req: Request) {
     // ✅ LUCIA 허브 라우팅 결정 — teaMode 분기 이전 (모든 분기에서 공유)
     const category = detectCategory(lastMsg);
     const luciaRoutingMsg = LUCIA_ROUTING_MESSAGE[category];
+    // ✅ 동일 카테고리 luciaIntro 중복 방지
+    const _alreadyIntroduced = Array.isArray(messages) && (messages as Array<{
+      role?: string;
+      luciaIntro?: string;
+    }>).some(m => {
+      if (m?.role !== 'assistant' || !m?.luciaIntro) return false;
+      const intro = m.luciaIntro;
+      if (category === 'sports'  && intro.includes('JACK')) return true;
+      if (category === 'news'    && intro.includes('RAY'))  return true;
+      if (category === 'legal'   && intro.includes('ECHO')) return true;
+      if (category === 'tech'    && intro.includes('RAY'))  return true;
+      if (category === 'finance' && intro.includes('재테크')) return true;
+      return false;
+    });
     // luciaIntro 주입 대상: finance/sports/news/legal/tech 만 (emotion/general 은 LUCIA 직접 처리)
     const _shouldInjectLuciaIntro =
       (category === 'finance' || category === 'sports' || category === 'news' || category === 'legal' || category === 'tech')
-      && !!luciaRoutingMsg;
+      && !!luciaRoutingMsg
+      && !_alreadyIntroduced;
     const respond = (body: unknown, init?: ResponseInit): Response => {
       if (
         _shouldInjectLuciaIntro &&
