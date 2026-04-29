@@ -2226,6 +2226,7 @@ export default function ChatWindow() {
         ...(m.role === 'assistant' && m.teaJack ? { teaJack: m.teaJack } : {}),
         ...(m.role === 'assistant' && m.teaEcho ? { teaEcho: m.teaEcho } : {}),
         ...(m.role === 'assistant' && m.teaRay ? { teaRay: m.teaRay } : {}),
+        ...(m.role === 'assistant' && m.luciaIntro ? { luciaIntro: m.luciaIntro } : {}),
       })),
       positionContext: buildPositionContext(position),
       teaMode: isTeaSend,
