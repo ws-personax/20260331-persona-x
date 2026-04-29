@@ -3145,7 +3145,7 @@ export default function ChatWindow() {
             );
           })()}
           <button
-            onClick={handleSend}
+            onClick={() => handleSend()}
             disabled={!input.trim() || isLoading}
             style={{
               background: '#FAE100',
