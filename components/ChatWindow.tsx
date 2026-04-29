@@ -1855,17 +1855,20 @@ export default function ChatWindow() {
       clearTimeout(autoSendStepTimerRef.current);
       autoSendStepTimerRef.current = null;
     }
-    setAutoSendCountdown(4);
+    setAutoSendCountdown(5);
     autoSendStepTimerRef.current = setTimeout(() => {
-      setAutoSendCountdown(3);
+      setAutoSendCountdown(4);
       autoSendStepTimerRef.current = setTimeout(() => {
-        setAutoSendCountdown(2);
+        setAutoSendCountdown(3);
         autoSendStepTimerRef.current = setTimeout(() => {
-          setAutoSendCountdown(1);
+          setAutoSendCountdown(2);
           autoSendStepTimerRef.current = setTimeout(() => {
-            autoSendStepTimerRef.current = null;
-            setAutoSendCountdown(null);
-            handleSendRef.current();
+            setAutoSendCountdown(1);
+            autoSendStepTimerRef.current = setTimeout(() => {
+              autoSendStepTimerRef.current = null;
+              setAutoSendCountdown(null);
+              handleSendRef.current();
+            }, 1000);
           }, 1000);
         }, 1000);
       }, 1000);
@@ -1933,6 +1936,15 @@ export default function ChatWindow() {
     type Item = { text: string; personaKey: 'ray' | 'jack' | 'lucia' | 'echo' };
     const newItems: Item[] = [];
 
+    // luciaIntro TTS — 안내 멘트 가장 먼저 읽기
+    if (last.luciaIntro && !queued.has('lucia')) {
+      newItems.push({
+        text: sanitizeForTTS(last.luciaIntro, 'lucia'),
+        personaKey: 'lucia' as const,
+      });
+      queued.add('lucia');
+    }
+
     if (last.teaMode) {
       const order: { key: 'lucia' | 'jack' | 'echo'; text?: string | null }[] = [
         { key: 'lucia', text: last.teaLucia },
@@ -1952,7 +1964,12 @@ export default function ChatWindow() {
         { key: 'ray',   text: last.personas.ray   },
         { key: 'jack',  text: last.personas.jack  },
         { key: 'lucia', text: last.personas.lucia },
-        { key: 'echo',  text: last.personas.echo  },
+        {
+          key: 'echo',
+          text: last.personas.echoDetails
+            ? last.personas.echo + ' ' + last.personas.echoDetails
+            : last.personas.echo,
+        },
       ];
       for (const o of order) {
         if (queued.has(o.key) || !o.text) continue;
