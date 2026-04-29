@@ -430,7 +430,7 @@ export async function POST(req: Request) {
     //   LLM 실패 시 round/카테고리 기반 템플릿으로 자동 폴백.
     //   ⚠️ 재테크 탭(teaMode=false)은 아래 블록을 건너뛰므로 동작 변화 없음.
     //   ⚠️ finance 카테고리는 teaMode 우회 → 아래 재테크 로직으로 진입.
-    if (teaMode && category !== 'finance') {
+    if ((teaMode || category === 'sports' || category === 'legal' || category === 'tech') && category !== 'finance') {
       // ── 카테고리 감지 — 폴백 템플릿 분기용 (LLM 응답 자체는 시스템 프롬프트가 알아서 적응) ──
       //   우선순위: 가족/건강 > 손실 > 기쁨 > 기타
       const isFamily = /(가족|부모|어머니|아버지|엄마|아빠|자식|아이|아들|딸|남편|아내|형제|자매|건강|병|아프|수술|입원|병원|암|치매)/.test(lastMsg);
@@ -642,6 +642,18 @@ export async function POST(req: Request) {
           jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
           isAdvancedAnswer: true,
         },
+      });
+    }
+
+    // ✅ 감정/일반 대화 가드 — teaMode=false 로 들어와도 종목 추출 차단
+    //   teaMode 블록은 teaMode=true 만 처리하므로, teaMode=false + emotion/general 케이스가
+    //   여기까지 흘러와 종목 분석 로직에 잘못 진입하는 것을 방지한다.
+    if (category === 'emotion' || category === 'general') {
+      return respond({
+        teaMode: true,
+        teaRound: 1,
+        teaPersona: 'lucia',
+        teaLucia: '',
       });
     }
 

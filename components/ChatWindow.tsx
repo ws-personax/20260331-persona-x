@@ -1855,22 +1855,15 @@ export default function ChatWindow() {
       clearTimeout(autoSendStepTimerRef.current);
       autoSendStepTimerRef.current = null;
     }
-    setAutoSendCountdown(5);
+    setAutoSendCountdown(2);
     autoSendStepTimerRef.current = setTimeout(() => {
-      setAutoSendCountdown(4);
+      setAutoSendCountdown(1);
       autoSendStepTimerRef.current = setTimeout(() => {
-        setAutoSendCountdown(3);
-        autoSendStepTimerRef.current = setTimeout(() => {
-          setAutoSendCountdown(2);
-          autoSendStepTimerRef.current = setTimeout(() => {
-            setAutoSendCountdown(1);
-            autoSendStepTimerRef.current = setTimeout(() => {
-              autoSendStepTimerRef.current = null;
-              setAutoSendCountdown(null);
-              handleSendRef.current();
-            }, 1000);
-          }, 1000);
-        }, 1000);
+        autoSendStepTimerRef.current = null;
+        setAutoSendCountdown(null);
+        try { recognitionRef.current?.stop(); } catch {}
+        setIsRecording(false);
+        handleSendRef.current();
       }, 1000);
     }, 1000);
   }, []);
@@ -1899,12 +1892,18 @@ export default function ChatWindow() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rec: any = new SR();
     rec.lang = 'ko-KR';
-    rec.continuous = false;
+    rec.continuous = true;
     rec.interimResults = false;
     rec.maxAlternatives = 1;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     rec.onresult = (e: any) => {
-      const transcript = e?.results?.[0]?.[0]?.transcript || '';
+      const startIdx = e?.resultIndex ?? 0;
+      let transcript = '';
+      for (let i = startIdx; i < (e?.results?.length || 0); i++) {
+        if (e.results[i]?.isFinal !== false) {
+          transcript += e.results[i]?.[0]?.transcript || '';
+        }
+      }
       if (transcript) {
         setInput(prev => (prev ? prev.trimEnd() + ' ' + transcript : transcript));
         startAutoSendCountdown();
