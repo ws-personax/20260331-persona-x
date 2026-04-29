@@ -691,6 +691,16 @@ export async function POST(req: Request) {
       });
     }
 
+    // ✅ news 카테고리 가드 — teaMode=false 로 들어와도 재테크 분석 진입 차단
+    if (category === 'news' && !teaMode) {
+      return respond({
+        teaMode: true,
+        teaRound: 1,
+        teaPersona: 'ray',
+        teaRay: '',
+      });
+    }
+
     // ✅ 감정/일반 대화 가드 — teaMode=false 로 들어와도 종목 추출 차단
     //   teaMode 블록은 teaMode=true 만 처리하므로, teaMode=false + emotion/general 케이스가
     //   여기까지 흘러와 종목 분석 로직에 잘못 진입하는 것을 방지한다.
