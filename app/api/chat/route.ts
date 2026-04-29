@@ -386,14 +386,16 @@ export async function POST(req: Request) {
     const CATEGORY_MAP = {
       finance:  /주식|펀드|ETF|부동산|투자|재테크|종목|코스피|코스닥|달러|금|채권|포트폴리오|수익|손절|매수|매도|배당|금리|환율|가상화폐|비트코인|저축|예금|적금|퇴직금|연금/,
       sports:   /야구|축구|농구|배구|골프|올림픽|경기|이길|승부|우승|선수|리그|기아|삼성라이온즈|두산|LG트윈스|롯데|한화|KT|SSG|NC|키움/,
+      news:     /정세|뉴스|전쟁|분쟁|중동|러시아|우크라이나|미중|외교|정치|대통령|선거|경제뉴스|시황|금융뉴스|증시|환경|기후|재난|사건|사고|테러/,
       legal:    /세금|법률|계약|소송|이혼|상속|증여|부동산등기|임대차|보증금|노동|퇴직|해고|세무|신고/,
       tech:     /자동차|전기차|배터리|반도체|AI|인공지능|스마트폰|앱|소프트웨어|하드웨어|IT|클라우드/,
       emotion:  /힘들|외로|슬프|우울|화나|기쁘|설레|불안|걱정|스트레스|피곤|지쳐|고민|마음|감정|위로|공감/,
     };
-    const detectCategory = (text: string): 'finance' | 'sports' | 'legal' | 'tech' | 'emotion' | 'general' => {
+    const detectCategory = (text: string): 'finance' | 'sports' | 'news' | 'legal' | 'tech' | 'emotion' | 'general' => {
       if (CATEGORY_MAP.finance.test(text)) return 'finance';
       if (CATEGORY_MAP.emotion.test(text)) return 'emotion';
       if (CATEGORY_MAP.sports.test(text))  return 'sports';
+      if (CATEGORY_MAP.news.test(text))    return 'news';
       if (CATEGORY_MAP.legal.test(text))   return 'legal';
       if (CATEGORY_MAP.tech.test(text))    return 'tech';
       return 'general';
@@ -401,6 +403,7 @@ export async function POST(req: Request) {
     const LUCIA_ROUTING_MESSAGE: Record<string, string> = {
       finance: '재테크 질문이시군요! RAY와 JACK이 전문가예요. 바로 연결해드릴게요. 📊',
       sports:  '스포츠 승부 예측은 JACK이 제일 잘해요! 연결해드릴게요. ⚡',
+      news:    '시사/뉴스 분석은 RAY가 정리해드릴게요! 연결해드릴게요. 📰',
       legal:   '법률/세금 문제는 RAY와 ECHO가 함께 분석해드릴게요. 🔍',
       tech:    '기술/자동차 관련은 RAY가 데이터로 분석해드릴게요. 💡',
       emotion: '',
@@ -410,9 +413,9 @@ export async function POST(req: Request) {
     // ✅ LUCIA 허브 라우팅 결정 — teaMode 분기 이전 (모든 분기에서 공유)
     const category = detectCategory(lastMsg);
     const luciaRoutingMsg = LUCIA_ROUTING_MESSAGE[category];
-    // luciaIntro 주입 대상: finance/sports/legal/tech 만 (emotion/general 은 LUCIA 직접 처리)
+    // luciaIntro 주입 대상: finance/sports/news/legal/tech 만 (emotion/general 은 LUCIA 직접 처리)
     const _shouldInjectLuciaIntro =
-      (category === 'finance' || category === 'sports' || category === 'legal' || category === 'tech')
+      (category === 'finance' || category === 'sports' || category === 'news' || category === 'legal' || category === 'tech')
       && !!luciaRoutingMsg;
     const respond = (body: unknown, init?: ResponseInit): Response => {
       if (
@@ -430,7 +433,7 @@ export async function POST(req: Request) {
     //   LLM 실패 시 round/카테고리 기반 템플릿으로 자동 폴백.
     //   ⚠️ 재테크 탭(teaMode=false)은 아래 블록을 건너뛰므로 동작 변화 없음.
     //   ⚠️ finance 카테고리는 teaMode 우회 → 아래 재테크 로직으로 진입.
-    if ((teaMode || category === 'sports' || category === 'legal' || category === 'tech') && category !== 'finance') {
+    if ((teaMode || category === 'sports' || category === 'news' || category === 'legal' || category === 'tech') && category !== 'finance') {
       // ── 카테고리 감지 — 폴백 템플릿 분기용 (LLM 응답 자체는 시스템 프롬프트가 알아서 적응) ──
       //   우선순위: 가족/건강 > 손실 > 기쁨 > 기타
       const isFamily = /(가족|부모|어머니|아버지|엄마|아빠|자식|아이|아들|딸|남편|아내|형제|자매|건강|병|아프|수술|입원|병원|암|치매)/.test(lastMsg);
