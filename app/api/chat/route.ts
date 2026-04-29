@@ -25,6 +25,7 @@ import type { DiscussMode, IndicatorFlags, PrevContext } from '@/lib/personax/te
 import { TEA_SYSTEM_LUCIA } from './prompts/tea-lucia';
 import { TEA_SYSTEM_JACK } from './prompts/tea-jack';
 import { TEA_SYSTEM_ECHO } from './prompts/tea-echo';
+import { TEA_SYSTEM_RAY } from './prompts/tea-ray';
 
 // ✅ 재테크 탭 고급 질문 — 4명 페르소나 투자 철학 프롬프트
 import { ADVANCED_SYSTEM_RAY } from './prompts/advanced-ray';
@@ -74,12 +75,13 @@ const buildTeaHistory = (rawMessages: unknown, persona: TeaPersonaKey): TeaMsg[]
   const mapped: TeaMsg[] = [];
   for (const raw of rawMessages) {
     if (!raw || typeof raw !== 'object') continue;
-    const m = raw as { role?: string; content?: string; teaJack?: string; teaEcho?: string };
+    const m = raw as { role?: string; content?: string; teaJack?: string; teaEcho?: string; teaRay?: string };
     if (m.role !== 'user' && m.role !== 'assistant') continue;
     let content = typeof m.content === 'string' ? m.content : '';
     if (m.role === 'assistant') {
       if (persona === 'jack' && typeof m.teaJack === 'string' && m.teaJack.trim()) content = m.teaJack;
       else if (persona === 'echo' && typeof m.teaEcho === 'string' && m.teaEcho.trim()) content = m.teaEcho;
+      else if (persona === 'ray' && typeof m.teaRay === 'string' && m.teaRay.trim()) content = m.teaRay;
     }
     if (!content.trim()) continue;
     mapped.push({ role: m.role, content });
@@ -454,10 +456,11 @@ export async function POST(req: Request) {
         ? Number(teaRound)
         : userTurns || 1;
 
-      // ── 페르소나별 이력 구성 (JACK/ECHO 는 과거 자기 발화로 재구성) ──
+      // ── 페르소나별 이력 구성 (JACK/ECHO/RAY 는 과거 자기 발화로 재구성) ──
       const luciaHistory = buildTeaHistory(messages, 'lucia');
       const jackHistory = buildTeaHistory(messages, 'jack');
       const echoHistory = buildTeaHistory(messages, 'echo');
+      const rayHistory = buildTeaHistory(messages, 'ray');
 
 
       // ── 폴백 템플릿 (LLM 실패 시 per-persona 사용) ──
@@ -498,15 +501,17 @@ export async function POST(req: Request) {
         fallbackEcho = '';
       }
 
-      // ── 단일 페르소나 1:1 응답 — 기본 lucia, JACK/ECHO 는 명시적 소환 시에만 ──
-      //   ✅ LUCIA 허브 카테고리 라우팅: sports→jack, legal/tech→echo (클라이언트 teaPersona 우선)
-      const _categoryPersona: 'jack' | 'echo' | null =
+      // ── 단일 페르소나 1:1 응답 — 기본 lucia, JACK/ECHO/RAY 는 명시적 소환 시에만 ──
+      //   ✅ LUCIA 허브 카테고리 라우팅: sports→jack, news→ray, legal/tech→echo (클라이언트 teaPersona 우선)
+      const _categoryPersona: 'jack' | 'echo' | 'ray' | null =
         category === 'sports' ? 'jack'
+        : category === 'news'   ? 'ray'
         : (category === 'legal' || category === 'tech') ? 'echo'
         : null;
-      const selectedPersona: 'lucia' | 'jack' | 'echo' =
+      const selectedPersona: 'lucia' | 'jack' | 'echo' | 'ray' =
         teaPersona === 'jack' ? 'jack'
         : teaPersona === 'echo' ? 'echo'
+        : teaPersona === 'ray'  ? 'ray'
         : _categoryPersona
           ? _categoryPersona
           : 'lucia';
@@ -554,6 +559,29 @@ export async function POST(req: Request) {
           teaRound: round,
           teaPersona: 'echo',
           teaEcho: echoLLM || fallbackEcho || '말하지 않은 것 중에 가장 무거운 건 뭔가요?',
+        });
+      }
+
+      if (selectedPersona === 'ray') {
+        const rayLLM = await callTeaPersona('ray', TEA_SYSTEM_RAY, rayHistory);
+        try {
+          const supabase = getSupabase();
+          if (supabase) {
+            await supabase.from('tea_logs').insert({
+              persona: selectedPersona,
+              turn_count: round,
+              first_message: lastMsg.slice(0, 100),
+              user_id: null,
+            });
+          }
+        } catch (e) {
+          console.warn('[tea] 로그 저장 실패 (무시)', e);
+        }
+        return respond({
+          teaMode: true,
+          teaRound: round,
+          teaPersona: 'ray',
+          teaRay: rayLLM || '시사 데이터 분석에 일시적인 문제가 있어요. 다시 질문해주세요.',
         });
       }
 
