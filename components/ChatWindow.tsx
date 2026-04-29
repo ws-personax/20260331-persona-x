@@ -2967,7 +2967,6 @@ export default function ChatWindow() {
         </div>
       )}
 
-      {hasUserSent && (
       <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
         {/* LUCIA 허브 — 필요 시 JACK/ECHO 소환. 비활성 페르소나는 disabled. */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
@@ -3166,7 +3165,6 @@ export default function ChatWindow() {
           </button>
         </div>
       </footer>
-      )}
 
       {showOnboarding && (
         <div
