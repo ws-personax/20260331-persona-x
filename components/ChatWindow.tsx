@@ -2195,7 +2195,7 @@ export default function ChatWindow() {
 
     // 재테크 키워드가 포함되면 4명 동시 답변, 아니면 단일 페르소나(LUCIA/JACK/ECHO)
     // sports/news/legal/tech 카테고리는 항상 teaMode=true
-    const FORCE_TEA_RE = /야구|축구|농구|배구|골프|올림픽|이길|승부|우승|선수|리그|야구단|정세|뉴스|전쟁|분쟁|중동|러시아|우크라이나|미중|외교|정치|세금|법률|소송|이혼|상속|자동차|전기차|반도체/;
+    const FORCE_TEA_RE = /야구|축구|농구|배구|골프|올림픽|이길|승부|우승|선수|리그|야구단|기아타이거즈|두산베어스|LG트윈스|롯데자이언츠|한화이글스|삼성라이온즈|정세|뉴스|전쟁|분쟁|중동|러시아|우크라이나|미중|외교|정치|세금|법률|소송|이혼|상속/;
     const isTeaSend = FORCE_TEA_RE.test(text) ? true : !isFinanceQuery(text);
 
     // eslint-disable-next-line no-console
