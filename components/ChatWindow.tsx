@@ -1666,26 +1666,26 @@ const OnboardingTabs = ({
           boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
           boxSizing: 'border-box',
         }}>
-          <p style={{ fontSize: 22, fontWeight: 900, color: '#111827', textAlign: 'center', margin: '0 0 6px', lineHeight: 1.3 }}>
-            무엇이든 물어보세요!
+          <p style={{ fontSize: 20, fontWeight: 900, color: '#111827', textAlign: 'center', margin: '0 0 4px', lineHeight: 1.3 }}>
+            지금 바로 경험해보세요
           </p>
-          <p style={{ fontSize: 16, fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 12px', lineHeight: 1.4 }}>
-            지금 어떤 고민이 있으세요?
+          <p style={{ fontSize: 13, fontWeight: 500, color: '#6b7280', textAlign: 'center', margin: '0 0 12px', lineHeight: 1.4 }}>
+            아래 버튼 하나만 눌러보세요 — 범용 AI와 다릅니다
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 12 }}>
             {[
-              { emoji: '😔', label: '마음이 너무 힘들어요' },
-              { emoji: '📈', label: '재테크가 고민이에요' },
-              { emoji: '🤔', label: '결정을 못 하겠어요' },
-            ].map(({ emoji, label }) => (
+              { emoji: '⚡', label: '삼성전자 지금 사도 될까?', desc: '4명이 다르게 답해요', send: '삼성전자 지금 사도 될까?' },
+              { emoji: '💜', label: '요즘 너무 의욕이 없어', desc: 'LUCIA가 들어드려요', send: '요즘 너무 의욕이 없어' },
+              { emoji: '🔍', label: '지금 내 선택이 맞을까?', desc: 'ECHO가 구조를 잡아줘요', send: '지금 내 선택이 맞을까?' },
+            ].map((item) => (
               <button
-                key={label}
+                key={item.label}
                 type="button"
                 className="px-intro-btn"
                 onClick={() => {
-                  setIntroInput(label);
-                  if (onSetInput) onSetInput(label);
+                  setIntroInput(item.send);
+                  if (onSetInput) onSetInput(item.send);
                 }}
                 style={{
                   width: '100%',
@@ -1698,14 +1698,14 @@ const OnboardingTabs = ({
                   display: 'flex',
                   alignItems: 'center',
                   gap: 10,
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: '#374151',
                   boxSizing: 'border-box',
                 }}
               >
-                <span style={{ fontSize: 18 }}>{emoji}</span>
-                {label}
+                <span style={{ fontSize: 18 }}>{item.emoji}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{item.label}</span>
+                  <span style={{ fontSize: 11, fontWeight: 500, color: '#9ca3af' }}>{item.desc}</span>
+                </div>
               </button>
             ))}
           </div>
