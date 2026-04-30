@@ -1723,7 +1723,7 @@ const OnboardingTabs = ({
               value={introInput}
               onChange={e => setIntroInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') classifyAndEnter(introInput); }}
-              placeholder="고민을 자유롭게 입력하세요"
+              placeholder="무엇이든 물어보세요"
               style={{
                 flex: 1,
                 padding: '10px 14px',
@@ -3073,7 +3073,7 @@ export default function ChatWindow() {
             value={input}
             onChange={e => { setInput(e.target.value); cancelAutoSend(); }}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
-            placeholder="무엇이든 물어보세요 (재테크 키워드는 4명이 동시 답변)"
+            placeholder="무엇이든 물어보세요"
             style={{
               flex: 1,
               minWidth: 0,
