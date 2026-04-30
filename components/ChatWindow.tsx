@@ -1640,9 +1640,13 @@ const OnboardingTabs = ({
         `}</style>
 
         <div style={{ textAlign: 'center', marginBottom: 20, padding: '0 8px', width: '100%' }}>
+          <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 4px', fontWeight: 500 }}>
+            범용 AI는 하나의 답을 말합니다.
+          </p>
           <p style={{ fontSize: 20, fontWeight: 900, color: '#1f2937', margin: '0 0 2px', lineHeight: 1.3 }}>
-            ⚡ 4명의 시선이{' '}
-            <span style={{ color: '#E85D4A' }}>부딪히면,</span>
+            ⚡{' '}
+            <span style={{ color: '#E85D4A' }}>지금,</span>
+            {' '}4개의 시선이 교차하며
           </p>
           <p style={{ fontSize: 20, fontWeight: 900, color: '#1f2937', margin: '0 0 6px', lineHeight: 1.3 }}>
             방향이 보입니다.
