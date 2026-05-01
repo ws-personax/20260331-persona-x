@@ -1199,9 +1199,29 @@ ${DISCLAIMER}`;
 
       // ✅ 전망 질문 — 코스피/나스닥으로 유도 (간단 안내 카드)
       if (isForecastQuery) {
+        // ✅ finance 카테고리(예: "요즘 주식 어때요?")는 RAY 일반 응답으로 처리
+        if (category === 'finance') {
+          const rayLLM = await callTeaPersona('ray', TEA_SYSTEM_RAY, [{ role: 'user', content: lastMsg }]);
+          return respond({
+            teaMode: true,
+            teaRound: 1,
+            teaPersona: 'ray',
+            teaRay: rayLLM || '구체적인 종목명을 말씀해 주시면 데이터 기반으로 분석해 드릴 수 있어요.',
+          });
+        }
         return respond({
           errorType: 'keyword_not_recognized',
           errorMessage: '시장 전망은 "코스피 전망" 또는 "나스닥 전망"으로\n질문해 주시면 즉각 분석해 드려요.',
+        });
+      }
+      // ✅ finance 카테고리(예: "주식 사도 될까요?", "지금 투자해도 될까요?") — 종목명 없는 일반 재테크 질문은 RAY 일반 응답
+      if (category === 'finance') {
+        const rayLLM = await callTeaPersona('ray', TEA_SYSTEM_RAY, [{ role: 'user', content: lastMsg }]);
+        return respond({
+          teaMode: true,
+          teaRound: 1,
+          teaPersona: 'ray',
+          teaRay: rayLLM || '구체적인 종목명을 말씀해 주시면 데이터 기반으로 분석해 드릴 수 있어요.',
         });
       }
       // ✅ 종목 미인식 — 친절한 안내 카드
