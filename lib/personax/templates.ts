@@ -290,8 +290,8 @@ const _buildJackText = (p: JackParams): string => {
     : `${line1}${jackRebuttal}`;
 };
 
-// ✅ JACK 답변 마지막 — 관심 연결 문장 부착
-export const buildJackText = (p: JackParams): string => _buildJackText(p) + JACK_TAIL;
+// ✅ JACK 빌더 — TAIL은 route.ts에서 MBTI 라인 다음에 부착
+export const buildJackText = _buildJackText;
 
 // ─────────────────────────────────────────────
 // 루시아 템플릿 파라미터
@@ -587,8 +587,8 @@ const _buildLuciaText = (p: LuciaParams): string => {
   return `${line1}\n${line2}${luciaRebuttal}`;
 };
 
-// ✅ LUCIA 답변 마지막 — 관심 연결 문장 부착
-export const buildLuciaText = (p: LuciaParams): string => _buildLuciaText(p) + LUCIA_TAIL;
+// ✅ LUCIA 빌더 — TAIL은 route.ts에서 MBTI 라인 다음에 부착
+export const buildLuciaText = _buildLuciaText;
 
 // ─────────────────────────────────────────────
 // ✅ 에코 템플릿 — situation × verdict 조합별 통찰
@@ -1112,13 +1112,13 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   // ✅ 트리거는 시간 조건 프리픽스 없이 표현 원칙만 노출 (forecastMode 동일)
   const finalTriggerText = triggerText;
 
-  // ✅ ECHO 말풍선 상단 — 초압축 4줄 고정 + 답변 마지막 관심 연결 문장
+  // ✅ ECHO 말풍선 상단 — 초압축 4줄 고정 (TAIL은 route.ts에서 부착)
   const summary = [
     `${modeEmoji} ${modeVerdict}`,
     oneLineSummary,
     `현재 상황: ${statusText}`,
     `트리거: ${finalTriggerText}`,
-  ].join('\n') + ECHO_TAIL;
+  ].join('\n');
 
   // ✅ details — 결론/컨플루언스/근거 prelude + ①②③ 현황 블록 + 면책
   const fmtPxEcho = (n: number): string =>

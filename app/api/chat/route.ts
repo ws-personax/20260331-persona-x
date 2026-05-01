@@ -18,7 +18,7 @@ import {
   TREND_PICKS, RECOMMEND_PATTERNS, detectAssetClass,
   extractTwoKeywords, getSector,
 } from '@/lib/personax/market';
-import { buildJackText, buildLuciaText, buildEchoText, RAY_TAIL } from '@/lib/personax/templates';
+import { buildJackText, buildLuciaText, buildEchoText, RAY_TAIL, JACK_TAIL, LUCIA_TAIL, ECHO_TAIL } from '@/lib/personax/templates';
 import type { DiscussMode, IndicatorFlags, PrevContext } from '@/lib/personax/templates';
 
 // ✅ 차 한잔 탭 페르소나별 시스템 프롬프트 (분리된 파일)
@@ -1689,7 +1689,8 @@ ${DISCLAIMER}`;
         `조건: ETF 투자 또는 종목명을 입력하시면 개별 분석을 즉시 개시합니다.`,
       ].join('\n');
 
-      finalEcho = `${indexEcho}\n\n${dataSourceLabel}${DISCLAIMER}`;
+      // ✅ ECHO 답변 마지막 — 관심 연결 문장 부착
+      finalEcho = `${indexEcho}\n\n${dataSourceLabel}${DISCLAIMER}${ECHO_TAIL}`;
 
     } else {
       const echoBuilt = buildEchoText({
@@ -1733,9 +1734,9 @@ ${DISCLAIMER}`;
         ma20: marketData?.trend?.ma20 ?? null,
         newsCount: news.length,
       });
-      // ✅ ECHO 1 (summary): 즉시 표시 — 결론/조건/행동 3줄
+      // ✅ ECHO 1 (summary): 즉시 표시 — 결론/조건/행동 3줄 + 답변 마지막 관심 연결 문장
       // ✅ ECHO 2 (details): 별도 버블 — confluence + 근거 + 지금 + 조건 + 비중 + dataSource + disclaimer
-      finalEcho = echoBuilt.summary;
+      finalEcho = echoBuilt.summary + ECHO_TAIL;
       finalEchoDetails = `${echoBuilt.details}\n\n${dataSourceLabel}${marketClosedNote}${DISCLAIMER}`;
     }
 
@@ -1983,9 +1984,9 @@ ${DISCLAIMER}`;
     const mbtiIdx   = Math.floor(Date.now() / 1000) % 10;
     const rayRotIdx = Math.floor(Date.now() / 1000) % rayMbtiPhrases.length;
 
-    const finalJackOut  = finalJack  + '\n— ' + jackMbtiPool[mbtiIdx];
-    const finalLuciaOut = finalLucia + '\n— ' + luciaMbtiPool[mbtiIdx];
-    // ✅ RAY 답변 마지막 — 관심 연결 문장 부착 (RAY는 빌더 미사용 → 여기서 부착)
+    // ✅ 모든 페르소나 — [본문] → [MBTI 라인] → [TAIL] 순서 통일
+    const finalJackOut  = finalJack  + '\n— ' + jackMbtiPool[mbtiIdx]   + JACK_TAIL;
+    const finalLuciaOut = finalLucia + '\n— ' + luciaMbtiPool[mbtiIdx]  + LUCIA_TAIL;
     const finalRayOut   = finalRay   + '\n— ' + rayMbtiPhrases[rayRotIdx] + RAY_TAIL;
 
     const finalReply = [finalRayOut, finalJackOut, finalLuciaOut, finalEcho].filter(Boolean).join('\n\n');
