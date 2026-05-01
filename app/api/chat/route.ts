@@ -18,7 +18,7 @@ import {
   TREND_PICKS, RECOMMEND_PATTERNS, detectAssetClass,
   extractTwoKeywords, getSector,
 } from '@/lib/personax/market';
-import { buildJackText, buildLuciaText, buildEchoText } from '@/lib/personax/templates';
+import { buildJackText, buildLuciaText, buildEchoText, RAY_TAIL } from '@/lib/personax/templates';
 import type { DiscussMode, IndicatorFlags, PrevContext } from '@/lib/personax/templates';
 
 // ✅ 차 한잔 탭 페르소나별 시스템 프롬프트 (분리된 파일)
@@ -1985,7 +1985,8 @@ ${DISCLAIMER}`;
 
     const finalJackOut  = finalJack  + '\n— ' + jackMbtiPool[mbtiIdx];
     const finalLuciaOut = finalLucia + '\n— ' + luciaMbtiPool[mbtiIdx];
-    const finalRayOut   = finalRay   + '\n— ' + rayMbtiPhrases[rayRotIdx];
+    // ✅ RAY 답변 마지막 — 관심 연결 문장 부착 (RAY는 빌더 미사용 → 여기서 부착)
+    const finalRayOut   = finalRay   + '\n— ' + rayMbtiPhrases[rayRotIdx] + RAY_TAIL;
 
     const finalReply = [finalRayOut, finalJackOut, finalLuciaOut, finalEcho].filter(Boolean).join('\n\n');
 

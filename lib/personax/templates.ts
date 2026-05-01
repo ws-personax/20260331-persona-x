@@ -1,6 +1,14 @@
 import type { AssetType, Verdict } from './types';
 
 // ─────────────────────────────────────────────
+// 페르소나 답변 마지막 — 관심 연결 문장
+// ─────────────────────────────────────────────
+export const RAY_TAIL = '\n\n보유 중이라면 단기 변동성\n주의가 필요한 구간이에요';
+export const JACK_TAIL = '\n\n지금 이 상황에서\n결정 못 하는 게 당연해요';
+export const ECHO_TAIL = '\n\n이런 고민을 한다는 것 자체가\n올바른 방향이에요';
+export const LUCIA_TAIL = '\n\n지금 더 무거운 게\n돈이에요, 아니면 마음이에요?';
+
+// ─────────────────────────────────────────────
 // 조사 헬퍼
 // ─────────────────────────────────────────────
 export const particle = (label: string): string => {
@@ -112,7 +120,7 @@ const JACK_BUY_PHRASES = [
   '추세가 확인된 구간이에요',
 ];
 
-export const buildJackText = (p: JackParams): string => {
+const _buildJackText = (p: JackParams): string => {
   // ✅ 충돌 시 JACK이 LUCIA에게 반박 — 장중/장 마감 모두 공통으로 뒤에 부착
   const jackRebuttal = p.conflict === 'conflict_jack_buy'
     ? '\n↳ 루시아의 신중론을 이해하지만, 지금은 기회를 놓치는 것이 더 큰 리스크입니다. 모멘텀 데이터가 명확합니다.'
@@ -281,6 +289,9 @@ export const buildJackText = (p: JackParams): string => {
     ? `${line1}\n${line2}${jackRebuttal}`
     : `${line1}${jackRebuttal}`;
 };
+
+// ✅ JACK 답변 마지막 — 관심 연결 문장 부착
+export const buildJackText = (p: JackParams): string => _buildJackText(p) + JACK_TAIL;
 
 // ─────────────────────────────────────────────
 // 루시아 템플릿 파라미터
@@ -462,7 +473,7 @@ const pickTail = (direction: PriceDirection, keyword: string): string => {
   return pool[idx];
 };
 
-export const buildLuciaText = (p: LuciaParams): string => {
+const _buildLuciaText = (p: LuciaParams): string => {
   // ✅ LUCIA가 JACK에게 반박 — 장중/장 마감 모두 공통으로 뒤에 부착
   const luciaRebuttal = p.conflict === 'conflict_jack_buy'
     ? '\n↳ 잭, 거래량이 말해주고 있어요. 숫자가 아직 확신을 주지 않아요. 서두르면 꼭 물려요.'
@@ -575,6 +586,9 @@ export const buildLuciaText = (p: LuciaParams): string => {
 
   return `${line1}\n${line2}${luciaRebuttal}`;
 };
+
+// ✅ LUCIA 답변 마지막 — 관심 연결 문장 부착
+export const buildLuciaText = (p: LuciaParams): string => _buildLuciaText(p) + LUCIA_TAIL;
 
 // ─────────────────────────────────────────────
 // ✅ 에코 템플릿 — situation × verdict 조합별 통찰
@@ -1098,13 +1112,13 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   // ✅ 트리거는 시간 조건 프리픽스 없이 표현 원칙만 노출 (forecastMode 동일)
   const finalTriggerText = triggerText;
 
-  // ✅ ECHO 말풍선 상단 — 초압축 4줄 고정
+  // ✅ ECHO 말풍선 상단 — 초압축 4줄 고정 + 답변 마지막 관심 연결 문장
   const summary = [
     `${modeEmoji} ${modeVerdict}`,
     oneLineSummary,
     `현재 상황: ${statusText}`,
     `트리거: ${finalTriggerText}`,
-  ].join('\n');
+  ].join('\n') + ECHO_TAIL;
 
   // ✅ details — 결론/컨플루언스/근거 prelude + ①②③ 현황 블록 + 면책
   const fmtPxEcho = (n: number): string =>
