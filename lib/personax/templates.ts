@@ -108,8 +108,8 @@ const JACK_BUY_PHRASES = [
   '조건 충족 시 분할 접근 고려',
   '기회의 창이 열렸습니다',
   '지금이 마지막 저점일 수 있습니다',
-  '신호가 명확합니다. 행동하십시오',
-  '추세가 확인됐습니다. 올라타십시오',
+  '신호가 명확한 흐름이에요',
+  '추세가 확인된 구간이에요',
 ];
 
 export const buildJackText = (p: JackParams): string => {
@@ -1095,17 +1095,8 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
     }
   }
 
-  // ✅ forecastMode는 트리거에 시간 프리픽스만 덧붙이고 동일한 4줄 포맷을 유지
-  const finalTriggerText: string = (() => {
-    if (!p.isForecast) return triggerText;
-    const isKR = p.assetType === 'KOREAN_STOCK';
-    const openTime = isKR ? '09:00' : '23:30';
-    const halfCheckpoint = isKR ? '12시 30분까지' : '02:30(개장 3시간)까지';
-    const prefix = p.isBeforeOpen
-      ? `${openTime} 개장 후 ${halfCheckpoint} `
-      : `내일 ${halfCheckpoint} `;
-    return `${prefix}${triggerText}`;
-  })();
+  // ✅ 트리거는 시간 조건 프리픽스 없이 표현 원칙만 노출 (forecastMode 동일)
+  const finalTriggerText = triggerText;
 
   // ✅ ECHO 말풍선 상단 — 초압축 4줄 고정
   const summary = [
