@@ -1570,10 +1570,14 @@ ${DISCLAIMER}`;
       : '';
 
     // ✅ USD 가격 간소화 표기 — "380.56" → "약 $381"
+    // ✅ 지수(코스피/나스닥/S&P500/다우 등)는 통화 단위 대신 "pt" 표기
+    const isMarketIndexKeyword = MARKET_INDEX_SET.has(keyword);
     const rayPriceDisplay = marketData
-      ? (currency === 'USD' && marketData.rawPrice
-          ? `약 $${Math.round(marketData.rawPrice).toLocaleString('en-US')}`
-          : `${marketData.price}${currency === 'KRW' ? '원' : ''}`)
+      ? (isMarketIndexKeyword
+          ? `${marketData.price}pt`
+          : currency === 'USD' && marketData.rawPrice
+            ? `약 $${Math.round(marketData.rawPrice).toLocaleString('en-US')}`
+            : `${marketData.price}${currency === 'KRW' ? '원' : ''}`)
       : '미지원';
 
     // ✅ RAY — 중립 팩트 3줄 (시세 / 거래량 / 변동성). 이평선·뉴스는 언급하지 않음.
