@@ -59,6 +59,10 @@ export const STOCK_MAP: Record<string, string> = {
   // ✅ 코스피 ETF
   'KODEX 200': '069500.KS', 'KODEX200': '069500.KS', '코덱스200': '069500.KS',
   'KODEX 레버리지': '122630.KS', 'KODEX레버리지': '122630.KS', '코덱스 레버리지': '122630.KS',
+  // ✅ 미국 지수 ETF (나스닥/S&P500/다우)
+  'QQQ': 'QQQ', 'TQQQ': 'TQQQ', 'SQQQ': 'SQQQ',
+  'SPY': 'SPY', 'VOO': 'VOO', 'IVV': 'IVV',
+  'DIA': 'DIA',
   // ✅ 추가 미국 종목
   '엑손모빌': 'XOM', '엑손모바일': 'XOM', '엑손': 'XOM', 'XOM': 'XOM',
   '존슨앤존슨': 'JNJ', 'JNJ': 'JNJ',

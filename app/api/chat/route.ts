@@ -1669,12 +1669,17 @@ ${DISCLAIMER}`;
         : `${keyword} 현재 ${marketData?.price || '데이터 없음'} (${safeNum(marketData?.change)}%)`;
 
       const isKRIndex = keyword === '코스피' || keyword === '코스닥' || keyword.includes('한국');
+      const isSP500 = keyword === 'S&P500' || keyword === 'SP500' || keyword === 'S&P';
+      const isDow = keyword === '다우' || keyword === '다우존스';
 
-      // ✅ ETF 실시간 데이터
+      // ✅ ETF 실시간 데이터 — 지수별 매핑
+      //   코스피/코스닥 → KODEX 200, KODEX 레버리지
+      //   S&P500       → SPY, VOO, IVV
+      //   다우존스     → DIA
+      //   나스닥(기본) → QQQ, TQQQ
       let etfLine = '';
       try {
         if (isKRIndex) {
-          // 코스피 ETF
           const [k200, klev] = await Promise.all([
             fetchMarketPrice('KODEX 200').catch(() => null),
             fetchMarketPrice('KODEX 레버리지').catch(() => null),
@@ -1682,17 +1687,29 @@ ${DISCLAIMER}`;
           const k200ch = parseFloat(k200?.change || '0');
           const klevch = parseFloat(klev?.change || '0');
           etfLine = `📊 코스피 ETF 현황:\nKODEX 200: ${k200?.price || '-'}원 (${k200ch >= 0 ? '+' : ''}${k200ch.toFixed(2)}%) ${k200ch > 0 ? '🟢' : k200ch < 0 ? '🔴' : '🟡'}\nKODEX 레버리지: ${klev?.price || '-'}원 (${klevch >= 0 ? '+' : ''}${klevch.toFixed(2)}%) ${klevch > 0 ? '🟢' : klevch < 0 ? '🔴' : '🟡'} ⚠️ 2배 레버리지`;
+        } else if (isSP500) {
+          const [spy, voo, ivv] = await Promise.all([
+            fetchMarketPrice('SPY').catch(() => null),
+            fetchMarketPrice('VOO').catch(() => null),
+            fetchMarketPrice('IVV').catch(() => null),
+          ]);
+          const spych = parseFloat(spy?.change || '0');
+          const vooch = parseFloat(voo?.change || '0');
+          const ivvch = parseFloat(ivv?.change || '0');
+          etfLine = `📊 S&P500 ETF 현황 (ETF로 직접 투자 가능):\nSPY (SPDR): $${spy?.price || '-'} (${spych >= 0 ? '+' : ''}${spych.toFixed(2)}%) ${spych > 0 ? '🟢' : spych < 0 ? '🔴' : '🟡'}\nVOO (Vanguard): $${voo?.price || '-'} (${vooch >= 0 ? '+' : ''}${vooch.toFixed(2)}%) ${vooch > 0 ? '🟢' : vooch < 0 ? '🔴' : '🟡'}\nIVV (iShares): $${ivv?.price || '-'} (${ivvch >= 0 ? '+' : ''}${ivvch.toFixed(2)}%) ${ivvch > 0 ? '🟢' : ivvch < 0 ? '🔴' : '🟡'}`;
+        } else if (isDow) {
+          const dia = await fetchMarketPrice('DIA').catch(() => null);
+          const diach = parseFloat(dia?.change || '0');
+          etfLine = `📊 다우존스 ETF 현황 (ETF로 직접 투자 가능):\nDIA (SPDR Dow Jones): $${dia?.price || '-'} (${diach >= 0 ? '+' : ''}${diach.toFixed(2)}%) ${diach > 0 ? '🟢' : diach < 0 ? '🔴' : '🟡'}`;
         } else {
           // 나스닥 ETF
-          const [qqq, tqqq, sqqq] = await Promise.all([
+          const [qqq, tqqq] = await Promise.all([
             fetchMarketPrice('QQQ').catch(() => null),
             fetchMarketPrice('TQQQ').catch(() => null),
-            fetchMarketPrice('SQQQ').catch(() => null),
           ]);
           const qqqch = parseFloat(qqq?.change || '0');
           const tqqqch = parseFloat(tqqq?.change || '0');
-          const sqqqch = parseFloat(sqqq?.change || '0');
-          etfLine = `📊 나스닥 ETF 현황 (ETF로 직접 투자 가능):\nQQQ (나스닥100): $${qqq?.price || '-'} (${qqqch >= 0 ? '+' : ''}${qqqch.toFixed(2)}%) ${qqqch > 0 ? '🟢' : qqqch < 0 ? '🔴' : '🟡'}\nTQQQ (3배 레버리지): $${tqqq?.price || '-'} (${tqqqch >= 0 ? '+' : ''}${tqqqch.toFixed(2)}%) ${tqqqch > 0 ? '🟢' : tqqqch < 0 ? '🔴' : '🟡'} ⚠️ 고위험\nSQQQ (인버스 3배): $${sqqq?.price || '-'} (${sqqqch >= 0 ? '+' : ''}${sqqqch.toFixed(2)}%) ${sqqqch > 0 ? '🟢' : sqqqch < 0 ? '🔴' : '🟡'} ⚠️ 하락 베팅`;
+          etfLine = `📊 나스닥 ETF 현황 (ETF로 직접 투자 가능):\nQQQ (나스닥100): $${qqq?.price || '-'} (${qqqch >= 0 ? '+' : ''}${qqqch.toFixed(2)}%) ${qqqch > 0 ? '🟢' : qqqch < 0 ? '🔴' : '🟡'}\nTQQQ (3배 레버리지): $${tqqq?.price || '-'} (${tqqqch >= 0 ? '+' : ''}${tqqqch.toFixed(2)}%) ${tqqqch > 0 ? '🟢' : tqqqch < 0 ? '🔴' : '🟡'} ⚠️ 고위험`;
         }
       } catch { etfLine = ''; }
 
