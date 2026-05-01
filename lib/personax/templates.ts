@@ -1106,8 +1106,7 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
     `트리거: ${finalTriggerText}`,
   ].join('\n');
 
-  // ✅ details — 구체 수치 조건/매수 권유 제거, 현황 안내 3블록 구조로 단순화
-  //   ① 이평선 현황 ② 거래량 현황 ③ 뉴스 흐름 + 면책
+  // ✅ details — 결론/컨플루언스/근거 prelude + ①②③ 현황 블록 + 면책
   const fmtPxEcho = (n: number): string =>
     p.currency === 'USD'
       ? `$${Math.round(n).toLocaleString('en-US')}`
@@ -1119,6 +1118,23 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
   };
 
   const detailBlocks: string[] = [];
+
+  // ✅ prelude — 결론 + 컨플루언스 + 4지표 + 근거
+  const volumeShortText = volumeText.replace(/^거래량\s*/, '');
+  const priceShortText = priceText.replace(/^시세\s*/, '');
+  const preludeLines = [
+    `결론: ${modeEmoji} ${modeVerdict}`,
+    `컨플루언스 신호 강도: ${strengthLabel} (${passCount}/4 지표 일치)`,
+    '',
+    '4가지 판단 지표:',
+    `${trendIcon} 이평선: ${trendText}`,
+    `${volumeIcon} 거래량: ${volumeShortText}`,
+    `${newsIcon} 뉴스: ${p.sentiment}`,
+    `${priceIcon} 시세: ${priceShortText}`,
+    '',
+    `근거: ${p.trendSummary || trendText}`,
+  ];
+  detailBlocks.push(preludeLines.join('\n'));
 
   // ① 이평선 현황
   if (p.ma5 && p.ma20 && p.rawPrice && p.rawPrice > 0) {
