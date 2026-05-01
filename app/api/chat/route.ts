@@ -1259,6 +1259,16 @@ ${DISCLAIMER}`;
           errorMessage: '죄송합니다. 해당 종목을 찾을 수 없어요.\n다른 종목명으로 입력해주세요.\n예: 삼성전자, 테슬라, SK하이닉스',
         });
       }
+      // ✅ 지수(다우/^DJI 등) 데이터 일시 미수급 시 RAY 일반 응답으로 폴백 — 에러 카드 대신 자연스러운 답변
+      if (MARKET_INDEX_SET.has(keyword)) {
+        const rayLLM = await callTeaPersona('ray', TEA_SYSTEM_RAY, [{ role: 'user', content: lastMsg }]);
+        return respond({
+          teaMode: true,
+          teaRound: 1,
+          teaPersona: 'ray',
+          teaRay: rayLLM || `${keyword} 실시간 데이터가 일시적으로 미수급이에요. 잠시 후 다시 질문해 주시면 데이터 기반으로 분석해 드릴 수 있어요.`,
+        });
+      }
       return respond({
         errorType: 'market_data_unavailable',
         errorMessage: '잠시 후 다시 시도해주세요.\n시세 데이터를 불러오는 중입니다. ⏳',
