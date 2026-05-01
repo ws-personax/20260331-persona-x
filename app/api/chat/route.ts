@@ -1728,6 +1728,10 @@ ${DISCLAIMER}`;
         // ✅ 시간대 — forecastMode 분기
         isForecast: (isKRClosed && assetType === 'KOREAN_STOCK') || (isUSClosed && assetType === 'US_STOCK'),
         isBeforeOpen: isKRBeforeOpen || (assetType === 'US_STOCK' && !isWeekend && timeKST < 2330 && timeKST >= 600),
+        // ✅ details 3블록 구조용 — 이평선/뉴스 현황
+        ma5: marketData?.trend?.ma5 ?? null,
+        ma20: marketData?.trend?.ma20 ?? null,
+        newsCount: news.length,
       });
       // ✅ ECHO 1 (summary): 즉시 표시 — 결론/조건/행동 3줄
       // ✅ ECHO 2 (details): 별도 버블 — confluence + 근거 + 지금 + 조건 + 비중 + dataSource + disclaimer

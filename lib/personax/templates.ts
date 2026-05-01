@@ -465,9 +465,9 @@ const pickTail = (direction: PriceDirection, keyword: string): string => {
 export const buildLuciaText = (p: LuciaParams): string => {
   // ✅ LUCIA가 JACK에게 반박 — 장중/장 마감 모두 공통으로 뒤에 부착
   const luciaRebuttal = p.conflict === 'conflict_jack_buy'
-    ? '\n↳ 잭 소장님, 거래량이 말해주고 있어요. 숫자가 아직 확신을 주지 않아요. 서두르면 꼭 물려요.'
+    ? '\n↳ 잭, 거래량이 말해주고 있어요. 숫자가 아직 확신을 주지 않아요. 서두르면 꼭 물려요.'
     : p.conflict === 'conflict_lucia_buy'
-      ? '\n↳ 잭 소장님의 신중함을 이해해요. 하지만 공포가 최고의 매수 기회였던 역사를 잊지 마세요.'
+      ? '\n↳ 잭의 신중함을 이해해요. 하지만 공포가 최고의 매수 기회였던 역사를 잊지 마세요.'
       : '';
 
   // ✅ 장 미개장/마감 시 — forecastMode (재반박 비활성화)
@@ -497,12 +497,12 @@ export const buildLuciaText = (p: LuciaParams): string => {
     const isAfterMarketCloseLucia = !p.isBeforeOpen;
     if (isAfterMarketCloseLucia) {
       if (mode === 'bull') {
-        return `소장님, 오늘 ${metaphor}.\n종가 기준 나쁘지 않았어요.\n내일 거래량이 따라준다면 좋은 신호예요.`;
+        return `오늘 ${metaphor}.\n종가 기준 나쁘지 않았어요.\n내일 거래량이 따라준다면 좋은 신호예요.`;
       }
       if (mode === 'bear') {
-        return `소장님, 오늘 ${metaphor}.\n마감이 아쉬웠어요.\n내일 추가 하락 없이 버텨주는지가 중요해요.`;
+        return `오늘 ${metaphor}.\n마감이 아쉬웠어요.\n내일 추가 하락 없이 버텨주는지가 중요해요.`;
       }
-      return `소장님, 오늘 ${metaphor}.\n방향을 못 정한 하루였어요.\n오늘 같은 날은 쉬는 것도 전략이에요.`;
+      return `오늘 ${metaphor}.\n방향을 못 정한 하루였어요.\n오늘 같은 날은 쉬는 것도 전략이에요.`;
     }
 
     let line1: string;
@@ -517,14 +517,14 @@ export const buildLuciaText = (p: LuciaParams): string => {
 
     if (mode === 'bear') {
       const head = negText ? `${negText} 기준으로` : '부정 신호 누적으로';
-      line1 = `소장님, ${head} 마치 ${metaphor}.`;
+      line1 = `${head} 마치 ${metaphor}.`;
       line2 = historyAwareLine;
     } else if (mode === 'bull') {
-      line1 = `소장님, 지표는 긍정적이에요. 하지만 FOMO에 휩쓸리지 마세요.`;
+      line1 = `지표는 긍정적이에요. 하지만 FOMO에 휩쓸리지 마세요.`;
       line2 = `${openTime} 개장 후 거래량 확인 후 진입하세요.`;
     } else {
       const head = negText ? `${negText}가 있어요.` : `방향이 아직 확정되지 않았어요.`;
-      line1 = `소장님, ${head} 마치 ${metaphor}.`;
+      line1 = `${head} 마치 ${metaphor}.`;
       line2 = historyAwareLine;
     }
 
@@ -560,16 +560,16 @@ export const buildLuciaText = (p: LuciaParams): string => {
 
   if (mode === 'bear') {
     // 부정 3개 이상 — 감정 경고 + 역발상 힌트 (JACK의 냉정한 데이터와 온도 차이)
-    line1 = `소장님, ${connector}마치 ${metaphor}. 지금은 현금이 맞아요.`;
+    line1 = `${connector}마치 ${metaphor}. 지금은 현금이 맞아요.`;
     line2 = `하지만 모두가 포기할 때가 오히려 기회일 수 있어요. 조금만 더 지켜봐요.`;
   } else if (mode === 'conflict') {
     // 갈등 — metaphor와 tail 모두 같은 direction으로 선택 (수정 1: 하락/급락 케이스 모순 제거)
     const tail = pickTail(direction, p.keyword);
-    line1 = `소장님, ${connector}마치 ${metaphor}.`;
+    line1 = `${connector}마치 ${metaphor}.`;
     line2 = tail;
   } else {
     // bull — FOMO 경고 (짧게)
-    line1 = `소장님, ${connector}${p.keyword}${topicParticle(p.keyword)} 지금 많은 신호가 긍정적이지만,`;
+    line1 = `${connector}${p.keyword}${topicParticle(p.keyword)} 지금 많은 신호가 긍정적이지만,`;
     line2 = `FOMO(나만 뒤처진다는 두려움)에 빠지지 마세요. 과열 구간에서는 더 신중해야 해요.`;
   }
 
@@ -616,6 +616,10 @@ interface EchoParams {
   // ✅ 시간대 (forecastMode 분기용)
   isForecast?: boolean;
   isBeforeOpen?: boolean;
+  // ✅ details 구조용 — 이평선/뉴스 현황
+  ma5?: number | null;
+  ma20?: number | null;
+  newsCount?: number;
 }
 
 // ✅ ECHO — 하워드 막스(Howard Marks) 스타일
@@ -1111,23 +1115,74 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
     `트리거: ${finalTriggerText}`,
   ].join('\n');
 
-  // ✅ details는 "자세히 보기" 확장 영역 — 기존 ECHO 2 전체 + 충돌 블록 흡수
-  //   순서: (conflict 시) ECHO 질문 + JACK/LUCIA 재답변 → 결론 상세 → confluence
-  //        → ⚔️ 참모진 판단 → 근거/지금/조건/비중
-  // ✅ 상단 summary의 modeVerdict와 details 첫 줄을 동일 문구로 통일
-  //    (기존 verdictText는 "포지션 축소를 권고합니다" 등 상단과 다른 문구가 나와 모순 발생)
-  const detailHeader = `결론: ${modeEmoji} ${modeVerdict}`;
-  const detailParts: string[] = [];
-  if (echoQuestion) {
-    detailParts.push(echoQuestion);
-    if (jackRebuttalLine) detailParts.push(jackRebuttalLine);
-    if (luciaRebuttalLine) detailParts.push(luciaRebuttalLine);
-    detailParts.push('');
+  // ✅ details — 구체 수치 조건/매수 권유 제거, 현황 안내 3블록 구조로 단순화
+  //   ① 이평선 현황 ② 거래량 현황 ③ 뉴스 흐름 + 면책
+  const fmtPxEcho = (n: number): string =>
+    p.currency === 'USD'
+      ? `$${Math.round(n).toLocaleString('en-US')}`
+      : `${Math.round(n).toLocaleString('ko-KR')}원`;
+  const fmtVolEcho = (v: number): string => {
+    if (v >= 100000000) return `${(v / 100000000).toFixed(1)}억주`;
+    if (v >= 10000) return `${Math.round(v / 10000).toLocaleString()}만주`;
+    return `${v.toLocaleString()}주`;
+  };
+
+  const detailBlocks: string[] = [];
+
+  // ① 이평선 현황
+  if (p.ma5 && p.ma20 && p.rawPrice && p.rawPrice > 0) {
+    const ma5Dir = p.rawPrice > p.ma5 ? '현재가 위' : '현재가 아래';
+    const ma20Dir = p.rawPrice > p.ma20 ? '현재가 위' : '현재가 아래';
+    detailBlocks.push(
+      [
+        '① 이평선 현황',
+        `   5일선: ${fmtPxEcho(p.ma5)} (${ma5Dir})`,
+        `   20일선: ${fmtPxEcho(p.ma20)} (${ma20Dir})`,
+        '   → 방향 전환 여부를 확인해보세요',
+      ].join('\n'),
+    );
+  } else {
+    detailBlocks.push(
+      [
+        '① 이평선 현황',
+        '   5일/20일 이평선 데이터 미수신',
+        '   → 방향 전환 여부를 확인해보세요',
+      ].join('\n'),
+    );
   }
-  detailParts.push(detailHeader, confluenceBlock);
-  if (debateBlock) detailParts.push(debateBlock);
-  detailParts.push(line2, line3, line4, line5);
-  const details = detailParts.join('\n');
+
+  // ② 거래량 현황
+  if (p.rawVolume && p.avgVolume && p.rawVolume > 0 && p.avgVolume > 0) {
+    const ratioPct = Math.round((p.rawVolume / p.avgVolume) * 100);
+    detailBlocks.push(
+      [
+        '② 거래량 현황',
+        `   오늘: ${fmtVolEcho(p.rawVolume)}`,
+        `   5일 평균 대비 ${ratioPct}%`,
+        '   → 추이 변화를 지켜보세요',
+      ].join('\n'),
+    );
+  } else {
+    detailBlocks.push(
+      [
+        '② 거래량 현황',
+        '   거래량 데이터 미수신',
+        '   → 추이 변화를 지켜보세요',
+      ].join('\n'),
+    );
+  }
+
+  // ③ 뉴스 흐름
+  const nCount = p.newsCount ?? 0;
+  detailBlocks.push(
+    [
+      '③ 뉴스 흐름',
+      `   오늘 관련 뉴스 ${nCount}건`,
+      '   → 직접 확인해보세요',
+    ].join('\n'),
+  );
+
+  const details = `${detailBlocks.join('\n\n')}\n\n모든 판단과 책임은\n투자자 본인에게 있습니다.`;
 
   return { summary, details };
 };
