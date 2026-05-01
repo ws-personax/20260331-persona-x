@@ -166,24 +166,13 @@ export const buildJackText = (p: JackParams): string => {
         : (mode === 'bull' ? '이평선 상승 추세 유지'
             : mode === 'bear' ? '이평선 하락 우세'
               : '이평선 방향 혼재');
-      const fmtAfter = (n: number): string =>
-        p.currency === 'USD'
-          ? `약 $${Math.round(n).toLocaleString('en-US')}`
-          : `${Math.round(n).toLocaleString('ko-KR')}원`;
-      const triggerPriceAfter = p.rawPrice && p.rawPrice > 0
-        ? fmtAfter(p.rawPrice * 1.02)
-        : (p.breakoutPrice || '돌파 기준가');
-      const stopPriceAfter = p.rawPrice && p.rawPrice > 0
-        ? fmtAfter(p.rawPrice * 0.98)
-        : (p.supportPrice || '리스크 기준선');
-
       if (mode === 'bull') {
-        return `오늘 ${changePctAfter} 마감. ${maComment}.\n내일 ${triggerPriceAfter} 돌파 + 거래량 증가 시\n진입 시나리오가 유효합니다.`;
+        return `오늘 ${changePctAfter} 마감. ${maComment}.\n내일 단기 방향성 확인 후 참고해볼 수 있어요.\n거래량 증가 시 진입 시나리오가 유효합니다.`;
       }
       if (mode === 'bear') {
-        return `오늘 ${changePctAfter} 마감. 약세 마감.\n내일 리스크 기준선 ${stopPriceAfter} 이탈 여부가\n핵심 확인 포인트입니다.`;
+        return `오늘 ${changePctAfter} 마감. 약세 마감.\n내일 단기 방향성 확인 후 참고해볼 수 있어요.\n시장 흐름 확인이 핵심 포인트입니다.`;
       }
-      return `오늘 ${changePctAfter} 마감. 방향성 없는 횡보.\n내일 ${triggerPriceAfter} 돌파 또는 ${stopPriceAfter} 이탈로\n방향이 결정될 가능성이 높습니다.`;
+      return `오늘 ${changePctAfter} 마감. 방향성 없는 횡보.\n내일 단기 방향성 확인 후 참고해볼 수 있어요.\n시장 흐름 확인 후 방향이 결정될 가능성이 높습니다.`;
     }
 
     let line1: string;
@@ -200,20 +189,10 @@ export const buildJackText = (p: JackParams): string => {
         line2 = `내일 ${halfCheckpoint} 거래량 ${volTrigger} 확인 후 진입하십시오.`;
       }
     } else if (mode === 'bear') {
-      // ✅ 역발상 강세론자 — 지지/돌파 레벨 제시 후 재진입 조건 명시
-      const fmtForecast = (n: number): string =>
-        p.currency === 'USD'
-          ? `약 $${Math.round(n).toLocaleString('en-US')}`
-          : `${Math.round(n).toLocaleString('ko-KR')}원`;
-      const bearSupport = p.rawPrice && p.rawPrice > 0
-        ? fmtForecast(p.rawPrice * 0.98)
-        : (p.supportPrice || '지지선');
-      const bearBreakout = p.rawPrice && p.rawPrice > 0
-        ? fmtForecast(p.rawPrice * 1.02)
-        : (p.breakoutPrice || '반등 기준가');
+      // ✅ 역발상 강세론자 — 단기 방향성 확인 후 재진입 조건 명시 (구체 수치 비공개)
       const bearL1 = `지휘관님, ${negText} 기준으로 조정 구간입니다.`;
-      const bearL2 = `단, 현재가 ${bearSupport} 지지 확인 후`;
-      const bearL3 = `${bearBreakout} 돌파 + 거래량 증가 시 즉각 재진입하십시오.`;
+      const bearL2 = `단기 방향성 확인 후 참고해볼 수 있어요.`;
+      const bearL3 = `시장 흐름 확인 + 거래량 증가 시 즉각 재진입하십시오.`;
       return `${bearL1}\n${bearL2}\n${bearL3}`;
     } else {
       // conflict / 혼재 — 긍정 지표 유무에 따라 표현 차별화
@@ -290,21 +269,10 @@ export const buildJackText = (p: JackParams): string => {
     if (flags?.priceDown) negatives.push('시세 하락');
     const negText = negatives.join(' + ') || '하락 지표 우세';
 
-    // ✅ 현재가 기준 지지선(-2%) / 돌파 기준가(+2%) 실시간 계산
-    const fmtBear = (n: number): string =>
-      p.currency === 'USD'
-        ? `약 $${Math.round(n).toLocaleString('en-US')}`
-        : `${Math.round(n).toLocaleString('ko-KR')}원`;
-    const supportLabel = p.rawPrice && p.rawPrice > 0
-      ? fmtBear(p.rawPrice * 0.98)
-      : (p.supportPrice || '지지선');
-    const breakoutLabel = p.rawPrice && p.rawPrice > 0
-      ? fmtBear(p.rawPrice * 1.02)
-      : (p.breakoutPrice || '반등 기준가');
-
+    // ✅ 단기 방향성 확인 후 재진입 조건 명시 (구체 지지선/돌파 수치 비공개)
     const bearL1 = `지휘관님, ${negText} 기준으로 조정 구간입니다.`;
-    const bearL2 = `단, 현재가 ${supportLabel} 지지 확인 후`;
-    const bearL3 = `${breakoutLabel} 돌파 + 거래량 증가 시 즉각 재진입하십시오.`;
+    const bearL2 = `단기 방향성 확인 후 참고해볼 수 있어요.`;
+    const bearL3 = `시장 흐름 확인 + 거래량 증가 시 즉각 재진입하십시오.`;
     return `${bearL1}\n${bearL2}\n${bearL3}${jackRebuttal}`;
   }
 
@@ -1069,13 +1037,8 @@ export const buildEchoText = (p: EchoParams): { summary: string; details: string
       : mode === 'bear' ? '리스크 관리 구간'
         : '신호 대기 중';
 
-  // ✅ 트리거 텍스트 — mode 기준(verdict 아님)
-  //   bull/conflict → 관심 구간 돌파 + 거래량
-  //   bear          → 리스크 기준선 이탈 감시
-  const triggerText =
-    mode === 'bear'
-      ? `리스크 기준선 ${p.sellPrice || '손절가'} 이탈 감시`
-      : `${effectiveBuyPrice || '매수 조건'} 돌파 + ${volNumberLabel}`;
+  // ✅ 트리거 텍스트 — SUMMARY에 구체 수치 미노출 (시장 흐름 확인 후 판단 원칙)
+  const triggerText = '시장 흐름 확인 후 판단하는 것도 원칙이에요';
 
   // ✅ ECHO 질문 (conflict 모드 + 장 중일 때만) — forecastMode에서는 비활성화
   // 충돌 유형별 3가지씩 로테이션 — getRotationIndex(ticker, length) 공통 시드 사용
