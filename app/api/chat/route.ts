@@ -2076,19 +2076,27 @@ ${DISCLAIMER}`;
 
 
     // ─── 히스토리 저장 ───
+    // ⚠️ Vercel 서버리스에서는 응답 반환 후 백그라운드 Promise 가 종료될 수 있어
+    //    fire-and-forget(`void Promise.race`) 대신 await 로 저장 완료를 보장한다.
+    //    Supabase 응답이 늦어질 경우 5초 타임아웃 후 응답을 반환한다.
     const isIndexKeyword = INDEX_KEYWORDS.has(keyword);
     if (userId && !isIndexKeyword) {
-      void Promise.race([
-        saveHistory({
-          keyword, question: lastMsg, verdict, totalScore: total, assetType, entryCondition,
-          priceAtTime: marketData?.price || '미수급', confidence, rawResponse: '',
-          marketData, ipAddress, userId, volIsHigh: vol.isHigh,
-        }),
-        new Promise(r => setTimeout(r, 5000)),
-      ]);
+      try {
+        await Promise.race([
+          saveHistory({
+            keyword, question: lastMsg, verdict, totalScore: total, assetType, entryCondition,
+            priceAtTime: marketData?.price || '미수급', confidence, rawResponse: '',
+            marketData, ipAddress, userId, volIsHigh: vol.isHigh,
+          }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('saveHistory timeout')), 5000)
+          ),
+        ]);
+      } catch (e) {
+        console.warn('[saveHistory] 저장 실패/타임아웃:', e);
+      }
     } else if (!userId) {
       console.warn('[saveHistory] 저장 스킵 — userId null');
-    } else if (isIndexKeyword) {
     }
 
     // ✅ 자세히 보기 전용 후처리 — 지시형 표현 완화 + 이모지 허용 셋 통일
