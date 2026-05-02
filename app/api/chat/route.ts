@@ -1,7 +1,7 @@
 ﻿import { fetchInvestmentNews } from '@/lib/news';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
-import { GoogleGenerativeAI, type GenerationConfig } from '@google/generative-ai';
+import { GoogleGenerativeAI, type GenerationConfig, type Tool } from '@google/generative-ai';
 
 // ✅ 분리된 모듈 import
 import type { Verdict } from '@/lib/personax/types';
@@ -121,6 +121,7 @@ const callTeaPersona = async (
   persona: TeaPersonaKey,
   system: string,
   history: TeaMsg[],
+  options?: { enableSearch?: boolean },
 ): Promise<string | null> => {
   const tag = `[tea:${persona}]`;
   if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
@@ -136,6 +137,11 @@ const callTeaPersona = async (
     console.warn(`${tag} contents 무효 (length=${contents.length}) → 템플릿 폴백`);
     return null;
   }
+  // ✅ Gemini 2.5 Google Search grounding — 시사/실시간 정보 질문에만 선택 적용 (비용 통제)
+  //    SDK Tool 타입에 googleSearch 필드가 아직 노출되지 않아 unknown 캐스팅 사용.
+  const searchTools: Tool[] | undefined = options?.enableSearch
+    ? ([{ googleSearch: {} }] as unknown as Tool[])
+    : undefined;
   for (let i = 0; i < TEA_GEMINI_FALLBACK_CHAIN.length; i++) {
     const modelName = TEA_GEMINI_FALLBACK_CHAIN[i];
     const nextModel = TEA_GEMINI_FALLBACK_CHAIN[i + 1];
@@ -143,6 +149,7 @@ const callTeaPersona = async (
       const model = teaGenAI.getGenerativeModel({
         model: modelName,
         systemInstruction: system,
+        ...(searchTools ? { tools: searchTools } : {}),
       });
       const result = await model.generateContent({
         contents,
@@ -633,7 +640,9 @@ export async function POST(req: Request) {
       }
 
       if (selectedPersona === 'ray') {
-        const rayLLM = await callTeaPersona('ray', TEA_SYSTEM_RAY, rayHistory);
+        // ✅ 시사/금융 일반 질문은 Google Search grounding 활성화 (실시간 정보)
+        const enableSearchForRay = category === 'news' || category === 'finance' || category === 'tech';
+        const rayLLM = await callTeaPersona('ray', TEA_SYSTEM_RAY, rayHistory, { enableSearch: enableSearchForRay });
         try {
           const supabase = getSupabase();
           if (supabase) {
@@ -1253,9 +1262,9 @@ ${DISCLAIMER}`;
 
       // ✅ 전망 질문 — 코스피/나스닥으로 유도 (간단 안내 카드)
       if (isForecastQuery) {
-        // ✅ finance 카테고리(예: "요즘 주식 어때요?")는 RAY 일반 응답으로 처리
+        // ✅ finance 카테고리(예: "요즘 주식 어때요?")는 RAY 일반 응답으로 처리 — 실시간 검색 활성화
         if (category === 'finance') {
-          const rayLLM = await callTeaPersona('ray', TEA_SYSTEM_RAY, [{ role: 'user', content: lastMsg }]);
+          const rayLLM = await callTeaPersona('ray', TEA_SYSTEM_RAY, [{ role: 'user', content: lastMsg }], { enableSearch: true });
           return respond({
             teaMode: true,
             teaRound: 1,
@@ -1269,8 +1278,9 @@ ${DISCLAIMER}`;
         });
       }
       // ✅ finance 카테고리(예: "주식 사도 될까요?", "지금 투자해도 될까요?") — 종목명 없는 일반 재테크 질문은 RAY 일반 응답
+      //    실시간 금리/거시지표 등 시사성 질문 가능 → Google Search grounding 활성화
       if (category === 'finance') {
-        const rayLLM = await callTeaPersona('ray', TEA_SYSTEM_RAY, [{ role: 'user', content: lastMsg }]);
+        const rayLLM = await callTeaPersona('ray', TEA_SYSTEM_RAY, [{ role: 'user', content: lastMsg }], { enableSearch: true });
         return respond({
           teaMode: true,
           teaRound: 1,
@@ -1314,8 +1324,9 @@ ${DISCLAIMER}`;
         });
       }
       // ✅ 지수(다우/^DJI 등) 데이터 일시 미수급 시 RAY 일반 응답으로 폴백 — 에러 카드 대신 자연스러운 답변
+      //    실시간 시황 보강을 위해 Google Search grounding 활성화
       if (MARKET_INDEX_SET.has(keyword)) {
-        const rayLLM = await callTeaPersona('ray', TEA_SYSTEM_RAY, [{ role: 'user', content: lastMsg }]);
+        const rayLLM = await callTeaPersona('ray', TEA_SYSTEM_RAY, [{ role: 'user', content: lastMsg }], { enableSearch: true });
         return respond({
           teaMode: true,
           teaRound: 1,
