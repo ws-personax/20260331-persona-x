@@ -1362,9 +1362,18 @@ ${DISCLAIMER}`;
     const trendCtx = analyzeTrendContext(marketData?.trend);
 
     // ✅ JACK/LUCIA용 trendSummary — 오늘 등락률 부착
+    //    +1% 이상: 강한 상승 마감 / +0.3~1%: 소폭 상승 마감 / -0.3~+0.3%: 방향성 없는 횡보
+    //    -1~-0.3%: 소폭 하락 마감 / -1% 이하: 강한 하락 마감
     const changeForTrend = marketData?.change ? parseFloat(marketData.change) : NaN;
+    const closeDescTrend = !Number.isFinite(changeForTrend)
+      ? '마감'
+      : changeForTrend >= 1   ? '강한 상승 마감'
+      : changeForTrend >= 0.3 ? '소폭 상승 마감'
+      : changeForTrend > -0.3 ? '방향성 없는 횡보'
+      : changeForTrend > -1   ? '소폭 하락 마감'
+      :                          '강한 하락 마감';
     const trendSummaryWithChange = (trendCtx.trendSummary && !Number.isNaN(changeForTrend))
-      ? `${trendCtx.trendSummary}, 오늘 ${changeForTrend >= 0 ? '+' : ''}${changeForTrend.toFixed(2)}% ${changeForTrend > 0.1 ? '상승' : changeForTrend < -0.1 ? '하락' : '보합'} 마감`
+      ? `${trendCtx.trendSummary}, 오늘 ${changeForTrend >= 0 ? '+' : ''}${changeForTrend.toFixed(2)}% ${closeDescTrend}`
       : (trendCtx.trendSummary || null);
 
     // ✅ 관망 세분화

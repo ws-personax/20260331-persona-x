@@ -166,21 +166,32 @@ const _buildJackText = (p: JackParams): string => {
     //    isBeforeOpen 플로우는 아래 기존 블록이 그대로 처리한다.
     const isAfterMarketClose = !p.isBeforeOpen;
     if (isAfterMarketClose) {
-      const changePctAfter = p.changeRaw && p.changeRaw !== '0.00'
-        ? `${parseFloat(p.changeRaw) >= 0 ? '+' : ''}${p.changeRaw}%`
+      const changeNumAfter = p.changeRaw ? parseFloat(p.changeRaw) : NaN;
+      const hasChangeAfter = Number.isFinite(changeNumAfter) && changeNumAfter !== 0;
+      const changePctAfter = hasChangeAfter
+        ? `${changeNumAfter >= 0 ? '+' : ''}${changeNumAfter.toFixed(2)}%`
         : '변동 없음';
-      const maComment = p.trendSummary && p.trendSummary.trim()
-        ? p.trendSummary
-        : (mode === 'bull' ? '이평선 상승 추세 유지'
-            : mode === 'bear' ? '이평선 하락 우세'
-              : '이평선 방향 혼재');
+      // ✅ 등락률 기반 descriptor — discussMode와 무관하게 실제 change%로 결정
+      //    (이전 버그: +0.89% 인데 conflict mode 라는 이유로 "방향성 없는 횡보" 표시)
+      //    +1% 이상: 강한 상승 마감 / +0.3~1%: 소폭 상승 마감 / -0.3~+0.3%: 방향성 없는 횡보
+      //    -1~-0.3%: 소폭 하락 마감 / -1% 이하: 강한 하락 마감
+      const closeDesc = !Number.isFinite(changeNumAfter)
+        ? '마감'
+        : changeNumAfter >= 1   ? '강한 상승 마감'
+        : changeNumAfter >= 0.3 ? '소폭 상승 마감'
+        : changeNumAfter > -0.3 ? '방향성 없는 횡보'
+        : changeNumAfter > -1   ? '소폭 하락 마감'
+        :                          '강한 하락 마감';
+      const headline = hasChangeAfter
+        ? `오늘 ${changePctAfter} ${closeDesc}.`
+        : `오늘 ${closeDesc}.`;
       if (mode === 'bull') {
-        return `오늘 ${changePctAfter} 마감. ${maComment}.\n내일 단기 방향성 확인 후 참고해볼 수 있어요.\n거래량 증가 시 진입 시나리오가 유효합니다.`;
+        return `${headline}\n내일 단기 방향성 확인 후 참고해볼 수 있어요.\n거래량 증가 시 진입 시나리오가 유효합니다.`;
       }
       if (mode === 'bear') {
-        return `오늘 ${changePctAfter} 마감. 약세 마감.\n내일 단기 방향성 확인 후 참고해볼 수 있어요.\n시장 흐름 확인이 핵심 포인트입니다.`;
+        return `${headline}\n내일 단기 방향성 확인 후 참고해볼 수 있어요.\n시장 흐름 확인이 핵심 포인트입니다.`;
       }
-      return `오늘 ${changePctAfter} 마감. 방향성 없는 횡보.\n내일 단기 방향성 확인 후 참고해볼 수 있어요.\n시장 흐름 확인 후 방향이 결정될 가능성이 높습니다.`;
+      return `${headline}\n내일 단기 방향성 확인 후 참고해볼 수 있어요.\n시장 흐름 확인 후 방향이 결정될 가능성이 높습니다.`;
     }
 
     let line1: string;
