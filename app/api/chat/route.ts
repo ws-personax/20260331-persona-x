@@ -505,6 +505,59 @@ export async function POST(req: Request) {
       return Response.json(body as Parameters<typeof Response.json>[0], init);
     };
 
+    // ✅ finance/뉴스 카테고리에서 종목명 없는 일반 질문 — 4페르소나 병렬 응답 빌더
+    //    RAY만 Google Search grounding 활성화(비용 통제), 나머지는 페르소나 톤만 적용.
+    //    news 카테고리 블록과 별도 — news는 4명 모두 검색이 필요하지만 finance 일반 질문은
+    //    RAY 사실 인용을 받아 JACK/LUCIA/ECHO 가 자기 톤으로 코멘트하는 구조.
+    const buildFinanceMultiPersonaResponse = async (msg: string): Promise<Response> => {
+      const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+      const yearNow = kstNow.getUTCFullYear();
+      const monthNow = kstNow.getUTCMonth() + 1;
+      const financePrefix = `[현재 시점: ${yearNow}년 ${monthNow}월 — 최신(${yearNow}년) 데이터·보도 기준으로 답변. 과거 인물·정책을 현재형으로 단정하지 말 것.]\n`;
+      const history: TeaMsg[] = [{ role: 'user', content: `${financePrefix}${msg}` }];
+
+      const [rayLLM, jackLLM, luciaLLM, echoLLM] = await Promise.all([
+        callTeaPersona('ray',   TEA_SYSTEM_RAY,   history, { enableSearch: true }),
+        callTeaPersona('jack',  TEA_SYSTEM_JACK,  history),
+        callTeaPersona('lucia', TEA_SYSTEM_LUCIA, history),
+        callTeaPersona('echo',  TEA_SYSTEM_ECHO,  history),
+      ]);
+
+      const cleanText = (t: string | null | undefined): string =>
+        (t || '').replace(/\*\*(.*?)\*\*/g, '$1').replace(/\n{2,}/g, '\n').trim();
+
+      const rayText   = cleanText(rayLLM)   || '구체적인 종목명을 말씀해주시면 데이터 기반으로 분석해드릴 수 있어요.';
+      const jackText  = cleanText(jackLLM)  || '핵심 지표가 정리되면 다시 짚어드리겠습니다.';
+      const luciaText = cleanText(luciaLLM) || '결정 전에 마음의 무게부터 같이 짚어볼까요?';
+      const echoText  = cleanText(echoLLM)  || '원칙이 흔들릴 땐 한 박자 쉬어가는 것도 방법이에요.';
+
+      try {
+        const supabase = getSupabase();
+        if (supabase) {
+          await supabase.from('tea_logs').insert({
+            persona: 'ray',
+            turn_count: 1,
+            first_message: msg.slice(0, 100),
+            user_id: null,
+          });
+        }
+      } catch (e) {
+        console.warn('[tea:finance] 로그 저장 실패 (무시)', e);
+      }
+
+      return respond({
+        reply: [rayText, jackText, luciaText, echoText].join('\n\n'),
+        personas: {
+          jack: jackText, lucia: luciaText, ray: rayText, echo: echoText,
+          verdict: '관망' as Verdict,
+          confidence: 0,
+          breakdown: '재테크 일반',
+          positionSizing: '0%',
+          jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
+        },
+      });
+    };
+
     // ✅ 차 한잔 모드 — LLM 기반 3 페르소나 응답 (Gemini 2.0 Flash, 병렬 호출)
     //   Round 1: LUCIA 단독 (감정 수용 단계)
     //   Round 2+: LUCIA + JACK + ECHO (세 API Promise.all 병렬)
@@ -565,6 +618,22 @@ export async function POST(req: Request) {
             jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
           },
         });
+      }
+
+      // ── ✅ finance 카테고리(teaMode) 종목명 없는 질문 — 4명 페르소나 병렬 응답 ──
+      //   기존: RAY 1명만 답변. 변경: 종목 미지정 일반 재테크 질문은 4명 다각도 응답.
+      //   "삼성전자/코스피/비트코인" 등 인식 가능한 종목·지수 키워드가 있으면 fall through
+      //   → 기존 단일 RAY (또는 메인 분석 경로) 유지.
+      if (category === 'finance' && !isExplicitPersonaPick) {
+        const teaFinKeyword = extractKeyword([{ role: 'user', content: lastMsg }]);
+        const hasKnownAsset = !!teaFinKeyword && (
+          !!STOCK_MAP[teaFinKeyword] || !!STOCK_MAP[teaFinKeyword.toUpperCase()] ||
+          !!CRYPTO_MAP[teaFinKeyword] || !!CRYPTO_MAP[teaFinKeyword.toUpperCase()] ||
+          MARKET_INDEX_SET.has(teaFinKeyword)
+        );
+        if (!hasKnownAsset) {
+          return await buildFinanceMultiPersonaResponse(lastMsg);
+        }
       }
 
       // ── 카테고리 감지 — 폴백 템플릿 분기용 (LLM 응답 자체는 시스템 프롬프트가 알아서 적응) ──
@@ -1317,31 +1386,19 @@ ${DISCLAIMER}`;
 
       // ✅ 전망 질문 — 코스피/나스닥으로 유도 (간단 안내 카드)
       if (isForecastQuery) {
-        // ✅ finance 카테고리(예: "요즘 주식 어때요?")는 RAY 일반 응답으로 처리 — 실시간 검색 활성화
+        // ✅ finance 카테고리(예: "요즘 주식 어때요?")는 4페르소나 병렬 응답 (RAY만 검색)
         if (category === 'finance') {
-          const rayLLM = await callTeaPersona('ray', TEA_SYSTEM_RAY, [{ role: 'user', content: lastMsg }], { enableSearch: true });
-          return respond({
-            teaMode: true,
-            teaRound: 1,
-            teaPersona: 'ray',
-            teaRay: rayLLM || '구체적인 종목명을 말씀해 주시면 데이터 기반으로 분석해 드릴 수 있어요.',
-          });
+          return await buildFinanceMultiPersonaResponse(lastMsg);
         }
         return respond({
           errorType: 'keyword_not_recognized',
           errorMessage: '시장 전망은 "코스피 전망" 또는 "나스닥 전망"으로\n질문해 주시면 즉각 분석해 드려요.',
         });
       }
-      // ✅ finance 카테고리(예: "주식 사도 될까요?", "지금 투자해도 될까요?") — 종목명 없는 일반 재테크 질문은 RAY 일반 응답
-      //    실시간 금리/거시지표 등 시사성 질문 가능 → Google Search grounding 활성화
+      // ✅ finance 카테고리(예: "주식 사도 될까요?", "요즘 미국 금리 어때요?") — 종목명 없는 일반 재테크 질문
+      //    4페르소나 병렬 응답 (RAY만 Google Search grounding 활성화)
       if (category === 'finance') {
-        const rayLLM = await callTeaPersona('ray', TEA_SYSTEM_RAY, [{ role: 'user', content: lastMsg }], { enableSearch: true });
-        return respond({
-          teaMode: true,
-          teaRound: 1,
-          teaPersona: 'ray',
-          teaRay: rayLLM || '구체적인 종목명을 말씀해 주시면 데이터 기반으로 분석해 드릴 수 있어요.',
-        });
+        return await buildFinanceMultiPersonaResponse(lastMsg);
       }
       // ✅ 종목 미인식 — 친절한 안내 카드
       return respond({
