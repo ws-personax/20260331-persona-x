@@ -297,6 +297,60 @@ const MARKET_INDEX_SET = new Set([
 ]);
 
 // ─────────────────────────────────────────────
+// ✅ 한국 증시 휴장일 (KRX 기준 — 연도 무관 MM-DD 셋)
+//   "지난 금요일" 하드코딩 제거를 위한 동적 거래일 계산 지원.
+//   대체공휴일/임시공휴일은 별도 추가 필요 (현 시점 최소 셋만 유지).
+// ─────────────────────────────────────────────
+const KR_MARKET_HOLIDAYS_MMDD: ReadonlySet<string> = new Set([
+  '01-01', // 신정
+  '03-01', // 삼일절
+  '05-01', // 근로자의 날
+  '05-05', // 어린이날
+  '06-06', // 현충일
+  '08-15', // 광복절
+  '10-03', // 개천절
+  '10-09', // 한글날
+  '12-25', // 성탄절
+  '12-31', // 연말 휴장
+]);
+
+// d 는 KST 오프셋이 적용된 Date 라고 가정 (getUTC* 사용)
+const isKRMarketHoliday = (d: Date): boolean => {
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  return KR_MARKET_HOLIDAYS_MMDD.has(`${mm}-${dd}`);
+};
+
+const isKRNonTradingDay = (d: Date): boolean => {
+  const dow = d.getUTCDay();
+  return dow === 0 || dow === 6 || isKRMarketHoliday(d);
+};
+
+// startD(포함)부터 거꾸로 거래일을 찾음. 연휴/장기 휴장 안전 마진 14일.
+const findPrevKRTradingDay = (startD: Date): Date => {
+  const d = new Date(startD.getTime());
+  for (let i = 0; i < 14; i++) {
+    if (!isKRNonTradingDay(d)) return d;
+    d.setUTCDate(d.getUTCDate() - 1);
+  }
+  return d;
+};
+
+// US 마지막 거래일(주말만 회피, US 공휴일은 별도 미반영 — 최소 범위)
+const findPrevWeekday = (startD: Date): Date => {
+  const d = new Date(startD.getTime());
+  for (let i = 0; i < 7; i++) {
+    const dow = d.getUTCDay();
+    if (dow !== 0 && dow !== 6) return d;
+    d.setUTCDate(d.getUTCDate() - 1);
+  }
+  return d;
+};
+
+const formatKRDateLabel = (d: Date): string =>
+  `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일`;
+
+// ─────────────────────────────────────────────
 // 자세히 보기 전용 후처리 — 지시형 표현 완화 + 이모지 허용 셋만 유지
 //   허용 이모지: ✅ ⚠️ 🔹 📊 📈 💡 🔴 🟡 🟢 (📍 렌더링 이슈로 🔹으로 대체)
 //   주의: 이 함수는 "자세히 보기(details)" 문자열에만 적용해야 함.
@@ -1296,24 +1350,37 @@ ${DISCLAIMER}`;
     const minuteKST = nowKST.getUTCMinutes();
     const timeKST = hourKST * 100 + minuteKST; // 예: 0815 = 오전 8시 15분
 
-    // 한국장: 평일 09:00~15:30 (KST), 주말 휴장
+    // 한국장: 평일 09:00~15:30 (KST), 주말/공휴일 휴장
     // ✅ 마감 시간 명시: 1530 = 15시 30분. 15:29:59까지 장중, 15:30:00부터 마감
     const KR_OPEN  = 900;
     const KR_CLOSE = 1530;
     const isWeekend = (assetType !== 'CRYPTO') && (dayKST === 0 || dayKST === 6);
-    const isKRBeforeOpen = assetType === 'KOREAN_STOCK' && !isWeekend && timeKST < KR_OPEN;
-    const isKRAfterClose = assetType === 'KOREAN_STOCK' && !isWeekend && timeKST >= KR_CLOSE;
-    const isKRClosed = isWeekend || isKRBeforeOpen || isKRAfterClose;
+    const isKRHolidayToday = assetType !== 'CRYPTO' && isKRMarketHoliday(nowKST);
+    const isKRNonTradingToday = isWeekend || isKRHolidayToday;
+    const isKRBeforeOpen = assetType === 'KOREAN_STOCK' && !isKRNonTradingToday && timeKST < KR_OPEN;
+    const isKRAfterClose = assetType === 'KOREAN_STOCK' && !isKRNonTradingToday && timeKST >= KR_CLOSE;
+    const isKRClosed = isKRNonTradingToday || isKRBeforeOpen || isKRAfterClose;
+
+    // ✅ 마지막 거래일 라벨 ("M월 D일") — 주말/공휴일/개장 전 분기에서 사용
+    //    - 비거래일(주말/공휴일): 오늘 직전 거래일
+    //    - 평일 개장 전: 어제 직전 거래일 (월요일 개장 전이면 지난 금요일)
+    const lastKRTradingDate = (() => {
+      if (isKRNonTradingToday) return findPrevKRTradingDay(nowKST);
+      const prev = new Date(nowKST.getTime());
+      prev.setUTCDate(prev.getUTCDate() - 1);
+      return findPrevKRTradingDay(prev);
+    })();
+    const lastKRTradingLabel = formatKRDateLabel(lastKRTradingDate);
 
     // 미국장: 평일 23:30~06:00 KST (서머타임 기준)
     const isUSClosed = assetType === 'US_STOCK' && !isCrypto &&
       (isWeekend || (timeKST >= 600 && timeKST < 2330));
 
     const marketClosedNote = isKRClosed && assetType === 'KOREAN_STOCK'
-      ? isWeekend
-        ? `\n⚠️ 주말 휴장 중 — 지난 금요일 종가 기준 분석입니다.`
+      ? isKRNonTradingToday
+        ? `\n⚠️ ${isWeekend ? '주말 휴장' : '공휴일 휴장'} 중 — ${lastKRTradingLabel} 종가 기준 분석입니다.`
         : isKRBeforeOpen
-          ? `\n⚠️ 장 개장 전(09:00 개장) — 전일 종가 기준 분석입니다.`
+          ? `\n⚠️ 장 개장 전(09:00 개장) — ${lastKRTradingLabel} 종가 기준 분석입니다.`
           : `\n⚠️ 장 마감 후 — 오늘 종가 기준 분석입니다.`
       : '';
 
@@ -1583,10 +1650,17 @@ ${DISCLAIMER}`;
     // ✅ 히스토리 — 이전 종목 맥락 연결용으로만 사용
 
     // ─── ✅ 레이: 완전 템플릿화 (Gemini 배제) ───
-    // ✅ 장 미개장 시 레이도 기준 날짜 표시
-    const rayTimeNote = (isKRClosed && assetType === 'KOREAN_STOCK') || (isUSClosed && assetType === 'US_STOCK')
-      ? ` (${isWeekend ? '지난 금요일' : isKRBeforeOpen ? '전일' : '오늘'} 종가 기준)`
-      : '';
+    // ✅ 장 미개장 시 레이도 기준 날짜 표시 — 주말/공휴일 동적 계산 (KR은 KR 휴장일 반영, US는 주말만)
+    const rayTimeNote = (() => {
+      if (isKRClosed && assetType === 'KOREAN_STOCK') {
+        return ` (${isKRNonTradingToday || isKRBeforeOpen ? `${lastKRTradingLabel} 종가` : '오늘 종가'} 기준)`;
+      }
+      if (isUSClosed && assetType === 'US_STOCK') {
+        const lastUSLabel = formatKRDateLabel(findPrevWeekday(nowKST));
+        return ` (${isWeekend ? `${lastUSLabel} 종가` : '오늘 종가'} 기준)`;
+      }
+      return '';
+    })();
 
     // ✅ USD 가격 간소화 표기 — "380.56" → "약 $381"
     // ✅ 지수(코스피/나스닥/S&P500/다우 등)는 통화 단위 대신 "pt" 표기
