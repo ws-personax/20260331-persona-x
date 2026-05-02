@@ -512,6 +512,61 @@ export async function POST(req: Request) {
     //   ⚠️ 재테크 탭(teaMode=false)은 아래 블록을 건너뛰므로 동작 변화 없음.
     //   ⚠️ finance 카테고리는 teaMode=true 일 때 RAY 로 자동 라우팅 (재테크 탭은 그대로 풀 분석).
     if (teaMode || category === 'sports' || category === 'news' || category === 'legal' || category === 'tech') {
+      // ── ✅ news 카테고리 — 4명 페르소나 병렬 응답 (Google Search grounding) ──
+      //   기존: RAY 1명만 답변 (단일 페르소나 dispatch). 시사·정세는 다각도 분석이 필요해
+      //   RAY/JACK/LUCIA/ECHO 4명 동시 응답으로 변경. teaPersona가 명시 픽(jack/echo/ray)
+      //   인 경우는 1:1 모드로 보고 기존 단일 응답을 유지한다.
+      const isExplicitPersonaPick = teaPersona === 'jack' || teaPersona === 'echo' || teaPersona === 'ray';
+      if (category === 'news' && !isExplicitPersonaPick) {
+        // 시간 컨텍스트 프리픽스 — 검색 결과가 구식 자료(2024 이하)에 편향되는 문제 방지
+        const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+        const yearNow = kstNow.getUTCFullYear();
+        const monthNow = kstNow.getUTCMonth() + 1;
+        const newsPrefix = `[현재 시점: ${yearNow}년 ${monthNow}월 — 가장 최근 보도(${yearNow}년)를 우선 참고하여 답변. 과거 인물·사건을 현재형으로 단정하지 말 것.]\n`;
+        const newsHistory: TeaMsg[] = [{ role: 'user', content: `${newsPrefix}${lastMsg}` }];
+
+        const [rayLLM, jackLLM, luciaLLM, echoLLM] = await Promise.all([
+          callTeaPersona('ray',   TEA_SYSTEM_RAY,   newsHistory, { enableSearch: true }),
+          callTeaPersona('jack',  TEA_SYSTEM_JACK,  newsHistory, { enableSearch: true }),
+          callTeaPersona('lucia', TEA_SYSTEM_LUCIA, newsHistory, { enableSearch: true }),
+          callTeaPersona('echo',  TEA_SYSTEM_ECHO,  newsHistory, { enableSearch: true }),
+        ]);
+
+        const cleanNews = (text: string | null | undefined): string =>
+          (text || '').replace(/\*\*(.*?)\*\*/g, '$1').replace(/\n{2,}/g, '\n').trim();
+
+        const rayText   = cleanNews(rayLLM)   || '실시간 검색이 일시 지연되고 있어요. 잠시 후 다시 질문해주세요.';
+        const jackText  = cleanNews(jackLLM)  || '핵심 변수가 정리되면 다시 짚어드릴게요.';
+        const luciaText = cleanNews(luciaLLM) || '뉴스를 보고 마음이 흔들리시면 천천히 이야기 나눠봐요.';
+        const echoText  = cleanNews(echoLLM)  || '구조적 흐름은 정보가 안정된 뒤 다시 정리해드릴게요.';
+
+        try {
+          const supabase = getSupabase();
+          if (supabase) {
+            await supabase.from('tea_logs').insert({
+              persona: 'ray',
+              turn_count: 1,
+              first_message: lastMsg.slice(0, 100),
+              user_id: null,
+            });
+          }
+        } catch (e) {
+          console.warn('[tea:news] 로그 저장 실패 (무시)', e);
+        }
+
+        return respond({
+          reply: [rayText, jackText, luciaText, echoText].join('\n\n'),
+          personas: {
+            jack: jackText, lucia: luciaText, ray: rayText, echo: echoText,
+            verdict: '관망' as Verdict,
+            confidence: 0,
+            breakdown: '시사 분석',
+            positionSizing: '0%',
+            jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
+          },
+        });
+      }
+
       // ── 카테고리 감지 — 폴백 템플릿 분기용 (LLM 응답 자체는 시스템 프롬프트가 알아서 적응) ──
       //   우선순위: 가족/건강 > 손실 > 기쁨 > 기타
       const isFamily = /(가족|부모|어머니|아버지|엄마|아빠|자식|아이|아들|딸|남편|아내|형제|자매|건강|병|아프|수술|입원|병원|암|치매)/.test(lastMsg);
