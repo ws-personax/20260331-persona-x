@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   authorize.searchParams.set('client_id', clientId);
   authorize.searchParams.set('redirect_uri', redirectUri);
   authorize.searchParams.set('state', state);
-  authorize.searchParams.set('scope', 'profile_nickname account_email profile_image');
+  authorize.searchParams.set('scope', 'profile_nickname profile_image');
 
   const res = NextResponse.redirect(authorize.toString());
   const isProd = process.env.NODE_ENV === 'production';
