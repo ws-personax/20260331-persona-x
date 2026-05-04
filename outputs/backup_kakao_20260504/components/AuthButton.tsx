@@ -7,19 +7,11 @@ type AuthUser = {
   email?: string | null;
 };
 
-type KakaoUser = {
-  id: number;
-  email?: string | null;
-  nickname?: string | null;
-  profileImage?: string | null;
-};
-
 export default function AuthButton() {
   const supabase = useMemo(() => createClient(), []);
 
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [kakao, setKakao] = useState<KakaoUser | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -27,6 +19,7 @@ export default function AuthButton() {
 
     const loadUser = async () => {
       // ✅ getUser 실패는 대개 "비로그인 상태" — 빨간색 에러로 노출하지 않음.
+      //   실패 시 user=null로 두고 조용히 로그인 버튼만 표시.
       const { data, error } = await supabase.auth.getUser();
       if (!mounted) return;
       if (error) {
@@ -36,20 +29,7 @@ export default function AuthButton() {
       setUser(data.user ? { email: data.user.email } : null);
     };
 
-    const loadKakao = async () => {
-      try {
-        const res = await fetch('/api/auth/kakao/me', { cache: 'no-store' });
-        if (!res.ok) return;
-        const json = (await res.json()) as { user: KakaoUser | null };
-        if (!mounted) return;
-        setKakao(json.user);
-      } catch {
-        /* 비로그인 — 무시 */
-      }
-    };
-
     loadUser();
-    loadKakao();
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       setTimeout(() => {
@@ -82,63 +62,38 @@ export default function AuthButton() {
     }
   };
 
-  const signInWithKakao = () => {
-    setLoading(true);
-    setError('');
-    window.location.href = '/api/auth/kakao/start';
-  };
-
   const signOut = async () => {
     try {
       setLoading(true);
       setError('');
-
-      if (kakao) {
-        const res = await fetch('/api/auth/kakao/logout', { method: 'POST' });
-        if (!res.ok) {
-          setError('로그아웃 중 잠시 문제가 발생했어요. 다시 시도해 주세요.');
-        } else {
-          setKakao(null);
-        }
-      }
-
-      if (user) {
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-          setError('로그아웃 중 잠시 문제가 발생했어요. 다시 시도해 주세요.');
-          console.error('로그아웃 실패:', error);
-        } else {
-          setUser(null);
-        }
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        setError('로그아웃 중 잠시 문제가 발생했어요. 다시 시도해 주세요.');
+        console.error('로그아웃 실패:', error);
+      } else {
+        setUser(null);
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const displayLabel =
-    kakao?.nickname || kakao?.email || user?.email || '로그인됨';
-  const isLoggedIn = Boolean(user || kakao);
-
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-      {isLoggedIn ? (
+      {user ? (
         <>
           <span
             style={{
               fontSize: '12px',
               color: '#374151',
               fontWeight: 600,
-              maxWidth: '160px',
+              maxWidth: '140px',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
             }}
           >
-            {displayLabel}
-            {kakao ? (
-              <span style={{ marginLeft: 6, color: '#a16207' }}>(Kakao)</span>
-            ) : null}
+            {user.email || '로그인됨'}
           </span>
           <button
             type="button"
@@ -174,22 +129,6 @@ export default function AuthButton() {
             }}
           >
             {loading ? '로그인 중...' : 'Google 로그인'}
-          </button>
-          <button
-            type="button"
-            onClick={signInWithKakao}
-            disabled={loading}
-            style={{
-              padding: '8px 14px',
-              borderRadius: '10px',
-              border: '1px solid #f5d300',
-              background: '#FEE500',
-              color: '#191600',
-              fontWeight: 700,
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {loading ? '로그인 중...' : '카카오 로그인'}
           </button>
           {/* ✅ 부드러운 회색 안내 — 빨간 에러 대신 긍정적 유도 문구 */}
           <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 500 }}>
