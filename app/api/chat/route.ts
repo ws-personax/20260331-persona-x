@@ -611,6 +611,32 @@ export async function POST(req: Request) {
         );
         const echoText  = cleanNews(echoLLM)  || '구조적 흐름은 정보가 안정된 뒤 다시 정리해드릴게요.';
 
+        // ── ✅ 2라운드 — 1라운드 응답을 본 뒤 각 페르소나가 자기 영역에서 한 번 더 짚기 ──
+        const round2Context = `${newsPrefix}사용자 질문: ${lastMsg}\n\n[1라운드 RAY]\n${rayText}\n[1라운드 JACK]\n${jackText}\n[1라운드 LUCIA]\n${luciaText}\n[1라운드 ECHO]\n${echoText}\n\n`;
+        const ray2History:   TeaMsg[] = [{ role: 'user', content: `${round2Context}[역할(2라운드 RAY): 위 1라운드를 본 뒤, 데이터·숫자 측면에서 빠졌거나 보강이 필요한 한 가지만 1~2줄로 짧게. 절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]` }];
+        const jack2History:  TeaMsg[] = [{ role: 'user', content: `${round2Context}[역할(2라운드 JACK): 위 1라운드를 본 뒤, 결정적으로 지금 해야 할 행동 한 가지만 짧고 투박하게 1~2줄로. 절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]` }];
+        const lucia2History: TeaMsg[] = [{ role: 'user', content: `${round2Context}[역할(2라운드 LUCIA): 위 1라운드를 본 뒤, 사람의 마음 측면에서 놓친 한 가지를 1~2줄로 인간적으로. 절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]` }];
+
+        const [ray2LLM, jack2LLM, lucia2LLM] = await Promise.all([
+          callTeaPersona('ray',   TEA_SYSTEM_RAY,   ray2History,   { enableSearch: true }),
+          callTeaPersona('jack',  TEA_SYSTEM_JACK,  jack2History,  { enableSearch: true }),
+          callTeaPersona('lucia', TEA_SYSTEM_LUCIA, lucia2History, { enableSearch: true }),
+        ]);
+
+        const rayText2   = cleanNews(ray2LLM);
+        const jackText2  = cleanNews(jack2LLM);
+        const luciaText2 = cleanNews(lucia2LLM);
+
+        // 2라운드 ECHO 최후 판결 — 1·2라운드 전체를 본 뒤 마무리
+        const echo2ConsolidationPrompt = `${newsPrefix}사용자 질문: ${lastMsg}\n\n[1라운드]\nRAY: ${rayText}\nJACK: ${jackText}\nLUCIA: ${luciaText}\nECHO: ${echoText}\n\n[2라운드]\nRAY: ${rayText2}\nJACK: ${jackText2}\nLUCIA: ${luciaText2}\n\n2라운드 답변을 모두 읽었습니다. ECHO로서 최후 판결을 내리세요. 뉴스/시사 질문이므로 "결정은 당신이 하십시오" 표현 금지. 판결 한 문장으로 마무리.`;
+        const echo2LLM = await callTeaPersona(
+          'echo',
+          TEA_SYSTEM_ECHO,
+          [{ role: 'user', content: echo2ConsolidationPrompt }],
+          { enableSearch: true },
+        );
+        const echoText2 = cleanNews(echo2LLM);
+
         try {
           const supabase = getSupabase();
           if (supabase) {
@@ -626,9 +652,13 @@ export async function POST(req: Request) {
         }
 
         return respond({
-          reply: [rayText, jackText, luciaText, echoText].join('\n\n'),
+          reply: [rayText, jackText, luciaText, echoText, rayText2, jackText2, luciaText2, echoText2].filter(Boolean).join('\n\n'),
           personas: {
             jack: jackText, lucia: luciaText, ray: rayText, echo: echoText,
+            ray2:   rayText2   || null,
+            jack2:  jackText2  || null,
+            lucia2: luciaText2 || null,
+            echo2:  echoText2  || null,
             verdict: '관망' as Verdict,
             confidence: 0,
             breakdown: '시사 분석',
