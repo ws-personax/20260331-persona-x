@@ -602,7 +602,7 @@ export async function POST(req: Request) {
 
         // ✅ ECHO 취합 판결 — 위 3명 응답을 컨텍스트로 받아 마지막에 호출
         //    'RAY는 ~로, JACK은 ~로, LUCIA는 ~로' 형식 절대 금지 (시스템 프롬프트에 원칙 등재)
-        const echoConsolidationPrompt = `${newsPrefix}사용자 질문: ${lastMsg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n위 세 답변을 듣고 ECHO로서 판결하라. 시스템 프롬프트의 '뉴스/시사 질문에서 ECHO 시작 방식' 원칙을 반드시 따를 것. 5줄 이내. 불릿·목록 사용 금지.`;
+        const echoConsolidationPrompt = `${newsPrefix}사용자 질문: ${lastMsg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n위 세 답변을 듣고 ECHO로서 판결하라. 시스템 프롬프트의 '뉴스/시사 질문에서 ECHO 시작 방식' 원칙을 반드시 따를 것. 5줄 이내. 불릿·목록 사용 금지. 반드시 마지막 줄은 RAY·JACK·LUCIA 세 사람에게 던지는 직접 질문 한 문장으로 마무리할 것(물음표 필수).`;
         const echoLLM = await callTeaPersona(
           'echo',
           TEA_SYSTEM_ECHO,
@@ -690,7 +690,7 @@ export async function POST(req: Request) {
         const luciaText = cleanLife(luciaLLM) || '많이 무거우셨겠어요. 천천히 같이 이야기 나눠봐요.';
 
         // ECHO 취합 판결 — 위 3명의 응답을 컨텍스트로 받아 마지막에 호출
-        const echoConsolidationPrompt = `사용자 질문: ${lastMsg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n위 세 사람의 응답을 듣고, 너의 시각에서 핵심을 짚고 우선순위를 정리해줘. 감정 위로보다는 구조적 통찰과 실행 가능한 한 가지 방향을 분명히 제시해. 5줄 이내. 불릿·목록 사용 금지.`;
+        const echoConsolidationPrompt = `사용자 질문: ${lastMsg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n위 세 사람의 응답을 듣고, 너의 시각에서 핵심을 짚고 우선순위를 정리해줘. 감정 위로보다는 구조적 통찰과 실행 가능한 한 가지 방향을 분명히 제시해. 5줄 이내. 불릿·목록 사용 금지. 반드시 마지막 줄은 RAY·JACK·LUCIA 세 사람에게 던지는 직접 질문 한 문장으로 마무리할 것(물음표 필수).`;
         const echoLLM = await callTeaPersona(
           'echo',
           TEA_SYSTEM_ECHO,
