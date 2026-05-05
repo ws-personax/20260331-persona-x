@@ -2282,6 +2282,20 @@ export default function ChatWindow() {
         console.debug('[tea] request teaRound:', teaRound, '/ response keys:', Object.keys(data), '/ teaLucia?', !!data.teaLucia, '/ teaJack?', !!data.teaJack, '/ teaEcho?', !!data.teaEcho, '/ teaRay?', !!data.teaRay);
       }
 
+      // [TEMP DEBUG] news round-2 필드 확인용 — 운영 배포 후 제거 예정
+      // eslint-disable-next-line no-console
+      console.debug('[round2-probe] data.teaMode:', data.teaMode,
+        '/ personas keys:', data.personas ? Object.keys(data.personas) : null,
+        '/ ray2?', !!data.personas?.ray2,
+        '/ jack2?', !!data.personas?.jack2,
+        '/ lucia2?', !!data.personas?.lucia2,
+        '/ echo2?', !!data.personas?.echo2,
+        '/ teaRay2?', !!data.teaRay2,
+        '/ teaJack2?', !!data.teaJack2,
+        '/ teaLucia2?', !!data.teaLucia2,
+        '/ teaEcho2?', !!data.teaEcho2,
+        '/ breakdown:', data.personas?.breakdown);
+
       const assistantMsg: Message = {
         id: generateId(),
         role: 'assistant',
@@ -2667,6 +2681,15 @@ export default function ChatWindow() {
                   const luciaText = msg.personas.lucia;
                   const jackSplitIdx = jackText.indexOf('\n↳ ');
                   const hasConflict = jackSplitIdx !== -1;
+
+                  // [TEMP DEBUG] news 응답 렌더 분기 확인용 — 제거 예정
+                  // eslint-disable-next-line no-console
+                  console.debug('[round2-render] branch:', msg.teaMode ? 'tea' : (hasConflict ? 'conflict' : 'non-conflict'),
+                    '/ breakdown:', msg.personas.breakdown,
+                    '/ has ray2?', !!msg.personas.ray2,
+                    '/ has jack2?', !!msg.personas.jack2,
+                    '/ has lucia2?', !!msg.personas.lucia2,
+                    '/ has echo2?', !!msg.personas.echo2);
 
                   if (hasConflict) {
                     const jackMain = jackText.slice(0, jackSplitIdx).trim();
