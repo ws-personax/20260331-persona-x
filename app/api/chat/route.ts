@@ -586,7 +586,7 @@ export async function POST(req: Request) {
       const luciaText = cleanText(luciaLLM) || '결정 전에 마음의 무게부터 같이 짚어볼까요?';
 
       // 2단계: ECHO 취합 + 씨앗 질문 (마지막 줄은 반드시 페르소나에게 던지는 질문)
-      const echoConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n세 답변을 읽었습니다. ECHO로서 취합 판결을 내리고, 가장 허점 있는 페르소나를 직접 지목해서 씨앗 질문을 던져 2라운드를 시작하세요. 5줄 이내. 목록 금지. 반드시 마지막 줄은 페르소나에게 던지는 질문으로 마무리.`;
+      const echoConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n당신은 ECHO입니다. 손석희 스타일로 판결하라. RAY/JACK/LUCIA 중 가장 허점 있는 한 명을 직접 지목해 날카로운 씨앗 질문을 던져라. 5줄 이내. 목록 금지. 마지막 줄은 반드시 물음표로 끝나는 질문.`;
       const echoLLM = await callTeaPersona(
         'echo',
         TEA_SYSTEM_ECHO,
@@ -596,13 +596,10 @@ export async function POST(req: Request) {
 
       // 3단계: 2라운드 RAY/JACK/LUCIA 병렬 (ECHO 직접 질문에만 응답)
       const round2Context = `${financePrefix}사용자 질문: ${msg}\n\n[1라운드 RAY]\n${rayText}\n[1라운드 JACK]\n${jackText}\n[1라운드 LUCIA]\n${luciaText}\n[1라운드 ECHO]\n${echoText}\n\n`;
-      const round2Base = '[ECHO가 방금 직접 질문을 던졌습니다. 그 질문에 답하라. 근거 한 줄 + 결론 한 줄, 총 2줄 이내. 페르소나 호칭에 님 붙이지 말 것.]';
-      const round2RayTone   = '[RAY: 반드시 숫자/데이터로 시작. 예: "코스피 PER 11배 — …"]';
-      const round2JackTone  = '[JACK: 짧고 투박하게. 모든 문장 "~요"로 끝낼 것.]';
-      const round2LuciaTone = '[LUCIA: "~잖아요"·"~거든요" 톤 유지. 다른 페르소나 흉내 금지. "아이고" 사용 금지(이미 1라운드에서 썼다고 가정).]';
-      const ray2History:   TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Base}${round2RayTone}` }];
-      const jack2History:  TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Base}${round2JackTone}` }];
-      const lucia2History: TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Base}${round2LuciaTone}` }];
+      const round2Prefix = '[ECHO가 방금 질문을 던졌다. RAY: 반드시 숫자/데이터로 시작해 2줄 이내 답하라. JACK: 짧고 투박하게 ~요 로 끝내라. 2줄 이내. LUCIA: ~잖아요 ~거든요 톤으로 2줄 이내. 아이고 금지. 페르소나 호칭에 님 붙이지 말 것.]';
+      const ray2History:   TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
+      const jack2History:  TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
+      const lucia2History: TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
 
       const [ray2LLM, jack2LLM, lucia2LLM] = await Promise.all([
         callTeaPersona('ray',   TEA_SYSTEM_RAY,   ray2History, { enableSearch: true }),
@@ -704,7 +701,7 @@ export async function POST(req: Request) {
 
         // ── ✅ 2라운드 — ECHO 1라운드 판결을 직접 질문으로 받아 각 페르소나가 그 질문에만 답하기 ──
         const round2Context = `${newsPrefix}사용자 질문: ${lastMsg}\n\n[1라운드 RAY]\n${rayText}\n[1라운드 JACK]\n${jackText}\n[1라운드 LUCIA]\n${luciaText}\n[1라운드 ECHO]\n${echoText}\n\n`;
-        const round2Prefix = '[ECHO가 방금 직접 질문을 던졌습니다. 그 질문에만 1~2줄로 답하세요. 새 정보 추가 금지. 페르소나 호칭에 님 붙이지 말 것.]';
+        const round2Prefix = '[ECHO가 방금 질문을 던졌다. RAY: 반드시 숫자/데이터로 시작해 2줄 이내 답하라. JACK: 짧고 투박하게 ~요 로 끝내라. 2줄 이내. LUCIA: ~잖아요 ~거든요 톤으로 2줄 이내. 아이고 금지. 페르소나 호칭에 님 붙이지 말 것.]';
         const ray2History:   TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
         const jack2History:  TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
         const lucia2History: TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
@@ -792,7 +789,7 @@ export async function POST(req: Request) {
 
         // ── ✅ 2라운드 (life) — ECHO 1라운드 판결을 직접 질문으로 받아 각자 그 질문에만 답하기 ──
         const lifeRound2Context = `사용자 질문: ${lastMsg}\n\n[1라운드 RAY]\n${rayText}\n[1라운드 JACK]\n${jackText}\n[1라운드 LUCIA]\n${luciaText}\n[1라운드 ECHO]\n${echoText}\n\n`;
-        const lifeRound2Prefix = '[ECHO가 방금 직접 질문을 던졌습니다. 그 질문에만 1~2줄로 답하세요. 새 정보 추가 금지. 페르소나 호칭에 님 붙이지 말 것.]';
+        const lifeRound2Prefix = '[ECHO가 방금 질문을 던졌다. RAY: 반드시 숫자/데이터로 시작해 2줄 이내 답하라. JACK: 짧고 투박하게 ~요 로 끝내라. 2줄 이내. LUCIA: ~잖아요 ~거든요 톤으로 2줄 이내. 아이고 금지. 페르소나 호칭에 님 붙이지 말 것.]';
         const lifeRay2History:   TeaMsg[] = [{ role: 'user', content: `${lifeRound2Context}${lifeRound2Prefix}` }];
         const lifeJack2History:  TeaMsg[] = [{ role: 'user', content: `${lifeRound2Context}${lifeRound2Prefix}` }];
         const lifeLucia2History: TeaMsg[] = [{ role: 'user', content: `${lifeRound2Context}${lifeRound2Prefix}` }];
