@@ -898,7 +898,7 @@ const getLoadingMessage = (text: string) => {
 
 // ✅ 카테고리 키워드 기반 로딩 페르소나 — getLoadingMessage와 동일 키워드 매핑 (아이콘/색상 분기용)
 const getLoadingPersona = (text: string): PersonaKey => {
-  if (/주식|펀드|코스피|비트코인|ETF|배당|환율|금리|삼성전자|테슬라|엔비디아|돈이|돈은|돈을|살까|팔까|물렸|손실|수익/.test(text)) return 'ray';
+  if (/주식|펀드|코스피|비트코인|ETF|배당|환율|금리|삼성전자|테슬라|엔비디아|돈이|돈은|돈을|살까|팔까|물렸|손실|수익|올랐|하락/.test(text)) return 'ray';
   if (/뉴스|정세|전쟁|이란|중동|트럼프|호르무즈|HMM|유가|금값/.test(text)) return 'ray';
   if (/야구|축구|농구|경기|선수|승부|리그|골프/.test(text)) return 'jack';
   if (/명퇴|은퇴|요양원|치매|무릎|허리|부모님|자녀|노후/.test(text)) return 'lucia';
