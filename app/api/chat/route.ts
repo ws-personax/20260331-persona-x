@@ -497,7 +497,7 @@ export async function POST(req: Request) {
     // luciaIntro 주입 대상: finance/sports/legal/tech 만 (emotion/general 은 LUCIA 직접 처리)
     // ✅ life/news 카테고리는 LUCIA 인트로 주입 제외 (4페르소나 응답 자체가 라우팅 안내 역할)
     const _shouldInjectLuciaIntro =
-      (category === 'finance' || category === 'sports' || category === 'legal' || category === 'tech')
+      (category === 'sports' || category === 'legal' || category === 'tech')
       && !!luciaRoutingMsg
       && !_alreadyIntroduced;
     const respond = (body: unknown, init?: ResponseInit): Response => {
@@ -519,22 +519,59 @@ export async function POST(req: Request) {
       const yearNow = kstNow.getUTCFullYear();
       const monthNow = kstNow.getUTCMonth() + 1;
       const financePrefix = `[현재 시점: ${yearNow}년 ${monthNow}월 — 최신(${yearNow}년) 데이터·보도 기준으로 답변. 과거 인물·정책을 현재형으로 단정하지 말 것.]\n`;
-      const history: TeaMsg[] = [{ role: 'user', content: `${financePrefix}${msg}` }];
-
-      const [rayLLM, jackLLM, luciaLLM, echoLLM] = await Promise.all([
-        callTeaPersona('ray',   TEA_SYSTEM_RAY,   history, { enableSearch: true }),
-        callTeaPersona('jack',  TEA_SYSTEM_JACK,  history),
-        callTeaPersona('lucia', TEA_SYSTEM_LUCIA, history),
-        callTeaPersona('echo',  TEA_SYSTEM_ECHO,  history),
-      ]);
 
       const cleanText = (t: string | null | undefined): string =>
         (t || '').replace(/\*\*(.*?)\*\*/g, '$1').replace(/\n{2,}/g, '\n').trim();
 
+      // 1단계: RAY/JACK/LUCIA 병렬 (페르소나별 역할 prefix)
+      const rayHistory:   TeaMsg[] = [{ role: 'user', content: `${financePrefix}[역할: 질문에 직접 답해라. 핵심 숫자 2개만. 절대 3줄 초과 금지. 목록 금지.]\n${msg}` }];
+      const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${financePrefix}[역할: 질문에 직접 답해라. 결단 중심. RAY 반박 가능. 3줄 이내.]\n${msg}` }];
+      const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${financePrefix}[역할: 질문에 직접 답해라. 감정·인간적 시각으로. 다른 페르소나 넘김 금지. 3줄 이내.]\n${msg}` }];
+
+      const [rayLLM, jackLLM, luciaLLM] = await Promise.all([
+        callTeaPersona('ray',   TEA_SYSTEM_RAY,   rayHistory, { enableSearch: true }),
+        callTeaPersona('jack',  TEA_SYSTEM_JACK,  jackHistory),
+        callTeaPersona('lucia', TEA_SYSTEM_LUCIA, luciaHistory),
+      ]);
+
       const rayText   = cleanText(rayLLM)   || '구체적인 종목명을 말씀해주시면 데이터 기반으로 분석해드릴 수 있어요.';
       const jackText  = cleanText(jackLLM)  || '핵심 지표가 정리되면 다시 짚어드리겠습니다.';
       const luciaText = cleanText(luciaLLM) || '결정 전에 마음의 무게부터 같이 짚어볼까요?';
-      const echoText  = cleanText(echoLLM)  || '원칙이 흔들릴 땐 한 박자 쉬어가는 것도 방법이에요.';
+
+      // 2단계: ECHO 취합 + 씨앗 질문 (마지막 줄은 반드시 페르소나에게 던지는 질문)
+      const echoConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n세 답변을 읽었습니다. ECHO로서 취합 판결을 내리고, 가장 허점 있는 페르소나를 직접 지목해서 씨앗 질문을 던져 2라운드를 시작하세요. 5줄 이내. 목록 금지. 반드시 마지막 줄은 페르소나에게 던지는 질문으로 마무리.`;
+      const echoLLM = await callTeaPersona(
+        'echo',
+        TEA_SYSTEM_ECHO,
+        [{ role: 'user', content: echoConsolidationPrompt }],
+      );
+      const echoText = cleanText(echoLLM) || '원칙이 흔들릴 땐 한 박자 쉬어가는 것도 방법이에요.';
+
+      // 3단계: 2라운드 RAY/JACK/LUCIA 병렬 (ECHO 직접 질문에만 응답)
+      const round2Context = `${financePrefix}사용자 질문: ${msg}\n\n[1라운드 RAY]\n${rayText}\n[1라운드 JACK]\n${jackText}\n[1라운드 LUCIA]\n${luciaText}\n[1라운드 ECHO]\n${echoText}\n\n`;
+      const round2Prefix = '[ECHO가 방금 직접 질문을 던졌습니다. 그 질문에만 1~2줄로 답하세요. 새 정보 추가 금지. 페르소나 호칭에 님 붙이지 말 것.]';
+      const ray2History:   TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
+      const jack2History:  TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
+      const lucia2History: TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
+
+      const [ray2LLM, jack2LLM, lucia2LLM] = await Promise.all([
+        callTeaPersona('ray',   TEA_SYSTEM_RAY,   ray2History, { enableSearch: true }),
+        callTeaPersona('jack',  TEA_SYSTEM_JACK,  jack2History),
+        callTeaPersona('lucia', TEA_SYSTEM_LUCIA, lucia2History),
+      ]);
+
+      const rayText2   = cleanText(ray2LLM);
+      const jackText2  = cleanText(jack2LLM);
+      const luciaText2 = cleanText(lucia2LLM);
+
+      // 4단계: ECHO 최후 판결 (한 문장)
+      const echo2ConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n[1라운드]\nRAY: ${rayText}\nJACK: ${jackText}\nLUCIA: ${luciaText}\nECHO: ${echoText}\n\n[2라운드]\nRAY: ${rayText2}\nJACK: ${jackText2}\nLUCIA: ${luciaText2}\n\n최후 판결을 한 문장으로만 내려라. 요약·정리·나열 금지. 절대 3줄 초과 금지. "결정은 당신이 하십시오" 표현 금지.`;
+      const echo2LLM = await callTeaPersona(
+        'echo',
+        TEA_SYSTEM_ECHO,
+        [{ role: 'user', content: echo2ConsolidationPrompt }],
+      );
+      const echoText2 = cleanText(echo2LLM);
 
       try {
         const supabase = getSupabase();
@@ -551,9 +588,13 @@ export async function POST(req: Request) {
       }
 
       return respond({
-        reply: [rayText, jackText, luciaText, echoText].join('\n\n'),
+        reply: [rayText, jackText, luciaText, echoText, rayText2, jackText2, luciaText2, echoText2].filter(Boolean).join('\n\n'),
         personas: {
           jack: jackText, lucia: luciaText, ray: rayText, echo: echoText,
+          ray2:   rayText2   || null,
+          jack2:  jackText2  || null,
+          lucia2: luciaText2 || null,
+          echo2:  echoText2  || null,
           verdict: '관망' as Verdict,
           confidence: 0,
           breakdown: '재테크 일반',
