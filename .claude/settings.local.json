@@ -26,7 +26,16 @@
       "Bash(mkdir -p \"D:/0 비지니스/0-PersonaX MVP/20260331-persona--x/outputs/backup_kakao_20260504/app/auth/callback\")",
       "Bash(mkdir -p \"D:/0 비지니스/0-PersonaX MVP/20260331-persona--x/outputs/backup_kakao_20260504/lib/supabase\")",
       "Bash(cp \"D:/0 비지니스/0-PersonaX MVP/20260331-persona--x/components/AuthButton.tsx\" \"D:/0 비지니스/0-PersonaX MVP/20260331-persona--x/outputs/backup_kakao_20260504/components/AuthButton.tsx\")",
-      "Bash(cp \"D:/0 비지니스/0-PersonaX MVP/20260331-persona--x/app/auth/callback/route.ts\" \"D:/0 비지니스/0-PersonaX MVP/20260331-persona--x/outputs/backup_kakao_20260504/app/auth/callback/route.ts\")"
+      "Bash(cp \"D:/0 비지니스/0-PersonaX MVP/20260331-persona--x/app/auth/callback/route.ts\" \"D:/0 비지니스/0-PersonaX MVP/20260331-persona--x/outputs/backup_kakao_20260504/app/auth/callback/route.ts\")",
+      "Bash(vercel logs *)",
+      "PowerShell(vercel logs *)",
+      "PowerShell(npx vercel logs https://20260331-persona-x.vercel.app --limit 20)",
+      "Bash(npx vercel *)",
+      "Bash(cp \"app/api/chat/prompts/tea-ray.ts\" \"app/api/chat/prompts/tea-ray.backup.ts\")",
+      "Bash(cp \"app/api/chat/prompts/tea-jack.ts\" \"app/api/chat/prompts/tea-jack.backup.ts\")",
+      "Bash(cp \"app/api/chat/prompts/tea-lucia.ts\" \"app/api/chat/prompts/tea-lucia.backup.ts\")",
+      "Bash(cp \"app/api/chat/prompts/tea-echo.ts\" \"app/api/chat/prompts/tea-echo.backup.ts\")",
+      "Bash(echo \"EXIT: $?\")"
     ]
   }
 }

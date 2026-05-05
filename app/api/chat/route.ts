@@ -523,15 +523,17 @@ export async function POST(req: Request) {
       const cleanText = (t: string | null | undefined): string =>
         (t || '').replace(/\*\*(.*?)\*\*/g, '$1').replace(/\n{2,}/g, '\n').trim();
 
-      // 직전 user→assistant 페어 추출 — assistant 응답에서 RAY 페르소나 발화를 우선 뽑음
-      // 우선순위: personas.ray → teaRay → content 첫 청크(\n\n 분리, multi-persona 응답은 RAY가 첫 자리)
+      // 직전 user→assistant 페어 추출 — assistant 응답에서 페르소나 발화를 폴백 체인으로 추출
+      // 우선순위: personas.ray → teaRay → personas.jack → teaJack → personas.lucia → teaLucia → content 첫 청크
       const recentContext = (() => {
         if (!Array.isArray(messages) || messages.length < 2) return '';
-        const prior = messages.slice(0, -1).slice(-6) as Array<{
+        const prior = messages.slice(0, -1).slice(-8) as Array<{
           role?: string;
           content?: string;
           teaRay?: string;
-          personas?: { ray?: string };
+          teaJack?: string;
+          teaLucia?: string;
+          personas?: { ray?: string; jack?: string; lucia?: string };
         }>;
         if (prior.length === 0) return '';
 
@@ -542,16 +544,20 @@ export async function POST(req: Request) {
         for (let i = 0; i < prior.length; i++) {
           const m = prior[i];
           if (m?.role !== 'user') continue;
-          const q = summarize(m.content || '', 80);
+          const q = summarize(m.content || '', 100);
           if (!q) continue;
           const next = prior[i + 1];
           if (next && next.role === 'assistant') {
-            const rayResp =
+            const personaResp =
               next.personas?.ray ||
               next.teaRay ||
+              next.personas?.jack ||
+              next.teaJack ||
+              next.personas?.lucia ||
+              next.teaLucia ||
               (next.content || '').split(/\n\n+/)[0] ||
               '';
-            const ray = summarize(rayResp, 150);
+            const ray = summarize(personaResp, 150);
             turns.push(ray ? `[유저: ${q}] → [RAY: ${ray}]` : `[유저: ${q}]`);
             i++; // 다음 assistant는 소비됐으므로 건너뜀
           } else {
@@ -575,7 +581,7 @@ export async function POST(req: Request) {
         callTeaPersona('lucia', TEA_SYSTEM_LUCIA, luciaHistory),
       ]);
 
-      const rayText   = cleanText(rayLLM)   || '구체적인 종목명을 말씀해주시면 데이터 기반으로 분석해드릴 수 있어요.';
+      const rayText   = cleanText(rayLLM)   || '지금 시장 데이터를 보면 — 좀 더 구체적인 상황을 말씀해주시면 수치로 정리해드릴게요.';
       const jackText  = cleanText(jackLLM)  || '핵심 지표가 정리되면 다시 짚어드리겠습니다.';
       const luciaText = cleanText(luciaLLM) || '결정 전에 마음의 무게부터 같이 짚어볼까요?';
 
