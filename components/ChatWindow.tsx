@@ -2781,7 +2781,15 @@ export default function ChatWindow() {
             <span>AI 참모진이 분석 중입니다. 약 20~30초 소요됩니다.</span>
           </div>
         )}
-        {isLoading && <TypingIndicator teaMode={messages.slice().reverse().find(m => m.role === 'user')?.teaMode === true} teaPersona={teaPersona} userText={messages.slice().reverse().find(m => m.role === 'user')?.content || ''} />}
+        {isLoading && <TypingIndicator teaMode={messages.slice().reverse().find(m => m.role === 'user')?.teaMode === true} teaPersona={teaPersona} userText={
+          messages
+            .slice()
+            .reverse()
+            .filter(m => m.role === 'user')
+            .slice(0, 3)
+            .map(m => m.content)
+            .join(' ') || ''
+        } />}
         <div ref={bottomRef} />
       </div>
       )}
