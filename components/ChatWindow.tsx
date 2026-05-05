@@ -873,11 +873,29 @@ const TEA_TYPING_TEXT: Record<'lucia' | 'jack' | 'echo', string> = {
   echo: 'ECHO가 핵심을 찾고 있어요...',
 };
 
-const TypingIndicator = ({ teaMode = false, teaPersona = null }: { teaMode?: boolean; teaPersona?: 'lucia' | 'jack' | 'echo' | null }) => {
+// ✅ 카테고리 키워드 기반 로딩 문구 — teaPersona가 명시 픽이 아닐 때 사용
+const getLoadingMessage = (text: string) => {
+  if (/주식|펀드|코스피|비트코인|ETF|배당|환율|금리|삼성전자|테슬라|엔비디아/.test(text))
+    return '📊 RAY가 데이터를 분석하고 있어요...';
+  if (/뉴스|정세|전쟁|이란|중동|트럼프|호르무즈|HMM|유가|금값/.test(text))
+    return '🔍 RAY가 최신 정보를 확인하고 있어요...';
+  if (/야구|축구|농구|경기|선수|승부|리그|골프/.test(text))
+    return '⚡ JACK이 승부를 읽고 있어요...';
+  if (/명퇴|은퇴|요양원|치매|무릎|허리|부모님|자녀|노후/.test(text))
+    return '🌿 LUCIA와 함께 생각하고 있어요...';
+  if (/법률|세금|계약|소송|퇴직금|실업급여/.test(text))
+    return '⚖️ ECHO가 구조를 짚고 있어요...';
+  return '🌿 LUCIA가 귀 기울이고 있어요...';
+};
+
+const TypingIndicator = ({ teaMode = false, teaPersona = null, userText = '' }: { teaMode?: boolean; teaPersona?: 'lucia' | 'jack' | 'echo' | null; userText?: string }) => {
   if (teaMode) {
     const personaKey = (teaPersona || 'lucia') as 'lucia' | 'jack' | 'echo';
     const p = PERSONAS[personaKey];
-    const text = TEA_TYPING_TEXT[personaKey];
+    // 명시 픽(jack/echo)이면 페르소나 고정 문구, 기본(lucia)이면 카테고리 분기 문구
+    const text = teaPersona === 'jack' || teaPersona === 'echo'
+      ? TEA_TYPING_TEXT[personaKey]
+      : getLoadingMessage(userText);
     return (
       <>
         <style>{`
@@ -2677,7 +2695,7 @@ export default function ChatWindow() {
             <span>AI 참모진이 분석 중입니다. 약 20~30초 소요됩니다.</span>
           </div>
         )}
-        {isLoading && <TypingIndicator teaMode={messages.slice().reverse().find(m => m.role === 'user')?.teaMode === true} teaPersona={teaPersona} />}
+        {isLoading && <TypingIndicator teaMode={messages.slice().reverse().find(m => m.role === 'user')?.teaMode === true} teaPersona={teaPersona} userText={messages.slice().reverse().find(m => m.role === 'user')?.content || ''} />}
         <div ref={bottomRef} />
       </div>
       )}
