@@ -611,11 +611,12 @@ export async function POST(req: Request) {
         );
         const echoText  = cleanNews(echoLLM)  || '구조적 흐름은 정보가 안정된 뒤 다시 정리해드릴게요.';
 
-        // ── ✅ 2라운드 — 1라운드 응답을 본 뒤 각 페르소나가 자기 영역에서 한 번 더 짚기 ──
+        // ── ✅ 2라운드 — ECHO 1라운드 판결을 직접 질문으로 받아 각 페르소나가 그 질문에만 답하기 ──
         const round2Context = `${newsPrefix}사용자 질문: ${lastMsg}\n\n[1라운드 RAY]\n${rayText}\n[1라운드 JACK]\n${jackText}\n[1라운드 LUCIA]\n${luciaText}\n[1라운드 ECHO]\n${echoText}\n\n`;
-        const ray2History:   TeaMsg[] = [{ role: 'user', content: `${round2Context}[역할(2라운드 RAY): 위 1라운드를 본 뒤, 데이터·숫자 측면에서 빠졌거나 보강이 필요한 한 가지만 1~2줄로 짧게. 절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]` }];
-        const jack2History:  TeaMsg[] = [{ role: 'user', content: `${round2Context}[역할(2라운드 JACK): 위 1라운드를 본 뒤, 결정적으로 지금 해야 할 행동 한 가지만 짧고 투박하게 1~2줄로. 절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]` }];
-        const lucia2History: TeaMsg[] = [{ role: 'user', content: `${round2Context}[역할(2라운드 LUCIA): 위 1라운드를 본 뒤, 사람의 마음 측면에서 놓친 한 가지를 1~2줄로 인간적으로. 절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]` }];
+        const round2Prefix = '[ECHO가 방금 당신에게 직접 질문을 던졌습니다. 그 질문에만 답하세요. 1~2줄. 새로 설명 시작 금지.]';
+        const ray2History:   TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
+        const jack2History:  TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
+        const lucia2History: TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
 
         const [ray2LLM, jack2LLM, lucia2LLM] = await Promise.all([
           callTeaPersona('ray',   TEA_SYSTEM_RAY,   ray2History,   { enableSearch: true }),
@@ -628,7 +629,7 @@ export async function POST(req: Request) {
         const luciaText2 = cleanNews(lucia2LLM);
 
         // 2라운드 ECHO 최후 판결 — 1·2라운드 전체를 본 뒤 마무리
-        const echo2ConsolidationPrompt = `${newsPrefix}사용자 질문: ${lastMsg}\n\n[1라운드]\nRAY: ${rayText}\nJACK: ${jackText}\nLUCIA: ${luciaText}\nECHO: ${echoText}\n\n[2라운드]\nRAY: ${rayText2}\nJACK: ${jackText2}\nLUCIA: ${luciaText2}\n\n2라운드 답변을 모두 읽었습니다. ECHO로서 최후 판결을 내리세요. 뉴스/시사 질문이므로 "결정은 당신이 하십시오" 표현 금지. 판결 한 문장으로 마무리.`;
+        const echo2ConsolidationPrompt = `${newsPrefix}사용자 질문: ${lastMsg}\n\n[1라운드]\nRAY: ${rayText}\nJACK: ${jackText}\nLUCIA: ${luciaText}\nECHO: ${echoText}\n\n[2라운드]\nRAY: ${rayText2}\nJACK: ${jackText2}\nLUCIA: ${luciaText2}\n\n최후 판결을 한 문장으로만 내려라. 요약·정리·나열 금지. 절대 3줄 초과 금지.`;
         const echo2LLM = await callTeaPersona(
           'echo',
           TEA_SYSTEM_ECHO,
@@ -697,6 +698,32 @@ export async function POST(req: Request) {
         );
         const echoText = cleanLife(echoLLM) || '세 사람의 답변을 종합하면, 가장 먼저 좁혀야 할 건 지금 가장 무거운 것이 무엇인가입니다.';
 
+        // ── ✅ 2라운드 (life) — ECHO 1라운드 판결을 직접 질문으로 받아 각자 그 질문에만 답하기 ──
+        const lifeRound2Context = `사용자 질문: ${lastMsg}\n\n[1라운드 RAY]\n${rayText}\n[1라운드 JACK]\n${jackText}\n[1라운드 LUCIA]\n${luciaText}\n[1라운드 ECHO]\n${echoText}\n\n`;
+        const lifeRound2Prefix = '[ECHO가 방금 당신에게 직접 질문을 던졌습니다. 그 질문에만 답하세요. 1~2줄. 새로 설명 시작 금지.]';
+        const lifeRay2History:   TeaMsg[] = [{ role: 'user', content: `${lifeRound2Context}${lifeRound2Prefix}` }];
+        const lifeJack2History:  TeaMsg[] = [{ role: 'user', content: `${lifeRound2Context}${lifeRound2Prefix}` }];
+        const lifeLucia2History: TeaMsg[] = [{ role: 'user', content: `${lifeRound2Context}${lifeRound2Prefix}` }];
+
+        const [lifeRay2LLM, lifeJack2LLM, lifeLucia2LLM] = await Promise.all([
+          callTeaPersona('ray',   TEA_SYSTEM_RAY,   lifeRay2History),
+          callTeaPersona('jack',  TEA_SYSTEM_JACK,  lifeJack2History),
+          callTeaPersona('lucia', TEA_SYSTEM_LUCIA, lifeLucia2History),
+        ]);
+
+        const lifeRayText2   = cleanLife(lifeRay2LLM);
+        const lifeJackText2  = cleanLife(lifeJack2LLM);
+        const lifeLuciaText2 = cleanLife(lifeLucia2LLM);
+
+        // 2라운드 ECHO 최후 판결 — 1·2라운드 전체를 본 뒤 마무리
+        const lifeEcho2ConsolidationPrompt = `사용자 질문: ${lastMsg}\n\n[1라운드]\nRAY: ${rayText}\nJACK: ${jackText}\nLUCIA: ${luciaText}\nECHO: ${echoText}\n\n[2라운드]\nRAY: ${lifeRayText2}\nJACK: ${lifeJackText2}\nLUCIA: ${lifeLuciaText2}\n\n최후 판결을 한 문장으로만 내려라. 요약·정리·나열 금지. 절대 3줄 초과 금지.`;
+        const lifeEcho2LLM = await callTeaPersona(
+          'echo',
+          TEA_SYSTEM_ECHO,
+          [{ role: 'user', content: lifeEcho2ConsolidationPrompt }],
+        );
+        const lifeEchoText2 = cleanLife(lifeEcho2LLM);
+
         try {
           const supabase = getSupabase();
           if (supabase) {
@@ -712,9 +739,13 @@ export async function POST(req: Request) {
         }
 
         return respond({
-          reply: [rayText, jackText, luciaText, echoText].join('\n\n'),
+          reply: [rayText, jackText, luciaText, echoText, lifeRayText2, lifeJackText2, lifeLuciaText2, lifeEchoText2].filter(Boolean).join('\n\n'),
           personas: {
             jack: jackText, lucia: luciaText, ray: rayText, echo: echoText,
+            ray2:   lifeRayText2   || null,
+            jack2:  lifeJackText2  || null,
+            lucia2: lifeLuciaText2 || null,
+            echo2:  lifeEchoText2  || null,
             verdict: '관망' as Verdict,
             confidence: 0,
             breakdown: '인생 후반전 고민',
