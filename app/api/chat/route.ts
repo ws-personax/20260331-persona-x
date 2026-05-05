@@ -583,9 +583,9 @@ export async function POST(req: Request) {
         const newsPrefix = `[현재 시점: ${yearNow}년 ${monthNow}월 — 가장 최근 보도(${yearNow}년)를 우선 참고하여 답변. 과거 인물·사건을 현재형으로 단정하지 말 것.]\n`;
 
         // ✅ 페르소나별 역할 분리 prefix — 동일 질문에 다른 시각으로 답하도록 유도
-        const rayHistory:   TeaMsg[] = [{ role: 'user', content: `${newsPrefix}[역할: 이 뉴스에서 숫자와 팩트만 3~4줄로 정리해줘. 배경 설명이나 의견 없이 데이터만.]\n${lastMsg}` }];
-        const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${newsPrefix}[역할: 이 상황에서 지금 당장 행동해야 할 것 하나만 짧고 투박하게 말해줘. 배경 설명 없이.]\n${lastMsg}` }];
-        const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${newsPrefix}[역할: 이 뉴스가 40~50대 일반인에게 감정적으로 어떤 의미인지, 인간적 시각으로만 2~3줄로 말해줘. 경제 분석 없이.]\n${lastMsg}` }];
+        const rayHistory:   TeaMsg[] = [{ role: 'user', content: `${newsPrefix}[역할: 이 뉴스에서 숫자와 팩트만 3~4줄로 정리해줘. 배경 설명이나 의견 없이 데이터만. 절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]\n${lastMsg}` }];
+        const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${newsPrefix}[역할: 이 상황에서 지금 당장 행동해야 할 것 하나만 짧고 투박하게 말해줘. 배경 설명 없이. 절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]\n${lastMsg}` }];
+        const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${newsPrefix}[역할: 이 뉴스가 40~50대 일반인에게 감정적으로 어떤 의미인지, 인간적 시각으로만 2~3줄로 말해줘. 경제 분석 없이. 절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]\n${lastMsg}` }];
 
         const [rayLLM, jackLLM, luciaLLM] = await Promise.all([
           callTeaPersona('ray',   TEA_SYSTEM_RAY,   rayHistory,   { enableSearch: true }),
@@ -602,7 +602,7 @@ export async function POST(req: Request) {
 
         // ✅ ECHO 취합 판결 — 위 3명 응답을 컨텍스트로 받아 마지막에 호출
         //    'RAY는 ~로, JACK은 ~로, LUCIA는 ~로' 형식 절대 금지 (시스템 프롬프트에 원칙 등재)
-        const echoConsolidationPrompt = `${newsPrefix}사용자 질문: ${lastMsg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n위 세 답변을 듣고 ECHO로서 판결하라. 시스템 프롬프트의 '뉴스/시사 질문에서 ECHO 시작 방식' 원칙을 반드시 따를 것.`;
+        const echoConsolidationPrompt = `${newsPrefix}사용자 질문: ${lastMsg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n위 세 답변을 듣고 ECHO로서 판결하라. 시스템 프롬프트의 '뉴스/시사 질문에서 ECHO 시작 방식' 원칙을 반드시 따를 것. 5줄 이내. 불릿·목록 사용 금지.`;
         const echoLLM = await callTeaPersona(
           'echo',
           TEA_SYSTEM_ECHO,
@@ -642,7 +642,8 @@ export async function POST(req: Request) {
       //   명퇴/건강/부모부양/자녀 걱정 등 인생 후반전 고민은 다각도 응답이 필요.
       //   RAY/JACK/LUCIA 3명이 먼저 병렬 응답 → ECHO가 그 결과를 받아 마지막에 취합 판결.
       if (category === 'life' && !isExplicitPersonaPick) {
-        const lifeHistory: TeaMsg[] = [{ role: 'user', content: lastMsg }];
+        const lifeLengthRule = '[절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]\n';
+        const lifeHistory: TeaMsg[] = [{ role: 'user', content: `${lifeLengthRule}${lastMsg}` }];
 
         const [rayLLM, jackLLM, luciaLLM] = await Promise.all([
           callTeaPersona('ray',   TEA_SYSTEM_RAY,   lifeHistory),
@@ -658,7 +659,7 @@ export async function POST(req: Request) {
         const luciaText = cleanLife(luciaLLM) || '많이 무거우셨겠어요. 천천히 같이 이야기 나눠봐요.';
 
         // ECHO 취합 판결 — 위 3명의 응답을 컨텍스트로 받아 마지막에 호출
-        const echoConsolidationPrompt = `사용자 질문: ${lastMsg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n위 세 사람의 응답을 듣고, 너의 시각에서 핵심을 짚고 우선순위를 정리해줘. 감정 위로보다는 구조적 통찰과 실행 가능한 한 가지 방향을 분명히 제시해.`;
+        const echoConsolidationPrompt = `사용자 질문: ${lastMsg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n위 세 사람의 응답을 듣고, 너의 시각에서 핵심을 짚고 우선순위를 정리해줘. 감정 위로보다는 구조적 통찰과 실행 가능한 한 가지 방향을 분명히 제시해. 5줄 이내. 불릿·목록 사용 금지.`;
         const echoLLM = await callTeaPersona(
           'echo',
           TEA_SYSTEM_ECHO,

@@ -35,6 +35,10 @@ interface PersonaData {
   rayNews?: NewsLink | null;
   echoNews?: NewsLink | null;
   isAdvancedAnswer?: boolean;
+  ray2?: string | null;
+  jack2?: string | null;
+  lucia2?: string | null;
+  echo2?: string | null;
 }
 
 type ErrorType = 'market_data_unavailable' | 'keyword_not_recognized' | 'analysis_failed';
@@ -55,6 +59,10 @@ interface Message {
   teaJack?: string;
   teaEcho?: string;
   teaRay?: string;
+  teaLucia2?: string;
+  teaJack2?: string;
+  teaEcho2?: string;
+  teaRay2?: string;
   luciaIntro?: string;
 }
 
@@ -2289,6 +2297,10 @@ export default function ChatWindow() {
         teaJack: data.teaJack,
         teaEcho: data.teaEcho,
         teaRay: data.teaRay,
+        teaLucia2: data.teaLucia2,
+        teaJack2: data.teaJack2,
+        teaEcho2: data.teaEcho2,
+        teaRay2: data.teaRay2,
         luciaIntro: typeof data.luciaIntro === 'string' && data.luciaIntro.trim() ? data.luciaIntro : undefined,
       };
 
@@ -2592,6 +2604,35 @@ export default function ChatWindow() {
                     timestamp={msg.timestamp}
                   />
                 )}
+                {msg.teaRay2 && (
+                  <PersonaBubble
+                    personaKey="ray"
+                    text={cleanTeaText(msg.teaRay2)}
+                    timestamp={msg.timestamp}
+                  />
+                )}
+                {msg.teaJack2 && (
+                  <PersonaBubble
+                    personaKey="jack"
+                    text={cleanJackText(msg.teaJack2)}
+                    timestamp={msg.timestamp}
+                  />
+                )}
+                {msg.teaLucia2 && (
+                  <PersonaBubble
+                    personaKey="lucia"
+                    text={cleanTeaText(msg.teaLucia2)}
+                    timestamp={msg.timestamp}
+                  />
+                )}
+                {msg.teaEcho2 && (
+                  <PersonaBubble
+                    personaKey="echo"
+                    text={cleanTeaText(msg.teaEcho2)}
+                    timestamp={msg.timestamp}
+                    hideEchoTag
+                  />
+                )}
               </div>
             ) : (
               <div style={{ marginBottom: 12 }}>
@@ -2655,6 +2696,18 @@ export default function ChatWindow() {
                               !msg.personas.breakdown.includes('종목'))
                           }
                         />
+                        {msg.personas.ray2 && (
+                          <PersonaBubble personaKey="ray" text={msg.personas.ray2} timestamp={msg.timestamp} />
+                        )}
+                        {msg.personas.jack2 && (
+                          <PersonaBubble personaKey="jack" text={msg.personas.jack2} timestamp={msg.timestamp} />
+                        )}
+                        {msg.personas.lucia2 && (
+                          <PersonaBubble personaKey="lucia" text={msg.personas.lucia2} timestamp={msg.timestamp} />
+                        )}
+                        {msg.personas.echo2 && (
+                          <EchoBubble summary={msg.personas.echo2} timestamp={msg.timestamp} hideDisclaimer />
+                        )}
                       </>
                     );
                   }
@@ -2680,6 +2733,18 @@ export default function ChatWindow() {
                             !msg.personas.breakdown.includes('종목'))
                         }
                       />
+                      {msg.personas.ray2 && (
+                        <PersonaBubble personaKey="ray" text={msg.personas.ray2} timestamp={msg.timestamp} />
+                      )}
+                      {msg.personas.jack2 && (
+                        <PersonaBubble personaKey="jack" text={msg.personas.jack2} timestamp={msg.timestamp} />
+                      )}
+                      {msg.personas.lucia2 && (
+                        <PersonaBubble personaKey="lucia" text={msg.personas.lucia2} timestamp={msg.timestamp} />
+                      )}
+                      {msg.personas.echo2 && (
+                        <EchoBubble summary={msg.personas.echo2} timestamp={msg.timestamp} hideDisclaimer />
+                      )}
                     </>
                   );
                 })() : (
