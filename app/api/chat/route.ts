@@ -797,20 +797,12 @@ export async function POST(req: Request) {
         });
       }
 
-      // ── ✅ finance 카테고리(teaMode) 종목명 없는 질문 — 4명 페르소나 병렬 응답 ──
-      //   기존: RAY 1명만 답변. 변경: 종목 미지정 일반 재테크 질문은 4명 다각도 응답.
-      //   "삼성전자/코스피/비트코인" 등 인식 가능한 종목·지수 키워드가 있으면 fall through
-      //   → 기존 단일 RAY (또는 메인 분석 경로) 유지.
+      // ── ✅ finance 카테고리(teaMode) 모든 질문 — 4명 페르소나 병렬 응답으로 강제 ──
+      //   teaMode=true 진입 시 STOCK_MAP/CRYPTO_MAP/MARKET_INDEX 키워드 일치 여부와 무관하게
+      //   "삼성전자/비트코인/코스피" 등 모든 재테크 질문을 4명 동시 응답 구조로 통합.
+      //   (단일 RAY 경로 / 단일 종목 풀 분석 경로는 teaMode=false 일 때만 사용 — 사실상 deprecated)
       if (category === 'finance' && !isExplicitPersonaPick) {
-        const teaFinKeyword = extractKeyword([{ role: 'user', content: lastMsg }]);
-        const hasKnownAsset = !!teaFinKeyword && (
-          !!STOCK_MAP[teaFinKeyword] || !!STOCK_MAP[teaFinKeyword.toUpperCase()] ||
-          !!CRYPTO_MAP[teaFinKeyword] || !!CRYPTO_MAP[teaFinKeyword.toUpperCase()] ||
-          MARKET_INDEX_SET.has(teaFinKeyword)
-        );
-        if (!hasKnownAsset) {
-          return await buildFinanceMultiPersonaResponse(lastMsg);
-        }
+        return await buildFinanceMultiPersonaResponse(lastMsg);
       }
 
       // ── 카테고리 감지 — 폴백 템플릿 분기용 (LLM 응답 자체는 시스템 프롬프트가 알아서 적응) ──
