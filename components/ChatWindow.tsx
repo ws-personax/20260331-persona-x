@@ -210,9 +210,11 @@ const EchoNewsChip = ({ news }: { news: NewsLink }) => (
 const NoticeBox = ({
   dataSource,
   marketClosedNote,
+  hideDisclaimer = false,
 }: {
   dataSource: string;
   marketClosedNote: string;
+  hideDisclaimer?: boolean;
 }) => (
   <div style={{ marginTop: 8, padding: '0 12px 0 58px' }}>
     <div
@@ -233,12 +235,16 @@ const NoticeBox = ({
           {dataSource}
         </p>
       )}
-      <p style={{ fontSize: 10, color: '#2563eb', margin: '3px 0 0', lineHeight: 1.5, fontWeight: 600 }}>
-        💡 컨플루언스 가이드: 낮음 → 참고 · 보통 → 고려 · 높음 → 확신
-      </p>
-      <p style={{ fontSize: 10, color: '#6b7280', margin: '6px 0 0', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
-        {PERSONAX_DISCLAIMER}
-      </p>
+      {!hideDisclaimer && (
+        <p style={{ fontSize: 10, color: '#2563eb', margin: '3px 0 0', lineHeight: 1.5, fontWeight: 600 }}>
+          💡 컨플루언스 가이드: 낮음 → 참고 · 보통 → 고려 · 높음 → 확신
+        </p>
+      )}
+      {!hideDisclaimer && (
+        <p style={{ fontSize: 10, color: '#6b7280', margin: '6px 0 0', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
+          {PERSONAX_DISCLAIMER}
+        </p>
+      )}
     </div>
   </div>
 );
@@ -692,11 +698,13 @@ const EchoBubble = memo(function EchoBubble({
   details,
   timestamp,
   echoNews,
+  hideDisclaimer = false,
 }: {
   summary: string;
   details?: string | null;
   timestamp: Date;
   echoNews?: NewsLink | null;
+  hideDisclaimer?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const p = PERSONAS.echo;
@@ -854,7 +862,7 @@ const EchoBubble = memo(function EchoBubble({
 
       {echoNews?.url && <EchoNewsChip news={echoNews} />}
 
-      <NoticeBox dataSource={dataSource} marketClosedNote={marketClosedNote} />
+      <NoticeBox dataSource={dataSource} marketClosedNote={marketClosedNote} hideDisclaimer={hideDisclaimer} />
     </div>
   );
 });
@@ -2609,6 +2617,7 @@ export default function ChatWindow() {
                           details={msg.personas.echoDetails}
                           timestamp={msg.timestamp}
                           echoNews={msg.personas.echoNews}
+                          hideDisclaimer={msg.personas.breakdown === '인생 후반전 고민'}
                         />
                       </>
                     );
@@ -2627,6 +2636,7 @@ export default function ChatWindow() {
                         details={msg.personas.echoDetails}
                         timestamp={msg.timestamp}
                         echoNews={msg.personas.echoNews}
+                        hideDisclaimer={msg.personas.breakdown === '인생 후반전 고민'}
                       />
                     </>
                   );

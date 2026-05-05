@@ -495,8 +495,9 @@ export async function POST(req: Request) {
       return false;
     });
     // luciaIntro 주입 대상: finance/sports/news/legal/tech 만 (emotion/general 은 LUCIA 직접 처리)
+    // ✅ life 카테고리는 LUCIA 인트로 주입 제외 (RAY/JACK/LUCIA + ECHO 취합 응답 자체가 라우팅 안내 역할)
     const _shouldInjectLuciaIntro =
-      (category === 'finance' || category === 'sports' || category === 'news' || category === 'life' || category === 'legal' || category === 'tech')
+      (category === 'finance' || category === 'sports' || category === 'news' || category === 'legal' || category === 'tech')
       && !!luciaRoutingMsg
       && !_alreadyIntroduced;
     const respond = (body: unknown, init?: ResponseInit): Response => {
