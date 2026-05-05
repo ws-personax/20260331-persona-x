@@ -455,14 +455,14 @@ export async function POST(req: Request) {
       tech:     /자동차|전기차|배터리|반도체|AI|인공지능|스마트폰|앱|소프트웨어|하드웨어|IT|클라우드/,
       emotion:  /힘들|외로|슬프|우울|화나|기쁘|설레|불안|걱정|스트레스|피곤|지쳐|고민|마음|감정|위로|공감|재테크고민|투자고민|노후걱정/,
     };
-    const detectCategory = (text: string): 'finance' | 'sports' | 'news' | 'life' | 'legal' | 'tech' | 'emotion' | 'general' => {
+    const detectCategory = (text: string): 'finance' | 'sports' | 'news' | 'legal' | 'tech' | 'life' | 'emotion' | 'general' => {
       if (CATEGORY_MAP.finance.test(text)) return 'finance';
-      if (CATEGORY_MAP.emotion.test(text)) return 'emotion';
-      if (CATEGORY_MAP.sports.test(text))  return 'sports';
       if (CATEGORY_MAP.news.test(text))    return 'news';
-      if (CATEGORY_MAP.life.test(text))    return 'life';
+      if (CATEGORY_MAP.sports.test(text))  return 'sports';
       if (CATEGORY_MAP.legal.test(text))   return 'legal';
+      if (CATEGORY_MAP.life.test(text))    return 'life';
       if (CATEGORY_MAP.tech.test(text))    return 'tech';
+      if (CATEGORY_MAP.emotion.test(text)) return 'emotion';
       return 'general';
     };
     const LUCIA_ROUTING_MESSAGE: Record<string, string> = {
