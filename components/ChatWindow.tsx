@@ -2770,9 +2770,7 @@ export default function ChatWindow() {
                       )}
                     </>
                   );
-                })() : (
-                  <PersonaBubble personaKey="jack" text={msg.content} timestamp={msg.timestamp} />
-                )}
+                })() : null}
               </div>
             )}
           </div>
@@ -3091,70 +3089,6 @@ export default function ChatWindow() {
 
       {hasUserSent && (
       <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
-        {/* LUCIA 허브 — 필요 시 JACK/ECHO 소환. 비활성 페르소나는 disabled. */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
-            {teaPersona !== 'lucia' && (
-              <button
-                type="button"
-                onClick={() => setTeaPersona('lucia')}
-                style={{
-                  background: '#fdf4ff',
-                  border: '1px solid #e9d5ff',
-                  borderRadius: 999,
-                  padding: '4px 10px',
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: '#6b21a8',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  opacity: 0.85,
-                }}
-                title="LUCIA로 돌아가기"
-              >
-                💜 LUCIA
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setTeaPersona('jack')}
-              disabled={teaPersona === 'jack'}
-              style={{
-                background: teaPersona === 'jack' ? '#e5e7eb' : '#f3f4f6',
-                border: '1px solid #d1d5db',
-                borderRadius: 999,
-                padding: '4px 10px',
-                fontSize: 11,
-                fontWeight: 700,
-                color: '#374151',
-                cursor: teaPersona === 'jack' ? 'default' : 'pointer',
-                whiteSpace: 'nowrap',
-                opacity: teaPersona === 'jack' ? 0.5 : 0.85,
-              }}
-              title="JACK 소환 — 결정 중심"
-            >
-              ⚡ JACK 소환
-            </button>
-            <button
-              type="button"
-              onClick={() => setTeaPersona('echo')}
-              disabled={teaPersona === 'echo'}
-              style={{
-                background: teaPersona === 'echo' ? '#fef9c3' : '#fffbeb',
-                border: '1px solid #fde68a',
-                borderRadius: 999,
-                padding: '4px 10px',
-                fontSize: 11,
-                fontWeight: 700,
-                color: '#78350f',
-                cursor: teaPersona === 'echo' ? 'default' : 'pointer',
-                whiteSpace: 'nowrap',
-                opacity: teaPersona === 'echo' ? 0.5 : 0.85,
-              }}
-              title="ECHO 소환 — 판단 구조"
-            >
-              🔍 ECHO 소환
-            </button>
-          </div>
         {ttsSupported && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
             <button
