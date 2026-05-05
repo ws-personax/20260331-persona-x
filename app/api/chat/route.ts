@@ -573,7 +573,7 @@ export async function POST(req: Request) {
       // 1단계: RAY/JACK/LUCIA 병렬 (페르소나별 역할 prefix)
       const rayHistory:   TeaMsg[] = [{ role: 'user', content: `${financePrefix}[역할: 질문에 직접 답해라. 핵심 숫자 2개만. 절대 3줄 초과 금지. 목록 금지.]${ctxSuffix}` }];
       const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${financePrefix}[역할: 질문에 직접 답해라. 결단 중심. RAY 반박 가능. 3줄 이내.]${ctxSuffix}` }];
-      const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${financePrefix}[역할: 질문에 직접 답해라. 감정·인간적 시각으로. 다른 페르소나 넘김 금지. 3줄 이내.]${ctxSuffix}` }];
+      const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${financePrefix}[역할: 질문에 직접 답해라. 감정·인간적 시각으로. 다른 페르소나 넘김 금지. 다른 페르소나의 말을 대신 말하거나 흉내 내지 마라. "아이고"는 한 대화에서 1회만 사용. "~잖아요"·"~거든요" 톤 유지. 3줄 이내.]${ctxSuffix}` }];
 
       const [rayLLM, jackLLM, luciaLLM] = await Promise.all([
         callTeaPersona('ray',   TEA_SYSTEM_RAY,   rayHistory, { enableSearch: true }),
@@ -596,10 +596,13 @@ export async function POST(req: Request) {
 
       // 3단계: 2라운드 RAY/JACK/LUCIA 병렬 (ECHO 직접 질문에만 응답)
       const round2Context = `${financePrefix}사용자 질문: ${msg}\n\n[1라운드 RAY]\n${rayText}\n[1라운드 JACK]\n${jackText}\n[1라운드 LUCIA]\n${luciaText}\n[1라운드 ECHO]\n${echoText}\n\n`;
-      const round2Prefix = '[ECHO가 방금 직접 질문을 던졌습니다. 그 질문에만 1~2줄로 답하세요. 새 정보 추가 금지. 페르소나 호칭에 님 붙이지 말 것.]';
-      const ray2History:   TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
-      const jack2History:  TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
-      const lucia2History: TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
+      const round2Base = '[ECHO가 방금 직접 질문을 던졌습니다. 그 질문에 답하라. 근거 한 줄 + 결론 한 줄, 총 2줄 이내. 페르소나 호칭에 님 붙이지 말 것.]';
+      const round2RayTone   = '[RAY: 반드시 숫자/데이터로 시작. 예: "코스피 PER 11배 — …"]';
+      const round2JackTone  = '[JACK: 짧고 투박하게. 모든 문장 "~요"로 끝낼 것.]';
+      const round2LuciaTone = '[LUCIA: "~잖아요"·"~거든요" 톤 유지. 다른 페르소나 흉내 금지. "아이고" 사용 금지(이미 1라운드에서 썼다고 가정).]';
+      const ray2History:   TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Base}${round2RayTone}` }];
+      const jack2History:  TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Base}${round2JackTone}` }];
+      const lucia2History: TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Base}${round2LuciaTone}` }];
 
       const [ray2LLM, jack2LLM, lucia2LLM] = await Promise.all([
         callTeaPersona('ray',   TEA_SYSTEM_RAY,   ray2History, { enableSearch: true }),
@@ -612,7 +615,7 @@ export async function POST(req: Request) {
       const luciaText2 = cleanText(lucia2LLM);
 
       // 4단계: ECHO 최후 판결 (한 문장)
-      const echo2ConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n[1라운드]\nRAY: ${rayText}\nJACK: ${jackText}\nLUCIA: ${luciaText}\nECHO: ${echoText}\n\n[2라운드]\nRAY: ${rayText2}\nJACK: ${jackText2}\nLUCIA: ${luciaText2}\n\n최후 판결을 한 문장으로만 내려라. 요약·정리·나열 금지. 절대 3줄 초과 금지. "결정은 당신이 하십시오" 표현 금지.`;
+      const echo2ConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n[1라운드]\nRAY: ${rayText}\nJACK: ${jackText}\nLUCIA: ${luciaText}\nECHO: ${echoText}\n\n[2라운드]\nRAY: ${rayText2}\nJACK: ${jackText2}\nLUCIA: ${luciaText2}\n\n최후 판결을 내려라. 요약·정리·나열 금지. 절대 3줄 초과 금지. "결정은 당신이 하십시오"·"선택은 당신 몫입니다"·"선택은 당신이 하십시오"·"판단은 본인 몫" 등 책임 회피 표현 절대 금지. 마지막 줄은 반드시 RAY·JACK·LUCIA 중 한 명을 지목해 던지는 날카로운 질문 한 문장(물음표 필수).`;
       const echo2LLM = await callTeaPersona(
         'echo',
         TEA_SYSTEM_ECHO,
