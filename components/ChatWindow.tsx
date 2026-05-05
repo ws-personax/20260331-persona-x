@@ -888,13 +888,25 @@ const getLoadingMessage = (text: string) => {
   return '🌿 LUCIA가 귀 기울이고 있어요...';
 };
 
+// ✅ 카테고리 키워드 기반 로딩 페르소나 — getLoadingMessage와 동일 키워드 매핑 (아이콘/색상 분기용)
+const getLoadingPersona = (text: string): PersonaKey => {
+  if (/주식|펀드|코스피|비트코인|ETF|배당|환율|금리|삼성전자|테슬라|엔비디아/.test(text)) return 'ray';
+  if (/뉴스|정세|전쟁|이란|중동|트럼프|호르무즈|HMM|유가|금값/.test(text)) return 'ray';
+  if (/야구|축구|농구|경기|선수|승부|리그|골프/.test(text)) return 'jack';
+  if (/명퇴|은퇴|요양원|치매|무릎|허리|부모님|자녀|노후/.test(text)) return 'lucia';
+  if (/법률|세금|계약|소송|퇴직금|실업급여/.test(text)) return 'echo';
+  return 'lucia';
+};
+
 const TypingIndicator = ({ teaMode = false, teaPersona = null, userText = '' }: { teaMode?: boolean; teaPersona?: 'lucia' | 'jack' | 'echo' | null; userText?: string }) => {
   if (teaMode) {
-    const personaKey = (teaPersona || 'lucia') as 'lucia' | 'jack' | 'echo';
+    // 명시 픽(jack/echo)이면 페르소나 고정, 그 외(lucia/null)는 userText 키워드로 분기 (ray 포함)
+    const personaKey: PersonaKey = teaPersona === 'jack' || teaPersona === 'echo'
+      ? teaPersona
+      : getLoadingPersona(userText);
     const p = PERSONAS[personaKey];
-    // 명시 픽(jack/echo)이면 페르소나 고정 문구, 기본(lucia)이면 카테고리 분기 문구
     const text = teaPersona === 'jack' || teaPersona === 'echo'
-      ? TEA_TYPING_TEXT[personaKey]
+      ? TEA_TYPING_TEXT[teaPersona]
       : getLoadingMessage(userText);
     return (
       <>
