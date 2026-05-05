@@ -581,13 +581,16 @@ export async function POST(req: Request) {
         const yearNow = kstNow.getUTCFullYear();
         const monthNow = kstNow.getUTCMonth() + 1;
         const newsPrefix = `[현재 시점: ${yearNow}년 ${monthNow}월 — 가장 최근 보도(${yearNow}년)를 우선 참고하여 답변. 과거 인물·사건을 현재형으로 단정하지 말 것.]\n`;
-        const newsHistory: TeaMsg[] = [{ role: 'user', content: `${newsPrefix}${lastMsg}` }];
 
-        const [rayLLM, jackLLM, luciaLLM, echoLLM] = await Promise.all([
-          callTeaPersona('ray',   TEA_SYSTEM_RAY,   newsHistory, { enableSearch: true }),
-          callTeaPersona('jack',  TEA_SYSTEM_JACK,  newsHistory, { enableSearch: true }),
-          callTeaPersona('lucia', TEA_SYSTEM_LUCIA, newsHistory, { enableSearch: true }),
-          callTeaPersona('echo',  TEA_SYSTEM_ECHO,  newsHistory, { enableSearch: true }),
+        // ✅ 페르소나별 역할 분리 prefix — 동일 질문에 다른 시각으로 답하도록 유도
+        const rayHistory:   TeaMsg[] = [{ role: 'user', content: `${newsPrefix}[역할: 이 뉴스에서 숫자와 팩트만 3~4줄로 정리해줘. 배경 설명이나 의견 없이 데이터만.]\n${lastMsg}` }];
+        const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${newsPrefix}[역할: 이 상황에서 지금 당장 행동해야 할 것 하나만 짧고 투박하게 말해줘. 배경 설명 없이.]\n${lastMsg}` }];
+        const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${newsPrefix}[역할: 이 뉴스가 40~50대 일반인에게 감정적으로 어떤 의미인지, 인간적 시각으로만 2~3줄로 말해줘. 경제 분석 없이.]\n${lastMsg}` }];
+
+        const [rayLLM, jackLLM, luciaLLM] = await Promise.all([
+          callTeaPersona('ray',   TEA_SYSTEM_RAY,   rayHistory,   { enableSearch: true }),
+          callTeaPersona('jack',  TEA_SYSTEM_JACK,  jackHistory,  { enableSearch: true }),
+          callTeaPersona('lucia', TEA_SYSTEM_LUCIA, luciaHistory, { enableSearch: true }),
         ]);
 
         const cleanNews = (text: string | null | undefined): string =>
@@ -596,6 +599,16 @@ export async function POST(req: Request) {
         const rayText   = cleanNews(rayLLM)   || '실시간 검색이 일시 지연되고 있어요. 잠시 후 다시 질문해주세요.';
         const jackText  = cleanNews(jackLLM)  || '핵심 변수가 정리되면 다시 짚어드릴게요.';
         const luciaText = cleanNews(luciaLLM) || '뉴스를 보고 마음이 흔들리시면 천천히 이야기 나눠봐요.';
+
+        // ✅ ECHO 취합 판결 — 위 3명 응답을 컨텍스트로 받아 마지막에 호출
+        //    'RAY는 ~로, JACK은 ~로, LUCIA는 ~로' 형식 절대 금지 (시스템 프롬프트에 원칙 등재)
+        const echoConsolidationPrompt = `${newsPrefix}사용자 질문: ${lastMsg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n위 세 답변을 듣고 ECHO로서 판결하라. 시스템 프롬프트의 '뉴스/시사 질문에서 ECHO 시작 방식' 원칙을 반드시 따를 것.`;
+        const echoLLM = await callTeaPersona(
+          'echo',
+          TEA_SYSTEM_ECHO,
+          [{ role: 'user', content: echoConsolidationPrompt }],
+          { enableSearch: true },
+        );
         const echoText  = cleanNews(echoLLM)  || '구조적 흐름은 정보가 안정된 뒤 다시 정리해드릴게요.';
 
         try {
