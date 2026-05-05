@@ -523,10 +523,28 @@ export async function POST(req: Request) {
       const cleanText = (t: string | null | undefined): string =>
         (t || '').replace(/\*\*(.*?)\*\*/g, '$1').replace(/\n{2,}/g, '\n').trim();
 
+      // 직전 2~3턴(최대 6개 메시지) 요약 — 현재 질문(messages 마지막) 제외
+      const recentContext = (() => {
+        if (!Array.isArray(messages) || messages.length < 2) return '';
+        const prior = messages.slice(0, -1).slice(-6) as Array<{ role?: string; content?: string }>;
+        if (prior.length === 0) return '';
+        return prior
+          .map(m => {
+            const role = m?.role === 'assistant' ? '어시스턴트' : '유저';
+            const content = (m?.content || '').slice(0, 200).replace(/\s+/g, ' ').trim();
+            return content ? `${role}: ${content}` : '';
+          })
+          .filter(Boolean)
+          .join(' / ');
+      })();
+      const ctxSuffix = recentContext
+        ? `\n[이전 대화 맥락: ${recentContext}]\n현재 질문: ${msg}`
+        : `\n${msg}`;
+
       // 1단계: RAY/JACK/LUCIA 병렬 (페르소나별 역할 prefix)
-      const rayHistory:   TeaMsg[] = [{ role: 'user', content: `${financePrefix}[역할: 질문에 직접 답해라. 핵심 숫자 2개만. 절대 3줄 초과 금지. 목록 금지.]\n${msg}` }];
-      const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${financePrefix}[역할: 질문에 직접 답해라. 결단 중심. RAY 반박 가능. 3줄 이내.]\n${msg}` }];
-      const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${financePrefix}[역할: 질문에 직접 답해라. 감정·인간적 시각으로. 다른 페르소나 넘김 금지. 3줄 이내.]\n${msg}` }];
+      const rayHistory:   TeaMsg[] = [{ role: 'user', content: `${financePrefix}[역할: 질문에 직접 답해라. 핵심 숫자 2개만. 절대 3줄 초과 금지. 목록 금지.]${ctxSuffix}` }];
+      const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${financePrefix}[역할: 질문에 직접 답해라. 결단 중심. RAY 반박 가능. 3줄 이내.]${ctxSuffix}` }];
+      const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${financePrefix}[역할: 질문에 직접 답해라. 감정·인간적 시각으로. 다른 페르소나 넘김 금지. 3줄 이내.]${ctxSuffix}` }];
 
       const [rayLLM, jackLLM, luciaLLM] = await Promise.all([
         callTeaPersona('ray',   TEA_SYSTEM_RAY,   rayHistory, { enableSearch: true }),
