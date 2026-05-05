@@ -450,15 +450,17 @@ export async function POST(req: Request) {
       finance:  /주식|펀드|ETF|종목|코스피|코스닥|나스닥|NASDAQ|S&P500|SP500|S&P|다우존스|다우|달러|금|채권|포트폴리오|수익|손절|매수|매도|배당|금리|환율|가상화폐|비트코인|저축|예금|적금|퇴직금|연금|삼성전자|SK하이닉스|카카오|네이버|현대차|기아차|LG전자|삼성바이오|셀트리온|포스코|KB금융|신한지주|하나금융|테슬라|애플|엔비디아|구글|아마존|마이크로소프트/,
       sports:   /야구|축구|농구|배구|골프|올림픽|경기|이길|승부|우승|선수|리그|기아|삼성라이온즈|두산|LG트윈스|롯데|한화|KT|SSG|NC|키움/,
       news:     /정세|뉴스|전쟁|분쟁|중동|러시아|우크라이나|미중|외교|정치|대통령|선거|경제뉴스|시황|금융뉴스|증시|환경|기후|재난|사건|사고|테러|유가|원유|석유|에너지|OPEC|산유국|천연가스|인플레이션|금리정책|연준|Fed|미연준|기준금리/,
-      legal:    /세금|법률|계약|소송|이혼|상속|증여|부동산등기|임대차|보증금|노동|퇴직|해고|세무|신고/,
+      life:     /명퇴|권고사직|은퇴|조기퇴직|퇴직 후|제2인생|요양원|치매|부모님 건강|어머니 건강|아버지 건강|무릎|허리|혈압|당뇨|갱년기|근감소|건강검진|병원|아이 대학|자녀 취업|자녀 결혼|아들 걱정|딸 걱정|황혼이혼|부부 갈등|노후|노후준비|노후자금|은퇴자금|막막|가장으로서|생계/,
+      legal:    /세금|법률|계약|소송|이혼|상속|증여|부동산등기|임대차|보증금|노동|퇴직|해고|세무|신고|명퇴|권고사직|퇴직금|실업급여|노동부|노무사/,
       tech:     /자동차|전기차|배터리|반도체|AI|인공지능|스마트폰|앱|소프트웨어|하드웨어|IT|클라우드/,
       emotion:  /힘들|외로|슬프|우울|화나|기쁘|설레|불안|걱정|스트레스|피곤|지쳐|고민|마음|감정|위로|공감|재테크고민|투자고민|노후걱정/,
     };
-    const detectCategory = (text: string): 'finance' | 'sports' | 'news' | 'legal' | 'tech' | 'emotion' | 'general' => {
+    const detectCategory = (text: string): 'finance' | 'sports' | 'news' | 'life' | 'legal' | 'tech' | 'emotion' | 'general' => {
       if (CATEGORY_MAP.finance.test(text)) return 'finance';
       if (CATEGORY_MAP.emotion.test(text)) return 'emotion';
       if (CATEGORY_MAP.sports.test(text))  return 'sports';
       if (CATEGORY_MAP.news.test(text))    return 'news';
+      if (CATEGORY_MAP.life.test(text))    return 'life';
       if (CATEGORY_MAP.legal.test(text))   return 'legal';
       if (CATEGORY_MAP.tech.test(text))    return 'tech';
       return 'general';
@@ -467,6 +469,7 @@ export async function POST(req: Request) {
       finance: '재테크 질문이시군요! RAY와 JACK이 전문가예요. 바로 연결해드릴게요. 📊',
       sports:  '스포츠 승부 예측은 JACK이 제일 잘해요! 연결해드릴게요. ⚡',
       news:    '시사/뉴스 분석은 RAY가 정리해드릴게요! 연결해드릴게요. 📰',
+      life:    '인생 후반전 고민이시군요. RAY/JACK/LUCIA가 같이 짚어드리고, ECHO가 마지막에 정리해드릴게요. 🌿',
       legal:   '법률/세금 문제는 RAY와 ECHO가 함께 분석해드릴게요. 🔍',
       tech:    '기술/자동차 관련은 RAY가 데이터로 분석해드릴게요. 💡',
       emotion: '',
@@ -488,11 +491,12 @@ export async function POST(req: Request) {
       if (category === 'legal'   && intro.includes('ECHO')) return true;
       if (category === 'tech'    && intro.includes('RAY'))  return true;
       if (category === 'finance' && intro.includes('재테크')) return true;
+      if (category === 'life'    && intro.includes('인생 후반전')) return true;
       return false;
     });
     // luciaIntro 주입 대상: finance/sports/news/legal/tech 만 (emotion/general 은 LUCIA 직접 처리)
     const _shouldInjectLuciaIntro =
-      (category === 'finance' || category === 'sports' || category === 'news' || category === 'legal' || category === 'tech')
+      (category === 'finance' || category === 'sports' || category === 'news' || category === 'life' || category === 'legal' || category === 'tech')
       && !!luciaRoutingMsg
       && !_alreadyIntroduced;
     const respond = (body: unknown, init?: ResponseInit): Response => {
@@ -564,7 +568,7 @@ export async function POST(req: Request) {
     //   LLM 실패 시 round/카테고리 기반 템플릿으로 자동 폴백.
     //   ⚠️ 재테크 탭(teaMode=false)은 아래 블록을 건너뛰므로 동작 변화 없음.
     //   ⚠️ finance 카테고리는 teaMode=true 일 때 RAY 로 자동 라우팅 (재테크 탭은 그대로 풀 분석).
-    if (teaMode || category === 'sports' || category === 'news' || category === 'legal' || category === 'tech') {
+    if (teaMode || category === 'sports' || category === 'news' || category === 'life' || category === 'legal' || category === 'tech') {
       // ── ✅ news 카테고리 — 4명 페르소나 병렬 응답 (Google Search grounding) ──
       //   기존: RAY 1명만 답변 (단일 페르소나 dispatch). 시사·정세는 다각도 분석이 필요해
       //   RAY/JACK/LUCIA/ECHO 4명 동시 응답으로 변경. teaPersona가 명시 픽(jack/echo/ray)
@@ -614,6 +618,61 @@ export async function POST(req: Request) {
             verdict: '관망' as Verdict,
             confidence: 0,
             breakdown: '시사 분석',
+            positionSizing: '0%',
+            jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
+          },
+        });
+      }
+
+      // ── ✅ life 카테고리 — 4명 페르소나 응답 + ECHO 취합 판결 ──
+      //   명퇴/건강/부모부양/자녀 걱정 등 인생 후반전 고민은 다각도 응답이 필요.
+      //   RAY/JACK/LUCIA 3명이 먼저 병렬 응답 → ECHO가 그 결과를 받아 마지막에 취합 판결.
+      if (category === 'life' && !isExplicitPersonaPick) {
+        const lifeHistory: TeaMsg[] = [{ role: 'user', content: lastMsg }];
+
+        const [rayLLM, jackLLM, luciaLLM] = await Promise.all([
+          callTeaPersona('ray',   TEA_SYSTEM_RAY,   lifeHistory),
+          callTeaPersona('jack',  TEA_SYSTEM_JACK,  lifeHistory),
+          callTeaPersona('lucia', TEA_SYSTEM_LUCIA, lifeHistory),
+        ]);
+
+        const cleanLife = (text: string | null | undefined): string =>
+          (text || '').replace(/\*\*(.*?)\*\*/g, '$1').replace(/\n{2,}/g, '\n').trim();
+
+        const rayText   = cleanLife(rayLLM)   || '데이터로 정리해드릴 부분은 잠시 후 다시 짚어드릴게요.';
+        const jackText  = cleanLife(jackLLM)  || '핵심 변수가 정리되면 다시 말씀드릴게요.';
+        const luciaText = cleanLife(luciaLLM) || '많이 무거우셨겠어요. 천천히 같이 이야기 나눠봐요.';
+
+        // ECHO 취합 판결 — 위 3명의 응답을 컨텍스트로 받아 마지막에 호출
+        const echoConsolidationPrompt = `사용자 질문: ${lastMsg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n위 세 사람의 응답을 듣고, 너의 시각에서 핵심을 짚고 우선순위를 정리해줘. 감정 위로보다는 구조적 통찰과 실행 가능한 한 가지 방향을 분명히 제시해.`;
+        const echoLLM = await callTeaPersona(
+          'echo',
+          TEA_SYSTEM_ECHO,
+          [{ role: 'user', content: echoConsolidationPrompt }],
+        );
+        const echoText = cleanLife(echoLLM) || '세 사람의 답변을 종합하면, 가장 먼저 좁혀야 할 건 지금 가장 무거운 것이 무엇인가입니다.';
+
+        try {
+          const supabase = getSupabase();
+          if (supabase) {
+            await supabase.from('tea_logs').insert({
+              persona: 'echo',
+              turn_count: 1,
+              first_message: lastMsg.slice(0, 100),
+              user_id: null,
+            });
+          }
+        } catch (e) {
+          console.warn('[tea:life] 로그 저장 실패 (무시)', e);
+        }
+
+        return respond({
+          reply: [rayText, jackText, luciaText, echoText].join('\n\n'),
+          personas: {
+            jack: jackText, lucia: luciaText, ray: rayText, echo: echoText,
+            verdict: '관망' as Verdict,
+            confidence: 0,
+            breakdown: '인생 후반전 고민',
             positionSizing: '0%',
             jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
           },
@@ -708,6 +767,7 @@ export async function POST(req: Request) {
         : category === 'news'   ? 'ray'
         : category === 'finance' ? 'ray'
         : (category === 'legal' || category === 'tech') ? 'echo'
+        : category === 'life' ? null
         : null;
       const selectedPersona: 'lucia' | 'jack' | 'echo' | 'ray' =
         teaPersona === 'jack' ? 'jack'
