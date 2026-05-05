@@ -523,22 +523,45 @@ export async function POST(req: Request) {
       const cleanText = (t: string | null | undefined): string =>
         (t || '').replace(/\*\*(.*?)\*\*/g, '$1').replace(/\n{2,}/g, '\n').trim();
 
-      // 직전 2~3턴(최대 6개 메시지) 요약 — 현재 질문(messages 마지막) 제외
+      // 직전 user→assistant 페어 추출 — assistant 응답에서 RAY 페르소나 발화를 우선 뽑음
+      // 우선순위: personas.ray → teaRay → content 첫 청크(\n\n 분리, multi-persona 응답은 RAY가 첫 자리)
       const recentContext = (() => {
         if (!Array.isArray(messages) || messages.length < 2) return '';
-        const prior = messages.slice(0, -1).slice(-6) as Array<{ role?: string; content?: string }>;
+        const prior = messages.slice(0, -1).slice(-6) as Array<{
+          role?: string;
+          content?: string;
+          teaRay?: string;
+          personas?: { ray?: string };
+        }>;
         if (prior.length === 0) return '';
-        return prior
-          .map(m => {
-            const role = m?.role === 'assistant' ? '어시스턴트' : '유저';
-            const content = (m?.content || '').slice(0, 200).replace(/\s+/g, ' ').trim();
-            return content ? `${role}: ${content}` : '';
-          })
-          .filter(Boolean)
-          .join(' / ');
+
+        const summarize = (s: string, n: number): string =>
+          (s || '').replace(/\s+/g, ' ').trim().slice(0, n);
+
+        const turns: string[] = [];
+        for (let i = 0; i < prior.length; i++) {
+          const m = prior[i];
+          if (m?.role !== 'user') continue;
+          const q = summarize(m.content || '', 80);
+          if (!q) continue;
+          const next = prior[i + 1];
+          if (next && next.role === 'assistant') {
+            const rayResp =
+              next.personas?.ray ||
+              next.teaRay ||
+              (next.content || '').split(/\n\n+/)[0] ||
+              '';
+            const ray = summarize(rayResp, 150);
+            turns.push(ray ? `[유저: ${q}] → [RAY: ${ray}]` : `[유저: ${q}]`);
+            i++; // 다음 assistant는 소비됐으므로 건너뜀
+          } else {
+            turns.push(`[유저: ${q}]`);
+          }
+        }
+        return turns.join(' → ');
       })();
       const ctxSuffix = recentContext
-        ? `\n[이전 대화 맥락: ${recentContext}]\n현재 질문: ${msg}`
+        ? `\n[직전 대화 주제: ${recentContext}]\n현재 질문: ${msg}`
         : `\n${msg}`;
 
       // 1단계: RAY/JACK/LUCIA 병렬 (페르소나별 역할 prefix)
