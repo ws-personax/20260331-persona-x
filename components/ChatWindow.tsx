@@ -2617,7 +2617,13 @@ export default function ChatWindow() {
                           details={msg.personas.echoDetails}
                           timestamp={msg.timestamp}
                           echoNews={msg.personas.echoNews}
-                          hideDisclaimer={msg.personas.breakdown === '인생 후반전 고민'}
+                          hideDisclaimer={
+                            msg.personas.breakdown === '인생 후반전 고민' ||
+                            (msg.personas.breakdown !== undefined &&
+                              !msg.personas.breakdown.includes('재테크') &&
+                              !msg.personas.breakdown.includes('투자') &&
+                              !msg.personas.breakdown.includes('종목'))
+                          }
                         />
                       </>
                     );
@@ -2636,7 +2642,13 @@ export default function ChatWindow() {
                         details={msg.personas.echoDetails}
                         timestamp={msg.timestamp}
                         echoNews={msg.personas.echoNews}
-                        hideDisclaimer={msg.personas.breakdown === '인생 후반전 고민'}
+                        hideDisclaimer={
+                          msg.personas.breakdown === '인생 후반전 고민' ||
+                          (msg.personas.breakdown !== undefined &&
+                            !msg.personas.breakdown.includes('재테크') &&
+                            !msg.personas.breakdown.includes('투자') &&
+                            !msg.personas.breakdown.includes('종목'))
+                        }
                       />
                     </>
                   );
