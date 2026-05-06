@@ -39,6 +39,7 @@ interface PersonaData {
   jack2?: string | null;
   lucia2?: string | null;
   echo2?: string | null;
+  order?: ('ray' | 'jack' | 'lucia')[];
 }
 
 type ErrorType = 'market_data_unavailable' | 'keyword_not_recognized' | 'analysis_failed';
@@ -2729,11 +2730,30 @@ export default function ChatWindow() {
                     );
                   }
 
+                  // 오케스트레이터가 결정한 발언 순서 사용. 미지정 시 RAY→JACK→LUCIA 폴백.
+                  const validKeys: ('ray' | 'jack' | 'lucia')[] = ['ray', 'jack', 'lucia'];
+                  const order: ('ray' | 'jack' | 'lucia')[] =
+                    Array.isArray(msg.personas.order) && msg.personas.order.length === 3 &&
+                    msg.personas.order.every(k => (validKeys as string[]).includes(k))
+                      ? msg.personas.order
+                      : validKeys;
+
+                  const renderRound1 = (key: 'ray' | 'jack' | 'lucia') => {
+                    if (key === 'ray') return <PersonaBubble key="r1-ray" personaKey="ray" text={msg.personas!.ray} timestamp={msg.timestamp} newsItem={msg.personas!.rayNews} details={msg.personas!.rayDetails} />;
+                    if (key === 'jack') return <PersonaBubble key="r1-jack" personaKey="jack" text={jackText} timestamp={msg.timestamp} newsItem={msg.personas!.jackNews} details={msg.personas!.jackDetails} />;
+                    return <PersonaBubble key="r1-lucia" personaKey="lucia" text={luciaText} timestamp={msg.timestamp} newsItem={msg.personas!.luciaNews} details={msg.personas!.luciaDetails} />;
+                  };
+
+                  const renderRound2 = (key: 'ray' | 'jack' | 'lucia') => {
+                    if (key === 'ray' && msg.personas!.ray2) return <PersonaBubble key="r2-ray" personaKey="ray" text={msg.personas!.ray2} timestamp={msg.timestamp} />;
+                    if (key === 'jack' && msg.personas!.jack2) return <PersonaBubble key="r2-jack" personaKey="jack" text={msg.personas!.jack2} timestamp={msg.timestamp} />;
+                    if (key === 'lucia' && msg.personas!.lucia2) return <PersonaBubble key="r2-lucia" personaKey="lucia" text={msg.personas!.lucia2} timestamp={msg.timestamp} />;
+                    return null;
+                  };
+
                   return (
                     <>
-                      <PersonaBubble personaKey="ray" text={msg.personas.ray} timestamp={msg.timestamp} newsItem={msg.personas.rayNews} details={msg.personas.rayDetails} />
-                      <PersonaBubble personaKey="jack" text={jackText} timestamp={msg.timestamp} newsItem={msg.personas.jackNews} details={msg.personas.jackDetails} />
-                      <PersonaBubble personaKey="lucia" text={luciaText} timestamp={msg.timestamp} newsItem={msg.personas.luciaNews} details={msg.personas.luciaDetails} />
+                      {order.map(renderRound1)}
                       <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>
                         ── ECHO COMMAND ──
                       </div>
@@ -2744,15 +2764,7 @@ export default function ChatWindow() {
                         echoNews={msg.personas.echoNews}
                         hideDisclaimer={msg.personas.breakdown !== undefined}
                       />
-                      {msg.personas.ray2 && (
-                        <PersonaBubble personaKey="ray" text={msg.personas.ray2} timestamp={msg.timestamp} />
-                      )}
-                      {msg.personas.jack2 && (
-                        <PersonaBubble personaKey="jack" text={msg.personas.jack2} timestamp={msg.timestamp} />
-                      )}
-                      {msg.personas.lucia2 && (
-                        <PersonaBubble personaKey="lucia" text={msg.personas.lucia2} timestamp={msg.timestamp} />
-                      )}
+                      {order.map(renderRound2)}
                       {msg.personas.echo2 && (
                         <EchoBubble summary={msg.personas.echo2} timestamp={msg.timestamp} hideDisclaimer />
                       )}

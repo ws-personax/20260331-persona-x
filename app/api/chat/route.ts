@@ -510,6 +510,65 @@ export async function POST(req: Request) {
       return Response.json(body as Parameters<typeof Response.json>[0], init);
     };
 
+    // ✅ 오케스트레이터 — multi-persona 분기 진입 전 토론 디렉터 LLM이 흐름을 결정
+    //    질문 유형에 따라 페르소나 발언 순서/각도/충돌 쟁점/ECHO 지목 대상을 미리 지시한다.
+    //    JSON 파싱 실패·LLM 실패 시 안전 기본값으로 폴백하므로 실패가 응답을 망가뜨리지 않는다.
+    type DiscussionPersona = 'ray' | 'jack' | 'lucia';
+    type OrchestratorPlan = {
+      order: DiscussionPersona[];
+      ray_angle: string;
+      jack_angle: string;
+      lucia_angle: string;
+      echo_target: DiscussionPersona;
+      echo_angle: string;
+      conflict_point: string;
+    };
+
+    const runOrchestrator = async (
+      msg: string,
+      fallbackOrder: DiscussionPersona[] = ['ray', 'jack', 'lucia'],
+    ): Promise<OrchestratorPlan> => {
+      const fallback: OrchestratorPlan = {
+        order: fallbackOrder,
+        ray_angle: '',
+        jack_angle: '',
+        lucia_angle: '',
+        echo_target: 'jack',
+        echo_angle: '',
+        conflict_point: '',
+      };
+
+      const orchestratorPrompt = `당신은 PersonaX 토론 디렉터입니다.\n유저 질문: "${msg}"\n\n아래 JSON만 출력하라. 다른 텍스트 절대 금지. 코드펜스도 금지.\n{\n  "order": ["ray","jack","lucia"],\n  "ray_angle": "RAY가 집중할 핵심 데이터 포인트 한 줄",\n  "jack_angle": "JACK이 반박할 허점 한 줄",\n  "lucia_angle": "LUCIA가 짚을 감정 포인트 한 줄",\n  "echo_target": "ray|jack|lucia 중 하나",\n  "echo_angle": "ECHO가 찌를 핵심 허점 한 줄",\n  "conflict_point": "RAY와 JACK이 직접 충돌할 핵심 쟁점 한 줄"\n}\n\norder 규칙:\n- 감정/인생 질문(명퇴·요양원·이혼·부모·죄책감·힘들·막막) → 첫 번째 lucia\n- 재테크/투자(주식·비트코인·삼성·ETF·PBR·매수·매도) → 첫 번째 ray\n- 결단/행동(해야 할까·결정·선택·지금 당장) → 첫 번째 jack\n- 시사/뉴스(전쟁·금리·환율·정치·경제뉴스) → 첫 번째 ray\n\necho_target 규칙:\n- RAY가 너무 냉정하게 숫자만 나열할 가능성 → ray\n- JACK이 근거 없이 밀어붙일 가능성 → jack\n- LUCIA가 감성으로만 흐를 가능성 → lucia\n- 셋 다 일치할 가능성 → 가장 자기 영역에서 약점이 큰 한 명`;
+
+      try {
+        const llm = await callTeaPersona(
+          'echo',
+          'JSON 출력 머신. 다른 텍스트 금지. 코드펜스 금지. 반드시 { 로 시작 } 로 끝나는 JSON 한 덩어리만 출력.',
+          [{ role: 'user', content: orchestratorPrompt }],
+        );
+        if (!llm) return fallback;
+        const m = llm.match(/\{[\s\S]*\}/);
+        if (!m) return fallback;
+        const parsed = JSON.parse(m[0]) as Record<string, unknown>;
+        const valid = ['ray', 'jack', 'lucia'] as const;
+        const isPersona = (s: unknown): s is DiscussionPersona =>
+          typeof s === 'string' && (valid as readonly string[]).includes(s);
+        const orderArr = Array.isArray(parsed.order) ? (parsed.order as unknown[]).filter(isPersona) : [];
+        return {
+          order: orderArr.length === 3 ? (orderArr as DiscussionPersona[]) : fallback.order,
+          ray_angle: typeof parsed.ray_angle === 'string' ? parsed.ray_angle : '',
+          jack_angle: typeof parsed.jack_angle === 'string' ? parsed.jack_angle : '',
+          lucia_angle: typeof parsed.lucia_angle === 'string' ? parsed.lucia_angle : '',
+          echo_target: isPersona(parsed.echo_target) ? parsed.echo_target : fallback.echo_target,
+          echo_angle: typeof parsed.echo_angle === 'string' ? parsed.echo_angle : '',
+          conflict_point: typeof parsed.conflict_point === 'string' ? parsed.conflict_point : '',
+        };
+      } catch (e) {
+        console.warn('[orchestrator] 파싱 실패, 폴백 사용', e);
+        return fallback;
+      }
+    };
+
     // ✅ finance/뉴스 카테고리에서 종목명 없는 일반 질문 — 4페르소나 병렬 응답 빌더
     //    RAY만 Google Search grounding 활성화(비용 통제), 나머지는 페르소나 톤만 적용.
     //    news 카테고리 블록과 별도 — news는 4명 모두 검색이 필요하지만 finance 일반 질문은
@@ -595,19 +654,26 @@ export async function POST(req: Request) {
         ? `\n[직전 대화 주제: ${recentContext}]\n현재 질문: ${msg}`
         : `\n${msg}`;
 
+      // 0단계: 오케스트레이터 — 토론 디렉터가 발언 순서/각도/충돌 쟁점/ECHO 지목 결정
+      const plan = await runOrchestrator(msg, ['ray', 'jack', 'lucia']);
+      const angleRay   = plan.ray_angle   ? `RAY 집중점: ${plan.ray_angle}.\n` : '';
+      const angleJack  = plan.jack_angle  ? `JACK 집중점: ${plan.jack_angle}.\n` : '';
+      const angleLucia = plan.lucia_angle ? `LUCIA 집중점: ${plan.lucia_angle}.\n` : '';
+      const conflictPointLine = plan.conflict_point ? `핵심 충돌 쟁점: ${plan.conflict_point}.\n` : '';
+
       // 1단계: RAY/JACK/LUCIA 병렬 (페르소나별 역할 prefix)
       // 공통 원칙 — 모든 페르소나 1라운드/2라운드 전체 적용
       const investmentRule = '공통 원칙: 직접 매수/매도 지시 절대 금지. "사세요" "파세요" "지금 당장 하세요" 표현 금지. 대신 조건부 판단 표현만 사용 — "~라면 고려해볼 수 있어요" / "~인 경우에는 ~도 방법이에요" / "~조건이면 ~구간이에요". 투자 판단과 책임은 본인에게 있음을 전제로 말할 것.';
 
       const conflictRule = '충돌 원칙: 다른 페르소나를 직접 지목해서 반박하라. RAY는 JACK의 직관을 숫자로 찌른다. JACK은 RAY의 데이터 해석을 현실로 반박한다. LUCIA는 두 사람이 싸우는 동안 유저 감정을 짚는다. 예시 — RAY: "JACK, 2022년부터 사지 말라고 했는데 그때 산 사람들이 지금 347% 수익이에요." JACK: "RAY, 그 숫자는 바닥에서 산 사람 기준이에요. 고점에 산 사람은 지금도 물려있어요." LUCIA: "두 분 싸우는 동안 이분 더 불안해지고 있어요."';
 
-      const rayRound1Role   = '당신은 RAY입니다. 김상욱+레이달리오 스타일. 차분하고 건조하게. 데이터가 나올 때만 살아난다. 먼저 JACK의 주장 허점을 숫자로 직접 찌를 것. "JACK, ~" 형태로 시작해도 됨. 숫자 2개 + JACK 반박 + 조건부 결론. 3줄 이내. 직접 매수/매도 지시 금지. 숫자는 딱 2개만. 3번째 숫자 나오면 멈춰라. 목표주가·증권사 의견·지분율·PER 동시 나열 금지. 가장 핵심적인 숫자 2개만 골라서 JACK 찌르는 데 써라.';
+      const rayRound1Role   = '당신은 RAY입니다. 김상욱+레이달리오 스타일. 차분하고 건조하게. 데이터가 나올 때만 살아난다. 먼저 JACK의 주장 허점을 숫자로 직접 찌를 것. "JACK, ~" 형태로 시작해도 됨. 숫자 2개 + JACK 반박 + 조건부 결론. 3줄 이내. 직접 매수/매도 지시 금지. 숫자는 반드시 2개만. 절대 3개 이상 금지. 가장 충격적인 숫자 1개 + JACK 반박에 필요한 숫자 1개. 증권사 보고서·목표주가·52주 등락률 나열 금지.';
       const jackRound1Role  = '당신은 JACK입니다. 마동석+피터린치 스타일. 말이 짧다. 투박하다. 틀려도 자신있다. 먼저 RAY 데이터 해석의 허점을 직접 찌를 것. "RAY, ~" 형태로 시작해도 됨. 과거 사례로 RAY 반박 + 조건부 결론. 3줄 이내. 직접 매수/매도 지시 금지.';
-      const luciaRound1Role = '당신은 LUCIA입니다. 손예진+오은영 스타일. 존댓말이지만 딱딱하지 않다. 살짝 언니 느낌. RAY와 JACK이 싸우는 동안 유저 감정을 짚어라. "두 분이 싸우는 동안 ~" 또는 "JACK, ~" 형태. 공감 1줄 + 실제 투자자 사례 근거 1줄 + 조건부 결론 1줄. 질문으로만 끝내지 말 것. "아이고"는 한 대화에서 1회만. "~잖아요"·"~거든요" 톤 유지. 3줄 이내.';
+      const luciaRound1Role = '당신은 LUCIA입니다. 손예진+오은영 스타일. 존댓말이지만 딱딱하지 않다. 살짝 언니 느낌. RAY와 JACK이 싸우는 동안 유저 감정을 짚어라. "두 분이 싸우는 동안 ~" 또는 "JACK, ~" 형태. 공감 1줄 + 실제 투자자 사례 근거 1줄 + 조건부 결론 1줄. 질문으로만 끝내지 말 것. 첫 문장에 "아이고" 금지. "아이고"는 대화 전체에서 1회만, 감정이 폭발하는 순간에만 사용. "~잖아요"·"~거든요" 톤 유지. 3줄 이내.';
 
-      const rayHistory:   TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${conflictRule}\n${rayRound1Role}${ctxSuffix}` }];
-      const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${conflictRule}\n${jackRound1Role}${ctxSuffix}` }];
-      const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${conflictRule}\n${luciaRound1Role}${ctxSuffix}` }];
+      const rayHistory:   TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${conflictRule}\n${angleRay}${conflictPointLine}${rayRound1Role}${ctxSuffix}` }];
+      const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${conflictRule}\n${angleJack}${conflictPointLine}${jackRound1Role}${ctxSuffix}` }];
+      const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${conflictRule}\n${angleLucia}${luciaRound1Role}${ctxSuffix}` }];
 
       const [rayLLM, jackLLM, luciaLLM] = await Promise.all([
         callTeaPersona('ray',   TEA_SYSTEM_RAY,   rayHistory, { enableSearch: true }),
@@ -620,7 +686,10 @@ export async function POST(req: Request) {
       const luciaText = cleanText(luciaLLM) || '결정 전에 마음의 무게부터 같이 짚어볼까요?';
 
       // 2단계: ECHO 취합 + 씨앗 질문 (마지막 줄은 반드시 페르소나에게 던지는 질문)
-      const echoConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n당신은 ECHO입니다. 손석희+워렌버핏 스타일. 감정을 철저히 통제한다. 말이 적지만 한 마디가 무겁다. RAY/JACK/LUCIA 중 가장 허점 있는 한 명을 직접 지목해서 그 사람 주장의 가장 약한 부분을 찌르는 날카로운 질문 하나로 끝내라. 시작 방식은 매번 다르게. "......" 침묵 후 한 방도 가능. 부드러운 질문 금지. 불편하게 만들어야 2라운드가 산다. "결정은 당신이"·"선택은 당신 몫" 책임 회피 표현 절대 금지. 5줄 이내. 목록 금지. 마지막 줄은 반드시 물음표로 끝나는 질문.`;
+      const echoTargetClause = (plan.echo_target && plan.echo_angle)
+        ? `이번엔 ${plan.echo_target.toUpperCase()}을 직접 지목해서 "${plan.echo_angle}" 이 부분을 찔러라.\n`
+        : '';
+      const echoConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n${echoTargetClause}당신은 ECHO입니다. 손석희+워렌버핏 스타일. 감정을 철저히 통제한다. 말이 적지만 한 마디가 무겁다. RAY/JACK/LUCIA 중 가장 허점 있는 한 명을 직접 지목해서 그 사람 주장의 가장 약한 부분을 찌르는 날카로운 질문 하나로 끝내라. 시작 방식은 매번 다르게. "......" 침묵 후 한 방도 가능. 부드러운 질문 금지. 불편하게 만들어야 2라운드가 산다. "결정은 당신이"·"선택은 당신 몫" 책임 회피 표현 절대 금지. 5줄 이내. 목록 금지. 마지막 줄은 반드시 물음표로 끝나는 질문.`;
       const echoLLM = await callTeaPersona(
         'echo',
         TEA_SYSTEM_ECHO,
@@ -697,7 +766,7 @@ export async function POST(req: Request) {
       const luciaText2 = cleanText(lucia2LLM);
 
       // 4단계: ECHO 최후 판결 — 씨앗 질문 금지, 명확한 판결 + 선언형 결론
-      const echo2ConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n1라운드 RAY: ${rayText}\n1라운드 JACK: ${jackText}\n1라운드 LUCIA: ${luciaText}\n1라운드 ECHO: ${echoText}\n\n2라운드 RAY: ${rayText2}\n2라운드 JACK: ${jackText2}\n2라운드 LUCIA: ${luciaText2}\n\n최후 판결이다. 씨앗 질문 금지. RAY/JACK/LUCIA 중 누가 맞는지 명확히 판결하라. 마지막 문장은 반드시 아래 형식 중 하나로 마무리하고 마침표로 끝낼 것:\n(1) "단기(N년 이내)면 [페르소나] 말이 맞습니다."\n(2) "[조건]이라면 지금 구간은 [판단]입니다."\n(3) "[핵심 변수]가 [방향]이면 [결론]입니다."\n"지금 이 싸움이 답을 보여줬습니다" 같은 결론 없는 문장으로 끝내지 마라. "~정하세요" "~하세요" 지시형 금지. 물음표 절대 금지. 요약·정리·나열 금지. 절대 3줄 초과 금지. "결정은 당신이 하십시오"·"선택은 당신 몫"·"판단은 본인이" 등 책임 회피 표현 절대 금지.`;
+      const echo2ConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n1라운드 RAY: ${rayText}\n1라운드 JACK: ${jackText}\n1라운드 LUCIA: ${luciaText}\n1라운드 ECHO: ${echoText}\n\n2라운드 RAY: ${rayText2}\n2라운드 JACK: ${jackText2}\n2라운드 LUCIA: ${luciaText2}\n\n최후 판결이다. 씨앗 질문 금지. RAY/JACK/LUCIA 중 누가 맞는지 명확히 판결하라. 마지막 문장은 반드시 아래 형식 중 하나로 마무리하고 마침표로 끝낼 것:\n(1) "단기(N년 이내)면 JACK, 장기면 LUCIA+RAY 말이 맞습니다."\n(2) "[조건]이라면 지금 구간은 [위험/기회]입니다."\n(3) "[핵심 변수]가 해결되지 않으면 [결론]입니다."\n조건만 말하고 판결 없이 끝내는 것 금지. "지금 이 싸움이 답을 보여줬습니다" 같은 결론 없는 문장으로 끝내지 마라. "~정하세요" "~하세요" 지시형 금지. 물음표 절대 금지. 요약·정리·나열 금지. 절대 3줄 초과 금지. "결정은 당신이 하십시오"·"선택은 당신 몫"·"판단은 본인이" 등 책임 회피 표현 절대 금지.`;
       const echo2LLM = await callTeaPersona(
         'echo',
         TEA_SYSTEM_ECHO,
@@ -727,6 +796,7 @@ export async function POST(req: Request) {
           jack2:  jackText2  || null,
           lucia2: luciaText2 || null,
           echo2:  echoText2  || null,
+          order:  plan.order,
           verdict: '관망' as Verdict,
           confidence: 0,
           breakdown: '재테크 일반',
@@ -755,10 +825,17 @@ export async function POST(req: Request) {
         const monthNow = kstNow.getUTCMonth() + 1;
         const newsPrefix = `[현재 시점: ${yearNow}년 ${monthNow}월 — 가장 최근 보도(${yearNow}년)를 우선 참고하여 답변. 과거 인물·사건을 현재형으로 단정하지 말 것.]\n`;
 
+        // 0단계: 오케스트레이터 — 토론 디렉터가 발언 순서/각도/충돌 쟁점/ECHO 지목 결정
+        const newsPlan = await runOrchestrator(lastMsg, ['ray', 'jack', 'lucia']);
+        const newsAngleRay   = newsPlan.ray_angle   ? `RAY 집중점: ${newsPlan.ray_angle}.\n` : '';
+        const newsAngleJack  = newsPlan.jack_angle  ? `JACK 집중점: ${newsPlan.jack_angle}.\n` : '';
+        const newsAngleLucia = newsPlan.lucia_angle ? `LUCIA 집중점: ${newsPlan.lucia_angle}.\n` : '';
+        const newsConflict   = newsPlan.conflict_point ? `핵심 충돌 쟁점: ${newsPlan.conflict_point}.\n` : '';
+
         // ✅ 페르소나별 역할 분리 prefix — 동일 질문에 다른 시각으로 답하도록 유도
-        const rayHistory:   TeaMsg[] = [{ role: 'user', content: `${newsPrefix}[역할: 질문에 직접 답해라. 핵심 숫자 2개만. 절대 3줄 초과 금지. 목록·불릿 금지.]\n${lastMsg}` }];
-        const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${newsPrefix}[역할: 이 상황에서 지금 당장 행동해야 할 것 하나만 짧고 투박하게 말해줘. 배경 설명 없이. 절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]\n${lastMsg}` }];
-        const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${newsPrefix}[역할: 이 뉴스가 40~50대 일반인에게 감정적으로 어떤 의미인지, 인간적 시각으로만 2~3줄로 말해줘. 경제 분석 없이. 절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]\n${lastMsg}` }];
+        const rayHistory:   TeaMsg[] = [{ role: 'user', content: `${newsPrefix}${newsAngleRay}${newsConflict}[역할: 질문에 직접 답해라. 핵심 숫자 2개만. 절대 3줄 초과 금지. 목록·불릿 금지.]\n${lastMsg}` }];
+        const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${newsPrefix}${newsAngleJack}${newsConflict}[역할: 이 상황에서 지금 당장 행동해야 할 것 하나만 짧고 투박하게 말해줘. 배경 설명 없이. 절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]\n${lastMsg}` }];
+        const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${newsPrefix}${newsAngleLucia}[역할: 이 뉴스가 40~50대 일반인에게 감정적으로 어떤 의미인지, 인간적 시각으로만 2~3줄로 말해줘. 경제 분석 없이. 절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]\n${lastMsg}` }];
 
         const [rayLLM, jackLLM, luciaLLM] = await Promise.all([
           callTeaPersona('ray',   TEA_SYSTEM_RAY,   rayHistory,   { enableSearch: true }),
@@ -785,7 +862,10 @@ export async function POST(req: Request) {
 
         // ✅ ECHO 취합 판결 — 위 3명 응답을 컨텍스트로 받아 마지막에 호출
         //    'RAY는 ~로, JACK은 ~로, LUCIA는 ~로' 형식 절대 금지 (시스템 프롬프트에 원칙 등재)
-        const echoConsolidationPrompt = `${newsPrefix}사용자 질문: ${lastMsg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n위 세 답변을 듣고 ECHO로서 판결하라. 시스템 프롬프트의 '뉴스/시사 질문에서 ECHO 시작 방식' 원칙을 반드시 따를 것. 5줄 이내. 불릿·목록 사용 금지. 반드시 마지막 줄은 RAY·JACK·LUCIA 세 사람에게 던지는 직접 질문 한 문장으로 마무리할 것(물음표 필수).`;
+        const newsEchoTargetClause = (newsPlan.echo_target && newsPlan.echo_angle)
+          ? `이번엔 ${newsPlan.echo_target.toUpperCase()}을 직접 지목해서 "${newsPlan.echo_angle}" 이 부분을 찔러라.\n`
+          : '';
+        const echoConsolidationPrompt = `${newsPrefix}사용자 질문: ${lastMsg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n${newsEchoTargetClause}위 세 답변을 듣고 ECHO로서 판결하라. 시스템 프롬프트의 '뉴스/시사 질문에서 ECHO 시작 방식' 원칙을 반드시 따를 것. 5줄 이내. 불릿·목록 사용 금지. 반드시 마지막 줄은 RAY·JACK·LUCIA 세 사람에게 던지는 직접 질문 한 문장으로 마무리할 것(물음표 필수).`;
         const echoLLM = await callTeaPersona(
           'echo',
           TEA_SYSTEM_ECHO,
@@ -843,6 +923,7 @@ export async function POST(req: Request) {
             jack2:  jackText2  || null,
             lucia2: luciaText2 || null,
             echo2:  echoText2  || null,
+            order:  newsPlan.order,
             verdict: '관망' as Verdict,
             confidence: 0,
             breakdown: '시사 분석',
@@ -856,14 +937,22 @@ export async function POST(req: Request) {
       //   명퇴/건강/부모부양/자녀 걱정 등 인생 후반전 고민은 다각도 응답이 필요.
       //   RAY/JACK/LUCIA 3명이 먼저 병렬 응답 → ECHO가 그 결과를 받아 마지막에 취합 판결.
       if (category === 'life' && !isExplicitPersonaPick) {
+        // 0단계: 오케스트레이터 — 토론 디렉터가 발언 순서/각도/충돌 쟁점/ECHO 지목 결정
+        const lifePlan = await runOrchestrator(lastMsg, ['lucia', 'jack', 'ray']);
+        const lifeAngleRay   = lifePlan.ray_angle   ? `RAY 집중점: ${lifePlan.ray_angle}.\n` : '';
+        const lifeAngleJack  = lifePlan.jack_angle  ? `JACK 집중점: ${lifePlan.jack_angle}.\n` : '';
+        const lifeAngleLucia = lifePlan.lucia_angle ? `LUCIA 집중점: ${lifePlan.lucia_angle}.\n` : '';
+        const lifeConflict   = lifePlan.conflict_point ? `핵심 충돌 쟁점: ${lifePlan.conflict_point}.\n` : '';
+
         const lifeLengthRule = '[절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]\n';
-        const lifeHistory: TeaMsg[] = [{ role: 'user', content: `${lifeLengthRule}${lastMsg}` }];
-        const lifeRayHistory: TeaMsg[] = [{ role: 'user', content: `[역할: 질문에 직접 답해라. 핵심 숫자 2개만. 절대 3줄 초과 금지. 목록·불릿 금지.]\n${lastMsg}` }];
+        const lifeJackHistory: TeaMsg[] = [{ role: 'user', content: `${lifeAngleJack}${lifeConflict}${lifeLengthRule}${lastMsg}` }];
+        const lifeLuciaHistory: TeaMsg[] = [{ role: 'user', content: `${lifeAngleLucia}${lifeLengthRule}${lastMsg}` }];
+        const lifeRayHistory: TeaMsg[] = [{ role: 'user', content: `${lifeAngleRay}${lifeConflict}[역할: 질문에 직접 답해라. 핵심 숫자 2개만. 절대 3줄 초과 금지. 목록·불릿 금지.]\n${lastMsg}` }];
 
         const [rayLLM, jackLLM, luciaLLM] = await Promise.all([
           callTeaPersona('ray',   TEA_SYSTEM_RAY,   lifeRayHistory),
-          callTeaPersona('jack',  TEA_SYSTEM_JACK,  lifeHistory),
-          callTeaPersona('lucia', TEA_SYSTEM_LUCIA, lifeHistory),
+          callTeaPersona('jack',  TEA_SYSTEM_JACK,  lifeJackHistory),
+          callTeaPersona('lucia', TEA_SYSTEM_LUCIA, lifeLuciaHistory),
         ]);
 
         const cleanLife = (text: string | null | undefined): string =>
@@ -884,7 +973,10 @@ export async function POST(req: Request) {
         const luciaText = cleanLife(luciaLLM) || '많이 무거우셨겠어요. 천천히 같이 이야기 나눠봐요.';
 
         // ECHO 취합 판결 — 위 3명의 응답을 컨텍스트로 받아 마지막에 호출
-        const echoConsolidationPrompt = `사용자 질문: ${lastMsg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n위 세 사람의 응답을 듣고, 너의 시각에서 핵심을 짚고 우선순위를 정리해줘. 감정 위로보다는 구조적 통찰과 실행 가능한 한 가지 방향을 분명히 제시해. 5줄 이내. 불릿·목록 사용 금지. 반드시 마지막 줄은 RAY·JACK·LUCIA 세 사람에게 던지는 직접 질문 한 문장으로 마무리할 것(물음표 필수).`;
+        const lifeEchoTargetClause = (lifePlan.echo_target && lifePlan.echo_angle)
+          ? `이번엔 ${lifePlan.echo_target.toUpperCase()}을 직접 지목해서 "${lifePlan.echo_angle}" 이 부분을 찔러라.\n`
+          : '';
+        const echoConsolidationPrompt = `사용자 질문: ${lastMsg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n${lifeEchoTargetClause}위 세 사람의 응답을 듣고, 너의 시각에서 핵심을 짚고 우선순위를 정리해줘. 감정 위로보다는 구조적 통찰과 실행 가능한 한 가지 방향을 분명히 제시해. 5줄 이내. 불릿·목록 사용 금지. 반드시 마지막 줄은 RAY·JACK·LUCIA 세 사람에게 던지는 직접 질문 한 문장으로 마무리할 것(물음표 필수).`;
         const echoLLM = await callTeaPersona(
           'echo',
           TEA_SYSTEM_ECHO,
@@ -940,6 +1032,7 @@ export async function POST(req: Request) {
             jack2:  lifeJackText2  || null,
             lucia2: lifeLuciaText2 || null,
             echo2:  lifeEchoText2  || null,
+            order:  lifePlan.order,
             verdict: '관망' as Verdict,
             confidence: 0,
             breakdown: '인생 후반전 고민',
