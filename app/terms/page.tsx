@@ -20,8 +20,8 @@ export default function TermsPage() {
 
       <Section title="제2조 (운영자 정보)">
         <Bullet>서비스명: PersonaX</Bullet>
-        <Bullet>운영자: 개인사업자 [대표자명 입력 필요]</Bullet>
-        <Bullet>문의: [이메일 주소 입력 필요]</Bullet>
+        <Bullet>운영자: 개인사업자 PersonaX 운영팀</Bullet>
+        <Bullet>문의: wsphp2024@gmail.com</Bullet>
       </Section>
 
       <Section title="제3조 (서비스의 내용)">

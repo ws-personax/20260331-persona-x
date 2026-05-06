@@ -62,8 +62,8 @@ export default function PrivacyPage() {
       </Section>
 
       <Section title="9. 개인정보 보호 책임자">
-        <Bullet>책임자: [대표자명 입력 필요]</Bullet>
-        <Bullet>문의: [이메일 주소 입력 필요]</Bullet>
+        <Bullet>책임자: PersonaX 운영팀</Bullet>
+        <Bullet>문의: wsphp2024@gmail.com</Bullet>
       </Section>
 
       <Section title="10. 처리방침의 변경">
