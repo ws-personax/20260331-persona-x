@@ -599,13 +599,15 @@ export async function POST(req: Request) {
       // 공통 원칙 — 모든 페르소나 1라운드/2라운드 전체 적용
       const investmentRule = '공통 원칙: 직접 매수/매도 지시 절대 금지. "사세요" "파세요" "지금 당장 하세요" 표현 금지. 대신 조건부 판단 표현만 사용 — "~라면 고려해볼 수 있어요" / "~인 경우에는 ~도 방법이에요" / "~조건이면 ~구간이에요". 투자 판단과 책임은 본인에게 있음을 전제로 말할 것.';
 
-      const rayRound1Role   = '역할: 숫자 2개 + 그 숫자가 말하는 결론 1줄. 숫자만 나열하고 결론 없는 답변 금지. 직접 매수/매도 지시 금지. 조건부 판단만. 절대 3줄 초과 금지. 목록 금지.';
+      const conflictRule = '충돌 원칙: 다른 페르소나를 직접 지목해서 반박하라. RAY는 JACK의 직관을 숫자로 찌른다. JACK은 RAY의 데이터 해석을 현실로 반박한다. LUCIA는 두 사람이 싸우는 동안 유저 감정을 짚는다. 예시 — RAY: "JACK, 2022년부터 사지 말라고 했는데 그때 산 사람들이 지금 347% 수익이에요." JACK: "RAY, 그 숫자는 바닥에서 산 사람 기준이에요. 고점에 산 사람은 지금도 물려있어요." LUCIA: "두 분 싸우는 동안 이분 더 불안해지고 있어요."';
+
+      const rayRound1Role   = '역할: 숫자 딱 2개만. 3줄 절대 초과 금지. 목표주가·증권사 의견·전망치 나열 금지. 반드시 다른 페르소나 주장의 허점을 숫자로 찌를 것.';
       const jackRound1Role  = '역할: 사야 하는지 말아야 하는지 조건부로 명확히 답하라. 근거(과거 사례/시장 원리) 1줄 + 조건부 결론 1줄. "사세요" "팔아요" 직접 지시 금지. 예시: "3년 이상 보유 가능하다면 지금 구간 나쁘지 않아요. HBM 경쟁 구도가 아직 불확실하기 때문이에요." 3줄 이내.';
       const luciaRound1Role = '역할: 유저 질문에 반드시 직접 답하라. 질문만 던지고 끝내는 것은 금지. 구조: 공감 1줄 + 근거(실제 사례/심리 연구) 1줄 + 조건부 결론 1줄. 예시: "2022년 하락장에서 분할 매수한 분들이 결국 수익 냈어요. 여유 자금이고 3년 이상 보유 가능하다면 소액 시작도 방법이에요." "사세요" 직접 지시 금지. 반드시 마침표로 끝낼 것. 다른 페르소나 넘김 금지. 다른 페르소나의 말을 대신 말하거나 흉내 내지 마라. "아이고"는 한 대화에서 1회만 사용. "~잖아요"·"~거든요" 톤 유지. 3줄 이내.';
 
-      const rayHistory:   TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${rayRound1Role}${ctxSuffix}` }];
-      const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${jackRound1Role}${ctxSuffix}` }];
-      const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${luciaRound1Role}${ctxSuffix}` }];
+      const rayHistory:   TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${conflictRule}\n${rayRound1Role}${ctxSuffix}` }];
+      const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${conflictRule}\n${jackRound1Role}${ctxSuffix}` }];
+      const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${conflictRule}\n${luciaRound1Role}${ctxSuffix}` }];
 
       const [rayLLM, jackLLM, luciaLLM] = await Promise.all([
         callTeaPersona('ray',   TEA_SYSTEM_RAY,   rayHistory, { enableSearch: true }),
@@ -618,7 +620,7 @@ export async function POST(req: Request) {
       const luciaText = cleanText(luciaLLM) || '결정 전에 마음의 무게부터 같이 짚어볼까요?';
 
       // 2단계: ECHO 취합 + 씨앗 질문 (마지막 줄은 반드시 페르소나에게 던지는 질문)
-      const echoConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n당신은 ECHO입니다. 손석희 스타일로 판결하라. RAY/JACK/LUCIA 중 가장 허점 있는 한 명을 직접 지목해 날카로운 씨앗 질문을 던져라. 5줄 이내. 목록 금지. 마지막 줄은 반드시 물음표로 끝나는 질문.`;
+      const echoConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n당신은 ECHO입니다. 손석희 스타일로 판결하라. 5줄 이내. 목록 금지. 가장 허점 있는 페르소나를 직접 지목하고, 그 사람의 주장에서 가장 약한 부분을 찌르는 날카로운 질문 하나로 끝내라. 부드러운 질문 금지. 불편하게 만들어야 2라운드가 산다. 마지막 줄은 반드시 물음표로 끝나는 질문.`;
       const echoLLM = await callTeaPersona(
         'echo',
         TEA_SYSTEM_ECHO,
@@ -694,8 +696,8 @@ export async function POST(req: Request) {
       const jackText2  = cleanText(jack2LLM);
       const luciaText2 = cleanText(lucia2LLM);
 
-      // 4단계: ECHO 최후 판결 — 씨앗 질문 금지, 명확한 판결 + 실질적 방향
-      const echo2ConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n1라운드 RAY: ${rayText}\n1라운드 JACK: ${jackText}\n1라운드 LUCIA: ${luciaText}\n1라운드 ECHO: ${echoText}\n\n2라운드 RAY: ${rayText2}\n2라운드 JACK: ${jackText2}\n2라운드 LUCIA: ${luciaText2}\n\n최후 판결이다. 씨앗 질문 금지. RAY/JACK/LUCIA 중 누가 맞는지 명확히 판결하라. 마지막 문장은 반드시 아래 형식 중 하나로 마무리하고 마침표로 끝낼 것:\n(1) "단기면 [페르소나], 장기면 [페르소나]. [핵심 조건] 먼저 정하세요."\n(2) "[조건]이면 사도 됩니다. [조건]이면 기다리세요."\n(3) "[핵심 변수]가 [방향]이면 [결론]입니다."\n물음표 절대 금지. 마지막 문장은 반드시 마침표로 끝낼 것. 요약·정리·나열 금지. 절대 3줄 초과 금지. "결정은 당신이 하십시오"·"선택은 당신 몫"·"판단은 본인이" 등 책임 회피 표현 절대 금지.`;
+      // 4단계: ECHO 최후 판결 — 씨앗 질문 금지, 명확한 판결 + 선언형 마무리
+      const echo2ConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n1라운드 RAY: ${rayText}\n1라운드 JACK: ${jackText}\n1라운드 LUCIA: ${luciaText}\n1라운드 ECHO: ${echoText}\n\n2라운드 RAY: ${rayText2}\n2라운드 JACK: ${jackText2}\n2라운드 LUCIA: ${luciaText2}\n\n최후 판결이다. 씨앗 질문 금지. RAY/JACK/LUCIA 중 누가 맞는지 명확히 판결하라. 마지막 문장은 반드시 선언형으로 마무리하고 마침표로 끝낼 것. "~정하세요" "~하세요" 지시형 금지. 물음표 절대 금지. 예시 — "불안 관리가 먼저입니다." / "기간이 답입니다." / "지금 이 싸움이 답을 보여줬습니다." / "단기면 JACK, 장기면 RAY+LUCIA가 맞습니다." 요약·정리·나열 금지. 절대 3줄 초과 금지. "결정은 당신이 하십시오"·"선택은 당신 몫"·"판단은 본인이" 등 책임 회피 표현 절대 금지.`;
       const echo2LLM = await callTeaPersona(
         'echo',
         TEA_SYSTEM_ECHO,
