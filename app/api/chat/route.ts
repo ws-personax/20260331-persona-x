@@ -638,7 +638,7 @@ export async function POST(req: Request) {
             ? '1줄. 숫자 한 가지만. 새 데이터 나열 금지.'
             : persona === 'JACK'
             ? '1줄. 한 마디만. 길게 늘어놓지 말 것.'
-            : '1줄. 짧은 공감 한 마디. "아이고" 사용 금지.';
+            : '지금 토론 맥락에서 유저 감정을 1줄로 짚되, 유저가 아닌 토론 참여자로서 말할 것. 예: "그 불안이 결정을 흐리게 하는 거잖아요." "답답하시죠"·"불안하시죠" 같은 공감만으로 끝내지 마라. 반드시 심리 연구 또는 실제 투자자 사례를 근거로 들 것.';
 
         const fallbackRole =
           persona === 'RAY'
@@ -646,6 +646,16 @@ export async function POST(req: Request) {
             : persona === 'JACK'
             ? '짧고 투박하게 "~요"로 끝내라. 2줄 이내.'
             : '"~잖아요"·"~거든요" 톤으로 2줄 이내. "아이고" 사용 금지.';
+
+        // 페르소나별 근거 출처 — 지목/비지목 무관하게 공통 적용
+        const evidenceSource =
+          persona === 'RAY'
+            ? '숫자/데이터 1개가 근거. 그 수치가 의미하는 것 한 줄이 주장.'
+            : persona === 'JACK'
+            ? '과거 사례 또는 시장 원리가 근거. 그 근거에서 나오는 결론 한 줄.'
+            : '심리 연구 또는 실제 투자자 사례가 근거. 그 근거에서 나오는 감정적 통찰 한 줄. "답답하시죠"·"불안하시죠" 공감만으로 끝내지 마라.';
+
+        const evidencePrinciple = `근거 원칙: 근거 없는 주장 절대 금지. 반드시 근거 한 줄 + 주장 한 줄 구조로 답하라. 근거는 숫자/사례/경험/데이터 중 하나. 근거 없이 감정이나 결론만 말하는 것은 답변이 아니다. ${evidenceSource}`;
 
         let focus: string;
         let role: string;
@@ -660,7 +670,7 @@ export async function POST(req: Request) {
           role = supportRole;
         }
 
-        return `지시: ${focus} ${role}\n출력 규칙: 대괄호 [...] 메타 태그를 출력에 포함하지 말 것. "RAY:" "JACK:" "LUCIA:" "ECHO:" 같은 페르소나 라벨로 줄을 시작하지 말 것. 호칭에 "님" 붙이지 말 것.`;
+        return `지시: ${focus} ${role}\n${evidencePrinciple}\n출력 규칙: 대괄호 [...] 메타 태그를 출력에 포함하지 말 것. "RAY:" "JACK:" "LUCIA:" "ECHO:" 같은 페르소나 라벨로 줄을 시작하지 말 것. 호칭에 "님" 붙이지 말 것.`;
       };
 
       const ray2History:   TeaMsg[] = [{ role: 'user', content: `${round2Context}${buildRound2('RAY')}` }];
@@ -678,7 +688,7 @@ export async function POST(req: Request) {
       const luciaText2 = cleanText(lucia2LLM);
 
       // 4단계: ECHO 최후 판결 — 씨앗 질문 금지, 명확한 판결 + 실질적 방향
-      const echo2ConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n1라운드 RAY: ${rayText}\n1라운드 JACK: ${jackText}\n1라운드 LUCIA: ${luciaText}\n1라운드 ECHO: ${echoText}\n\n2라운드 RAY: ${rayText2}\n2라운드 JACK: ${jackText2}\n2라운드 LUCIA: ${luciaText2}\n\n최후 판결이다. 씨앗 질문 금지. 물음표로 끝내지 마라. RAY/JACK/LUCIA 중 누가 맞는지 명확히 판결하고 유저에게 실질적 방향 한 줄로 마무리하라. 예시: "단기면 JACK, 3년 이상이면 RAY+LUCIA. 기간 먼저 정하세요." 요약·정리·나열 금지. 절대 3줄 초과 금지. "결정은 당신이 하십시오"·"선택은 당신 몫"·"판단은 본인이" 등 책임 회피 표현 절대 금지.`;
+      const echo2ConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n1라운드 RAY: ${rayText}\n1라운드 JACK: ${jackText}\n1라운드 LUCIA: ${luciaText}\n1라운드 ECHO: ${echoText}\n\n2라운드 RAY: ${rayText2}\n2라운드 JACK: ${jackText2}\n2라운드 LUCIA: ${luciaText2}\n\n최후 판결이다. 씨앗 질문 금지. RAY/JACK/LUCIA 중 누가 맞는지 명확히 판결하라. 마지막 문장은 반드시 아래 형식 중 하나로 마무리하고 마침표로 끝낼 것:\n(1) "단기면 [페르소나], 장기면 [페르소나]. [핵심 조건] 먼저 정하세요."\n(2) "[조건]이면 사도 됩니다. [조건]이면 기다리세요."\n(3) "[핵심 변수]가 [방향]이면 [결론]입니다."\n물음표 절대 금지. 마지막 문장은 반드시 마침표로 끝낼 것. 요약·정리·나열 금지. 절대 3줄 초과 금지. "결정은 당신이 하십시오"·"선택은 당신 몫"·"판단은 본인이" 등 책임 회피 표현 절대 금지.`;
       const echo2LLM = await callTeaPersona(
         'echo',
         TEA_SYSTEM_ECHO,
