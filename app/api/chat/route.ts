@@ -224,6 +224,7 @@ const getSupabase = () => {
 //   실패 시 null 반환 → 호출부에서 기존 4-페르소나 LLM 폴백.
 // ─────────────────────────────────────────────
 type Screenplay = {
+  order: ('ray' | 'jack' | 'lucia')[];
   ray: string;
   jack: string;
   lucia: string;
@@ -252,9 +253,9 @@ async function callScreenplayOrchestrator(
     const m = llm.match(/\{[\s\S]*\}/);
     if (!m) return null;
     const parsed = JSON.parse(m[0]) as Record<string, unknown>;
-    const keys: (keyof Screenplay)[] = ['ray', 'jack', 'lucia', 'echo', 'ray2', 'jack2', 'lucia2', 'echo2'];
+    const stringKeys: (keyof Omit<Screenplay, 'order'>)[] = ['ray', 'jack', 'lucia', 'echo', 'ray2', 'jack2', 'lucia2', 'echo2'];
     const result: Partial<Screenplay> = {};
-    for (const k of keys) {
+    for (const k of stringKeys) {
       const v = parsed[k];
       if (typeof v !== 'string' || !v.trim()) {
         console.warn(`[screenplay] 키 누락/빈값: ${k}`);
@@ -262,6 +263,12 @@ async function callScreenplayOrchestrator(
       }
       result[k] = v.trim();
     }
+    const validPersonas = ['ray', 'jack', 'lucia'] as const;
+    const isValidPersona = (s: unknown): s is 'ray' | 'jack' | 'lucia' =>
+      typeof s === 'string' && (validPersonas as readonly string[]).includes(s);
+    result.order = Array.isArray(parsed.order) && parsed.order.length === 3 && parsed.order.every(isValidPersona)
+      ? (parsed.order as ('ray' | 'jack' | 'lucia')[])
+      : ['ray', 'jack', 'lucia'];
     return result as Screenplay;
   } catch (e) {
     console.warn('[screenplay] 호출 실패', e);
@@ -856,16 +863,17 @@ export async function POST(req: Request) {
             }
           };
 
-          // 1라운드: RAY → JACK → LUCIA → ECHO
-          await streamPersona('ray',   1, screenplay.ray);
-          await streamPersona('jack',  1, screenplay.jack);
-          await streamPersona('lucia', 1, screenplay.lucia);
+          // 1라운드: order 기반 순서
+          const streamOrder = screenplay.order;
+          for (const key of streamOrder) {
+            await streamPersona(key, 1, screenplay[key]);
+          }
           await streamEcho(1, screenplay.echo);
 
-          // 2라운드: RAY → JACK → LUCIA → ECHO
-          await streamPersona('ray',   2, screenplay.ray2);
-          await streamPersona('jack',  2, screenplay.jack2);
-          await streamPersona('lucia', 2, screenplay.lucia2);
+          // 2라운드: order 기반 순서
+          for (const key of streamOrder) {
+            await streamPersona(key, 2, screenplay[`${key}2` as 'ray2' | 'jack2' | 'lucia2']);
+          }
           await streamEcho(2, screenplay.echo2);
 
           try {
@@ -894,7 +902,7 @@ export async function POST(req: Request) {
               jack2:  screenplay.jack2  || null,
               lucia2: screenplay.lucia2 || null,
               echo2:  screenplay.echo2  || null,
-              order:  plan.order,
+              order:  screenplay.order || plan.order,
               verdict: '관망',
               confidence: 0,
               breakdown: '재테크 일반',
