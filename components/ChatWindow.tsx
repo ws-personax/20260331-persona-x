@@ -2778,9 +2778,6 @@ export default function ChatWindow() {
                         <PersonaBubble personaKey="jack" text={jackMain} timestamp={msg.timestamp} newsItem={msg.personas.jackNews} details={msg.personas.jackDetails} />
                         <PersonaBubble personaKey="lucia" text={luciaMain} timestamp={msg.timestamp} newsItem={msg.personas.luciaNews} details={msg.personas.luciaDetails} />
                         <PersonaBubble personaKey="jack" text={jackRebuttalText} timestamp={msg.timestamp} isRebuttal />
-                        <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>
-                          ── ECHO COMMAND ──
-                        </div>
                         <EchoBubble
                           summary={msg.personas.echo}
                           details={msg.personas.echoDetails}
@@ -2860,9 +2857,6 @@ export default function ChatWindow() {
                       {order.map(renderRound1)}
                       {showEcho1 && (
                         <>
-                          <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>
-                            ── ECHO COMMAND ──
-                          </div>
                           <EchoBubble
                             key={`echo1-${hasText(msg.personas.echo) ? 'real' : 'loading'}`}
                             summary={hasText(msg.personas.echo) ? msg.personas.echo : 'ECHO가 판결 중...'}

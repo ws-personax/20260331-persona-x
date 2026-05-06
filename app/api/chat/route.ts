@@ -828,14 +828,16 @@ export async function POST(req: Request) {
         // 성공 시 RAY → JACK → LUCIA → ECHO 순서로 15자 청크 / 20ms 딜레이 진행형 스트리밍.
         // 실패(null) 시 아래 기존 4-페르소나 LLM 폴백 로직으로 진입.
         const isFinanceCategory = ['finance', 'stock', 'crypto', 'economy'].includes(category);
+        const isScreenplayCategory = isFinanceCategory ||
+          ['life', 'emotion', 'news', 'general'].includes(category);
         const screenplay = await callScreenplayOrchestrator(
           msg,
-          'finance',
+          category,
           recentContext,
           isFinanceCategory,
         );
 
-        if (screenplay) {
+        if (screenplay && isScreenplayCategory) {
           // 페르소나 round 1·2 진행형 스트리밍 — 누적 텍스트로 send (클라이언트는 replace 방식)
           const streamPersona = async (key: 'ray' | 'jack' | 'lucia', round: 1 | 2, full: string) => {
             let acc = '';
