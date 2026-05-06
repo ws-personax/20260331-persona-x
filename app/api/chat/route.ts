@@ -565,12 +565,18 @@ export async function POST(req: Request) {
       echo_target: DiscussionPersona;
       echo_angle: string;
       conflict_point: string;
+      ray_limit: string;
+      lucia_limit: string;
+      is_followup: boolean;
+      avoid_repeat: string;
     };
 
     const runOrchestrator = async (
       msg: string,
       fallbackOrder: DiscussionPersona[] = ['ray', 'jack', 'lucia'],
+      priorContext: { recentSummary?: string; priorRayResponse?: string } = {},
     ): Promise<OrchestratorPlan> => {
+      const hasPrior = !!(priorContext.recentSummary || priorContext.priorRayResponse);
       const fallback: OrchestratorPlan = {
         order: fallbackOrder,
         ray_angle: '',
@@ -579,9 +585,17 @@ export async function POST(req: Request) {
         echo_target: 'jack',
         echo_angle: '',
         conflict_point: '',
+        ray_limit: '숫자 2개만. 핵심 지표명 명시.',
+        lucia_limit: '3줄 이내. 마침표 종결.',
+        is_followup: hasPrior,
+        avoid_repeat: priorContext.priorRayResponse ? priorContext.priorRayResponse.slice(0, 120) : '',
       };
 
-      const orchestratorPrompt = `당신은 PersonaX 토론 디렉터입니다.\n유저 질문: "${msg}"\n\n아래 JSON만 출력하라. 다른 텍스트 절대 금지. 코드펜스도 금지.\n{\n  "order": ["ray","jack","lucia"],\n  "ray_angle": "RAY가 집중할 핵심 데이터 포인트 한 줄",\n  "jack_angle": "JACK이 반박할 허점 한 줄",\n  "lucia_angle": "LUCIA가 짚을 감정 포인트 한 줄",\n  "echo_target": "ray|jack|lucia 중 하나",\n  "echo_angle": "ECHO가 찌를 핵심 허점 한 줄",\n  "conflict_point": "RAY와 JACK이 직접 충돌할 핵심 쟁점 한 줄"\n}\n\norder 규칙:\n- 감정/인생 질문(명퇴·요양원·이혼·부모·죄책감·힘들·막막) → 첫 번째 lucia\n- 재테크/투자(주식·비트코인·삼성·ETF·PBR·매수·매도) → 첫 번째 ray\n- 결단/행동(해야 할까·결정·선택·지금 당장) → 첫 번째 jack\n- 시사/뉴스(전쟁·금리·환율·정치·경제뉴스) → 첫 번째 ray\n\necho_target 규칙:\n- RAY가 너무 냉정하게 숫자만 나열할 가능성 → ray\n- JACK이 근거 없이 밀어붙일 가능성 → jack\n- LUCIA가 감성으로만 흐를 가능성 → lucia\n- 셋 다 일치할 가능성 → 가장 자기 영역에서 약점이 큰 한 명`;
+      const priorBlock = hasPrior
+        ? `\n[이전 대화 요약] ${priorContext.recentSummary || ''}\n[이전 RAY 응답] ${(priorContext.priorRayResponse || '').slice(0, 200)}\n`
+        : '';
+
+      const orchestratorPrompt = `당신은 PersonaX 토론 디렉터입니다.\n유저 질문: "${msg}"${priorBlock}\n\n아래 JSON만 출력하라. 다른 텍스트 절대 금지. 코드펜스도 금지.\n{\n  "order": ["ray","jack","lucia"],\n  "ray_angle": "RAY가 집중할 핵심 데이터 포인트 한 줄",\n  "jack_angle": "JACK이 반박할 허점 한 줄",\n  "lucia_angle": "LUCIA가 짚을 감정 포인트 한 줄",\n  "echo_target": "ray|jack|lucia 중 하나",\n  "echo_angle": "ECHO가 찌를 핵심 허점 한 줄",\n  "conflict_point": "RAY와 JACK이 직접 충돌할 핵심 쟁점 한 줄",\n  "ray_limit": "숫자 2개만. 핵심 지표명 명시.",\n  "lucia_limit": "3줄 이내. 마침표 종결.",\n  "is_followup": true|false,\n  "avoid_repeat": "이전 RAY가 이미 언급한 내용 한 줄 요약 — LUCIA·JACK 반복 금지용. 이전 대화 없으면 빈 문자열."\n}\n\norder 규칙:\n- 감정/인생 질문(명퇴·요양원·이혼·부모·죄책감·힘들·막막) → 첫 번째 lucia\n- 재테크/투자(주식·비트코인·삼성·ETF·PBR·매수·매도) → 첫 번째 ray\n- 결단/행동(해야 할까·결정·선택·지금 당장) → 첫 번째 jack\n- 시사/뉴스(전쟁·금리·환율·정치·경제뉴스) → 첫 번째 ray\n\necho_target 규칙:\n- RAY가 너무 냉정하게 숫자만 나열할 가능성 → ray\n- JACK이 근거 없이 밀어붙일 가능성 → jack\n- LUCIA가 감성으로만 흐를 가능성 → lucia\n- 셋 다 일치할 가능성 → 가장 자기 영역에서 약점이 큰 한 명\n\nis_followup 규칙:\n- "[이전 대화 요약]" 또는 "[이전 RAY 응답]" 블록이 위에 존재하거나, 질문이 "그럼/그러면/그건/그래서" 등으로 시작하면 true.\n- 그렇지 않으면 false.\n\navoid_repeat 규칙:\n- is_followup=true 일 때, 이전 RAY 응답에서 핵심 키워드/수치를 한 줄 요약해 LUCIA·JACK이 반복하지 않도록 가이드.\n- is_followup=false 면 빈 문자열.`;
 
       try {
         const llm = await callTeaPersona(
@@ -605,6 +619,10 @@ export async function POST(req: Request) {
           echo_target: isPersona(parsed.echo_target) ? parsed.echo_target : fallback.echo_target,
           echo_angle: typeof parsed.echo_angle === 'string' ? parsed.echo_angle : '',
           conflict_point: typeof parsed.conflict_point === 'string' ? parsed.conflict_point : '',
+          ray_limit: typeof parsed.ray_limit === 'string' && parsed.ray_limit.trim() ? parsed.ray_limit : fallback.ray_limit,
+          lucia_limit: typeof parsed.lucia_limit === 'string' && parsed.lucia_limit.trim() ? parsed.lucia_limit : fallback.lucia_limit,
+          is_followup: typeof parsed.is_followup === 'boolean' ? parsed.is_followup : fallback.is_followup,
+          avoid_repeat: typeof parsed.avoid_repeat === 'string' ? parsed.avoid_repeat : fallback.avoid_repeat,
         };
       } catch (e) {
         console.warn('[orchestrator] 파싱 실패, 폴백 사용', e);
@@ -698,11 +716,35 @@ export async function POST(req: Request) {
         : `\n${msg}`;
 
       // 0단계: 오케스트레이터 — 토론 디렉터가 발언 순서/각도/충돌 쟁점/ECHO 지목 결정
-      const plan = await runOrchestrator(msg, ['ray', 'jack', 'lucia']);
+      // 후속 질문 감지를 위해 직전 RAY 응답 한 줄 추출해 priorContext로 전달
+      const priorRayResponse = (() => {
+        if (!Array.isArray(messages) || messages.length === 0) return '';
+        const prior = messages.slice(-8) as Array<{
+          role?: string;
+          personas?: { ray?: string };
+          teaRay?: string;
+        }>;
+        for (let i = prior.length - 1; i >= 0; i--) {
+          const m = prior[i];
+          if (m?.role !== 'assistant') continue;
+          const ray = m.personas?.ray || m.teaRay || '';
+          if (ray) return ray.replace(/\s+/g, ' ').trim().slice(0, 200);
+        }
+        return '';
+      })();
+      const plan = await runOrchestrator(msg, ['ray', 'jack', 'lucia'], {
+        recentSummary: recentContext,
+        priorRayResponse,
+      });
       const angleRay   = plan.ray_angle   ? `RAY 집중점: ${plan.ray_angle}.\n` : '';
       const angleJack  = plan.jack_angle  ? `JACK 집중점: ${plan.jack_angle}.\n` : '';
       const angleLucia = plan.lucia_angle ? `LUCIA 집중점: ${plan.lucia_angle}.\n` : '';
       const conflictPointLine = plan.conflict_point ? `핵심 충돌 쟁점: ${plan.conflict_point}.\n` : '';
+      // is_followup / avoid_repeat 주입 — 후속 질문에서 페르소나 간 중복 발화 방지
+      const followupClause = plan.is_followup ? '후속 질문이다. 이전 1라운드와 다른 각도로만 말하라.\n' : '';
+      const avoidClause = (plan.is_followup && plan.avoid_repeat) ? `RAY가 이미 "${plan.avoid_repeat}" 언급함. 동일 내용 반복 금지.\n` : '';
+      const rayLimitClause = plan.ray_limit ? ` ${plan.ray_limit}` : '';
+      const luciaLimitClause = plan.lucia_limit ? ` ${plan.lucia_limit}` : '';
 
       // 1단계: RAY/JACK/LUCIA 병렬 (페르소나별 역할 prefix)
       // 공통 원칙 — 모든 페르소나 1라운드/2라운드 전체 적용
@@ -714,9 +756,9 @@ export async function POST(req: Request) {
       const jackRound1Role  = '당신은 JACK입니다. 마동석+피터린치 스타일. 말이 짧다. 투박하다. 틀려도 자신있다. 먼저 RAY 데이터 해석의 허점을 직접 찌를 것. "RAY, ~" 형태로 시작해도 됨. 과거 사례로 RAY 반박 + 조건부 결론. 3줄 이내. 직접 매수/매도 지시 금지.';
       const luciaRound1Role = '당신은 LUCIA입니다. 손예진+오은영 스타일. 존댓말이지만 딱딱하지 않다. 살짝 언니 느낌. RAY와 JACK이 싸우는 동안 유저 감정을 짚어라. "두 분이 싸우는 동안 ~" 또는 "JACK, ~" 형태. 공감 1줄 + 근거(실제 투자자 사례/심리 연구) 1줄 + 조건부 결론 1줄. 이전 RAY나 JACK이 말한 내용을 그대로 반복하거나 요약하지 마라. 당신만의 감성적 관점으로만 말할 것. 질문 1개도 금지. 0개다. 마지막 문장은 반드시 마침표. "~하신 건가요?"·"~있으세요?"·"~인가요?"·"~건지"·"~건가요"·"~궁금" 으로 끝나는 문장 절대 금지. 첫 문장에 "아이고" 금지. "아이고"는 대화 전체에서 1회만, 감정이 폭발하는 순간에만 사용. "~잖아요"·"~거든요" 톤 유지. 3줄 이내. 절대 초과 금지.';
 
-      const rayHistory:   TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${conflictRule}\n${angleRay}${conflictPointLine}${rayRound1Role}${ctxSuffix}` }];
-      const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${conflictRule}\n${angleJack}${conflictPointLine}${jackRound1Role}${ctxSuffix}` }];
-      const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${conflictRule}\n${angleLucia}${luciaRound1Role}${ctxSuffix}` }];
+      const rayHistory:   TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${conflictRule}\n${followupClause}${angleRay}${conflictPointLine}${rayRound1Role}${rayLimitClause}${ctxSuffix}` }];
+      const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${conflictRule}\n${followupClause}${avoidClause}${angleJack}${conflictPointLine}${jackRound1Role}${ctxSuffix}` }];
+      const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${conflictRule}\n${followupClause}${avoidClause}${angleLucia}${luciaRound1Role}${luciaLimitClause}${ctxSuffix}` }];
 
       // 스트리밍 모드 — 각 페르소나 LLM 완성 시 즉시 NDJSON 청크 전송
       return streamRespond(async (send) => {
