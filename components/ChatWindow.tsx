@@ -1671,160 +1671,83 @@ const OnboardingTabs = ({
 
   return (
     <>
-        <style>{`
-          .px-intro-btn {
-            transition: transform 0.12s ease, box-shadow 0.12s ease;
-          }
-          .px-intro-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(0,0,0,0.10);
-          }
-          .px-intro-input:focus {
-            outline: none;
-            border-color: #6366f1;
-            box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
-          }
-        `}</style>
+      <style>{`
+        .px-intro-input:focus {
+          outline: none;
+          border-color: #6366f1;
+          box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+        }
+      `}</style>
 
-        <div style={{ textAlign: 'center', marginBottom: 20, padding: '0 8px', width: '100%' }}>
-          <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 4px', fontWeight: 500 }}>
-            범용 AI는 하나의 답을 말합니다.
-          </p>
-          <p style={{ fontSize: 20, fontWeight: 900, color: '#1f2937', margin: '0 0 2px', lineHeight: 1.3 }}>
-            ⚡{' '}
-            <span style={{ color: '#E85D4A' }}>지금,</span>
-            {' '}4개의 시선이 교차하며
-          </p>
-          <p style={{ fontSize: 20, fontWeight: 900, color: '#1f2937', margin: '0 0 6px', lineHeight: 1.3 }}>
-            방향이 보입니다.
-          </p>
-          <p style={{ fontSize: 13, color: '#6b7280', margin: '0', fontWeight: 500 }}>
-            당신이 결정하고, 마침내 성장합니다.
-          </p>
-        </div>
+      {/* 슬로건 한 줄 — 카드와 입력창을 자연스럽게 잇는 다리 */}
+      <p style={{ fontSize: 12.5, color: '#9ca3af', textAlign: 'center', margin: '2px 0 14px', fontWeight: 500, lineHeight: 1.5, padding: '0 8px' }}>
+        AI 대나무숲 — 말하면 4명이 충돌하고, 당신이 결정합니다
+      </p>
 
-        <div style={{
-          width: '100%',
-          maxWidth: 480,
-          background: '#ffffff',
-          border: '1px solid #e5e7eb',
-          borderRadius: 16,
-          padding: '16px 14px 14px',
-          boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-          boxSizing: 'border-box',
-        }}>
-          <p style={{ fontSize: 20, fontWeight: 900, color: '#111827', textAlign: 'center', margin: '0 0 4px', lineHeight: 1.3 }}>
-            지금 바로 경험해보세요
-          </p>
-          <p style={{ fontSize: 13, fontWeight: 500, color: '#6b7280', textAlign: 'center', margin: '0 0 12px', lineHeight: 1.4 }}>
-            아래 버튼 하나만 눌러보세요 — 범용 AI와 다릅니다
-          </p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 12 }}>
-            {[
-              { emoji: '⚡', label: '삼성전자 지금 사도 될까?', desc: '4명이 다르게 답해요', send: '삼성전자 지금 사도 될까?' },
-              { emoji: '💜', label: '요즘 너무 의욕이 없어', desc: 'LUCIA가 들어드려요', send: '요즘 너무 의욕이 없어' },
-              { emoji: '🔍', label: '요즘 결정을 못 하겠어', desc: 'ECHO가 구조를 잡아줘요', send: '요즘 결정을 못 하겠어' },
-            ].map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                className="px-intro-btn"
-                onClick={() => {
-                  setIntroInput(item.send);
-                  if (onSetInput) onSetInput(item.send);
-                }}
-                style={{
-                  width: '100%',
-                  padding: '11px 14px',
-                  background: '#f9fafb',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 10,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  boxSizing: 'border-box',
-                }}
-              >
-                <span style={{ fontSize: 18 }}>{item.emoji}</span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{item.label}</span>
-                  <span style={{ fontSize: 11, fontWeight: 500, color: '#9ca3af' }}>{item.desc}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
-            <span style={{ fontSize: 11.5, color: '#9ca3af' }}>또는 직접 입력</span>
-            <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
-          </div>
-
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              className="px-intro-input"
-              type="text"
-              value={introInput}
-              onChange={e => setIntroInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') classifyAndEnter(introInput); }}
-              placeholder="무엇이든 물어보세요"
-              style={{
-                flex: 1,
-                padding: '10px 14px',
-                fontSize: 14,
-                border: '1px solid #d1d5db',
-                borderRadius: 10,
-                background: '#ffffff',
-                color: '#111827',
-                boxSizing: 'border-box',
-              }}
-            />
-            {sttSupported && onStartRecording && (
-              <button
-                type="button"
-                onClick={onStartRecording}
-                style={{
-                  padding: '10px 12px',
-                  background: '#f3f4f6',
-                  border: '1px solid #d1d5db',
-                  borderRadius: 10,
-                  cursor: 'pointer',
-                  fontSize: 18,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                🎤
-              </button>
-            )}
+      {/* 입력창 */}
+      <div style={{ width: '100%', maxWidth: 480, boxSizing: 'border-box' }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            className="px-intro-input"
+            type="text"
+            value={introInput}
+            onChange={e => setIntroInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') classifyAndEnter(introInput); }}
+            placeholder="무엇이든 물어보세요"
+            style={{
+              flex: 1,
+              padding: '11px 14px',
+              fontSize: 14,
+              border: '1px solid #d1d5db',
+              borderRadius: 10,
+              background: '#ffffff',
+              color: '#111827',
+              boxSizing: 'border-box',
+            }}
+          />
+          {sttSupported && onStartRecording && (
             <button
               type="button"
-              onClick={() => classifyAndEnter(introInput)}
+              onClick={onStartRecording}
               style={{
-                padding: '10px 16px',
-                background: '#FAE100',
-                border: 'none',
+                padding: '10px 12px',
+                background: '#f3f4f6',
+                border: '1px solid #d1d5db',
                 borderRadius: 10,
                 cursor: 'pointer',
-                fontSize: 13,
-                fontWeight: 700,
-                color: '#111827',
-                whiteSpace: 'nowrap',
+                fontSize: 18,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
-              시작
+              🎤
             </button>
-          </div>
-          <p style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center', margin: '10px 0 0', lineHeight: 1.4 }}>
-            투자 권유·불법·욕설은 답변이 제한될 수 있어요
-          </p>
+          )}
+          <button
+            type="button"
+            onClick={() => classifyAndEnter(introInput)}
+            style={{
+              padding: '10px 18px',
+              background: '#FAE100',
+              border: 'none',
+              borderRadius: 10,
+              cursor: 'pointer',
+              fontSize: 13,
+              fontWeight: 700,
+              color: '#111827',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            시작
+          </button>
         </div>
-      </>
-    );
+        <p style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center', margin: '10px 0 0', lineHeight: 1.4 }}>
+          투자 권유·불법·욕설은 답변이 제한될 수 있어요
+        </p>
+      </div>
+    </>
+  );
 };
 
 export default function ChatWindow() {
@@ -2656,27 +2579,6 @@ export default function ChatWindow() {
               );
             })}
 
-            <button
-              type="button"
-              onClick={() => {
-                setInput('삼성전자 지금 사도 될까?');
-              }}
-              style={{
-                marginTop: 8,
-                width: '100%',
-                padding: '9px 12px',
-                background: '#FAE100',
-                border: 'none',
-                borderRadius: 10,
-                fontSize: 13,
-                fontWeight: 800,
-                color: '#1f2937',
-                cursor: 'pointer',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-              }}
-            >
-              나도 물어보기 →
-            </button>
           </div>
 
           <OnboardingTabs
