@@ -2145,6 +2145,7 @@ export default function ChatWindow() {
     messagesRef.current = nextMessages;
     setMessages(nextMessages);
     setIsLoading(true);
+    setPendingOrder(null); // 새 요청마다 초기화
     if (isAdvanced) setIsAdvancedLoading(true);
     setInput('');
 
@@ -2226,6 +2227,9 @@ export default function ChatWindow() {
               return { ...m, personas: p };
             }
             if (event.type === 'done' && event.personas) {
+              if (event.personas.order && event.personas.order.length > 0) {
+                setPendingOrder(event.personas.order);
+              }
               return { ...m, content: event.reply || '', personas: event.personas };
             }
             return m;
@@ -2316,6 +2320,7 @@ export default function ChatWindow() {
       setMessages(updated);
     } finally {
       setIsLoading(false);
+      setPendingOrder(null);
       setIsAdvancedLoading(false);
     }
   }, [teaPersona]);
