@@ -1645,6 +1645,18 @@ const IntroSlider = () => {
       }}>
         {'본 서비스는 투자 참고용이며, 투자 판단과 책임은 투자자 본인에게 있습니다.\n차 한잔 탭은 심리상담을 대체하지 않습니다.'}
       </p>
+      <p style={{
+        marginTop: 4,
+        marginBottom: 0,
+        textAlign: 'center',
+        fontSize: 9.5,
+        lineHeight: 1.5,
+        color: '#9ca3af',
+      }}>
+        <Link href="/terms" style={{ color: '#6b7280', textDecoration: 'underline' }}>이용약관</Link>
+        <span style={{ margin: '0 6px', color: '#d1d5db' }}>·</span>
+        <Link href="/privacy" style={{ color: '#6b7280', textDecoration: 'underline' }}>개인정보처리방침</Link>
+      </p>
     </div>
   );
 };
