@@ -596,9 +596,16 @@ export async function POST(req: Request) {
         : `\n${msg}`;
 
       // 1단계: RAY/JACK/LUCIA 병렬 (페르소나별 역할 prefix)
-      const rayHistory:   TeaMsg[] = [{ role: 'user', content: `${financePrefix}[역할: 질문에 직접 답해라. 핵심 숫자 2개만. 절대 3줄 초과 금지. 목록 금지.]${ctxSuffix}` }];
-      const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${financePrefix}[역할: 질문에 직접 답해라. 결단 중심. RAY 반박 가능. 3줄 이내.]${ctxSuffix}` }];
-      const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${financePrefix}[역할: 질문에 직접 답해라. 감정·인간적 시각으로. 다른 페르소나 넘김 금지. 다른 페르소나의 말을 대신 말하거나 흉내 내지 마라. "아이고"는 한 대화에서 1회만 사용. "~잖아요"·"~거든요" 톤 유지. 3줄 이내.]${ctxSuffix}` }];
+      // 공통 원칙 — 모든 페르소나 1라운드/2라운드 전체 적용
+      const investmentRule = '공통 원칙: 직접 매수/매도 지시 절대 금지. "사세요" "파세요" "지금 당장 하세요" 표현 금지. 대신 조건부 판단 표현만 사용 — "~라면 고려해볼 수 있어요" / "~인 경우에는 ~도 방법이에요" / "~조건이면 ~구간이에요". 투자 판단과 책임은 본인에게 있음을 전제로 말할 것.';
+
+      const rayRound1Role   = '역할: 숫자 2개 + 그 숫자가 말하는 결론 1줄. 숫자만 나열하고 결론 없는 답변 금지. 직접 매수/매도 지시 금지. 조건부 판단만. 절대 3줄 초과 금지. 목록 금지.';
+      const jackRound1Role  = '역할: 사야 하는지 말아야 하는지 조건부로 명확히 답하라. 근거(과거 사례/시장 원리) 1줄 + 조건부 결론 1줄. "사세요" "팔아요" 직접 지시 금지. 예시: "3년 이상 보유 가능하다면 지금 구간 나쁘지 않아요. HBM 경쟁 구도가 아직 불확실하기 때문이에요." 3줄 이내.';
+      const luciaRound1Role = '역할: 유저 질문에 반드시 직접 답하라. 질문만 던지고 끝내는 것은 금지. 구조: 공감 1줄 + 근거(실제 사례/심리 연구) 1줄 + 조건부 결론 1줄. 예시: "2022년 하락장에서 분할 매수한 분들이 결국 수익 냈어요. 여유 자금이고 3년 이상 보유 가능하다면 소액 시작도 방법이에요." "사세요" 직접 지시 금지. 반드시 마침표로 끝낼 것. 다른 페르소나 넘김 금지. 다른 페르소나의 말을 대신 말하거나 흉내 내지 마라. "아이고"는 한 대화에서 1회만 사용. "~잖아요"·"~거든요" 톤 유지. 3줄 이내.';
+
+      const rayHistory:   TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${rayRound1Role}${ctxSuffix}` }];
+      const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${jackRound1Role}${ctxSuffix}` }];
+      const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${luciaRound1Role}${ctxSuffix}` }];
 
       const [rayLLM, jackLLM, luciaLLM] = await Promise.all([
         callTeaPersona('ray',   TEA_SYSTEM_RAY,   rayHistory, { enableSearch: true }),
@@ -670,7 +677,7 @@ export async function POST(req: Request) {
           role = supportRole;
         }
 
-        return `지시: ${focus} ${role}\n${evidencePrinciple}\n출력 규칙: 대괄호 [...] 메타 태그를 출력에 포함하지 말 것. "RAY:" "JACK:" "LUCIA:" "ECHO:" 같은 페르소나 라벨로 줄을 시작하지 말 것. 호칭에 "님" 붙이지 말 것.`;
+        return `지시: ${focus} ${role}\n${evidencePrinciple}\n${investmentRule}\n출력 규칙: 대괄호 [...] 메타 태그를 출력에 포함하지 말 것. "RAY:" "JACK:" "LUCIA:" "ECHO:" 같은 페르소나 라벨로 줄을 시작하지 말 것. 호칭에 "님" 붙이지 말 것.`;
       };
 
       const ray2History:   TeaMsg[] = [{ role: 'user', content: `${round2Context}${buildRound2('RAY')}` }];
