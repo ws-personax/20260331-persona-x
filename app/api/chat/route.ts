@@ -515,6 +515,44 @@ export async function POST(req: Request) {
     // 2라운드 페르소나 응답에서 다른 페르소나 발화 누출 방어 — 첫 빈 줄 이전 문단만 사용
     const firstParagraph = (t: string): string => (t || '').split(/\n\s*\n/)[0].trim();
 
+    // ✅ 페르소나별 순차 스트리밍 — 각 LLM 호출 완성 시점에 NDJSON 청크 1개씩 클라이언트로 전송
+    type StreamEvent =
+      | { type: 'persona'; key: 'ray' | 'jack' | 'lucia'; round: 1 | 2; text: string }
+      | { type: 'echo'; round: 1 | 2; text: string }
+      | { type: 'done'; personas: Record<string, unknown>; reply: string };
+
+    const streamRespond = (
+      build: (send: (event: StreamEvent) => void) => Promise<void>,
+    ): Response => {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          const send = (event: StreamEvent) => {
+            try {
+              controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'));
+            } catch (e) {
+              console.warn('[stream] enqueue 실패', e);
+            }
+          };
+          try {
+            await build(send);
+          } catch (e) {
+            console.error('[stream] build 실패', e);
+            send({ type: 'done', personas: {}, reply: '' });
+          } finally {
+            try { controller.close(); } catch {}
+          }
+        },
+      });
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'application/x-ndjson; charset=utf-8',
+          'Cache-Control': 'no-cache, no-transform',
+          'X-Accel-Buffering': 'no',
+        },
+      });
+    };
+
     // ✅ 오케스트레이터 — multi-persona 분기 진입 전 토론 디렉터 LLM이 흐름을 결정
     //    질문 유형에 따라 페르소나 발언 순서/각도/충돌 쟁점/ECHO 지목 대상을 미리 지시한다.
     //    JSON 파싱 실패·LLM 실패 시 안전 기본값으로 폴백하므로 실패가 응답을 망가뜨리지 않는다.
@@ -680,135 +718,162 @@ export async function POST(req: Request) {
       const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${conflictRule}\n${angleJack}${conflictPointLine}${jackRound1Role}${ctxSuffix}` }];
       const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${financePrefix}${investmentRule}\n${conflictRule}\n${angleLucia}${luciaRound1Role}${ctxSuffix}` }];
 
-      const [rayLLM, jackLLM, luciaLLM] = await Promise.all([
-        callTeaPersona('ray',   TEA_SYSTEM_RAY,   rayHistory, { enableSearch: true }),
-        callTeaPersona('jack',  TEA_SYSTEM_JACK,  jackHistory),
-        callTeaPersona('lucia', TEA_SYSTEM_LUCIA, luciaHistory),
-      ]);
-
-      const rayText   = cleanText(rayLLM)   || '지금 시장 데이터를 보면 — 좀 더 구체적인 상황을 말씀해주시면 수치로 정리해드릴게요.';
-      const jackText  = cleanText(jackLLM)  || '핵심 지표가 정리되면 다시 짚어드리겠습니다.';
-      const luciaText = cleanText(luciaLLM) || '결정 전에 마음의 무게부터 같이 짚어볼까요?';
-
-      // 2단계: ECHO 취합 + 씨앗 질문 (마지막 줄은 반드시 페르소나에게 던지는 질문)
-      const echoTargetClause = (plan.echo_target && plan.echo_angle)
-        ? `이번엔 ${plan.echo_target.toUpperCase()}을 직접 지목해서 "${plan.echo_angle}" 이 부분을 찔러라.\n`
-        : '';
-      const echoConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n${echoTargetClause}당신은 ECHO입니다. 손석희+워렌버핏 스타일. 감정을 철저히 통제한다. 말이 적지만 한 마디가 무겁다. RAY/JACK/LUCIA 중 가장 허점 있는 한 명을 직접 지목해서 그 사람 주장의 가장 약한 부분을 찌르는 날카로운 질문 하나로 끝내라. 시작 방식은 매번 다르게. "......" 침묵 후 한 방도 가능. 부드러운 질문 금지. 불편하게 만들어야 2라운드가 산다. "결정은 당신이"·"선택은 당신 몫" 책임 회피 표현 절대 금지. 5줄 이내. 목록 금지. 마지막 줄은 반드시 물음표로 끝나는 질문.`;
-      const echoLLM = await callTeaPersona(
-        'echo',
-        TEA_SYSTEM_ECHO,
-        [{ role: 'user', content: echoConsolidationPrompt }],
-      );
-      const echoText = cleanText(echoLLM) || '원칙이 흔들릴 땐 한 박자 쉬어가는 것도 방법이에요.';
-
-      // 3단계: 2라운드 RAY/JACK/LUCIA 병렬 (ECHO 직접 질문에만 응답)
-      // ECHO가 지목한 페르소나는 핵심 답변자, 나머지는 1줄 보조 역할.
-      const targetedPersona = detectTargetedPersona(echoText);
-      const round2Context = `${financePrefix}사용자 질문: ${msg}\n\n1라운드 RAY: ${rayText}\n1라운드 JACK: ${jackText}\n1라운드 LUCIA: ${luciaText}\n1라운드 ECHO: ${echoText}\n\n`;
-
-      const buildRound2 = (persona: 'RAY' | 'JACK' | 'LUCIA'): string => {
-        // 지목 페르소나는 3줄 이내 정면 답변. 비지목 페르소나는 페르소나별 1줄 보조.
-        const targetedRole =
-          persona === 'RAY'
-            ? '반드시 숫자/데이터로 시작해 3줄 이내로 ECHO 질문에 정면 답하라.'
-            : persona === 'JACK'
-            ? '짧고 투박하게 "~요"로 끝내며 3줄 이내로 ECHO 질문에 정면 답하라.'
-            : '"~잖아요"·"~거든요" 톤으로 3줄 이내로 ECHO 질문에 정면 답하라. "아이고" 사용 금지. 마지막 문장을 질문으로 끝내지 마라. "~궁금해요"·"~어떤가요"·"~있으세요" 종결 금지. 반드시 마침표로 끝나는 문장으로 마무리.';
-
-        const supportRole =
-          persona === 'RAY'
-            ? '1줄. 숫자 한 가지만. 새 데이터 나열 금지.'
-            : persona === 'JACK'
-            ? '1줄. 한 마디만. 길게 늘어놓지 말 것.'
-            : '지금 토론 맥락에서 유저 감정을 1줄로 짚되, 유저가 아닌 토론 참여자로서 말할 것. 예: "그 불안이 결정을 흐리게 하는 거잖아요." "답답하시죠"·"불안하시죠" 같은 공감만으로 끝내지 마라. 반드시 심리 연구 또는 실제 투자자 사례를 근거로 들 것. 마지막 문장을 질문으로 끝내지 마라. "~궁금해요"·"~어떤가요"·"~있으세요" 종결 금지. 반드시 마침표로 끝나는 문장으로 마무리.';
-
-        const fallbackRole =
-          persona === 'RAY'
-            ? '반드시 숫자/데이터로 시작해 2줄 이내 답하라.'
-            : persona === 'JACK'
-            ? '짧고 투박하게 "~요"로 끝내라. 2줄 이내.'
-            : '"~잖아요"·"~거든요" 톤으로 2줄 이내. "아이고" 사용 금지.';
-
-        // 페르소나별 근거 출처 — 지목/비지목 무관하게 공통 적용
-        const evidenceSource =
-          persona === 'RAY'
-            ? '숫자/데이터 1개가 근거. 그 수치가 의미하는 것 한 줄이 주장.'
-            : persona === 'JACK'
-            ? '과거 사례 또는 시장 원리가 근거. 그 근거에서 나오는 결론 한 줄.'
-            : '심리 연구 또는 실제 투자자 사례가 근거. 그 근거에서 나오는 감정적 통찰 한 줄. "답답하시죠"·"불안하시죠" 공감만으로 끝내지 마라.';
-
-        const evidencePrinciple = `근거 원칙: 근거 없는 주장 절대 금지. 반드시 근거 한 줄 + 주장 한 줄 구조로 답하라. 근거는 숫자/사례/경험/데이터 중 하나. 근거 없이 감정이나 결론만 말하는 것은 답변이 아니다. ${evidenceSource}`;
-
-        let focus: string;
-        let role: string;
-        if (!targetedPersona) {
-          focus = 'ECHO가 방금 던진 질문에 답하라.';
-          role = fallbackRole;
-        } else if (targetedPersona === persona) {
-          focus = `ECHO가 지목한 페르소나: ${persona}. 너(${persona})가 ECHO 질문의 직접 대상이다. 핵심 답변자로 정면 응답.`;
-          role = targetedRole;
-        } else {
-          focus = `ECHO가 지목한 페르소나: ${targetedPersona}. 너는 보조 역할이다.`;
-          role = supportRole;
-        }
-
-        return `지시: ${focus} ${role}\n${evidencePrinciple}\n${investmentRule}\n출력 규칙: 대괄호 [...] 메타 태그를 출력에 포함하지 말 것. "RAY:" "JACK:" "LUCIA:" "ECHO:" 같은 페르소나 라벨로 줄을 시작하지 말 것. 호칭에 "님" 붙이지 말 것.`;
-      };
-
-      const ray2History:   TeaMsg[] = [{ role: 'user', content: `${round2Context}${buildRound2('RAY')}` }];
-      const jack2History:  TeaMsg[] = [{ role: 'user', content: `${round2Context}${buildRound2('JACK')}` }];
-      const lucia2History: TeaMsg[] = [{ role: 'user', content: `${round2Context}${buildRound2('LUCIA')}` }];
-
-      const [ray2LLM, jack2LLM, lucia2LLM] = await Promise.all([
-        callTeaPersona('ray',   TEA_SYSTEM_RAY,   ray2History, { enableSearch: true }),
-        callTeaPersona('jack',  TEA_SYSTEM_JACK,  jack2History),
-        callTeaPersona('lucia', TEA_SYSTEM_LUCIA, lucia2History),
-      ]);
-
-      // 2라운드 모든 페르소나 응답은 첫 문단(첫 빈 줄 이전)만 사용 — 다른 페르소나 발화 누출 방지
-      const rayText2   = firstParagraph(cleanText(ray2LLM));
-      const jackText2  = firstParagraph(cleanText(jack2LLM));
-      const luciaText2 = firstParagraph(cleanText(lucia2LLM));
-
-      // 4단계: ECHO 최후 판결 — 씨앗 질문 금지, 명확한 판결 + 선언형 결론
-      const echo2ConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n1라운드 RAY: ${rayText}\n1라운드 JACK: ${jackText}\n1라운드 LUCIA: ${luciaText}\n1라운드 ECHO: ${echoText}\n\n2라운드 RAY: ${rayText2}\n2라운드 JACK: ${jackText2}\n2라운드 LUCIA: ${luciaText2}\n\n최후 판결이다. 씨앗 질문 금지. RAY/JACK/LUCIA 중 누가 맞는지 명확히 판결하라. 마지막 문장은 반드시 아래 형식 중 하나로 마무리하고 마침표로 끝낼 것:\n(1) "단기(N년 이내)면 JACK, 장기면 LUCIA+RAY 말이 맞습니다."\n(2) "[조건]이라면 지금 구간은 [위험/기회]입니다."\n(3) "[핵심 변수]가 해결되지 않으면 [결론]입니다."\n조건만 말하고 판결 없이 끝내는 것 금지. "지금 이 싸움이 답을 보여줬습니다" 같은 결론 없는 문장으로 끝내지 마라. "~정하세요" "~하세요" 지시형 금지. 물음표 절대 금지. 요약·정리·나열 금지. 절대 3줄 초과 금지. "결정은 당신이 하십시오"·"선택은 당신 몫"·"판단은 본인이" 등 책임 회피 표현 절대 금지.`;
-      const echo2LLM = await callTeaPersona(
-        'echo',
-        TEA_SYSTEM_ECHO,
-        [{ role: 'user', content: echo2ConsolidationPrompt }],
-      );
-      const echoText2 = cleanText(echo2LLM);
-
-      try {
-        const supabase = getSupabase();
-        if (supabase) {
-          await supabase.from('tea_logs').insert({
-            persona: 'ray',
-            turn_count: 1,
-            first_message: msg.slice(0, 100),
-            user_id: null,
+      // 스트리밍 모드 — 각 페르소나 LLM 완성 시 즉시 NDJSON 청크 전송
+      return streamRespond(async (send) => {
+        // 1단계 병렬 — 각자 완성하는 즉시 send로 클라이언트에 전달
+        const rayPromise = callTeaPersona('ray', TEA_SYSTEM_RAY, rayHistory, { enableSearch: true })
+          .then(r => {
+            const text = cleanText(r) || '지금 시장 데이터를 보면 — 좀 더 구체적인 상황을 말씀해주시면 수치로 정리해드릴게요.';
+            send({ type: 'persona', key: 'ray', round: 1, text });
+            return text;
           });
-        }
-      } catch (e) {
-        console.warn('[tea:finance] 로그 저장 실패 (무시)', e);
-      }
+        const jackPromise = callTeaPersona('jack', TEA_SYSTEM_JACK, jackHistory)
+          .then(r => {
+            const text = cleanText(r) || '핵심 지표가 정리되면 다시 짚어드리겠습니다.';
+            send({ type: 'persona', key: 'jack', round: 1, text });
+            return text;
+          });
+        const luciaPromise = callTeaPersona('lucia', TEA_SYSTEM_LUCIA, luciaHistory)
+          .then(r => {
+            const text = cleanText(r) || '결정 전에 마음의 무게부터 같이 짚어볼까요?';
+            send({ type: 'persona', key: 'lucia', round: 1, text });
+            return text;
+          });
+        const [rayText, jackText, luciaText] = await Promise.all([rayPromise, jackPromise, luciaPromise]);
 
-      return respond({
-        reply: [rayText, jackText, luciaText, echoText, rayText2, jackText2, luciaText2, echoText2].filter(Boolean).join('\n\n'),
-        personas: {
-          jack: jackText, lucia: luciaText, ray: rayText, echo: echoText,
-          ray2:   rayText2   || null,
-          jack2:  jackText2  || null,
-          lucia2: luciaText2 || null,
-          echo2:  echoText2  || null,
-          order:  plan.order,
-          verdict: '관망' as Verdict,
-          confidence: 0,
-          breakdown: '재테크 일반',
-          positionSizing: '0%',
-          jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
-        },
+        // 2단계: ECHO 취합 + 씨앗 질문 (마지막 줄은 반드시 페르소나에게 던지는 질문)
+        const echoTargetClause = (plan.echo_target && plan.echo_angle)
+          ? `이번엔 ${plan.echo_target.toUpperCase()}을 직접 지목해서 "${plan.echo_angle}" 이 부분을 찔러라.\n`
+          : '';
+        const echoConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n${echoTargetClause}당신은 ECHO입니다. 손석희+워렌버핏 스타일. 감정을 철저히 통제한다. 말이 적지만 한 마디가 무겁다. RAY/JACK/LUCIA 중 가장 허점 있는 한 명을 직접 지목해서 그 사람 주장의 가장 약한 부분을 찌르는 날카로운 질문 하나로 끝내라. 시작 방식은 매번 다르게. "......" 침묵 후 한 방도 가능. 부드러운 질문 금지. 불편하게 만들어야 2라운드가 산다. "결정은 당신이"·"선택은 당신 몫" 책임 회피 표현 절대 금지. 5줄 이내. 목록 금지. 마지막 줄은 반드시 물음표로 끝나는 질문.`;
+        const echoLLM = await callTeaPersona(
+          'echo',
+          TEA_SYSTEM_ECHO,
+          [{ role: 'user', content: echoConsolidationPrompt }],
+        );
+        const echoText = cleanText(echoLLM) || '원칙이 흔들릴 땐 한 박자 쉬어가는 것도 방법이에요.';
+        send({ type: 'echo', round: 1, text: echoText });
+
+        // 3단계: 2라운드 RAY/JACK/LUCIA 병렬 (ECHO 직접 질문에만 응답)
+        // ECHO가 지목한 페르소나는 핵심 답변자, 나머지는 1줄 보조 역할.
+        const targetedPersona = detectTargetedPersona(echoText);
+        const round2Context = `${financePrefix}사용자 질문: ${msg}\n\n1라운드 RAY: ${rayText}\n1라운드 JACK: ${jackText}\n1라운드 LUCIA: ${luciaText}\n1라운드 ECHO: ${echoText}\n\n`;
+
+        const buildRound2 = (persona: 'RAY' | 'JACK' | 'LUCIA'): string => {
+          // 지목 페르소나는 3줄 이내 정면 답변. 비지목 페르소나는 페르소나별 1줄 보조.
+          const targetedRole =
+            persona === 'RAY'
+              ? '반드시 숫자/데이터로 시작해 3줄 이내로 ECHO 질문에 정면 답하라.'
+              : persona === 'JACK'
+              ? '짧고 투박하게 "~요"로 끝내며 3줄 이내로 ECHO 질문에 정면 답하라.'
+              : '"~잖아요"·"~거든요" 톤으로 3줄 이내로 ECHO 질문에 정면 답하라. "아이고" 사용 금지. 마지막 문장을 질문으로 끝내지 마라. "~궁금해요"·"~어떤가요"·"~있으세요" 종결 금지. 반드시 마침표로 끝나는 문장으로 마무리.';
+
+          const supportRole =
+            persona === 'RAY'
+              ? '1줄. 숫자 한 가지만. 새 데이터 나열 금지.'
+              : persona === 'JACK'
+              ? '1줄. 한 마디만. 길게 늘어놓지 말 것.'
+              : '지금 토론 맥락에서 유저 감정을 1줄로 짚되, 유저가 아닌 토론 참여자로서 말할 것. 예: "그 불안이 결정을 흐리게 하는 거잖아요." "답답하시죠"·"불안하시죠" 같은 공감만으로 끝내지 마라. 반드시 심리 연구 또는 실제 투자자 사례를 근거로 들 것. 마지막 문장을 질문으로 끝내지 마라. "~궁금해요"·"~어떤가요"·"~있으세요" 종결 금지. 반드시 마침표로 끝나는 문장으로 마무리.';
+
+          const fallbackRole =
+            persona === 'RAY'
+              ? '반드시 숫자/데이터로 시작해 2줄 이내 답하라.'
+              : persona === 'JACK'
+              ? '짧고 투박하게 "~요"로 끝내라. 2줄 이내.'
+              : '"~잖아요"·"~거든요" 톤으로 2줄 이내. "아이고" 사용 금지.';
+
+          // 페르소나별 근거 출처 — 지목/비지목 무관하게 공통 적용
+          const evidenceSource =
+            persona === 'RAY'
+              ? '숫자/데이터 1개가 근거. 그 수치가 의미하는 것 한 줄이 주장.'
+              : persona === 'JACK'
+              ? '과거 사례 또는 시장 원리가 근거. 그 근거에서 나오는 결론 한 줄.'
+              : '심리 연구 또는 실제 투자자 사례가 근거. 그 근거에서 나오는 감정적 통찰 한 줄. "답답하시죠"·"불안하시죠" 공감만으로 끝내지 마라.';
+
+          const evidencePrinciple = `근거 원칙: 근거 없는 주장 절대 금지. 반드시 근거 한 줄 + 주장 한 줄 구조로 답하라. 근거는 숫자/사례/경험/데이터 중 하나. 근거 없이 감정이나 결론만 말하는 것은 답변이 아니다. ${evidenceSource}`;
+
+          let focus: string;
+          let role: string;
+          if (!targetedPersona) {
+            focus = 'ECHO가 방금 던진 질문에 답하라.';
+            role = fallbackRole;
+          } else if (targetedPersona === persona) {
+            focus = `ECHO가 지목한 페르소나: ${persona}. 너(${persona})가 ECHO 질문의 직접 대상이다. 핵심 답변자로 정면 응답.`;
+            role = targetedRole;
+          } else {
+            focus = `ECHO가 지목한 페르소나: ${targetedPersona}. 너는 보조 역할이다.`;
+            role = supportRole;
+          }
+
+          return `지시: ${focus} ${role}\n${evidencePrinciple}\n${investmentRule}\n출력 규칙: 대괄호 [...] 메타 태그를 출력에 포함하지 말 것. "RAY:" "JACK:" "LUCIA:" "ECHO:" 같은 페르소나 라벨로 줄을 시작하지 말 것. 호칭에 "님" 붙이지 말 것.`;
+        };
+
+        const ray2History:   TeaMsg[] = [{ role: 'user', content: `${round2Context}${buildRound2('RAY')}` }];
+        const jack2History:  TeaMsg[] = [{ role: 'user', content: `${round2Context}${buildRound2('JACK')}` }];
+        const lucia2History: TeaMsg[] = [{ role: 'user', content: `${round2Context}${buildRound2('LUCIA')}` }];
+
+        // 2라운드 병렬 — 각자 완성 시 즉시 send
+        const ray2Promise = callTeaPersona('ray', TEA_SYSTEM_RAY, ray2History, { enableSearch: true })
+          .then(r => {
+            const text = firstParagraph(cleanText(r));
+            send({ type: 'persona', key: 'ray', round: 2, text });
+            return text;
+          });
+        const jack2Promise = callTeaPersona('jack', TEA_SYSTEM_JACK, jack2History)
+          .then(r => {
+            const text = firstParagraph(cleanText(r));
+            send({ type: 'persona', key: 'jack', round: 2, text });
+            return text;
+          });
+        const lucia2Promise = callTeaPersona('lucia', TEA_SYSTEM_LUCIA, lucia2History)
+          .then(r => {
+            const text = firstParagraph(cleanText(r));
+            send({ type: 'persona', key: 'lucia', round: 2, text });
+            return text;
+          });
+        const [rayText2, jackText2, luciaText2] = await Promise.all([ray2Promise, jack2Promise, lucia2Promise]);
+
+        // 4단계: ECHO 최후 판결 — 씨앗 질문 금지, 명확한 판결 + 선언형 결론
+        const echo2ConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n1라운드 RAY: ${rayText}\n1라운드 JACK: ${jackText}\n1라운드 LUCIA: ${luciaText}\n1라운드 ECHO: ${echoText}\n\n2라운드 RAY: ${rayText2}\n2라운드 JACK: ${jackText2}\n2라운드 LUCIA: ${luciaText2}\n\n최후 판결이다. 씨앗 질문 금지. RAY/JACK/LUCIA 중 누가 맞는지 명확히 판결하라. 마지막 문장은 반드시 아래 형식 중 하나로 마무리하고 마침표로 끝낼 것:\n(1) "단기(N년 이내)면 JACK, 장기면 LUCIA+RAY 말이 맞습니다."\n(2) "[조건]이라면 지금 구간은 [위험/기회]입니다."\n(3) "[핵심 변수]가 해결되지 않으면 [결론]입니다."\n조건만 말하고 판결 없이 끝내는 것 금지. "지금 이 싸움이 답을 보여줬습니다" 같은 결론 없는 문장으로 끝내지 마라. "~정하세요" "~하세요" 지시형 금지. 물음표 절대 금지. 요약·정리·나열 금지. 절대 3줄 초과 금지. "결정은 당신이 하십시오"·"선택은 당신 몫"·"판단은 본인이" 등 책임 회피 표현 절대 금지.`;
+        const echo2LLM = await callTeaPersona(
+          'echo',
+          TEA_SYSTEM_ECHO,
+          [{ role: 'user', content: echo2ConsolidationPrompt }],
+        );
+        const echoText2 = cleanText(echo2LLM);
+        send({ type: 'echo', round: 2, text: echoText2 });
+
+        try {
+          const supabase = getSupabase();
+          if (supabase) {
+            await supabase.from('tea_logs').insert({
+              persona: 'ray',
+              turn_count: 1,
+              first_message: msg.slice(0, 100),
+              user_id: null,
+            });
+          }
+        } catch (e) {
+          console.warn('[tea:finance] 로그 저장 실패 (무시)', e);
+        }
+
+        send({
+          type: 'done',
+          reply: [rayText, jackText, luciaText, echoText, rayText2, jackText2, luciaText2, echoText2].filter(Boolean).join('\n\n'),
+          personas: {
+            jack: jackText, lucia: luciaText, ray: rayText, echo: echoText,
+            ray2:   rayText2   || null,
+            jack2:  jackText2  || null,
+            lucia2: luciaText2 || null,
+            echo2:  echoText2  || null,
+            order:  plan.order,
+            verdict: '관망',
+            confidence: 0,
+            breakdown: '재테크 일반',
+            positionSizing: '0%',
+            jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
+          },
+        });
       });
     };
 

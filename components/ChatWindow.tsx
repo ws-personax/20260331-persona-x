@@ -2276,6 +2276,84 @@ export default function ChatWindow() {
         body: JSON.stringify(requestBody),
       });
 
+      // ✅ NDJSON 스트리밍 응답 처리 — 각 페르소나 완성 시점에 청크 단위로 버블 갱신
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/x-ndjson') && response.body) {
+        const assistantId = generateId();
+        const initialPersonas: PersonaData = {
+          jack: '', lucia: '', ray: '', echo: '',
+          ray2: null, jack2: null, lucia2: null, echo2: null,
+          verdict: '관망', confidence: 0, breakdown: '', positionSizing: '0%',
+          jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
+          order: ['ray', 'jack', 'lucia'],
+        };
+        const initialMsg: Message = {
+          id: assistantId,
+          role: 'assistant',
+          timestamp: new Date(),
+          content: '',
+          personas: initialPersonas,
+          retryText: text,
+        };
+        const startedMessages = [...nextMessages, initialMsg];
+        messagesRef.current = startedMessages;
+        setMessages(startedMessages);
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        const applyEvent = (event: { type?: string; key?: string; round?: number; text?: string; personas?: PersonaData; reply?: string }) => {
+          setMessages(prev => prev.map(m => {
+            if (m.id !== assistantId || !m.personas) return m;
+            const p = { ...m.personas } as PersonaData & Record<string, unknown>;
+            if (event.type === 'persona' && event.key && event.round) {
+              const fieldKey = event.round === 2 ? `${event.key}2` : event.key;
+              p[fieldKey] = event.text ?? '';
+              // 1라운드 ECHO 도착 후 round 2 placeholder 비우기는 echo 이벤트에서 처리
+              return { ...m, personas: p };
+            }
+            if (event.type === 'echo' && event.round) {
+              const fieldKey = event.round === 2 ? 'echo2' : 'echo';
+              p[fieldKey] = event.text ?? '';
+              if (event.round === 1) {
+                // ECHO 1 도착 → round 2 placeholder 시작 (null → '')
+                if (p.ray2 === null) p.ray2 = '';
+                if (p.jack2 === null) p.jack2 = '';
+                if (p.lucia2 === null) p.lucia2 = '';
+              }
+              return { ...m, personas: p };
+            }
+            if (event.type === 'done' && event.personas) {
+              return { ...m, content: event.reply || '', personas: event.personas };
+            }
+            return m;
+          }));
+        };
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            try {
+              applyEvent(JSON.parse(trimmed));
+            } catch (e) {
+              console.warn('[stream] parse 실패', e, trimmed);
+            }
+          }
+        }
+        // flush any tail
+        if (buffer.trim()) {
+          try { applyEvent(JSON.parse(buffer.trim())); } catch {}
+        }
+        return;
+      }
+
       const data = await response.json();
 
       if (isTeaSend) {
@@ -2738,35 +2816,62 @@ export default function ChatWindow() {
                       ? msg.personas.order
                       : validKeys;
 
+                  // 스트리밍 로딩 텍스트 — 페르소나별 대기 메시지
+                  const loadingText: Record<'ray' | 'jack' | 'lucia', string> = {
+                    ray: 'RAY가 분석 중...',
+                    jack: 'JACK이 판단 중...',
+                    lucia: 'LUCIA가 공감 중...',
+                  };
+
                   const renderRound1 = (key: 'ray' | 'jack' | 'lucia') => {
-                    if (key === 'ray') return <PersonaBubble key="r1-ray" personaKey="ray" text={msg.personas!.ray} timestamp={msg.timestamp} newsItem={msg.personas!.rayNews} details={msg.personas!.rayDetails} />;
-                    if (key === 'jack') return <PersonaBubble key="r1-jack" personaKey="jack" text={jackText} timestamp={msg.timestamp} newsItem={msg.personas!.jackNews} details={msg.personas!.jackDetails} />;
-                    return <PersonaBubble key="r1-lucia" personaKey="lucia" text={luciaText} timestamp={msg.timestamp} newsItem={msg.personas!.luciaNews} details={msg.personas!.luciaDetails} />;
+                    if (key === 'ray') {
+                      const text = msg.personas!.ray || loadingText.ray;
+                      return <PersonaBubble key="r1-ray" personaKey="ray" text={text} timestamp={msg.timestamp} newsItem={msg.personas!.rayNews} details={msg.personas!.rayDetails} />;
+                    }
+                    if (key === 'jack') {
+                      const text = jackText || loadingText.jack;
+                      return <PersonaBubble key="r1-jack" personaKey="jack" text={text} timestamp={msg.timestamp} newsItem={msg.personas!.jackNews} details={msg.personas!.jackDetails} />;
+                    }
+                    const text = luciaText || loadingText.lucia;
+                    return <PersonaBubble key="r1-lucia" personaKey="lucia" text={text} timestamp={msg.timestamp} newsItem={msg.personas!.luciaNews} details={msg.personas!.luciaDetails} />;
                   };
 
                   const renderRound2 = (key: 'ray' | 'jack' | 'lucia') => {
-                    if (key === 'ray' && msg.personas!.ray2) return <PersonaBubble key="r2-ray" personaKey="ray" text={msg.personas!.ray2} timestamp={msg.timestamp} />;
-                    if (key === 'jack' && msg.personas!.jack2) return <PersonaBubble key="r2-jack" personaKey="jack" text={msg.personas!.jack2} timestamp={msg.timestamp} />;
-                    if (key === 'lucia' && msg.personas!.lucia2) return <PersonaBubble key="r2-lucia" personaKey="lucia" text={msg.personas!.lucia2} timestamp={msg.timestamp} />;
-                    return null;
+                    const field = `${key}2` as 'ray2' | 'jack2' | 'lucia2';
+                    const value = msg.personas![field];
+                    // null = 아직 round 2 시작 전 (ECHO 1 미도착) → 렌더 안 함
+                    if (value === null || value === undefined) return null;
+                    // '' = round 2 시작했지만 해당 페르소나 LLM 미완성 → 로딩 텍스트
+                    const text = value || loadingText[key];
+                    return <PersonaBubble key={`r2-${key}`} personaKey={key} text={text} timestamp={msg.timestamp} />;
                   };
+
+                  // 단계별 진행 상태 — 스트리밍 중에도 자연스러운 노출 흐름
+                  const allR1Done = !!(msg.personas.ray && msg.personas.jack && msg.personas.lucia);
+                  const allR2Done = !!(msg.personas.ray2 && msg.personas.jack2 && msg.personas.lucia2);
+                  const showEcho1 = !!msg.personas.echo || allR1Done;
+                  const showEcho2 = !!msg.personas.echo2 || (!!msg.personas.echo && allR2Done);
 
                   return (
                     <>
                       {order.map(renderRound1)}
-                      <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>
-                        ── ECHO COMMAND ──
-                      </div>
-                      <EchoBubble
-                        summary={msg.personas.echo}
-                        details={msg.personas.echoDetails}
-                        timestamp={msg.timestamp}
-                        echoNews={msg.personas.echoNews}
-                        hideDisclaimer={msg.personas.breakdown !== undefined}
-                      />
+                      {showEcho1 && (
+                        <>
+                          <div style={{ textAlign: 'center', margin: '10px 0', color: '#b45309', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>
+                            ── ECHO COMMAND ──
+                          </div>
+                          <EchoBubble
+                            summary={msg.personas.echo || 'ECHO가 판결 중...'}
+                            details={msg.personas.echoDetails}
+                            timestamp={msg.timestamp}
+                            echoNews={msg.personas.echoNews}
+                            hideDisclaimer={msg.personas.breakdown !== undefined}
+                          />
+                        </>
+                      )}
                       {order.map(renderRound2)}
-                      {msg.personas.echo2 && (
-                        <EchoBubble summary={msg.personas.echo2} timestamp={msg.timestamp} hideDisclaimer />
+                      {showEcho2 && (
+                        <EchoBubble summary={msg.personas.echo2 || 'ECHO가 최후 판결 중...'} timestamp={msg.timestamp} hideDisclaimer />
                       )}
                     </>
                   );
