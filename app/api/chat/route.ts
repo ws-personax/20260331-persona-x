@@ -841,7 +841,7 @@ export async function POST(req: Request) {
           msg,
           category,
           recentContext,
-          isFinanceCategory,
+          true,
         );
 
         if (screenplay && isScreenplayCategory) {
