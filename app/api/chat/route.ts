@@ -450,7 +450,7 @@ export async function POST(req: Request) {
       finance:  /주식|펀드|ETF|종목|코스피|코스닥|나스닥|NASDAQ|S&P500|SP500|S&P|다우존스|다우|달러|금|채권|포트폴리오|수익|손절|매수|매도|배당|금리|환율|가상화폐|비트코인|저축|예금|적금|퇴직금|연금|삼성전자|SK하이닉스|카카오|네이버|현대차|기아차|LG전자|삼성바이오|셀트리온|포스코|KB금융|신한지주|하나금융|테슬라|애플|엔비디아|구글|아마존|마이크로소프트|돈이|돈은|돈을|살까|팔까|투자할까|넣을까|빼야|수익|손실|올랐|떨어졌|물렸|상승|하락/,
       sports:   /야구|축구|농구|배구|골프|올림픽|경기|이길|승부|우승|선수|리그|기아|삼성라이온즈|두산|LG트윈스|롯데|한화|KT|SSG|NC|키움/,
       news:     /정세|뉴스|전쟁|분쟁|중동|러시아|우크라이나|미중|외교|정치|대통령|선거|경제뉴스|시황|금융뉴스|증시|환경|기후|재난|사건|사고|테러|유가|원유|석유|에너지|OPEC|산유국|천연가스|인플레이션|금리정책|연준|Fed|미연준|기준금리|호르무즈|이란|이스라엘|하마스|헤즈볼라|가자|레바논|트럼프|바이든|시진핑|푸틴|북한|미사일|핵|제재|관세|무역전쟁|환율전쟁|HMM|화물선|해운|공급망|반도체규제|AI규제|빅테크|실리콘밸리|연방|의회|상원|하원|탄핵|대선|총선|보궐|여당|야당|국회|법안|정책/,
-      life:     /명퇴|권고사직|은퇴|조기퇴직|퇴직 후|제2인생|요양원|치매|부모님 건강|어머니 건강|아버지 건강|무릎|허리|혈압|당뇨|갱년기|근감소|건강검진|병원|아이 대학|자녀 취업|자녀 결혼|아들 걱정|딸 걱정|황혼이혼|부부 갈등|노후|노후준비|노후자금|은퇴자금|막막|가장으로서|생계|카드론|노후파산|노후빈곤|황혼육아|손자|손녀|며느리|사위|시댁|처가|이혼숙려|졸혼|별거/,
+      life:     /명퇴|명예퇴직|희망퇴직|퇴직 권유|권고사직|은퇴|조기퇴직|퇴직 후|제2인생|요양원|치매|부모님 건강|어머니 건강|아버지 건강|무릎|허리|혈압|당뇨|갱년기|근감소|건강검진|병원|아이 대학|자녀 취업|자녀 결혼|아들 걱정|딸 걱정|황혼이혼|부부 갈등|노후|노후준비|노후자금|은퇴자금|막막|가장으로서|생계|카드론|노후파산|노후빈곤|황혼육아|손자|손녀|며느리|사위|시댁|처가|이혼숙려|졸혼|별거/,
       legal:    /세금|법률|계약|소송|이혼|상속|증여|부동산등기|임대차|보증금|노동|퇴직|해고|세무|신고|명퇴|권고사직|퇴직금|실업급여|노동부|노무사/,
       tech:     /자동차|전기차|배터리|반도체|AI|인공지능|스마트폰|앱|소프트웨어|하드웨어|IT|클라우드/,
       emotion:  /힘들|외로|슬프|우울|화나|기쁘|설레|불안|걱정|스트레스|피곤|지쳐|고민|마음|감정|위로|공감|재테크고민|투자고민|노후걱정/,
@@ -459,8 +459,10 @@ export async function POST(req: Request) {
       if (CATEGORY_MAP.finance.test(text)) return 'finance';
       if (CATEGORY_MAP.news.test(text))    return 'news';
       if (CATEGORY_MAP.sports.test(text))  return 'sports';
-      if (CATEGORY_MAP.legal.test(text))   return 'legal';
+      // life를 legal보다 먼저 체크: 명퇴/권고사직은 법적 측면도 있지만 인생/감정 문제가 우선.
+      // legal로 가면 ECHO 단일 핸들러로 빠져 4명 충돌 구조가 형성되지 않는다.
       if (CATEGORY_MAP.life.test(text))    return 'life';
+      if (CATEGORY_MAP.legal.test(text))   return 'legal';
       if (CATEGORY_MAP.tech.test(text))    return 'tech';
       if (CATEGORY_MAP.emotion.test(text)) return 'emotion';
       return 'general';
@@ -761,7 +763,9 @@ export async function POST(req: Request) {
         callTeaPersona('lucia', TEA_SYSTEM_LUCIA, lucia2History),
       ]);
 
-      const rayText2   = cleanText(ray2LLM);
+      // RAY 2라운드는 첫 문단(첫 빈 줄 이전)만 사용 — 다른 페르소나 발화 누출 방지
+      const firstParagraph = (t: string): string => (t || '').split(/\n\s*\n/)[0].trim();
+      const rayText2   = firstParagraph(cleanText(ray2LLM));
       const jackText2  = cleanText(jack2LLM);
       const luciaText2 = cleanText(lucia2LLM);
 
