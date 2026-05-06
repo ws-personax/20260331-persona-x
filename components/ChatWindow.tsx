@@ -870,12 +870,14 @@ const getLoadingPersona = (text: string): PersonaKey => {
   return 'lucia';
 };
 
-const TypingIndicator = ({ teaMode = false, teaPersona = null, userText = '' }: { teaMode?: boolean; teaPersona?: 'lucia' | 'jack' | 'echo' | null; userText?: string }) => {
+const TypingIndicator = ({ teaMode = false, teaPersona = null, userText = '', pendingOrder = null }: { teaMode?: boolean; teaPersona?: 'lucia' | 'jack' | 'echo' | null; userText?: string; pendingOrder?: ('ray' | 'jack' | 'lucia')[] | null }) => {
   if (teaMode) {
-    // 명시 픽(jack/echo)이면 페르소나 고정, 그 외(lucia/null)는 userText 키워드로 분기 (ray 포함)
+    // 명시 픽(jack/echo)이면 페르소나 고정, 그 외(lucia/null)는 order 첫 발화자 → 키워드 fallback
     const personaKey: PersonaKey = teaPersona === 'jack' || teaPersona === 'echo'
       ? teaPersona
-      : getLoadingPersona(userText);
+      : pendingOrder && pendingOrder.length > 0
+        ? pendingOrder[0]
+        : getLoadingPersona(userText);
     const p = PERSONAS[personaKey];
     const text = teaPersona === 'jack' || teaPersona === 'echo'
       ? TEA_TYPING_TEXT[teaPersona]
@@ -2064,6 +2066,7 @@ export default function ChatWindow() {
   const [pendingText, setPendingText] = useState('');
   const [pendingKeyword, setPendingKeyword] = useState('');
   const [pendingInitialPosition, setPendingInitialPosition] = useState<Partial<Position> | null>(null);
+  const [pendingOrder, setPendingOrder] = useState<('ray' | 'jack' | 'lucia')[] | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -2864,7 +2867,7 @@ export default function ChatWindow() {
             <span>AI 참모진이 분석 중입니다. 약 20~30초 소요됩니다.</span>
           </div>
         )}
-        {isLoading && <TypingIndicator teaMode={messages.slice().reverse().find(m => m.role === 'user')?.teaMode === true} teaPersona={teaPersona} userText={
+        {isLoading && <TypingIndicator teaMode={messages.slice().reverse().find(m => m.role === 'user')?.teaMode === true} teaPersona={teaPersona} pendingOrder={pendingOrder} userText={
           messages
             .slice()
             .reverse()
