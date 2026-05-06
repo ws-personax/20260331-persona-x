@@ -218,6 +218,14 @@ const getSupabase = () => {
   return createClient(url, key);
 };
 
+// service role client — RLS 우회 (서버 전용 로깅: tea_logs 등)
+const getAdminSupabase = () => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key);
+};
+
 // ─────────────────────────────────────────────
 // ✅ 극본 오케스트레이터 — 1번 LLM 호출로 RAY/JACK/LUCIA/ECHO 4명 1·2라운드 8개 대사 동시 생성
 //   기존 4번 호출 구조의 중복 발화·맥락 단절 문제 해소.
@@ -877,9 +885,9 @@ export async function POST(req: Request) {
           await streamEcho(2, screenplay.echo2);
 
           try {
-            const supabase = getSupabase();
-            if (supabase) {
-              await supabase.from('tea_logs').insert({
+            const adminSupabase = getAdminSupabase();
+            if (adminSupabase) {
+              await adminSupabase.from('tea_logs').insert({
                 persona: 'ray',
                 turn_count: 1,
                 first_message: msg.slice(0, 100),
@@ -1040,9 +1048,9 @@ export async function POST(req: Request) {
         send({ type: 'echo', round: 2, text: echoText2 });
 
         try {
-          const supabase = getSupabase();
-          if (supabase) {
-            await supabase.from('tea_logs').insert({
+          const adminSupabase = getAdminSupabase();
+          if (adminSupabase) {
+            await adminSupabase.from('tea_logs').insert({
               persona: 'ray',
               turn_count: 1,
               first_message: msg.slice(0, 100),
@@ -1170,9 +1178,9 @@ export async function POST(req: Request) {
         const echoText2 = cleanNews(echo2LLM);
 
         try {
-          const supabase = getSupabase();
-          if (supabase) {
-            await supabase.from('tea_logs').insert({
+          const adminSupabase = getAdminSupabase();
+          if (adminSupabase) {
+            await adminSupabase.from('tea_logs').insert({
               persona: 'ray',
               turn_count: 1,
               first_message: lastMsg.slice(0, 100),
@@ -1280,9 +1288,9 @@ export async function POST(req: Request) {
         const lifeEchoText2 = cleanLife(lifeEcho2LLM);
 
         try {
-          const supabase = getSupabase();
-          if (supabase) {
-            await supabase.from('tea_logs').insert({
+          const adminSupabase = getAdminSupabase();
+          if (adminSupabase) {
+            await adminSupabase.from('tea_logs').insert({
               persona: 'echo',
               turn_count: 1,
               first_message: lastMsg.slice(0, 100),
@@ -1404,9 +1412,9 @@ export async function POST(req: Request) {
       if (selectedPersona === 'jack') {
         const jackLLM = await callTeaPersona('jack', TEA_SYSTEM_JACK, jackHistory);
         try {
-          const supabase = getSupabase();
-          if (supabase) {
-            await supabase.from('tea_logs').insert({
+          const adminSupabase = getAdminSupabase();
+          if (adminSupabase) {
+            await adminSupabase.from('tea_logs').insert({
               persona: selectedPersona,
               turn_count: round,
               first_message: lastMsg.slice(0, 100),
@@ -1427,9 +1435,9 @@ export async function POST(req: Request) {
       if (selectedPersona === 'echo') {
         const echoLLM = await callTeaPersona('echo', TEA_SYSTEM_ECHO, echoHistory);
         try {
-          const supabase = getSupabase();
-          if (supabase) {
-            await supabase.from('tea_logs').insert({
+          const adminSupabase = getAdminSupabase();
+          if (adminSupabase) {
+            await adminSupabase.from('tea_logs').insert({
               persona: selectedPersona,
               turn_count: round,
               first_message: lastMsg.slice(0, 100),
@@ -1452,9 +1460,9 @@ export async function POST(req: Request) {
         const enableSearchForRay = category === 'news' || category === 'finance' || category === 'tech';
         const rayLLM = await callTeaPersona('ray', TEA_SYSTEM_RAY, rayHistory, { enableSearch: enableSearchForRay });
         try {
-          const supabase = getSupabase();
-          if (supabase) {
-            await supabase.from('tea_logs').insert({
+          const adminSupabase = getAdminSupabase();
+          if (adminSupabase) {
+            await adminSupabase.from('tea_logs').insert({
               persona: selectedPersona,
               turn_count: round,
               first_message: lastMsg.slice(0, 100),
@@ -1482,9 +1490,9 @@ export async function POST(req: Request) {
           .trim();
       }
       try {
-        const supabase = getSupabase();
-        if (supabase) {
-          await supabase.from('tea_logs').insert({
+        const adminSupabase = getAdminSupabase();
+        if (adminSupabase) {
+          await adminSupabase.from('tea_logs').insert({
             persona: selectedPersona,
             turn_count: round,
             first_message: lastMsg.slice(0, 100),
