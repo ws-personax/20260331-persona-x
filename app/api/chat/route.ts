@@ -1307,7 +1307,7 @@ export async function POST(req: Request) {
       //   teaMode=true 진입 시 STOCK_MAP/CRYPTO_MAP/MARKET_INDEX 키워드 일치 여부와 무관하게
       //   "삼성전자/비트코인/코스피" 등 모든 재테크 질문을 4명 동시 응답 구조로 통합.
       //   (단일 RAY 경로 / 단일 종목 풀 분석 경로는 teaMode=false 일 때만 사용 — 사실상 deprecated)
-      if (category === 'finance' && !isExplicitPersonaPick) {
+      if (!isExplicitPersonaPick) {
         return await buildFinanceMultiPersonaResponse(lastMsg);
       }
 
