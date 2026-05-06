@@ -117,7 +117,7 @@ const PERSONAS: Record<
     bubbleBg: '#fff8d6',
     bubbleBorder: '#d4a017',
     textColor: '#111827',
-    echoTag: 'SUMMARY',
+    echoTag: '',
   },
 };
 
@@ -585,24 +585,6 @@ const PersonaBubble = memo(function PersonaBubble({
                     : `1px solid ${p.bubbleBorder}`,
               }}
             >
-              {isEcho && p.echoTag && !hideEchoTag && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: -11,
-                    left: 10,
-                    background: p.iconBg,
-                    color: '#111827',
-                    fontSize: 10,
-                    fontWeight: 900,
-                    padding: '2px 8px',
-                    borderRadius: 5,
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                  }}
-                >
-                  {p.echoTag}
-                </div>
-              )}
               <p
                 style={{
                   fontSize: 14,
@@ -786,25 +768,6 @@ const EchoBubble = memo(function EchoBubble({
                 wordBreak: 'break-word',
               }}
             >
-              {p.echoTag && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: -11,
-                    left: 10,
-                    background: p.iconBg,
-                    color: '#111827',
-                    fontSize: 10,
-                    fontWeight: 900,
-                    padding: '2px 8px',
-                    borderRadius: 5,
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                  }}
-                >
-                  {p.echoTag}
-                </div>
-              )}
-
               <p
                 style={{
                   fontSize: 14,
