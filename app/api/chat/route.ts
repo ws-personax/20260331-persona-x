@@ -512,6 +512,9 @@ export async function POST(req: Request) {
       return Response.json(body as Parameters<typeof Response.json>[0], init);
     };
 
+    // 2라운드 페르소나 응답에서 다른 페르소나 발화 누출 방어 — 첫 빈 줄 이전 문단만 사용
+    const firstParagraph = (t: string): string => (t || '').split(/\n\s*\n/)[0].trim();
+
     // ✅ 오케스트레이터 — multi-persona 분기 진입 전 토론 디렉터 LLM이 흐름을 결정
     //    질문 유형에 따라 페르소나 발언 순서/각도/충돌 쟁점/ECHO 지목 대상을 미리 지시한다.
     //    JSON 파싱 실패·LLM 실패 시 안전 기본값으로 폴백하므로 실패가 응답을 망가뜨리지 않는다.
@@ -763,11 +766,10 @@ export async function POST(req: Request) {
         callTeaPersona('lucia', TEA_SYSTEM_LUCIA, lucia2History),
       ]);
 
-      // RAY 2라운드는 첫 문단(첫 빈 줄 이전)만 사용 — 다른 페르소나 발화 누출 방지
-      const firstParagraph = (t: string): string => (t || '').split(/\n\s*\n/)[0].trim();
+      // 2라운드 모든 페르소나 응답은 첫 문단(첫 빈 줄 이전)만 사용 — 다른 페르소나 발화 누출 방지
       const rayText2   = firstParagraph(cleanText(ray2LLM));
-      const jackText2  = cleanText(jack2LLM);
-      const luciaText2 = cleanText(lucia2LLM);
+      const jackText2  = firstParagraph(cleanText(jack2LLM));
+      const luciaText2 = firstParagraph(cleanText(lucia2LLM));
 
       // 4단계: ECHO 최후 판결 — 씨앗 질문 금지, 명확한 판결 + 선언형 결론
       const echo2ConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n1라운드 RAY: ${rayText}\n1라운드 JACK: ${jackText}\n1라운드 LUCIA: ${luciaText}\n1라운드 ECHO: ${echoText}\n\n2라운드 RAY: ${rayText2}\n2라운드 JACK: ${jackText2}\n2라운드 LUCIA: ${luciaText2}\n\n최후 판결이다. 씨앗 질문 금지. RAY/JACK/LUCIA 중 누가 맞는지 명확히 판결하라. 마지막 문장은 반드시 아래 형식 중 하나로 마무리하고 마침표로 끝낼 것:\n(1) "단기(N년 이내)면 JACK, 장기면 LUCIA+RAY 말이 맞습니다."\n(2) "[조건]이라면 지금 구간은 [위험/기회]입니다."\n(3) "[핵심 변수]가 해결되지 않으면 [결론]입니다."\n조건만 말하고 판결 없이 끝내는 것 금지. "지금 이 싸움이 답을 보여줬습니다" 같은 결론 없는 문장으로 끝내지 마라. "~정하세요" "~하세요" 지시형 금지. 물음표 절대 금지. 요약·정리·나열 금지. 절대 3줄 초과 금지. "결정은 당신이 하십시오"·"선택은 당신 몫"·"판단은 본인이" 등 책임 회피 표현 절대 금지.`;
@@ -891,9 +893,10 @@ export async function POST(req: Request) {
           callTeaPersona('lucia', TEA_SYSTEM_LUCIA, lucia2History, { enableSearch: true }),
         ]);
 
-        const rayText2   = cleanNews(ray2LLM);
-        const jackText2  = cleanNews(jack2LLM);
-        const luciaText2 = cleanNews(lucia2LLM);
+        // 2라운드 페르소나 응답은 첫 문단만 사용 — 다른 페르소나 발화 누출 방어
+        const rayText2   = firstParagraph(cleanNews(ray2LLM));
+        const jackText2  = firstParagraph(cleanNews(jack2LLM));
+        const luciaText2 = firstParagraph(cleanNews(lucia2LLM));
 
         // 2라운드 ECHO 최후 판결 — 1·2라운드 전체를 본 뒤 마무리
         const echo2ConsolidationPrompt = `${newsPrefix}사용자 질문: ${lastMsg}\n\n[1라운드]\nRAY: ${rayText}\nJACK: ${jackText}\nLUCIA: ${luciaText}\nECHO: ${echoText}\n\n[2라운드]\nRAY: ${rayText2}\nJACK: ${jackText2}\nLUCIA: ${luciaText2}\n\n최후 판결을 한 문장으로만 내려라. 요약·정리·나열 금지. 절대 3줄 초과 금지. "결정은 당신이 하십시오" 표현 금지.`;
@@ -1001,9 +1004,10 @@ export async function POST(req: Request) {
           callTeaPersona('lucia', TEA_SYSTEM_LUCIA, lifeLucia2History),
         ]);
 
-        const lifeRayText2   = cleanLife(lifeRay2LLM);
-        const lifeJackText2  = cleanLife(lifeJack2LLM);
-        const lifeLuciaText2 = cleanLife(lifeLucia2LLM);
+        // 2라운드 페르소나 응답은 첫 문단만 사용 — 다른 페르소나 발화 누출 방어
+        const lifeRayText2   = firstParagraph(cleanLife(lifeRay2LLM));
+        const lifeJackText2  = firstParagraph(cleanLife(lifeJack2LLM));
+        const lifeLuciaText2 = firstParagraph(cleanLife(lifeLucia2LLM));
 
         // 2라운드 ECHO 최후 판결 — 1·2라운드 전체를 본 뒤 마무리
         const lifeEcho2ConsolidationPrompt = `사용자 질문: ${lastMsg}\n\n[1라운드]\nRAY: ${rayText}\nJACK: ${jackText}\nLUCIA: ${luciaText}\nECHO: ${echoText}\n\n[2라운드]\nRAY: ${lifeRayText2}\nJACK: ${lifeJackText2}\nLUCIA: ${lifeLuciaText2}\n\n최후 판결을 한 문장으로만 내려라. 요약·정리·나열 금지. 절대 3줄 초과 금지. "결정은 당신이 하십시오" 표현 금지.`;
