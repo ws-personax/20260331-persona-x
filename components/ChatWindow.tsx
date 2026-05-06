@@ -2597,6 +2597,88 @@ export default function ChatWindow() {
 
       {!hasUserSent && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center' }}>
+          {/* ✅ 4명 충돌 미리보기 카드 — 첫 진입 시 페르소나 토론 구조를 3초 안에 인지시킴 */}
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 420,
+              marginBottom: 18,
+              padding: '14px 14px 12px',
+              background: 'linear-gradient(180deg, #fafafa 0%, #f3f4f6 100%)',
+              border: '1px solid #e5e7eb',
+              borderRadius: 14,
+              boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+            }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#1f2937', marginBottom: 10 }}>
+              💬 삼성전자 지금 사도 될까?
+            </div>
+
+            {([
+              { key: 'ray',   text: 'PBR 1.1배, 역대 최저입니다. 외국인 순매수 3주 연속 12조원.' },
+              { key: 'jack',  text: 'RAY, 2022년부터 3년째 그 말 했잖아요. 결과가 어떻게 됐어요?' },
+              { key: 'lucia', text: 'JACK, 그럼 삼성전자 영원히 사지 말라는 거예요?' },
+              { key: 'echo',  text: '단기면 JACK, 장기면 LUCIA. 기간이 먼저입니다.' },
+            ] as { key: PersonaKey; text: string }[]).map(({ key, text }) => {
+              const p = PERSONAS[key];
+              return (
+                <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
+                  <div
+                    style={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: 8,
+                      background: p.iconBg,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <span style={{ color: '#fff', fontWeight: 800, fontSize: 11 }}>{p.initial}</span>
+                  </div>
+                  <div
+                    style={{
+                      flex: 1,
+                      background: p.bubbleBg,
+                      border: `1px solid ${p.bubbleBorder}`,
+                      borderRadius: 10,
+                      padding: '6px 10px',
+                      fontSize: 12.5,
+                      lineHeight: 1.45,
+                      color: p.textColor,
+                    }}
+                  >
+                    <span style={{ fontWeight: 700, marginRight: 4 }}>{p.name}</span>
+                    {text}
+                  </div>
+                </div>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={() => {
+                setInput('삼성전자 지금 사도 될까?');
+              }}
+              style={{
+                marginTop: 8,
+                width: '100%',
+                padding: '9px 12px',
+                background: '#FAE100',
+                border: 'none',
+                borderRadius: 10,
+                fontSize: 13,
+                fontWeight: 800,
+                color: '#1f2937',
+                cursor: 'pointer',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+              }}
+            >
+              나도 물어보기 →
+            </button>
+          </div>
+
           <OnboardingTabs
             onSubmit={(text) => handleSend(text)}
             onSetInput={(text) => { setInput(text); }}
