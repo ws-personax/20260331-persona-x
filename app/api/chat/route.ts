@@ -625,7 +625,22 @@ export async function POST(req: Request) {
       const round2Context = `${financePrefix}사용자 질문: ${msg}\n\n1라운드 RAY: ${rayText}\n1라운드 JACK: ${jackText}\n1라운드 LUCIA: ${luciaText}\n1라운드 ECHO: ${echoText}\n\n`;
 
       const buildRound2 = (persona: 'RAY' | 'JACK' | 'LUCIA'): string => {
-        const role =
+        // 지목 페르소나는 3줄 이내 정면 답변. 비지목 페르소나는 페르소나별 1줄 보조.
+        const targetedRole =
+          persona === 'RAY'
+            ? '반드시 숫자/데이터로 시작해 3줄 이내로 ECHO 질문에 정면 답하라.'
+            : persona === 'JACK'
+            ? '짧고 투박하게 "~요"로 끝내며 3줄 이내로 ECHO 질문에 정면 답하라.'
+            : '"~잖아요"·"~거든요" 톤으로 3줄 이내로 ECHO 질문에 정면 답하라. "아이고" 사용 금지.';
+
+        const supportRole =
+          persona === 'RAY'
+            ? '1줄. 숫자 한 가지만. 새 데이터 나열 금지.'
+            : persona === 'JACK'
+            ? '1줄. 한 마디만. 길게 늘어놓지 말 것.'
+            : '1줄. 짧은 공감 한 마디. "아이고" 사용 금지.';
+
+        const fallbackRole =
           persona === 'RAY'
             ? '반드시 숫자/데이터로 시작해 2줄 이내 답하라.'
             : persona === 'JACK'
@@ -633,12 +648,16 @@ export async function POST(req: Request) {
             : '"~잖아요"·"~거든요" 톤으로 2줄 이내. "아이고" 사용 금지.';
 
         let focus: string;
+        let role: string;
         if (!targetedPersona) {
           focus = 'ECHO가 방금 던진 질문에 답하라.';
+          role = fallbackRole;
         } else if (targetedPersona === persona) {
           focus = `ECHO가 지목한 페르소나: ${persona}. 너(${persona})가 ECHO 질문의 직접 대상이다. 핵심 답변자로 정면 응답.`;
+          role = targetedRole;
         } else {
-          focus = `ECHO가 지목한 페르소나: ${targetedPersona}. 너는 보조 역할 — 1줄로 짧게 거든다.`;
+          focus = `ECHO가 지목한 페르소나: ${targetedPersona}. 너는 보조 역할이다.`;
+          role = supportRole;
         }
 
         return `지시: ${focus} ${role}\n출력 규칙: 대괄호 [...] 메타 태그를 출력에 포함하지 말 것. "RAY:" "JACK:" "LUCIA:" "ECHO:" 같은 페르소나 라벨로 줄을 시작하지 말 것. 호칭에 "님" 붙이지 말 것.`;
@@ -658,8 +677,8 @@ export async function POST(req: Request) {
       const jackText2  = cleanText(jack2LLM);
       const luciaText2 = cleanText(lucia2LLM);
 
-      // 4단계: ECHO 최후 판결 (한 문장)
-      const echo2ConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n[1라운드]\nRAY: ${rayText}\nJACK: ${jackText}\nLUCIA: ${luciaText}\nECHO: ${echoText}\n\n[2라운드]\nRAY: ${rayText2}\nJACK: ${jackText2}\nLUCIA: ${luciaText2}\n\n최후 판결을 내려라. 요약·정리·나열 금지. 절대 3줄 초과 금지. "결정은 당신이 하십시오"·"선택은 당신 몫입니다"·"선택은 당신이 하십시오"·"판단은 본인 몫" 등 책임 회피 표현 절대 금지. 마지막 줄은 반드시 RAY·JACK·LUCIA 중 한 명을 지목해 던지는 날카로운 질문 한 문장(물음표 필수).`;
+      // 4단계: ECHO 최후 판결 — 씨앗 질문 금지, 명확한 판결 + 실질적 방향
+      const echo2ConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n1라운드 RAY: ${rayText}\n1라운드 JACK: ${jackText}\n1라운드 LUCIA: ${luciaText}\n1라운드 ECHO: ${echoText}\n\n2라운드 RAY: ${rayText2}\n2라운드 JACK: ${jackText2}\n2라운드 LUCIA: ${luciaText2}\n\n최후 판결이다. 씨앗 질문 금지. 물음표로 끝내지 마라. RAY/JACK/LUCIA 중 누가 맞는지 명확히 판결하고 유저에게 실질적 방향 한 줄로 마무리하라. 예시: "단기면 JACK, 3년 이상이면 RAY+LUCIA. 기간 먼저 정하세요." 요약·정리·나열 금지. 절대 3줄 초과 금지. "결정은 당신이 하십시오"·"선택은 당신 몫"·"판단은 본인이" 등 책임 회피 표현 절대 금지.`;
       const echo2LLM = await callTeaPersona(
         'echo',
         TEA_SYSTEM_ECHO,
