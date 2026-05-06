@@ -520,8 +520,33 @@ export async function POST(req: Request) {
       const monthNow = kstNow.getUTCMonth() + 1;
       const financePrefix = `[현재 시점: ${yearNow}년 ${monthNow}월 — 최신(${yearNow}년) 데이터·보도 기준으로 답변. 과거 인물·정책을 현재형으로 단정하지 말 것.]\n`;
 
+      // LLM이 프롬프트의 대괄호 메타 태그(예: [1라운드 RAY], [ECHO가 방금 질문...], [역할: ...])를
+      // 출력에 그대로 echo하는 케이스 방어. 또한 페르소나가 다른 페르소나의 라벨로 줄을
+      // 시작하는 흉내 패턴도 제거.
       const cleanText = (t: string | null | undefined): string =>
-        (t || '').replace(/\*\*(.*?)\*\*/g, '$1').replace(/\n{2,}/g, '\n').trim();
+        (t || '')
+          .replace(/\*\*(.*?)\*\*/g, '$1')
+          .replace(/\[(?:1라운드|2라운드|3라운드)[^\]]*\]/g, '')
+          .replace(/\[ECHO[^\]]*\]/g, '')
+          .replace(/\[역할[^\]]*\]/g, '')
+          .replace(/\[지시[^\]]*\]/g, '')
+          .replace(/\[현재 시점[^\]]*\]/g, '')
+          .replace(/^\s*(?:RAY|JACK|LUCIA|ECHO)\s*[:：]\s*/gm, '')
+          .replace(/^\s*지시\s*[:：]\s*/gm, '')
+          .replace(/\n{2,}/g, '\n')
+          .trim();
+
+      // ECHO 응답에서 마지막 질문이 향하는 페르소나 추출
+      // 마지막 물음표 직전 ~200자 윈도우에서 페르소나명을 찾는다.
+      const detectTargetedPersona = (echoResp: string): 'RAY' | 'JACK' | 'LUCIA' | null => {
+        if (!echoResp) return null;
+        const lastQ = echoResp.lastIndexOf('?');
+        const tail = lastQ > 0
+          ? echoResp.slice(Math.max(0, lastQ - 200), lastQ + 1)
+          : echoResp.slice(-200);
+        const m = tail.match(/(RAY|JACK|LUCIA)/i);
+        return m ? (m[1].toUpperCase() as 'RAY' | 'JACK' | 'LUCIA') : null;
+      };
 
       // 직전 user→assistant 페어 추출 — assistant 응답에서 페르소나 발화를 폴백 체인으로 추출
       // 우선순위: personas.ray → teaRay → personas.jack → teaJack → personas.lucia → teaLucia → content 첫 청크
@@ -595,11 +620,33 @@ export async function POST(req: Request) {
       const echoText = cleanText(echoLLM) || '원칙이 흔들릴 땐 한 박자 쉬어가는 것도 방법이에요.';
 
       // 3단계: 2라운드 RAY/JACK/LUCIA 병렬 (ECHO 직접 질문에만 응답)
-      const round2Context = `${financePrefix}사용자 질문: ${msg}\n\n[1라운드 RAY]\n${rayText}\n[1라운드 JACK]\n${jackText}\n[1라운드 LUCIA]\n${luciaText}\n[1라운드 ECHO]\n${echoText}\n\n`;
-      const round2Prefix = '[ECHO가 방금 질문을 던졌다. RAY: 반드시 숫자/데이터로 시작해 2줄 이내 답하라. JACK: 짧고 투박하게 ~요 로 끝내라. 2줄 이내. LUCIA: ~잖아요 ~거든요 톤으로 2줄 이내. 아이고 금지. 페르소나 호칭에 님 붙이지 말 것.]';
-      const ray2History:   TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
-      const jack2History:  TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
-      const lucia2History: TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
+      // ECHO가 지목한 페르소나는 핵심 답변자, 나머지는 1줄 보조 역할.
+      const targetedPersona = detectTargetedPersona(echoText);
+      const round2Context = `${financePrefix}사용자 질문: ${msg}\n\n1라운드 RAY: ${rayText}\n1라운드 JACK: ${jackText}\n1라운드 LUCIA: ${luciaText}\n1라운드 ECHO: ${echoText}\n\n`;
+
+      const buildRound2 = (persona: 'RAY' | 'JACK' | 'LUCIA'): string => {
+        const role =
+          persona === 'RAY'
+            ? '반드시 숫자/데이터로 시작해 2줄 이내 답하라.'
+            : persona === 'JACK'
+            ? '짧고 투박하게 "~요"로 끝내라. 2줄 이내.'
+            : '"~잖아요"·"~거든요" 톤으로 2줄 이내. "아이고" 사용 금지.';
+
+        let focus: string;
+        if (!targetedPersona) {
+          focus = 'ECHO가 방금 던진 질문에 답하라.';
+        } else if (targetedPersona === persona) {
+          focus = `ECHO가 지목한 페르소나: ${persona}. 너(${persona})가 ECHO 질문의 직접 대상이다. 핵심 답변자로 정면 응답.`;
+        } else {
+          focus = `ECHO가 지목한 페르소나: ${targetedPersona}. 너는 보조 역할 — 1줄로 짧게 거든다.`;
+        }
+
+        return `지시: ${focus} ${role}\n출력 규칙: 대괄호 [...] 메타 태그를 출력에 포함하지 말 것. "RAY:" "JACK:" "LUCIA:" "ECHO:" 같은 페르소나 라벨로 줄을 시작하지 말 것. 호칭에 "님" 붙이지 말 것.`;
+      };
+
+      const ray2History:   TeaMsg[] = [{ role: 'user', content: `${round2Context}${buildRound2('RAY')}` }];
+      const jack2History:  TeaMsg[] = [{ role: 'user', content: `${round2Context}${buildRound2('JACK')}` }];
+      const lucia2History: TeaMsg[] = [{ role: 'user', content: `${round2Context}${buildRound2('LUCIA')}` }];
 
       const [ray2LLM, jack2LLM, lucia2LLM] = await Promise.all([
         callTeaPersona('ray',   TEA_SYSTEM_RAY,   ray2History, { enableSearch: true }),
@@ -682,7 +729,17 @@ export async function POST(req: Request) {
         ]);
 
         const cleanNews = (text: string | null | undefined): string =>
-          (text || '').replace(/\*\*(.*?)\*\*/g, '$1').replace(/\n{2,}/g, '\n').trim();
+          (text || '')
+            .replace(/\*\*(.*?)\*\*/g, '$1')
+            .replace(/\[(?:1라운드|2라운드|3라운드)[^\]]*\]/g, '')
+            .replace(/\[ECHO[^\]]*\]/g, '')
+            .replace(/\[역할[^\]]*\]/g, '')
+            .replace(/\[지시[^\]]*\]/g, '')
+            .replace(/\[현재 시점[^\]]*\]/g, '')
+            .replace(/^\s*(?:RAY|JACK|LUCIA|ECHO)\s*[:：]\s*/gm, '')
+            .replace(/^\s*지시\s*[:：]\s*/gm, '')
+            .replace(/\n{2,}/g, '\n')
+            .trim();
 
         const rayText   = cleanNews(rayLLM)   || '실시간 검색이 일시 지연되고 있어요. 잠시 후 다시 질문해주세요.';
         const jackText  = cleanNews(jackLLM)  || '핵심 변수가 정리되면 다시 짚어드릴게요.';
@@ -772,7 +829,17 @@ export async function POST(req: Request) {
         ]);
 
         const cleanLife = (text: string | null | undefined): string =>
-          (text || '').replace(/\*\*(.*?)\*\*/g, '$1').replace(/\n{2,}/g, '\n').trim();
+          (text || '')
+            .replace(/\*\*(.*?)\*\*/g, '$1')
+            .replace(/\[(?:1라운드|2라운드|3라운드)[^\]]*\]/g, '')
+            .replace(/\[ECHO[^\]]*\]/g, '')
+            .replace(/\[역할[^\]]*\]/g, '')
+            .replace(/\[지시[^\]]*\]/g, '')
+            .replace(/\[현재 시점[^\]]*\]/g, '')
+            .replace(/^\s*(?:RAY|JACK|LUCIA|ECHO)\s*[:：]\s*/gm, '')
+            .replace(/^\s*지시\s*[:：]\s*/gm, '')
+            .replace(/\n{2,}/g, '\n')
+            .trim();
 
         const rayText   = cleanLife(rayLLM)   || '데이터로 정리해드릴 부분은 잠시 후 다시 짚어드릴게요.';
         const jackText  = cleanLife(jackLLM)  || '핵심 변수가 정리되면 다시 말씀드릴게요.';
