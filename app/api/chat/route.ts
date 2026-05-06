@@ -745,8 +745,7 @@ export async function POST(req: Request) {
         return m ? (m[1].toUpperCase() as 'RAY' | 'JACK' | 'LUCIA') : null;
       };
 
-      // 직전 user→assistant 페어 추출 — assistant 응답에서 페르소나 발화를 폴백 체인으로 추출
-      // 우선순위: personas.ray → teaRay → personas.jack → teaJack → personas.lucia → teaLucia → content 첫 청크
+      // 직전 user→assistant 페어 — 4명 페르소나 발화 모두 보존해서 충돌 맥락 유지
       const recentContext = (() => {
         if (!Array.isArray(messages) || messages.length < 2) return '';
         const prior = messages.slice(0, -1).slice(-8) as Array<{
@@ -755,7 +754,7 @@ export async function POST(req: Request) {
           teaRay?: string;
           teaJack?: string;
           teaLucia?: string;
-          personas?: { ray?: string; jack?: string; lucia?: string };
+          personas?: { ray?: string; jack?: string; lucia?: string; echo?: string };
         }>;
         if (prior.length === 0) return '';
 
@@ -770,17 +769,17 @@ export async function POST(req: Request) {
           if (!q) continue;
           const next = prior[i + 1];
           if (next && next.role === 'assistant') {
-            const personaResp =
-              next.personas?.ray ||
-              next.teaRay ||
-              next.personas?.jack ||
-              next.teaJack ||
-              next.personas?.lucia ||
-              next.teaLucia ||
-              (next.content || '').split(/\n\n+/)[0] ||
-              '';
-            const ray = summarize(personaResp, 150);
-            turns.push(ray ? `[유저: ${q}] → [RAY: ${ray}]` : `[유저: ${q}]`);
+            const rayText   = summarize(next.personas?.ray   || next.teaRay   || '', 100);
+            const jackText  = summarize(next.personas?.jack  || next.teaJack  || '', 80);
+            const luciaText = summarize(next.personas?.lucia || next.teaLucia || '', 80);
+            const echoText  = summarize(next.personas?.echo  || '', 60);
+
+            const ctxParts: string[] = [`[유저: ${q}]`];
+            if (rayText)   ctxParts.push(`[RAY: ${rayText}]`);
+            if (jackText)  ctxParts.push(`[JACK: ${jackText}]`);
+            if (luciaText) ctxParts.push(`[LUCIA: ${luciaText}]`);
+            if (echoText)  ctxParts.push(`[ECHO: ${echoText}]`);
+            turns.push(ctxParts.join(' → '));
             i++; // 다음 assistant는 소비됐으므로 건너뜀
           } else {
             turns.push(`[유저: ${q}]`);
