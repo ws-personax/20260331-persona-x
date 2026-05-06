@@ -2819,17 +2819,23 @@ export default function ChatWindow() {
                     lucia: 'LUCIA가 공감 중...',
                   };
 
+                  // 1글자라도 도착하면 즉시 실제 텍스트로 전환. key를 loading↔real로 바꿔서
+                  // PersonaBubble의 memo를 우회하고 강제 리마운트시킨다.
+                  const hasText = (s: string | null | undefined): s is string =>
+                    typeof s === 'string' && s.trim().length > 0;
+
                   const renderRound1 = (key: 'ray' | 'jack' | 'lucia') => {
-                    if (key === 'ray') {
-                      const text = msg.personas!.ray || loadingText.ray;
-                      return <PersonaBubble key="r1-ray" personaKey="ray" text={text} timestamp={msg.timestamp} newsItem={msg.personas!.rayNews} details={msg.personas!.rayDetails} />;
-                    }
-                    if (key === 'jack') {
-                      const text = jackText || loadingText.jack;
-                      return <PersonaBubble key="r1-jack" personaKey="jack" text={text} timestamp={msg.timestamp} newsItem={msg.personas!.jackNews} details={msg.personas!.jackDetails} />;
-                    }
-                    const text = luciaText || loadingText.lucia;
-                    return <PersonaBubble key="r1-lucia" personaKey="lucia" text={text} timestamp={msg.timestamp} newsItem={msg.personas!.luciaNews} details={msg.personas!.luciaDetails} />;
+                    let raw: string | null | undefined;
+                    let news: NewsLink | null | undefined;
+                    let details: string | null | undefined;
+                    if (key === 'ray')        { raw = msg.personas!.ray;   news = msg.personas!.rayNews;   details = msg.personas!.rayDetails; }
+                    else if (key === 'jack')  { raw = jackText;            news = msg.personas!.jackNews;  details = msg.personas!.jackDetails; }
+                    else                      { raw = luciaText;           news = msg.personas!.luciaNews; details = msg.personas!.luciaDetails; }
+
+                    const ready = hasText(raw);
+                    const displayText = ready ? raw : loadingText[key];
+                    const bubbleKey = `r1-${key}-${ready ? 'real' : 'loading'}`;
+                    return <PersonaBubble key={bubbleKey} personaKey={key} text={displayText} timestamp={msg.timestamp} newsItem={news} details={details} />;
                   };
 
                   const renderRound2 = (key: 'ray' | 'jack' | 'lucia') => {
@@ -2837,9 +2843,10 @@ export default function ChatWindow() {
                     const value = msg.personas![field];
                     // null = 아직 round 2 시작 전 (ECHO 1 미도착) → 렌더 안 함
                     if (value === null || value === undefined) return null;
-                    // '' = round 2 시작했지만 해당 페르소나 LLM 미완성 → 로딩 텍스트
-                    const text = value || loadingText[key];
-                    return <PersonaBubble key={`r2-${key}`} personaKey={key} text={text} timestamp={msg.timestamp} />;
+                    const ready = hasText(value);
+                    const displayText = ready ? value : loadingText[key];
+                    const bubbleKey = `r2-${key}-${ready ? 'real' : 'loading'}`;
+                    return <PersonaBubble key={bubbleKey} personaKey={key} text={displayText} timestamp={msg.timestamp} />;
                   };
 
                   // 단계별 진행 상태 — 스트리밍 중에도 자연스러운 노출 흐름
@@ -2857,7 +2864,8 @@ export default function ChatWindow() {
                             ── ECHO COMMAND ──
                           </div>
                           <EchoBubble
-                            summary={msg.personas.echo || 'ECHO가 판결 중...'}
+                            key={`echo1-${hasText(msg.personas.echo) ? 'real' : 'loading'}`}
+                            summary={hasText(msg.personas.echo) ? msg.personas.echo : 'ECHO가 판결 중...'}
                             details={msg.personas.echoDetails}
                             timestamp={msg.timestamp}
                             echoNews={msg.personas.echoNews}
@@ -2867,7 +2875,12 @@ export default function ChatWindow() {
                       )}
                       {order.map(renderRound2)}
                       {showEcho2 && (
-                        <EchoBubble summary={msg.personas.echo2 || 'ECHO가 최후 판결 중...'} timestamp={msg.timestamp} hideDisclaimer />
+                        <EchoBubble
+                          key={`echo2-${hasText(msg.personas.echo2) ? 'real' : 'loading'}`}
+                          summary={hasText(msg.personas.echo2) ? msg.personas.echo2! : 'ECHO가 최후 판결 중...'}
+                          timestamp={msg.timestamp}
+                          hideDisclaimer
+                        />
                       )}
                     </>
                   );
