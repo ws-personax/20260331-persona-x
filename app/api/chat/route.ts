@@ -26,6 +26,7 @@ import { TEA_SYSTEM_LUCIA } from './prompts/tea-lucia';
 import { TEA_SYSTEM_JACK } from './prompts/tea-jack';
 import { TEA_SYSTEM_ECHO } from './prompts/tea-echo';
 import { TEA_SYSTEM_RAY } from './prompts/tea-ray';
+import { SCREENPLAY_SYSTEM_PROMPT, buildScreenplayPrompt } from './prompts/orchestrator-screenplay';
 
 // ✅ 재테크 탭 고급 질문 — 4명 페르소나 투자 철학 프롬프트
 import { ADVANCED_SYSTEM_RAY } from './prompts/advanced-ray';
@@ -216,6 +217,67 @@ const getSupabase = () => {
   if (!url || !key) return null;
   return createClient(url, key);
 };
+
+// ─────────────────────────────────────────────
+// ✅ 극본 오케스트레이터 — 1번 LLM 호출로 RAY/JACK/LUCIA/ECHO 4명 1·2라운드 8개 대사 동시 생성
+//   기존 4번 호출 구조의 중복 발화·맥락 단절 문제 해소.
+//   실패 시 null 반환 → 호출부에서 기존 4-페르소나 LLM 폴백.
+// ─────────────────────────────────────────────
+type Screenplay = {
+  ray: string;
+  jack: string;
+  lucia: string;
+  echo: string;
+  ray2: string;
+  jack2: string;
+  lucia2: string;
+  echo2: string;
+};
+
+async function callScreenplayOrchestrator(
+  userMessage: string,
+  category: string,
+  recentContext: string,
+  enableSearch: boolean,
+): Promise<Screenplay | null> {
+  try {
+    const userPrompt = buildScreenplayPrompt(userMessage, category, recentContext);
+    const llm = await callTeaPersona(
+      'echo',
+      SCREENPLAY_SYSTEM_PROMPT,
+      [{ role: 'user', content: userPrompt }],
+      { enableSearch },
+    );
+    if (!llm) return null;
+    const m = llm.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    const parsed = JSON.parse(m[0]) as Record<string, unknown>;
+    const keys: (keyof Screenplay)[] = ['ray', 'jack', 'lucia', 'echo', 'ray2', 'jack2', 'lucia2', 'echo2'];
+    const result: Partial<Screenplay> = {};
+    for (const k of keys) {
+      const v = parsed[k];
+      if (typeof v !== 'string' || !v.trim()) {
+        console.warn(`[screenplay] 키 누락/빈값: ${k}`);
+        return null;
+      }
+      result[k] = v.trim();
+    }
+    return result as Screenplay;
+  } catch (e) {
+    console.warn('[screenplay] 호출 실패', e);
+    return null;
+  }
+}
+
+// 텍스트를 size 글자 단위로 분할 — 진행형 스트리밍 청크용
+function chunkText(text: string, size: number): string[] {
+  if (!text) return [];
+  const out: string[] = [];
+  for (let i = 0; i < text.length; i += size) {
+    out.push(text.slice(i, i + size));
+  }
+  return out;
+}
 
 // ─────────────────────────────────────────────
 // ✅ parseChainedPersonas 제거 — Gemini 완전 제거로 불필요
@@ -762,6 +824,88 @@ export async function POST(req: Request) {
 
       // 스트리밍 모드 — 각 페르소나 LLM 완성 시 즉시 NDJSON 청크 전송
       return streamRespond(async (send) => {
+        // ✅ 극본 오케스트레이터 우선 시도 — 1번 LLM 호출로 8개 대사 동시 생성
+        // 성공 시 RAY → JACK → LUCIA → ECHO 순서로 15자 청크 / 20ms 딜레이 진행형 스트리밍.
+        // 실패(null) 시 아래 기존 4-페르소나 LLM 폴백 로직으로 진입.
+        const isFinanceCategory = ['finance', 'stock', 'crypto', 'economy'].includes(category);
+        const screenplay = await callScreenplayOrchestrator(
+          msg,
+          'finance',
+          recentContext,
+          isFinanceCategory,
+        );
+
+        if (screenplay) {
+          // 페르소나 round 1·2 진행형 스트리밍 — 누적 텍스트로 send (클라이언트는 replace 방식)
+          const streamPersona = async (key: 'ray' | 'jack' | 'lucia', round: 1 | 2, full: string) => {
+            let acc = '';
+            for (const c of chunkText(full, 15)) {
+              acc += c;
+              send({ type: 'persona', key, round, text: acc });
+              await new Promise(r => setTimeout(r, 20));
+            }
+          };
+          const streamEcho = async (round: 1 | 2, full: string) => {
+            let acc = '';
+            for (const c of chunkText(full, 15)) {
+              acc += c;
+              send({ type: 'echo', round, text: acc });
+              await new Promise(r => setTimeout(r, 20));
+            }
+          };
+
+          // 1라운드: RAY → JACK → LUCIA → ECHO
+          await streamPersona('ray',   1, screenplay.ray);
+          await streamPersona('jack',  1, screenplay.jack);
+          await streamPersona('lucia', 1, screenplay.lucia);
+          await streamEcho(1, screenplay.echo);
+
+          // 2라운드: RAY → JACK → LUCIA → ECHO
+          await streamPersona('ray',   2, screenplay.ray2);
+          await streamPersona('jack',  2, screenplay.jack2);
+          await streamPersona('lucia', 2, screenplay.lucia2);
+          await streamEcho(2, screenplay.echo2);
+
+          try {
+            const supabase = getSupabase();
+            if (supabase) {
+              await supabase.from('tea_logs').insert({
+                persona: 'ray',
+                turn_count: 1,
+                first_message: msg.slice(0, 100),
+                user_id: null,
+              });
+            }
+          } catch (e) {
+            console.warn('[tea:finance:screenplay] 로그 저장 실패 (무시)', e);
+          }
+
+          send({
+            type: 'done',
+            reply: [
+              screenplay.ray, screenplay.jack, screenplay.lucia, screenplay.echo,
+              screenplay.ray2, screenplay.jack2, screenplay.lucia2, screenplay.echo2,
+            ].filter(Boolean).join('\n\n'),
+            personas: {
+              jack: screenplay.jack, lucia: screenplay.lucia, ray: screenplay.ray, echo: screenplay.echo,
+              ray2:   screenplay.ray2   || null,
+              jack2:  screenplay.jack2  || null,
+              lucia2: screenplay.lucia2 || null,
+              echo2:  screenplay.echo2  || null,
+              order:  plan.order,
+              verdict: '관망',
+              confidence: 0,
+              breakdown: '재테크 일반',
+              positionSizing: '0%',
+              jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
+            },
+          });
+          return;
+        }
+
+        console.error('[screenplay] 폴백 — 기존 4-페르소나 LLM 호출 사용');
+
+        // ─── 폴백: 기존 4-페르소나 병렬 LLM 호출 (절대 삭제 금지) ───
         // 1단계 병렬 — 각자 완성하는 즉시 send로 클라이언트에 전달
         const rayPromise = callTeaPersona('ray', TEA_SYSTEM_RAY, rayHistory, { enableSearch: true })
           .then(r => {
