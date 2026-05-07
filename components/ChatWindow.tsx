@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
-import Link from 'next/link';
 import AuthButton from '@/components/AuthButton';
+import HistoryModal from '@/components/HistoryModal';
+import { createClient as createSupabaseBrowser } from '@/lib/supabase/client';
 import { PositionInput, buildPositionContext } from './PositionInput';
 import type { Position } from './PositionInput';
 import { inferCurrency, detectKeyword, shouldShowPosition } from '@/lib/maps';
@@ -1475,6 +1476,9 @@ export default function ChatWindow() {
   const [showQuickQ, setShowQuickQ] = useState(false);
   const [teaPersona, setTeaPersona] = useState<'lucia' | 'jack' | 'echo'>('lucia');
   const [luciaGreeting, setLuciaGreeting] = useState<string | null>(null);
+  // ✅ 히스토리 모달 — 페이지 이동 없이 같은 supabase 인스턴스로 데이터 조회 (모바일 세션 단절 방지)
+  const [showHistory, setShowHistory] = useState(false);
+  const supabaseRef = useMemo(() => createSupabaseBrowser(), []);
 
   useEffect(() => {
     // eslint-disable-next-line no-console
@@ -2167,8 +2171,9 @@ export default function ChatWindow() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: '60vw' }}>
           <AuthButton />
-          <Link
-            href="/history"
+          <button
+            type="button"
+            onClick={() => setShowHistory(true)}
             style={{
               background: '#fff',
               padding: '5px 12px',
@@ -2176,13 +2181,13 @@ export default function ChatWindow() {
               fontSize: 12,
               fontWeight: 700,
               color: '#374151',
-              textDecoration: 'none',
               border: '1px solid #d1d5db',
               whiteSpace: 'nowrap',
+              cursor: 'pointer',
             }}
           >
             History
-          </Link>
+          </button>
         </div>
       </header>
 
@@ -3084,6 +3089,12 @@ export default function ChatWindow() {
       </footer>
       )}
     </div>
+    {showHistory && (
+      <HistoryModal
+        onClose={() => setShowHistory(false)}
+        supabaseClient={supabaseRef}
+      />
+    )}
     </>
   );
 }
