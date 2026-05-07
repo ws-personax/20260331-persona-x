@@ -532,7 +532,11 @@ export async function POST(req: Request) {
       tech:     /자동차|전기차|배터리|반도체|AI|인공지능|스마트폰|앱|소프트웨어|하드웨어|IT|클라우드/,
       emotion:  /힘들|외로|슬프|우울|화나|기쁘|설레|불안|걱정|스트레스|피곤|지쳐|고민|마음|감정|위로|공감|재테크고민|투자고민|노후걱정/,
     };
+    // 건강/의료 키워드 — finance보다 먼저 체크해야 "돈이 들어가는 시술/병원" 류 질문이 재테크로 오분류되지 않는다.
+    // 별도 health 카테고리가 없으므로 life로 라우팅 (4명 페르소나 + ECHO 판결 구조).
+    const HEALTH_KEYWORDS = /피부과|병원|시술|성형|약|치료|수술|검사|진료|의사|한의원|치과|안과|이비인후과|내과|외과|정신과|MRI|CT|항암|투약|처방|입원|외래/;
     const detectCategory = (text: string): 'finance' | 'sports' | 'news' | 'legal' | 'tech' | 'life' | 'emotion' | 'general' => {
+      if (HEALTH_KEYWORDS.test(text))      return 'life';
       if (CATEGORY_MAP.finance.test(text)) return 'finance';
       if (CATEGORY_MAP.news.test(text))    return 'news';
       if (CATEGORY_MAP.sports.test(text))  return 'sports';
@@ -2083,7 +2087,7 @@ ${DISCLAIMER}`;
         }
         return respond({
           errorType: 'keyword_not_recognized',
-          errorMessage: '시장 전망은 "코스피 전망" 또는 "나스닥 전망"으로\n질문해 주시면 즉각 분석해 드려요.',
+          errorMessage: '죄송해요, 지금 답변하기 어려운 질문이에요. 재테크, 감정, 건강, 일상 고민을 말씀해 주시면 4명이 함께 생각해드릴게요.',
         });
       }
       // ✅ finance 카테고리(예: "주식 사도 될까요?", "요즘 미국 금리 어때요?") — 종목명 없는 일반 재테크 질문
@@ -2094,7 +2098,7 @@ ${DISCLAIMER}`;
       // ✅ 종목 미인식 — 친절한 안내 카드
       return respond({
         errorType: 'keyword_not_recognized',
-        errorMessage: '죄송합니다. 해당 종목을 찾을 수 없어요.\n다른 종목명으로 입력해주세요.\n예: 삼성전자, 테슬라, SK하이닉스',
+        errorMessage: '죄송해요, 지금 답변하기 어려운 질문이에요. 재테크, 감정, 건강, 일상 고민을 말씀해 주시면 4명이 함께 생각해드릴게요.',
       });
     }
 
@@ -2123,7 +2127,7 @@ ${DISCLAIMER}`;
       if (!isRecognized) {
         return respond({
           errorType: 'keyword_not_recognized',
-          errorMessage: '죄송합니다. 해당 종목을 찾을 수 없어요.\n다른 종목명으로 입력해주세요.\n예: 삼성전자, 테슬라, SK하이닉스',
+          errorMessage: '죄송해요, 지금 답변하기 어려운 질문이에요. 재테크, 감정, 건강, 일상 고민을 말씀해 주시면 4명이 함께 생각해드릴게요.',
         });
       }
       // ✅ 지수(다우/^DJI 등) 데이터 일시 미수급 시 RAY 일반 응답으로 폴백 — 에러 카드 대신 자연스러운 답변
@@ -3020,7 +3024,7 @@ ${DISCLAIMER}`;
     console.error("❌ 사령부 에러:", e);
     return Response.json({
       errorType: 'analysis_failed',
-      errorMessage: '분석 중 오류가 발생했습니다.\n종목명을 다시 입력해주세요. 🔄',
+      errorMessage: '죄송해요, 지금 답변하기 어려운 질문이에요. 재테크, 감정, 건강, 일상 고민을 말씀해 주시면 4명이 함께 생각해드릴게요.',
     });
   }
 }
