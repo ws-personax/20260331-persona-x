@@ -123,6 +123,14 @@ export default function HistoryPage() {
         setLoading(true);
         setDebug(d => ({ ...d, step: 'loadData 시작' }));
 
+        // ✅ 삼성 브라우저 등 storage 제한 환경 대비 — 자동 갱신 루프 시작 후 잠시 대기
+        try {
+          await supabase.auth.startAutoRefresh();
+        } catch {
+          // 무시 — 이미 시작됐거나 환경 미지원
+        }
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         // ✅ 모바일 쿠키 동기화 지연 대비 — refreshSession()으로 토큰 갱신 시도 후 getUser() 확인
         //    refreshSession은 만료 토큰을 갱신하고, 세션이 아예 없으면 무해하게 패스
         try {

@@ -10,9 +10,14 @@ export function createClient() {
       auth: {
         persistSession: true,
         detectSessionInUrl: true,
-        // ✅ 모바일 Safari/Chrome 쿠키 미동기화 대응 — localStorage에 세션 저장
-        //    (쿠키 기반 SSR 대신 클라이언트 storage로 폴백 → 모바일 OAuth 직후 세션 즉시 사용 가능)
-        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+        // ✅ PKCE flow — 삼성 브라우저/모바일 환경에서 더 안정적
+        flowType: 'pkce',
+      },
+      // ✅ 쿠키 기본 사용 (storage 명시 제거) + SameSite=Lax/Secure 명시로
+      //    삼성 브라우저 등에서 localStorage 접근 차단 시에도 세션 유지
+      cookieOptions: {
+        sameSite: 'lax',
+        secure: true,
       },
     },
   );
