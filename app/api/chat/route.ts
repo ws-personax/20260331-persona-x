@@ -371,6 +371,56 @@ const saveHistory = async (params: {
 };
 
 // ─────────────────────────────────────────────
+// saveTeaConversation — teaMode(차 한잔/시사·인생·일상) 4페르소나 응답 저장
+//   기존 saveHistory(finance 시그니처)에 매핑해서 user_analysis_history에 동일 적재.
+//   verdict='관망' / assetType='TEA' / entryCondition=category / 가격·진입조건은 의미 없음.
+//   userId는 함수 내부에서 createServerSupabase().auth.getUser()로 자체 조회.
+// ─────────────────────────────────────────────
+const saveTeaConversation = async (params: {
+  keyword: string;
+  category: string | null;
+  rayText: string;
+  jackText: string;
+  luciaText: string;
+  echoText: string;
+}): Promise<void> => {
+  try {
+    const supabaseServer = await createServerSupabase();
+    const { data: { user }, error: getUserErr } = await supabaseServer.auth.getUser();
+    if (getUserErr) {
+      console.warn('[tea:saveHistory:getUser] error:', getUserErr.message);
+    }
+    const userId = user?.id ?? null;
+    if (!userId) {
+      console.warn('[tea:saveHistory] userId null — saveHistory 스킵');
+      return;
+    }
+    const rawResponse = [
+      params.rayText   && `[RAY]\n${params.rayText}`,
+      params.jackText  && `[JACK]\n${params.jackText}`,
+      params.luciaText && `[LUCIA]\n${params.luciaText}`,
+      params.echoText  && `[ECHO]\n${params.echoText}`,
+    ].filter(Boolean).join('\n\n');
+
+    await saveHistory({
+      keyword: params.keyword.slice(0, 100),
+      question: params.keyword,
+      verdict: '관망' as Verdict,
+      totalScore: 0,
+      assetType: 'TEA',
+      entryCondition: params.category || 'tea',
+      priceAtTime: '-',
+      confidence: 0,
+      rawResponse,
+      marketData: null,
+      userId,
+    });
+  } catch (e) {
+    console.warn('[tea:saveHistory] 예외:', e);
+  }
+};
+
+// ─────────────────────────────────────────────
 // INDEX_KEYWORDS — 히스토리 저장 제외
 // ─────────────────────────────────────────────
 const INDEX_KEYWORDS = new Set([
@@ -1199,6 +1249,16 @@ export async function POST(req: Request) {
           console.warn('[tea:news] 로그 저장 실패 (무시)', e);
         }
 
+        // teaMode 히스토리 저장 (news 4페르소나)
+        void saveTeaConversation({
+          keyword: lastMsg,
+          category: category || 'news',
+          rayText:   [rayText,   rayText2  ].filter(Boolean).join('\n\n'),
+          jackText:  [jackText,  jackText2 ].filter(Boolean).join('\n\n'),
+          luciaText: [luciaText, luciaText2].filter(Boolean).join('\n\n'),
+          echoText:  [echoText,  echoText2 ].filter(Boolean).join('\n\n'),
+        });
+
         return respond({
           reply: [rayText, jackText, luciaText, echoText, rayText2, jackText2, luciaText2, echoText2].filter(Boolean).join('\n\n'),
           personas: {
@@ -1308,6 +1368,16 @@ export async function POST(req: Request) {
         } catch (e) {
           console.warn('[tea:life] 로그 저장 실패 (무시)', e);
         }
+
+        // teaMode 히스토리 저장 (life 4페르소나)
+        void saveTeaConversation({
+          keyword: lastMsg,
+          category: category || 'life',
+          rayText:   [rayText,   lifeRayText2  ].filter(Boolean).join('\n\n'),
+          jackText:  [jackText,  lifeJackText2 ].filter(Boolean).join('\n\n'),
+          luciaText: [luciaText, lifeLuciaText2].filter(Boolean).join('\n\n'),
+          echoText:  [echoText,  lifeEchoText2 ].filter(Boolean).join('\n\n'),
+        });
 
         return respond({
           reply: [rayText, jackText, luciaText, echoText, lifeRayText2, lifeJackText2, lifeLuciaText2, lifeEchoText2].filter(Boolean).join('\n\n'),
@@ -1557,6 +1627,13 @@ export async function POST(req: Request) {
       const lucia = splitForBubble(luciaText);
       const echo = splitForBubble(echoText);
 
+
+      // teaMode 히스토리 저장 (advanced 4페르소나)
+      void saveTeaConversation({
+        keyword: lastMsg,
+        category: category || 'advanced',
+        rayText, jackText, luciaText, echoText,
+      });
 
       return respond({
         reply: [rayText, jackText, luciaText, echoText].join('\n\n'),
