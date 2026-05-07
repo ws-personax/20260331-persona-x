@@ -2113,9 +2113,27 @@ ${DISCLAIMER}`;
     let userId: string | null = null;
     try {
       const supabaseServer = await createServerSupabase();
-      const { data: { user } } = await supabaseServer.auth.getUser();
+      const { data: { user }, error: getUserErr } = await supabaseServer.auth.getUser();
+      if (getUserErr) {
+        console.warn('[saveHistory:getUser] error:', {
+          message: getUserErr.message,
+          name: getUserErr.name,
+          status: (getUserErr as { status?: number }).status,
+        });
+      }
+      console.log('[saveHistory:getUser] result:', {
+        hasUser: !!user,
+        userId: user?.id ?? null,
+        email: user?.email ?? null,
+      });
       userId = user?.id ?? null;
-    } catch { userId = null; }
+      if (!userId) {
+        console.warn('[saveHistory:getUser] userId null — 히스토리 저장 스킵 예정 (서버 쿠키 미동기화 가능)');
+      }
+    } catch (e) {
+      console.warn('[saveHistory:getUser] 예외 — userId null로 처리:', e);
+      userId = null;
+    }
 
     const [marketData, nasdaqData, rawNews] = await Promise.all([
       fetchMarketPrice(keyword),
