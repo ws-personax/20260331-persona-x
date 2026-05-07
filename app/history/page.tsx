@@ -104,8 +104,14 @@ export default function HistoryPage() {
       try {
         setLoading(true);
 
-        // ✅ 모바일 쿠키 동기화 지연 대비 — getSession()으로 세션부터 확인
+        // ✅ 모바일 쿠키 동기화 지연 대비 — refreshSession()으로 토큰 갱신 시도 후 getSession() 확인
         //    (모바일 Safari/Chrome에서 OAuth 직후 getUser() 호출 시 세션 미반영 케이스 있음)
+        //    refreshSession은 만료 토큰을 갱신하고, 세션이 아예 없으면 null을 반환해 무해하게 패스
+        try {
+          await supabase.auth.refreshSession();
+        } catch (refreshErr) {
+          console.warn('[history] refreshSession 무시 가능한 오류:', refreshErr);
+        }
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) {
           console.error('[history] getSession 실패:', {
