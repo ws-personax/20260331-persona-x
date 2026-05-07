@@ -4,6 +4,19 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 export async function createClient() {
   const cookieStore = await cookies();
 
+  // ⚠️ 디버그 — 모바일/서버리스에서 쿠키 미동기화 추적용
+  try {
+    const all = cookieStore.getAll();
+    const sbCookies = all.filter(c => c.name.startsWith('sb-'));
+    console.log('[supabase:server] cookies count:', {
+      total: all.length,
+      sbCount: sbCookies.length,
+      sbNames: sbCookies.map(c => c.name),
+    });
+  } catch (e) {
+    console.warn('[supabase:server] cookies 읽기 실패:', e);
+  }
+
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
