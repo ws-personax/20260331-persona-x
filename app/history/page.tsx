@@ -215,13 +215,13 @@ export default function HistoryPage() {
   }, [filteredItems]);
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', background: '#b2c7da', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ minHeight: '100dvh', background: '#b2c7da', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
       <p style={{ color: '#374151', fontWeight: 700 }}>히스토리 불러오는 중...</p>
     </div>
   );
 
   if (error) return (
-    <div style={{ minHeight: '100vh', background: '#b2c7da', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
+    <div style={{ minHeight: '100dvh', background: '#b2c7da', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
       <p style={{ color: '#dc2626', fontWeight: 700 }}>{error}</p>
       <Link href="/" style={{ background: '#111827', color: '#fff', padding: '10px 20px', borderRadius: 10, textDecoration: 'none', fontWeight: 700 }}>
         홈으로
@@ -230,7 +230,9 @@ export default function HistoryPage() {
   );
 
   return (
-    <div style={{ minHeight: '100vh', background: '#b2c7da', fontFamily: 'sans-serif' }}>
+    // ✅ 모바일 대응: 100dvh로 iOS Safari dynamic toolbar 대응, overflow:auto 명시,
+    //    iOS momentum scrolling 활성화로 스크롤 끊김 방지
+    <div style={{ minHeight: '100dvh', background: '#b2c7da', fontFamily: 'sans-serif', overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
       <header style={{ background: 'rgba(178,199,218,0.95)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(0,0,0,0.06)', position: 'sticky', top: 0, zIndex: 10 }}>
         <Link href="/" style={{ fontWeight: 800, fontSize: 18, color: '#1f2937', textDecoration: 'none' }}>
           ← PersonaX
@@ -238,7 +240,7 @@ export default function HistoryPage() {
         <span style={{ fontSize: 12, color: '#374151', fontWeight: 600 }}>{user?.email || ''}</span>
       </header>
 
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: '20px 16px' }}>
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '20px 16px', paddingBottom: 'max(40px, env(safe-area-inset-bottom))' }}>
         {/* ✅ 기간 필터 */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           {([0, 7, 30] as const).map(d => (
