@@ -103,24 +103,52 @@ export default function HistoryPage() {
     const loadData = async () => {
       try {
         setLoading(true);
-        const { data: userData, error: userError } = await supabase.auth.getUser();
-        if (userError) throw userError;
-        const authUser = userData.user;
-        if (!authUser) {
-          setError('로그인이 필요합니다.');
+
+        // ✅ 모바일 쿠키 동기화 지연 대비 — getSession()으로 세션부터 확인
+        //    (모바일 Safari/Chrome에서 OAuth 직후 getUser() 호출 시 세션 미반영 케이스 있음)
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          console.error('[history] getSession 실패:', {
+            message: sessionError.message,
+            name: sessionError.name,
+            status: (sessionError as { status?: number }).status,
+          });
+          throw sessionError;
+        }
+        if (!session) {
+          // 세션 없음 → 에러가 아니라 "로그인 안내"
+          setError('NO_SESSION');
           return;
         }
+        const authUser = session.user;
         setUser({ email: authUser.email });
+
         const { data, error: dbError } = await supabase
           .from('user_analysis_history')
           .select('id, created_at, keyword, verdict, confidence, entry_price_num, target_price_num, stop_loss_num, currency, result_status, asset_type, question')
           .eq('user_id', authUser.id)
           .order('created_at', { ascending: false })
           .limit(50);
-        if (dbError) throw dbError;
+        if (dbError) {
+          console.error('[history] DB 쿼리 실패:', {
+            message: dbError.message,
+            code: dbError.code,
+            details: dbError.details,
+            hint: dbError.hint,
+            user_id: authUser.id,
+          });
+          throw dbError;
+        }
         setItems(data || []);
       } catch (e) {
-        console.error(e);
+        // 상세 로깅 — message/stack까지 출력해야 모바일 원인 파악 가능
+        console.error('[history] loadData 실패:', {
+          error: e,
+          message: e instanceof Error ? e.message : String(e),
+          name: e instanceof Error ? e.name : undefined,
+          stack: e instanceof Error ? e.stack : undefined,
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+        });
         setError('히스토리를 불러오지 못했습니다.');
       } finally {
         setLoading(false);
@@ -217,6 +245,18 @@ export default function HistoryPage() {
   if (loading) return (
     <div style={{ minHeight: '100dvh', background: '#b2c7da', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
       <p style={{ color: '#374151', fontWeight: 700 }}>히스토리 불러오는 중...</p>
+    </div>
+  );
+
+  // ✅ 세션 없음 — 에러 대신 친절한 로그인 안내 (모바일 쿠키 미동기화 대응)
+  if (error === 'NO_SESSION') return (
+    <div style={{ minHeight: '100dvh', background: '#b2c7da', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, overflow: 'auto', WebkitOverflowScrolling: 'touch', padding: '0 24px' }}>
+      <p style={{ color: '#374151', fontWeight: 700, textAlign: 'center', fontSize: 15, margin: 0 }}>
+        로그인 후 히스토리를 볼 수 있어요.
+      </p>
+      <Link href="/" style={{ background: '#111827', color: '#fff', padding: '10px 20px', borderRadius: 10, textDecoration: 'none', fontWeight: 700 }}>
+        홈으로
+      </Link>
     </div>
   );
 
