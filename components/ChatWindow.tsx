@@ -1367,265 +1367,6 @@ const TeaTabContent = ({
   );
 };
 
-type IntroPersonaKey = 'lucia' | 'jack' | 'echo' | 'ray';
-const INTRO_PERSONA_STYLES: Record<IntroPersonaKey, { bg: string; border: string; title: string; body: string }> = {
-  lucia: { bg: '#f3e8ff', border: '#c4b5fd', title: '#6b21a8', body: '#581c87' },
-  jack:  { bg: '#1f2937', border: '#0f172a', title: '#f9fafb', body: '#e5e7eb' },
-  echo:  { bg: '#064e3b', border: '#022c22', title: '#d1fae5', body: '#a7f3d0' },
-  ray:   { bg: '#dbeafe', border: '#7dd3fc', title: '#0369a1', body: '#075985' },
-};
-type IntroSlogan = {
-  topIcon: string;
-  topText: string;
-  mainIcon: string;
-  mainText: string;
-  highlightWord: string;
-  highlightColor: string;
-  subIcon: string;
-  subText: string;
-};
-type IntroSlide = {
-  id: 'finance' | 'tea';
-  question: string;
-  layout: '2x2' | 'row3';
-  slogan: IntroSlogan;
-  cards: { persona: IntroPersonaKey; name: string; role: string; text: string }[];
-};
-const INTRO_SLIDES: IntroSlide[] = [
-  {
-    id: 'finance',
-    question: '삼성전자 지금 사야 할까요?',
-    layout: '2x2',
-    slogan: {
-      topIcon: '📊',
-      topText: '범용 AI는 답을 드리지만,',
-      mainIcon: '⚡',
-      mainText: '4명이 충돌하고, 당신이 결정합니다.',
-      highlightWord: '충돌',
-      highlightColor: '#E85D4A',
-      subIcon: '📚',
-      subText: '재테크 고민, 함께 공부해요',
-    },
-    cards: [
-      { persona: 'ray',   name: 'RAY',   role: '데이터 · 분석', text: '외국인 순매도 3주 연속.\n52주 최저가 대비 +18%.\n지표들을 종합적으로 살펴볼 필요가 있습니다.' },
-      { persona: 'jack',  name: 'JACK',  role: '결단 · 전략',  text: '방향이 결정되기 전엔 기다리는 것도 전략.\n분할 접근과 관망,\n두 가지 시각이 있습니다.' },
-      { persona: 'lucia', name: 'LUCIA', role: '감정 · 공감',  text: '그 고민 뒤에 뭔가 더 있는 것 같아요.\n요즘 투자가 불안하게 느껴지는\n이유가 있어요?' },
-      { persona: 'echo',  name: 'ECHO',  role: '구조 · 원칙',  text: '타이밍보다 원칙이 먼저입니다.\n지금 필요한 건 매수 결정이 아니라\n본인만의 투자 기준입니다.' },
-    ],
-  },
-  {
-    id: 'tea',
-    question: '남편이랑 싸웠어요',
-    layout: 'row3',
-    slogan: {
-      topIcon: '☕',
-      topText: '판단은 잠시 내려놓으시고,',
-      mainIcon: '💜',
-      mainText: 'AI 참모진이 마음을 함께 나눕니다.',
-      highlightWord: '함께',
-      highlightColor: '#9B59B6',
-      subIcon: '🤝',
-      subText: '마음 고민, 저희가 함께해요',
-    },
-    cards: [
-      { persona: 'lucia', name: 'LUCIA', role: '감정 · 공감', text: '아… 많이 속상하셨겠다.\n가까운 사람이랑 다투고 나면\n그 감정이 오래 남잖아요.' },
-      { persona: 'jack',  name: 'JACK',  role: '결단 · 전략', text: '지금 할 수 있는 건 두 가지입니다.\n1. 본인이 먼저 사과\n2. 남편 사과 기다리기\n관계를 원한다면 1번입니다.' },
-      { persona: 'echo',  name: 'ECHO',  role: '구조 · 원칙', text: '결론: 감정 충돌이 아닙니다.\n소통 구조의 문제입니다.\n먼저 손 내미는 쪽이\n관계를 가져갑니다.' },
-    ],
-  },
-];
-
-const renderSloganHighlight = (text: string, word: string, color: string) => {
-  if (!word || !text.includes(word)) return text;
-  const parts = text.split(word);
-  return parts.flatMap((part, i) =>
-    i < parts.length - 1
-      ? [<span key={`p${i}`}>{part}</span>, <span key={`h${i}`} style={{ color, fontWeight: 900 }}>{word}</span>]
-      : [<span key={`p${i}`}>{part}</span>],
-  );
-};
-
-const IntroSlider = () => {
-  const [idx, setIdx] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => {
-      setIdx(i => (i + 1) % INTRO_SLIDES.length);
-    }, 5000);
-    return () => clearInterval(t);
-  }, []);
-
-  const slide = INTRO_SLIDES[idx];
-
-  return (
-    <div style={{ width: '100%', maxWidth: 380, margin: '0 auto 10px' }}>
-      <style>{`
-        @keyframes pxIntroFade {
-          from { opacity: 0; transform: translateY(6px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        .px-intro-slide {
-          animation: pxIntroFade 0.45s ease both;
-        }
-      `}</style>
-
-      <div key={slide.id} className="px-intro-slide">
-        <div style={{ textAlign: 'center', marginBottom: 10 }}>
-          <p style={{
-            fontSize: 11.5,
-            fontWeight: 500,
-            color: '#9ca3af',
-            letterSpacing: 0.3,
-            margin: '0 0 3px',
-          }}>
-            {slide.slogan.topIcon} {slide.slogan.topText}
-          </p>
-          <p style={{
-            fontSize: 16,
-            fontWeight: 800,
-            color: '#1f2937',
-            lineHeight: 1.35,
-            margin: '0 0 4px',
-          }}>
-            {slide.slogan.mainIcon}{' '}
-            {renderSloganHighlight(slide.slogan.mainText, slide.slogan.highlightWord, slide.slogan.highlightColor)}
-          </p>
-          <p style={{
-            fontSize: 11.5,
-            fontWeight: 500,
-            color: '#6b7280',
-            lineHeight: 1.45,
-            margin: '0 0 10px',
-          }}>
-            {slide.slogan.subIcon} {slide.slogan.subText}
-          </p>
-        </div>
-
-        <p style={{
-          fontSize: 13,
-          fontWeight: 700,
-          color: '#1f2937',
-          textAlign: 'center',
-          margin: '0 0 8px',
-          padding: '5px 12px',
-          background: '#ffffff',
-          border: '1px solid #e5e7eb',
-          borderRadius: 999,
-          display: 'inline-block',
-          width: 'auto',
-          maxWidth: '100%',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-        }}>
-          “{slide.question}”
-        </p>
-
-        {/* 2x2 (재테크): 가로 2 × 세로 2
-            row3 (차 한잔): 가로 3 × 세로 1, 모바일에서도 3개 나란히 */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: slide.layout === 'row3' ? '1fr 1fr 1fr' : '1fr 1fr',
-          gap: slide.layout === 'row3' ? 5 : 6,
-        }}>
-          {slide.cards.map(c => {
-            const st = INTRO_PERSONA_STYLES[c.persona];
-            const isRow3 = slide.layout === 'row3';
-            return (
-              <div
-                key={c.name}
-                style={{
-                  background: st.bg,
-                  border: `1px solid ${st.border}`,
-                  borderRadius: 11,
-                  padding: isRow3 ? '7px 7px' : '7px 9px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 4,
-                  minHeight: isRow3 ? 130 : 86,
-                  minWidth: 0,
-                }}
-              >
-                <div style={{
-                  fontSize: isRow3 ? 9.5 : 10.5,
-                  fontWeight: 800,
-                  color: st.title,
-                  letterSpacing: 0.2,
-                  display: 'flex',
-                  alignItems: 'baseline',
-                  gap: 4,
-                  flexWrap: 'wrap',
-                  lineHeight: 1.2,
-                }}>
-                  <span>{c.name}</span>
-                  <span style={{ fontWeight: 600, opacity: 0.8, fontSize: isRow3 ? 8.5 : 10 }}>· {c.role}</span>
-                </div>
-                <p style={{
-                  margin: 0,
-                  fontSize: isRow3 ? 9.5 : 10.5,
-                  lineHeight: 1.4,
-                  color: st.body,
-                  whiteSpace: 'pre-line',
-                  wordBreak: 'keep-all',
-                }}>
-                  {c.text}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        gap: 8,
-        marginTop: 8,
-      }}>
-        {INTRO_SLIDES.map((s, i) => (
-          <button
-            key={s.id}
-            type="button"
-            aria-label={`슬라이드 ${i + 1}`}
-            onClick={() => setIdx(i)}
-            style={{
-              width: i === idx ? 22 : 8,
-              height: 8,
-              borderRadius: 999,
-              border: 'none',
-              padding: 0,
-              background: i === idx ? '#1f2937' : '#d1d5db',
-              cursor: 'pointer',
-              transition: 'width 0.25s ease, background 0.25s ease',
-            }}
-          />
-        ))}
-      </div>
-
-      <p style={{
-        marginTop: 10,
-        marginBottom: 0,
-        textAlign: 'center',
-        fontSize: 9.5,
-        lineHeight: 1.5,
-        color: '#9ca3af',
-        whiteSpace: 'pre-line',
-      }}>
-        {'본 서비스는 투자 참고용이며, 투자 판단과 책임은 투자자 본인에게 있습니다.\n차 한잔 탭은 심리상담을 대체하지 않습니다.'}
-      </p>
-      <p style={{
-        marginTop: 4,
-        marginBottom: 0,
-        textAlign: 'center',
-        fontSize: 9.5,
-        lineHeight: 1.5,
-        color: '#9ca3af',
-      }}>
-        <Link href="/terms" style={{ color: '#6b7280', textDecoration: 'underline' }}>이용약관</Link>
-        <span style={{ margin: '0 6px', color: '#d1d5db' }}>·</span>
-        <Link href="/privacy" style={{ color: '#6b7280', textDecoration: 'underline' }}>개인정보처리방침</Link>
-      </p>
-    </div>
-  );
-};
-
 const OnboardingTabs = ({
   onSubmit,
   onSetInput,
@@ -2503,12 +2244,12 @@ export default function ChatWindow() {
 
       {!hasUserSent && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center' }}>
-          {/* ✅ 4명 충돌 미리보기 카드 — 첫 진입 시 페르소나 토론 구조를 3초 안에 인지시킴 */}
+          {/* 페르소나 말풍선 2x2 — 첫 진입 시 4명 토론 구조를 한눈에 보여줌 */}
           <div
             style={{
               width: '100%',
               maxWidth: 420,
-              marginBottom: 18,
+              marginBottom: 14,
               padding: '14px 14px 12px',
               background: 'linear-gradient(180deg, #fafafa 0%, #f3f4f6 100%)',
               border: '1px solid #e5e7eb',
@@ -2520,48 +2261,80 @@ export default function ChatWindow() {
               💬 삼성전자 지금 사도 될까?
             </div>
 
-            {([
-              { key: 'ray',   text: 'PBR 1.1배, 역대 최저입니다. 외국인 순매수 3주 연속 12조원.' },
-              { key: 'jack',  text: 'RAY, 2022년부터 3년째 그 말 했잖아요. 결과가 어떻게 됐어요?' },
-              { key: 'lucia', text: 'JACK, 그럼 삼성전자 영원히 사지 말라는 거예요?' },
-              { key: 'echo',  text: '단기면 JACK, 장기면 LUCIA. 기간이 먼저입니다.' },
-            ] as { key: PersonaKey; text: string }[]).map(({ key, text }) => {
-              const p = PERSONAS[key];
-              return (
-                <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              {([
+                { key: 'ray',   text: 'PBR 1.1배, 역대 최저입니다. 외국인 순매수 3주 연속 12조원.' },
+                { key: 'jack',  text: 'RAY, 2022년부터 3년째 그 말 했잖아요. 결과가 어떻게 됐어요?' },
+                { key: 'lucia', text: 'JACK, 그럼 삼성전자 영원히 사지 말라는 거예요?' },
+                { key: 'echo',  text: '단기면 JACK, 장기면 LUCIA. 기간이 먼저입니다.' },
+              ] as { key: PersonaKey; text: string }[]).map(({ key, text }) => {
+                const p = PERSONAS[key];
+                return (
                   <div
+                    key={key}
                     style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: 8,
-                      background: p.iconBg,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <span style={{ color: '#fff', fontWeight: 800, fontSize: 11 }}>{p.initial}</span>
-                  </div>
-                  <div
-                    style={{
-                      flex: 1,
                       background: p.bubbleBg,
                       border: `1px solid ${p.bubbleBorder}`,
                       borderRadius: 10,
-                      padding: '6px 10px',
-                      fontSize: 12.5,
-                      lineHeight: 1.45,
-                      color: p.textColor,
+                      padding: '7px 9px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 3,
+                      minHeight: 90,
+                      minWidth: 0,
                     }}
                   >
-                    <span style={{ fontWeight: 700, marginRight: 4 }}>{p.name}</span>
-                    {text}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <div
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: 5,
+                          background: p.iconBg,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span style={{ color: '#fff', fontWeight: 800, fontSize: 9 }}>{p.initial}</span>
+                      </div>
+                      <span style={{ fontWeight: 800, fontSize: 11, color: p.textColor }}>{p.name}</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: 11, lineHeight: 1.4, color: p.textColor, wordBreak: 'keep-all' }}>
+                      {text}
+                    </p>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+          </div>
 
+          {/* 예시 버튼 3개 — 재테크 / 감정 / 일상 대표 질문 */}
+          <div style={{ width: '100%', maxWidth: 420, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginBottom: 14 }}>
+            {[
+              '삼성전자 지금 사도 될까?',
+              '출근이 너무 힘들어요',
+              '내일 어린이날인데 어디 갈까요?',
+            ].map(text => (
+              <button
+                key={text}
+                type="button"
+                onClick={() => { setInput(text); handleSend(text); }}
+                style={{
+                  padding: '8px 13px',
+                  background: '#f3f4f6',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 20,
+                  fontSize: 12.5,
+                  color: '#374151',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                }}
+              >
+                {text}
+              </button>
+            ))}
           </div>
 
           <OnboardingTabs
