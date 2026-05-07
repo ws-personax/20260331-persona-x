@@ -91,18 +91,6 @@ const ProfitBadge = ({
   );
 };
 
-// ⚠️ 임시 디버그 — 모바일에서 콘솔 접근 어려워 화면에 직접 표시. 원인 파악 후 제거 예정.
-type DebugInfo = {
-  step: string;
-  refreshSession?: { ok: boolean; error?: string };
-  getUser?: { ok: boolean; userId?: string; email?: string; error?: { message: string; name: string; status?: number } };
-  getSession?: { ok: boolean; hasSession?: boolean; error?: string };
-  dbQuery?: { ok: boolean; rowCount?: number; error?: { message: string; code?: string; details?: string; hint?: string } };
-  finalError?: { message: string; name?: string };
-  userAgent?: string;
-  startedAt: string;
-};
-
 export default function HistoryPage() {
   const supabase = useMemo(() => createClient(), []);
   const [items, setItems] = useState<HistoryItem[]>([]);
@@ -110,18 +98,11 @@ export default function HistoryPage() {
   const [error, setError] = useState('');
   const [currentPrices, setCurrentPrices] = useState<Record<number, CurrentPrice>>({});
   const [user, setUser] = useState<{ email?: string | null } | null>(null);
-  // ⚠️ 임시 디버그 상태 — 화면에 표시
-  const [debug, setDebug] = useState<DebugInfo>({
-    step: 'init',
-    startedAt: new Date().toISOString(),
-    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
-  });
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
-        setDebug(d => ({ ...d, step: 'loadData 시작' }));
 
         // ✅ 삼성 브라우저 등 storage 제한 환경 대비 — 자동 갱신 루프 시작 후 잠시 대기
         try {
@@ -135,24 +116,8 @@ export default function HistoryPage() {
         //    refreshSession은 만료 토큰을 갱신하고, 세션이 아예 없으면 무해하게 패스
         try {
           await supabase.auth.refreshSession();
-          setDebug(d => ({ ...d, step: 'refreshSession 성공', refreshSession: { ok: true } }));
         } catch (refreshErr) {
-          const msg = refreshErr instanceof Error ? refreshErr.message : String(refreshErr);
           console.warn('[history] refreshSession 무시 가능한 오류:', refreshErr);
-          setDebug(d => ({ ...d, step: 'refreshSession 실패(무시)', refreshSession: { ok: false, error: msg } }));
-        }
-
-        // ⚠️ 디버그용 — getSession() 결과도 함께 캡처 (실제 분기는 getUser 사용)
-        try {
-          const { data: { session }, error: sessErr } = await supabase.auth.getSession();
-          setDebug(d => ({
-            ...d,
-            getSession: sessErr
-              ? { ok: false, error: sessErr.message }
-              : { ok: true, hasSession: !!session },
-          }));
-        } catch (e) {
-          setDebug(d => ({ ...d, getSession: { ok: false, error: e instanceof Error ? e.message : String(e) } }));
         }
 
         // ✅ getSession()이 아닌 getUser() 사용 — Supabase 서버에 토큰을 직접 검증해
@@ -164,27 +129,10 @@ export default function HistoryPage() {
             name: userError.name,
             status: (userError as { status?: number }).status,
           } : 'user is null');
-          setDebug(d => ({
-            ...d,
-            step: 'getUser 실패',
-            getUser: {
-              ok: false,
-              error: userError ? {
-                message: userError.message,
-                name: userError.name,
-                status: (userError as { status?: number }).status,
-              } : { message: 'user is null', name: 'NoUser' },
-            },
-          }));
           setError('NO_SESSION');
           return;
         }
         setUser({ email: authUser.email });
-        setDebug(d => ({
-          ...d,
-          step: 'getUser 성공',
-          getUser: { ok: true, userId: authUser.id, email: authUser.email ?? undefined },
-        }));
 
         const { data, error: dbError } = await supabase
           .from('user_analysis_history')
@@ -200,27 +148,9 @@ export default function HistoryPage() {
             hint: dbError.hint,
             user_id: authUser.id,
           });
-          setDebug(d => ({
-            ...d,
-            step: 'DB 쿼리 실패',
-            dbQuery: {
-              ok: false,
-              error: {
-                message: dbError.message,
-                code: dbError.code,
-                details: dbError.details,
-                hint: dbError.hint,
-              },
-            },
-          }));
           throw dbError;
         }
         setItems(data || []);
-        setDebug(d => ({
-          ...d,
-          step: 'DB 쿼리 성공',
-          dbQuery: { ok: true, rowCount: (data || []).length },
-        }));
       } catch (e) {
         // 상세 로깅 — message/stack까지 출력해야 모바일 원인 파악 가능
         console.error('[history] loadData 실패:', {
@@ -230,13 +160,6 @@ export default function HistoryPage() {
           stack: e instanceof Error ? e.stack : undefined,
           userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
         });
-        setDebug(d => ({
-          ...d,
-          finalError: {
-            message: e instanceof Error ? e.message : String(e),
-            name: e instanceof Error ? e.name : undefined,
-          },
-        }));
         setError('히스토리를 불러오지 못했습니다.');
       } finally {
         setLoading(false);
@@ -330,73 +253,8 @@ export default function HistoryPage() {
     };
   }, [filteredItems]);
 
-  // ⚠️ 임시 디버그 박스 — 모바일에서 화면 직접 확인용. 원인 파악 후 제거.
-  const DebugBox = () => (
-    <div
-      style={{
-        position: 'fixed',
-        top: 8,
-        left: 8,
-        right: 8,
-        zIndex: 9999,
-        background: '#ffffff',
-        border: '2px solid #dc2626',
-        borderRadius: 8,
-        padding: '8px 10px',
-        fontSize: 10.5,
-        lineHeight: 1.45,
-        color: '#111827',
-        fontFamily: 'monospace',
-        maxHeight: '40vh',
-        overflowY: 'auto',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-        WebkitOverflowScrolling: 'touch',
-      }}
-    >
-      <div style={{ fontWeight: 800, color: '#dc2626', marginBottom: 4, fontSize: 11 }}>
-        🐛 DEBUG (임시)
-      </div>
-      <div><strong>step:</strong> {debug.step}</div>
-      <div><strong>started:</strong> {debug.startedAt}</div>
-      {debug.refreshSession && (
-        <div><strong>refreshSession:</strong> {debug.refreshSession.ok ? 'OK' : `FAIL — ${debug.refreshSession.error}`}</div>
-      )}
-      {debug.getSession && (
-        <div>
-          <strong>getSession:</strong>{' '}
-          {debug.getSession.ok ? `OK (hasSession=${String(debug.getSession.hasSession)})` : `FAIL — ${debug.getSession.error}`}
-        </div>
-      )}
-      {debug.getUser && (
-        <div style={{ marginTop: 4 }}>
-          <strong>getUser:</strong>{' '}
-          {debug.getUser.ok
-            ? `OK — userId=${debug.getUser.userId}, email=${debug.getUser.email ?? '(none)'}`
-            : `FAIL — ${debug.getUser.error?.name}: ${debug.getUser.error?.message}${debug.getUser.error?.status ? ` (status=${debug.getUser.error.status})` : ''}`}
-        </div>
-      )}
-      {debug.dbQuery && (
-        <div style={{ marginTop: 4 }}>
-          <strong>dbQuery:</strong>{' '}
-          {debug.dbQuery.ok
-            ? `OK — rowCount=${debug.dbQuery.rowCount}`
-            : `FAIL — message="${debug.dbQuery.error?.message}", code="${debug.dbQuery.error?.code}", hint="${debug.dbQuery.error?.hint}", details="${debug.dbQuery.error?.details}"`}
-        </div>
-      )}
-      {debug.finalError && (
-        <div style={{ marginTop: 4, color: '#dc2626' }}>
-          <strong>finalError:</strong> {debug.finalError.name}: {debug.finalError.message}
-        </div>
-      )}
-      <div style={{ marginTop: 6, fontSize: 9.5, color: '#6b7280', wordBreak: 'break-all' }}>
-        UA: {debug.userAgent}
-      </div>
-    </div>
-  );
-
   if (loading) return (
     <div style={{ minHeight: '100dvh', background: '#b2c7da', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
-      <DebugBox />
       <p style={{ color: '#374151', fontWeight: 700 }}>히스토리 불러오는 중...</p>
     </div>
   );
@@ -404,7 +262,6 @@ export default function HistoryPage() {
   // ✅ 세션 없음 — 에러 대신 친절한 로그인 안내 (모바일 쿠키 미동기화 대응)
   if (error === 'NO_SESSION') return (
     <div style={{ minHeight: '100dvh', background: '#b2c7da', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, overflow: 'auto', WebkitOverflowScrolling: 'touch', padding: '0 24px' }}>
-      <DebugBox />
       <p style={{ color: '#374151', fontWeight: 700, textAlign: 'center', fontSize: 15, margin: 0, marginTop: 200 }}>
         로그인 후 히스토리를 볼 수 있어요.
       </p>
@@ -416,7 +273,6 @@ export default function HistoryPage() {
 
   if (error) return (
     <div style={{ minHeight: '100dvh', background: '#b2c7da', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
-      <DebugBox />
       <p style={{ color: '#dc2626', fontWeight: 700, marginTop: 200 }}>{error}</p>
       <Link href="/" style={{ background: '#111827', color: '#fff', padding: '10px 20px', borderRadius: 10, textDecoration: 'none', fontWeight: 700 }}>
         홈으로
@@ -428,7 +284,6 @@ export default function HistoryPage() {
     // ✅ 모바일 대응: 100dvh로 iOS Safari dynamic toolbar 대응, overflow:auto 명시,
     //    iOS momentum scrolling 활성화로 스크롤 끊김 방지
     <div style={{ minHeight: '100dvh', background: '#b2c7da', fontFamily: 'sans-serif', overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
-      <DebugBox />
       <header style={{ background: 'rgba(178,199,218,0.95)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(0,0,0,0.06)', position: 'sticky', top: 0, zIndex: 10 }}>
         <Link href="/" style={{ fontWeight: 800, fontSize: 18, color: '#1f2937', textDecoration: 'none' }}>
           ← PersonaX
