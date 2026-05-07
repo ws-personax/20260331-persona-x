@@ -308,8 +308,13 @@ const saveHistory = async (params: {
   ipAddress?: string | null; userId?: string | null; volIsHigh?: boolean;
 }): Promise<void> => {
   try {
+    console.log('[saveHistory] userId:', params.userId);
+    console.log('[saveHistory] keyword:', params.keyword);
     const supabase = getSupabase();
-    if (!supabase) return;
+    if (!supabase) {
+      console.warn('[saveHistory] supabase client null — 환경변수 확인 필요');
+      return;
+    }
 
     const { buy, sell } = extractConditionPrices(params.entryCondition);
     const stopNum = parsePriceToNumber(sell);
@@ -358,11 +363,11 @@ const saveHistory = async (params: {
     });
 
     if (insertError) {
-      console.warn('⚠️ 히스토리 저장 실패:',
-        insertError.message, '| code:', insertError.code
-      );
+      console.error('[saveHistory] 저장 실패:', insertError.message, insertError.code);
+    } else {
+      console.log('[saveHistory] 저장 성공');
     }
-  } catch (err) { console.warn('⚠️ 히스토리 저장 예외:', err); }
+  } catch (err) { console.error('[saveHistory] 예외:', err); }
 };
 
 // ─────────────────────────────────────────────
