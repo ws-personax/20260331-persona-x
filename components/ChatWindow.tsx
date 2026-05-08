@@ -1932,7 +1932,7 @@ export default function ChatWindow() {
           ray2: null, jack2: null, lucia2: null, echo2: null,
           verdict: '관망', confidence: 0, breakdown: '', positionSizing: '0%',
           jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
-          order: ['ray', 'jack', 'lucia'],
+          order: ['lucia', 'jack', 'ray'],
         };
         const initialMsg: Message = {
           id: assistantId,
