@@ -27,6 +27,18 @@ import { TEA_SYSTEM_JACK } from './prompts/tea-jack';
 import { TEA_SYSTEM_ECHO } from './prompts/tea-echo';
 import { TEA_SYSTEM_RAY } from './prompts/tea-ray';
 import { SCREENPLAY_SYSTEM_PROMPT, buildScreenplayPrompt } from './prompts/orchestrator-screenplay';
+import {
+  detectPersonaOrderHybrid,
+  buildTaggedRound1SystemPrompt,
+  buildTaggedRound2SystemPrompt,
+  buildTaggedRound1UserPrompt,
+  buildTaggedRound2UserPrompt,
+  parseTaggedRound1,
+  parseTaggedRound2,
+  type TaggedPersonaKey,
+  type TaggedRound1Result,
+  type TaggedRound2Result,
+} from './prompts/orchestrator-tagged';
 
 // ✅ 재테크 탭 고급 질문 — 4명 페르소나 투자 철학 프롬프트
 import { ADVANCED_SYSTEM_RAY } from './prompts/advanced-ray';
@@ -280,6 +292,62 @@ async function callScreenplayOrchestrator(
     return result as Screenplay;
   } catch (e) {
     console.warn('[screenplay] 호출 실패', e);
+    return null;
+  }
+}
+
+// ─────────────────────────────────────────────
+// ✅ 단일 호출 태그 기반 오케스트레이터 (1라운드 / 2라운드 분리)
+//   1라운드: [FIRST] [SECOND] [THIRD] [ECHO_QUESTION]
+//   2라운드: [FIRST_2] [SECOND_2] [THIRD_2] [ECHO_FINAL]
+//   하이브리드 순서: 감정 키워드 감지 시 LUCIA 먼저, 아니면 카테고리 기반.
+// ─────────────────────────────────────────────
+async function callTaggedRound1(
+  userMessage: string,
+  category: string,
+  recentContext: string,
+  order: TaggedPersonaKey[],
+  enableSearch: boolean,
+): Promise<TaggedRound1Result | null> {
+  try {
+    const systemPrompt = buildTaggedRound1SystemPrompt();
+    const userPrompt = buildTaggedRound1UserPrompt(userMessage, category, recentContext, order);
+    const llm = await callTeaPersona(
+      'echo',
+      systemPrompt,
+      [{ role: 'user', content: userPrompt }],
+      { enableSearch },
+    );
+    if (!llm) return null;
+    return parseTaggedRound1(llm);
+  } catch (e) {
+    console.warn('[tagged-r1] 호출 실패', e);
+    return null;
+  }
+}
+
+async function callTaggedRound2(
+  userMessage: string,
+  category: string,
+  recentContext: string,
+  order: TaggedPersonaKey[],
+  round1: TaggedRound1Result,
+  userAnswer: string,
+  enableSearch: boolean,
+): Promise<TaggedRound2Result | null> {
+  try {
+    const systemPrompt = buildTaggedRound2SystemPrompt();
+    const userPrompt = buildTaggedRound2UserPrompt(userMessage, category, recentContext, order, round1, userAnswer);
+    const llm = await callTeaPersona(
+      'echo',
+      systemPrompt,
+      [{ role: 'user', content: userPrompt }],
+      { enableSearch },
+    );
+    if (!llm) return null;
+    return parseTaggedRound2(llm);
+  } catch (e) {
+    console.warn('[tagged-r2] 호출 실패', e);
     return null;
   }
 }
@@ -897,6 +965,205 @@ export async function POST(req: Request) {
 
       // 스트리밍 모드 — 각 페르소나 LLM 완성 시 즉시 NDJSON 청크 전송
       return streamRespond(async (send) => {
+        // ─────────────────────────────────────────────
+        // ✅ 단일 호출 태그 기반 오케스트레이터 (1라운드 / 2라운드 분리)
+        //   - 1라운드: [FIRST] [SECOND] [THIRD] [ECHO_QUESTION] (4개 태그)
+        //   - 2라운드: [FIRST_2] [SECOND_2] [THIRD_2] [ECHO_FINAL] (4개 태그)
+        //   - 하이브리드 순서: 감정 키워드 시 LUCIA 먼저, 아니면 카테고리 기반.
+        //   - 라운드 분리는 teaRound 파라미터로 결정 (클라이언트가 메시지 수로 계산).
+        // ─────────────────────────────────────────────
+        const order = detectPersonaOrderHybrid(msg, category);
+        const enableSearchTagged = ['finance', 'stock', 'crypto', 'economy', 'news'].includes(category);
+        const isRound1 = !teaRound || teaRound <= 1;
+
+        const streamPersonaTagged = async (key: TaggedPersonaKey, full: string) => {
+          let acc = '';
+          for (const c of chunkText(full, 15)) {
+            acc += c;
+            send({ type: 'persona', key, round: 1, text: acc });
+            await new Promise(r => setTimeout(r, 20));
+          }
+        };
+        const streamEchoTagged = async (full: string) => {
+          let acc = '';
+          for (const c of chunkText(full, 15)) {
+            acc += c;
+            send({ type: 'echo', round: 1, text: acc });
+            await new Promise(r => setTimeout(r, 20));
+          }
+        };
+
+        if (isRound1) {
+          const r1 = await callTaggedRound1(msg, category, recentContext, order, enableSearchTagged);
+          if (r1) {
+            const personaText: Record<TaggedPersonaKey, string> = {
+              ray: '', jack: '', lucia: '',
+            };
+            personaText[order[0]] = r1.first;
+            personaText[order[1]] = r1.second;
+            personaText[order[2]] = r1.third;
+
+            for (const key of order) {
+              await streamPersonaTagged(key, personaText[key]);
+            }
+            await streamEchoTagged(r1.echoQuestion);
+
+            try {
+              const adminSupabase = getAdminSupabase();
+              if (adminSupabase) {
+                await adminSupabase.from('tea_logs').insert({
+                  persona: 'ray',
+                  turn_count: 1,
+                  first_message: msg.slice(0, 100),
+                  user_id: null,
+                });
+              }
+            } catch (e) {
+              console.warn('[tea:tagged-r1] 로그 저장 실패 (무시)', e);
+            }
+
+            send({
+              type: 'done',
+              reply: [r1.first, r1.second, r1.third, r1.echoQuestion].filter(Boolean).join('\n\n'),
+              personas: {
+                ray: personaText.ray,
+                jack: personaText.jack,
+                lucia: personaText.lucia,
+                echo: r1.echoQuestion,
+                ray2: null, jack2: null, lucia2: null, echo2: null,
+                order,
+                verdict: '관망',
+                confidence: 0,
+                breakdown: '재테크 일반',
+                positionSizing: '0%',
+                jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
+              },
+            });
+            return;
+          }
+          console.error('[tagged-r1] 파싱 실패 — done 응답');
+          send({
+            type: 'done',
+            reply: '',
+            personas: {
+              ray: '', jack: '', lucia: '', echo: '',
+              ray2: null, jack2: null, lucia2: null, echo2: null,
+              order,
+              verdict: '관망', confidence: 0, breakdown: '재테크 일반', positionSizing: '0%',
+              jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
+            },
+          });
+          return;
+        }
+
+        // 2라운드 — 직전 어시스턴트 메시지에서 1라운드 컨텍스트 추출 + 직전 유저 답변 전달.
+        const priorAssistant = (() => {
+          if (!Array.isArray(messages)) return null;
+          for (let i = messages.length - 2; i >= 0; i--) {
+            const m = messages[i] as { role?: string; personas?: { ray?: string; jack?: string; lucia?: string; echo?: string; order?: TaggedPersonaKey[] } };
+            if (m?.role === 'assistant' && m?.personas) return m;
+          }
+          return null;
+        })();
+        const priorOrder: TaggedPersonaKey[] = (priorAssistant?.personas?.order && priorAssistant.personas.order.length === 3)
+          ? priorAssistant.personas.order
+          : order;
+        const priorText: Record<TaggedPersonaKey, string> = {
+          ray:   priorAssistant?.personas?.ray   || '',
+          jack:  priorAssistant?.personas?.jack  || '',
+          lucia: priorAssistant?.personas?.lucia || '',
+        };
+        const priorRound1: TaggedRound1Result = {
+          first: priorText[priorOrder[0]] || '',
+          second: priorText[priorOrder[1]] || '',
+          third: priorText[priorOrder[2]] || '',
+          echoQuestion: priorAssistant?.personas?.echo || '',
+        };
+        // 원 질문 (가장 최근 user msg 두 개 중 앞의 것 — 즉 1라운드 진입 질문)
+        const priorUserQuestion = (() => {
+          if (!Array.isArray(messages)) return msg;
+          const userMsgs = messages.filter((m: { role?: string }) => m?.role === 'user');
+          if (userMsgs.length >= 2) return (userMsgs[userMsgs.length - 2] as { content?: string }).content || msg;
+          return msg;
+        })();
+
+        const r2 = await callTaggedRound2(
+          priorUserQuestion,
+          category,
+          recentContext,
+          priorOrder,
+          priorRound1,
+          msg, // 직전 유저 메시지 = ECHO_QUESTION에 대한 답변
+          enableSearchTagged,
+        );
+
+        if (r2) {
+          const personaText2: Record<TaggedPersonaKey, string> = {
+            ray: '', jack: '', lucia: '',
+          };
+          personaText2[priorOrder[0]] = r2.first;
+          personaText2[priorOrder[1]] = r2.second;
+          personaText2[priorOrder[2]] = r2.third;
+
+          for (const key of priorOrder) {
+            await streamPersonaTagged(key, personaText2[key]);
+          }
+          await streamEchoTagged(r2.echoFinal);
+
+          try {
+            const adminSupabase = getAdminSupabase();
+            if (adminSupabase) {
+              await adminSupabase.from('tea_logs').insert({
+                persona: 'echo',
+                turn_count: 2,
+                first_message: msg.slice(0, 100),
+                user_id: null,
+              });
+            }
+          } catch (e) {
+            console.warn('[tea:tagged-r2] 로그 저장 실패 (무시)', e);
+          }
+
+          send({
+            type: 'done',
+            reply: [r2.first, r2.second, r2.third, r2.echoFinal].filter(Boolean).join('\n\n'),
+            personas: {
+              ray: personaText2.ray,
+              jack: personaText2.jack,
+              lucia: personaText2.lucia,
+              echo: r2.echoFinal,
+              ray2: null, jack2: null, lucia2: null, echo2: null,
+              order: priorOrder,
+              verdict: '관망',
+              confidence: 0,
+              breakdown: '재테크 일반',
+              positionSizing: '0%',
+              jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
+            },
+          });
+          return;
+        }
+        console.error('[tagged-r2] 파싱 실패 — done 응답');
+        send({
+          type: 'done',
+          reply: '',
+          personas: {
+            ray: '', jack: '', lucia: '', echo: '',
+            ray2: null, jack2: null, lucia2: null, echo2: null,
+            order: priorOrder,
+            verdict: '관망', confidence: 0, breakdown: '재테크 일반', positionSizing: '0%',
+            jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
+          },
+        });
+        return;
+
+        // ─────────────────────────────────────────────
+        // ⚠️ DEPRECATED — 기존 screenplay JSON 단일 호출 + 4-페르소나 개별 호출 폴백.
+        //   단일 호출 태그 기반 오케스트레이터로 전환 (위 블록).
+        //   참조용으로 보존 — `if (false)` 로 비활성화 (주석 처리 효과).
+        // ─────────────────────────────────────────────
+        // eslint-disable-next-line no-constant-condition
+        if (false) {
         // ✅ 극본 오케스트레이터 우선 시도 — 1번 LLM 호출로 8개 대사 동시 생성
         // 성공 시 RAY → JACK → LUCIA → ECHO 순서로 15자 청크 / 20ms 딜레이 진행형 스트리밍.
         // 실패(null) 시 아래 기존 4-페르소나 LLM 폴백 로직으로 진입.
@@ -1136,6 +1403,7 @@ export async function POST(req: Request) {
             jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
           },
         });
+        } // ── DEPRECATED 블록 종료 (if (false)) ──
       });
     };
 

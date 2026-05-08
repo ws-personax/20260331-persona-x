@@ -1902,6 +1902,8 @@ export default function ChatWindow() {
         ...(m.role === 'assistant' && m.teaEcho ? { teaEcho: m.teaEcho } : {}),
         ...(m.role === 'assistant' && m.teaRay ? { teaRay: m.teaRay } : {}),
         ...(m.role === 'assistant' && m.luciaIntro ? { luciaIntro: m.luciaIntro } : {}),
+        // ✅ 단일 호출 태그 오케스트레이터 — 2라운드 호출 시 1라운드 personas 컨텍스트 전달
+        ...(m.role === 'assistant' && m.personas ? { personas: m.personas } : {}),
       })),
       positionContext: buildPositionContext(position),
       teaMode: isTeaSend,
