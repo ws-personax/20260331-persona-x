@@ -37,7 +37,9 @@
       "Bash(cp \"app/api/chat/prompts/tea-echo.ts\" \"app/api/chat/prompts/tea-echo.backup.ts\")",
       "Bash(echo \"EXIT: $?\")",
       "Bash(npx --no-install tsc --noEmit)",
-      "Bash(echo \"EXIT_CODE=$?\")"
+      "Bash(echo \"EXIT_CODE=$?\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://20260331-persona-x.vercel.app)",
+      "Bash(curl *)"
     ]
   }
 }

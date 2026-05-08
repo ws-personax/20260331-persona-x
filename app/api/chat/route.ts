@@ -592,6 +592,7 @@ export async function POST(req: Request) {
     const HEALTH_KEYWORDS = /피부과|병원|시술|성형|약|치료|수술|검사|진료|의사|한의원|치과|안과|이비인후과|내과|외과|정신과|MRI|CT|항암|투약|처방|입원|외래/;
     const detectCategory = (text: string): 'finance' | 'sports' | 'news' | 'legal' | 'tech' | 'life' | 'emotion' | 'general' => {
       if (HEALTH_KEYWORDS.test(text))      return 'life';
+      if (CATEGORY_MAP.emotion.test(text)) return 'emotion';
       if (CATEGORY_MAP.finance.test(text)) return 'finance';
       if (CATEGORY_MAP.news.test(text))    return 'news';
       if (CATEGORY_MAP.sports.test(text))  return 'sports';
@@ -600,7 +601,6 @@ export async function POST(req: Request) {
       if (CATEGORY_MAP.life.test(text))    return 'life';
       if (CATEGORY_MAP.legal.test(text))   return 'legal';
       if (CATEGORY_MAP.tech.test(text))    return 'tech';
-      if (CATEGORY_MAP.emotion.test(text)) return 'emotion';
       return 'general';
     };
     const LUCIA_ROUTING_MESSAGE: Record<string, string> = {
