@@ -840,6 +840,93 @@ const EchoBubble = memo(function EchoBubble({
   );
 });
 
+// ✅ ECHO 질문 직후 인라인 답변 입력창 — 단일 호출 태그 오케스트레이터 2라운드 트리거.
+//   답변하기 → handleSendWithPosition(value, null) → teaRound=2.
+//   건너뛰기 → handleSendWithPosition('', null) → 빈 값으로 teaRound=2.
+const EchoAnswerInline = memo(function EchoAnswerInline({
+  onSubmit,
+  disabled,
+}: {
+  onSubmit: (answer: string) => void;
+  disabled?: boolean;
+}) {
+  const [value, setValue] = useState('');
+  return (
+    <div style={{
+      margin: '4px 12px 16px 56px',
+      padding: 10,
+      background: '#fffbea',
+      border: '1px solid #fbbf24',
+      borderRadius: 12,
+      maxWidth: 560,
+    }}>
+      <div style={{ marginBottom: 6, fontSize: 12, fontWeight: 700, color: '#92400e' }}>
+        ECHO의 질문에 답하시면 2라운드가 시작됩니다
+      </div>
+      <textarea
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="ECHO의 질문에 답해주세요..."
+        disabled={disabled}
+        rows={2}
+        style={{
+          width: '100%',
+          padding: 8,
+          border: '1px solid #d1d5db',
+          borderRadius: 8,
+          fontSize: 13,
+          resize: 'none',
+          boxSizing: 'border-box',
+          fontFamily: 'inherit',
+          outline: 'none',
+        }}
+      />
+      <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
+        <button
+          type="button"
+          onClick={() => onSubmit('')}
+          disabled={disabled}
+          style={{
+            padding: '6px 12px',
+            background: '#f3f4f6',
+            border: '1px solid #d1d5db',
+            borderRadius: 8,
+            fontSize: 12,
+            fontWeight: 600,
+            color: '#6b7280',
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            opacity: disabled ? 0.6 : 1,
+          }}
+        >
+          건너뛰기
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const trimmed = value.trim();
+            if (!trimmed) return;
+            onSubmit(trimmed);
+          }}
+          disabled={disabled || !value.trim()}
+          style={{
+            padding: '6px 12px',
+            background: '#FAE100',
+            border: '1px solid #FAE100',
+            borderRadius: 8,
+            fontSize: 12,
+            fontWeight: 700,
+            color: '#1f2937',
+            cursor: (disabled || !value.trim()) ? 'not-allowed' : 'pointer',
+            opacity: (disabled || !value.trim()) ? 0.6 : 1,
+          }}
+        >
+          답변하기
+        </button>
+      </div>
+    </div>
+  );
+});
+
 const TEA_TYPING_TEXT: Record<'lucia' | 'jack' | 'echo', string> = {
   lucia: '💜 LUCIA가 당신의 마음을 읽고 있어요...',
   jack: 'JACK이 생각을 정리하고 있어요...',
@@ -2382,22 +2469,25 @@ export default function ChatWindow() {
             </div>
           );
         })()}
-        {messages.map(msg => (
+        {messages.map((msg, msgIdx) => (
           <div key={msg.id}>
             {msg.role === 'user' ? (
-              <div data-msg-id={msg.id} style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16, padding: '0 12px' }}>
-                <div style={{ background: '#FAE100', borderRadius: '15px 0 15px 15px', padding: '10px 15px', maxWidth: '75%', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                  <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>
-                    {msg.content.includes('약 10초') ? (
-                      <>
-                        {msg.content.split('약 10초')[0]}
-                        <span style={{ fontWeight: 900, fontSize: 16 }}>약 10초</span>
-                        {msg.content.split('약 10초')[1]}
-                      </>
-                    ) : msg.content}
-                  </p>
+              // ✅ ECHO 질문 건너뛰기로 빈 값 전송된 경우 user 버블을 숨김
+              msg.content.trim() ? (
+                <div data-msg-id={msg.id} style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16, padding: '0 12px' }}>
+                  <div style={{ background: '#FAE100', borderRadius: '15px 0 15px 15px', padding: '10px 15px', maxWidth: '75%', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>
+                      {msg.content.includes('약 10초') ? (
+                        <>
+                          {msg.content.split('약 10초')[0]}
+                          <span style={{ fontWeight: 900, fontSize: 16 }}>약 10초</span>
+                          {msg.content.split('약 10초')[1]}
+                        </>
+                      ) : msg.content}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              ) : null
             ) : msg.errorType && msg.errorMessage ? (
               <div style={{ marginBottom: 12 }}>
                 <ErrorCard
@@ -2616,6 +2706,13 @@ export default function ChatWindow() {
                             echoNews={msg.personas.echoNews}
                             hideDisclaimer={msg.personas.breakdown !== undefined}
                           />
+                          {/* ✅ ECHO_QUESTION 직후 인라인 답변 입력창 — 마지막 어시스턴트 메시지에서만 노출 */}
+                          {msgIdx === messages.length - 1 && hasText(msg.personas.echo) && !hasText(msg.personas.echo2) && (
+                            <EchoAnswerInline
+                              disabled={isLoading}
+                              onSubmit={(answer) => handleSendWithPosition(answer, null)}
+                            />
+                          )}
                         </>
                       )}
                       {order.map(renderRound2)}
