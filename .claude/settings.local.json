@@ -39,7 +39,8 @@
       "Bash(npx --no-install tsc --noEmit)",
       "Bash(echo \"EXIT_CODE=$?\")",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://20260331-persona-x.vercel.app)",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "Bash(python -c ' *)"
     ]
   }
 }
