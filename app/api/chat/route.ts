@@ -84,10 +84,18 @@ function getClientIp(req: Request): string {
 //   기존 GOOGLE_GENERATIVE_AI_API_KEY 재사용. LLM 실패 시 호출부에서
 //   기존 템플릿으로 폴백.
 // ─────────────────────────────────────────────
-const TEA_GEMINI_MODEL = process.env.NEXT_PUBLIC_AI_MODEL || 'gemini-2.5-flash';
+// ✅ Pro/Flash 이중 폴백 구조
+//   Primary: Gemini 2.5 Pro (느리지만 페르소나 지시 준수율 높음, 60초 타임아웃)
+//   Fallback: Gemini 2.5 Flash → 2.0 Flash (빠른 폴백, 30초 타임아웃)
+const TEA_GEMINI_PRIMARY_MODEL = process.env.GEMINI_PRIMARY_MODEL || 'gemini-2.5-pro';
+const TEA_GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash';
 const TEA_GEMINI_FALLBACK_CHAIN: string[] = Array.from(
-  new Set([TEA_GEMINI_MODEL, 'gemini-2.5-flash', 'gemini-2.0-flash']),
+  new Set([TEA_GEMINI_PRIMARY_MODEL, TEA_GEMINI_FALLBACK_MODEL, 'gemini-2.0-flash']),
 );
+// 모델별 타임아웃 — Pro는 60초, Flash는 30초
+const getModelTimeoutMs = (modelName: string): number => {
+  return modelName.toLowerCase().includes('pro') ? 60_000 : 30_000;
+};
 const TEA_RETRY_DELAY_MS = 500;
 const isRetriableModelError = (err: unknown): boolean => {
   const anyErr = err as { status?: number; message?: string };
@@ -99,7 +107,8 @@ const isRetriableModelError = (err: unknown): boolean => {
     msg.includes('overloaded') ||
     msg.includes('unavailable') ||
     msg.includes('rate limit') ||
-    msg.includes('too many requests')
+    msg.includes('too many requests') ||
+    msg.includes('timeout')
   );
 };
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -194,14 +203,21 @@ const callTeaPersona = async (
         systemInstruction: system,
         ...(searchTools ? { tools: searchTools } : {}),
       });
-      const result = await model.generateContent({
-        contents,
-        generationConfig: {
-          maxOutputTokens: 1200,
-          temperature: 0.7,
-          thinkingConfig: { thinkingBudget: 0 },
-        } as GenerationConfig,
-      });
+      // ✅ 모델별 타임아웃 — Pro 60s / Flash 30s (Promise.race로 강제 컷)
+      const timeoutMs = getModelTimeoutMs(modelName);
+      const result = await Promise.race([
+        model.generateContent({
+          contents,
+          generationConfig: {
+            maxOutputTokens: 1200,
+            temperature: 0.7,
+            thinkingConfig: { thinkingBudget: 0 },
+          } as GenerationConfig,
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`${modelName} timeout after ${timeoutMs}ms`)), timeoutMs),
+        ),
+      ]);
       const blockReason = result?.response?.promptFeedback?.blockReason;
       if (blockReason) {
         console.warn(`${tag} ${modelName} 차단됨 — blockReason=${blockReason} → 템플릿 폴백`);
