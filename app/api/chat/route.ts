@@ -87,7 +87,7 @@ function getClientIp(req: Request): string {
 // ✅ Pro/Flash 이중 폴백 구조
 //   Primary: Gemini 2.5 Pro (느리지만 페르소나 지시 준수율 높음, 60초 타임아웃)
 //   Fallback: Gemini 2.5 Flash → 2.0 Flash (빠른 폴백, 30초 타임아웃)
-const TEA_GEMINI_PRIMARY_MODEL = process.env.GEMINI_PRIMARY_MODEL || 'gemini-2.5-pro';
+const TEA_GEMINI_PRIMARY_MODEL = process.env.GEMINI_PRIMARY_MODEL || 'gemini-2.5-flash';
 const TEA_GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash';
 const TEA_GEMINI_FALLBACK_CHAIN: string[] = Array.from(
   new Set([TEA_GEMINI_PRIMARY_MODEL, TEA_GEMINI_FALLBACK_MODEL, 'gemini-2.0-flash']),
