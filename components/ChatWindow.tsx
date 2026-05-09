@@ -860,9 +860,6 @@ const EchoAnswerInline = memo(function EchoAnswerInline({
       borderRadius: 12,
       maxWidth: 560,
     }}>
-      <div style={{ marginBottom: 6, fontSize: 12, fontWeight: 700, color: '#92400e' }}>
-        ECHO의 질문에 답하시면 2라운드가 시작됩니다
-      </div>
       <textarea
         value={value}
         onChange={(e) => setValue(e.target.value)}
@@ -2706,8 +2703,8 @@ export default function ChatWindow() {
                             echoNews={msg.personas.echoNews}
                             hideDisclaimer={msg.personas.breakdown !== undefined}
                           />
-                          {/* ✅ ECHO_QUESTION 직후 인라인 답변 입력창 — 마지막 어시스턴트 메시지에서만 노출 */}
-                          {msgIdx === messages.length - 1 && hasText(msg.personas.echo) && !hasText(msg.personas.echo2) && (
+                          {/* ✅ ECHO_QUESTION 직후 인라인 답변 입력창 — ECHO 1라운드에 질문(?)이 포함된 경우에만 노출 */}
+                          {msgIdx === messages.length - 1 && hasText(msg.personas.echo) && !hasText(msg.personas.echo2) && msg.personas.echo!.includes('?') && (
                             <EchoAnswerInline
                               disabled={isLoading}
                               onSubmit={(answer) => handleSendWithPosition(answer, null)}
