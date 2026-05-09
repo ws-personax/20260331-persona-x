@@ -54,7 +54,7 @@ export const maxDuration = 60;
 //   기존 GOOGLE_GENERATIVE_AI_API_KEY 재사용. LLM 실패 시 호출부에서
 //   기존 템플릿으로 폴백.
 // ─────────────────────────────────────────────
-const TEA_GEMINI_MODEL = process.env.NEXT_PUBLIC_AI_MODEL || 'gemini-2.5-pro';
+const TEA_GEMINI_MODEL = process.env.NEXT_PUBLIC_AI_MODEL || 'gemini-2.5-flash';
 const TEA_GEMINI_FALLBACK_CHAIN: string[] = Array.from(
   new Set([TEA_GEMINI_MODEL, 'gemini-2.5-flash', 'gemini-2.0-flash']),
 );
