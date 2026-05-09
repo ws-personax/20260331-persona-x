@@ -851,6 +851,11 @@ const EchoAnswerInline = memo(function EchoAnswerInline({
   disabled?: boolean;
 }) {
   const [value, setValue] = useState('');
+  const submit = () => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    onSubmit(trimmed);
+  };
   return (
     <div style={{
       margin: '4px 12px 16px 56px',
@@ -863,7 +868,13 @@ const EchoAnswerInline = memo(function EchoAnswerInline({
       <textarea
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder="ECHO의 질문에 답해주세요..."
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            if (!disabled) submit();
+          }
+        }}
+        placeholder="ECHO의 질문에 답해주세요... (Enter로 제출, Shift+Enter로 줄바꿈)"
         disabled={disabled}
         rows={2}
         style={{
@@ -899,11 +910,7 @@ const EchoAnswerInline = memo(function EchoAnswerInline({
         </button>
         <button
           type="button"
-          onClick={() => {
-            const trimmed = value.trim();
-            if (!trimmed) return;
-            onSubmit(trimmed);
-          }}
+          onClick={submit}
           disabled={disabled || !value.trim()}
           style={{
             padding: '6px 12px',
