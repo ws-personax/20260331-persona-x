@@ -49,6 +49,36 @@ import { ADVANCED_SYSTEM_ECHO } from './prompts/advanced-echo';
 export const maxDuration = 60;
 
 // ─────────────────────────────────────────────
+// ✅ Rate Limiting — IP당 1분 5회 제한 (API 비용 폭탄 방지)
+// ─────────────────────────────────────────────
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const limit = rateLimitMap.get(ip);
+
+  if (!limit || now > limit.resetTime) {
+    rateLimitMap.set(ip, { count: 1, resetTime: now + 60000 });
+    return true;
+  }
+
+  if (limit.count >= 5) {
+    return false;
+  }
+
+  limit.count++;
+  return true;
+}
+
+function getClientIp(req: Request): string {
+  return (
+    req.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+    req.headers.get('x-real-ip') ||
+    'unknown'
+  );
+}
+
+// ─────────────────────────────────────────────
 // ✅ 차 한잔(teaMode) 전용 — Gemini Flash LLM 호출
 //   재테크 탭과 완전히 분리 (import/사용처 전부 teaMode 블록 안에서만)
 //   기존 GOOGLE_GENERATIVE_AI_API_KEY 재사용. LLM 실패 시 호출부에서
@@ -640,6 +670,15 @@ const normalizeDetails = (text: string | null | undefined): string | null => {
 // ─────────────────────────────────────────────
 export async function POST(req: Request) {
   // ✅ Gemini 제거됨 — API 키 불필요
+
+  // ✅ Rate Limit 체크 — IP당 1분 5회 초과 시 429 반환
+  const clientIp = getClientIp(req);
+  if (!checkRateLimit(clientIp)) {
+    return new Response(
+      JSON.stringify({ error: '요청이 너무 많아요. 잠시 후 다시 시도해주세요.' }),
+      { status: 429, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
 
   try {
     const { messages, positionContext, teaMode, teaRound, teaPersona, isAdvancedQuestion } = await req.json();
