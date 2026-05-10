@@ -996,7 +996,7 @@ const EchoAnswerInline = memo(function EchoAnswerInline({
               if (!disabled) submit();
             }
           }}
-          placeholder="ECHO의 질문에 답해주세요... (Enter로 제출, Shift+Enter로 줄바꿈)"
+          placeholder="ECHO의 질문에 답해주세요..."
           disabled={disabled}
           rows={2}
           style={{
