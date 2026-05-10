@@ -1917,6 +1917,18 @@ export default function ChatWindow() {
 
   const hasUserSent = useMemo(() => messages.some(m => m.role === 'user'), [messages]);
 
+  // ECHO 질문이 살아있는 동안에는 메인 입력창을 숨기고 EchoAnswerInline만 노출
+  const pendingEchoQuestion = useMemo(() => {
+    if (messages.length === 0) return false;
+    const last = messages[messages.length - 1];
+    if (last.role !== 'assistant' || !last.personas) return false;
+    const echo = last.personas.echo;
+    const echo2 = last.personas.echo2;
+    const hasEcho = typeof echo === 'string' && echo.trim().length > 0;
+    const hasEcho2 = typeof echo2 === 'string' && echo2.trim().length > 0;
+    return hasEcho && !hasEcho2 && echo!.includes('?');
+  }, [messages]);
+
   const scrollPadding = hasUserSent ? '20px 0 140px' : '16px 0 140px';
 
   useEffect(() => {
@@ -3055,7 +3067,7 @@ export default function ChatWindow() {
         </div>
       )}
 
-      {hasUserSent && (
+      {hasUserSent && !pendingEchoQuestion && (
       <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
         {ttsSupported && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
