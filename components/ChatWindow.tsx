@@ -3067,7 +3067,7 @@ export default function ChatWindow() {
         </div>
       )}
 
-      {hasUserSent && !pendingEchoQuestion && (
+      {hasUserSent && (
       <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
         {ttsSupported && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
@@ -3121,6 +3121,49 @@ export default function ChatWindow() {
             </span>
           </div>
         )}
+        {pendingEchoQuestion ? (
+          // ECHO 답변 모드 — 텍스트 입력은 위쪽 EchoAnswerInline에서 처리. 여기는 음성 컨트롤만 노출
+          sttSupported && (() => {
+            const inCountdown = autoSendCountdown !== null;
+            const bg = inCountdown ? '#fef3c7' : isRecording ? '#fee2e2' : '#f3f4f6';
+            const borderColor = inCountdown ? '#f59e0b' : isRecording ? '#dc2626' : '#d1d5db';
+            const fg = inCountdown ? '#92400e' : isRecording ? '#dc2626' : '#374151';
+            const label = inCountdown ? '자동 전송 취소' : isRecording ? '녹음 중지' : '음성으로 답변';
+            return (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>
+                  {label}
+                </span>
+                <button
+                  type="button"
+                  onClick={toggleRecording}
+                  disabled={isLoading}
+                  title={label}
+                  style={{
+                    background: bg,
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: 12,
+                    width: 56,
+                    minHeight: 56,
+                    height: 56,
+                    flexShrink: 0,
+                    boxSizing: 'border-box',
+                    fontSize: 22,
+                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                    opacity: isLoading ? 0.5 : 1,
+                    color: fg,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  aria-label={label}
+                >
+                  🎤
+                </button>
+              </div>
+            );
+          })()
+        ) : (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <textarea
             ref={textareaRef}
@@ -3201,6 +3244,7 @@ export default function ChatWindow() {
             Send
           </button>
         </div>
+        )}
       </footer>
       )}
     </div>
