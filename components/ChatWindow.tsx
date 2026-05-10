@@ -843,18 +843,136 @@ const EchoBubble = memo(function EchoBubble({
 // ✅ ECHO 질문 직후 인라인 답변 입력창 — 단일 호출 태그 오케스트레이터 2라운드 트리거.
 //   답변하기 → handleSendWithPosition(value, null) → teaRound=2.
 //   건너뛰기 → handleSendWithPosition('', null) → 빈 값으로 teaRound=2.
-const EchoAnswerInline = memo(function EchoAnswerInline({
-  onSubmit,
-  disabled,
+// 입력창 옆에 붙는 [🎤 / 🔊] 세로 스택 — 일반 모드와 ECHO 모드에서 공통 사용
+const VoiceControlsColumn = memo(function VoiceControlsColumn({
+  sttSupported,
+  ttsSupported,
+  isRecording,
+  isLoading,
+  autoSendCountdown,
+  autoRead,
+  onToggleRecording,
+  onToggleAutoRead,
 }: {
-  onSubmit: (answer: string) => void;
-  disabled?: boolean;
+  sttSupported: boolean;
+  ttsSupported: boolean;
+  isRecording: boolean;
+  isLoading: boolean;
+  autoSendCountdown: number | null;
+  autoRead: boolean;
+  onToggleRecording: () => void;
+  onToggleAutoRead: () => void;
 }) {
-  const [value, setValue] = useState('');
+  if (!sttSupported && !ttsSupported) return null;
+  const inCountdown = autoSendCountdown !== null;
+  const bg = inCountdown ? '#fef3c7' : isRecording ? '#fee2e2' : '#f3f4f6';
+  const borderColor = inCountdown ? '#f59e0b' : isRecording ? '#dc2626' : '#d1d5db';
+  const fg = inCountdown ? '#92400e' : isRecording ? '#dc2626' : '#374151';
+  const micLabel = inCountdown ? '자동 전송 취소' : isRecording ? '녹음 중지' : '음성 입력';
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'stretch',
+        gap: 4,
+        flexShrink: 0,
+        width: 56,
+      }}
+    >
+      {sttSupported && (
+        <button
+          type="button"
+          onClick={onToggleRecording}
+          disabled={isLoading}
+          title={inCountdown ? `${micLabel} (${autoSendCountdown}초)` : micLabel}
+          aria-label={micLabel}
+          style={{
+            background: bg,
+            border: `1px solid ${borderColor}`,
+            borderRadius: 12,
+            width: 56,
+            height: 56,
+            boxSizing: 'border-box',
+            fontSize: 22,
+            cursor: isLoading ? 'not-allowed' : 'pointer',
+            opacity: isLoading ? 0.5 : 1,
+            color: fg,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
+          }}
+        >
+          🎤
+          {inCountdown && (
+            <span
+              style={{
+                position: 'absolute',
+                bottom: -2,
+                right: -2,
+                background: '#f59e0b',
+                color: '#fff',
+                fontSize: 10,
+                fontWeight: 800,
+                borderRadius: 999,
+                padding: '1px 5px',
+                lineHeight: 1.2,
+              }}
+            >
+              {autoSendCountdown}
+            </span>
+          )}
+        </button>
+      )}
+      {ttsSupported && (
+        <button
+          type="button"
+          onClick={onToggleAutoRead}
+          title={autoRead ? '자동 읽기 끄기' : '자동 읽기 켜기'}
+          aria-label={autoRead ? '자동 읽기 끄기' : '자동 읽기 켜기'}
+          style={{
+            background: autoRead ? '#dbeafe' : '#f9fafb',
+            border: `1px solid ${autoRead ? '#93c5fd' : '#e5e7eb'}`,
+            borderRadius: 8,
+            width: 56,
+            height: 20,
+            padding: 0,
+            fontSize: 10,
+            fontWeight: 700,
+            color: autoRead ? '#1e40af' : '#9ca3af',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            lineHeight: 1,
+          }}
+        >
+          {autoRead ? '🔊 ON' : '🔊 OFF'}
+        </button>
+      )}
+    </div>
+  );
+});
+
+const EchoAnswerInline = memo(function EchoAnswerInline({
+  value,
+  onChange,
+  onSubmit,
+  onSkip,
+  disabled,
+  voiceColumn,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onSubmit: () => void;
+  onSkip: () => void;
+  disabled?: boolean;
+  voiceColumn?: React.ReactNode;
+}) {
   const submit = () => {
-    const trimmed = value.trim();
-    if (!trimmed) return;
-    onSubmit(trimmed);
+    if (!value.trim()) return;
+    onSubmit();
   };
   return (
     <div style={{
@@ -863,70 +981,76 @@ const EchoAnswerInline = memo(function EchoAnswerInline({
       background: '#fffbea',
       border: '1px solid #fbbf24',
       borderRadius: 12,
-      maxWidth: 560,
+      maxWidth: 620,
+      display: 'flex',
+      gap: 8,
+      alignItems: 'flex-start',
     }}>
-      <textarea
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-            e.preventDefault();
-            if (!disabled) submit();
-          }
-        }}
-        placeholder="ECHO의 질문에 답해주세요... (Enter로 제출, Shift+Enter로 줄바꿈)"
-        disabled={disabled}
-        rows={2}
-        style={{
-          width: '100%',
-          padding: 8,
-          border: '1px solid #d1d5db',
-          borderRadius: 8,
-          fontSize: 13,
-          resize: 'none',
-          boxSizing: 'border-box',
-          fontFamily: 'inherit',
-          outline: 'none',
-        }}
-      />
-      <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
-        <button
-          type="button"
-          onClick={() => onSubmit('')}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              if (!disabled) submit();
+            }
+          }}
+          placeholder="ECHO의 질문에 답해주세요... (Enter로 제출, Shift+Enter로 줄바꿈)"
           disabled={disabled}
+          rows={2}
           style={{
-            padding: '6px 12px',
-            background: '#f3f4f6',
+            width: '100%',
+            padding: 8,
             border: '1px solid #d1d5db',
             borderRadius: 8,
-            fontSize: 12,
-            fontWeight: 600,
-            color: '#6b7280',
-            cursor: disabled ? 'not-allowed' : 'pointer',
-            opacity: disabled ? 0.6 : 1,
+            fontSize: 13,
+            resize: 'none',
+            boxSizing: 'border-box',
+            fontFamily: 'inherit',
+            outline: 'none',
           }}
-        >
-          건너뛰기
-        </button>
-        <button
-          type="button"
-          onClick={submit}
-          disabled={disabled || !value.trim()}
-          style={{
-            padding: '6px 12px',
-            background: '#FAE100',
-            border: '1px solid #FAE100',
-            borderRadius: 8,
-            fontSize: 12,
-            fontWeight: 700,
-            color: '#1f2937',
-            cursor: (disabled || !value.trim()) ? 'not-allowed' : 'pointer',
-            opacity: (disabled || !value.trim()) ? 0.6 : 1,
-          }}
-        >
-          답변하기
-        </button>
+        />
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            onClick={onSkip}
+            disabled={disabled}
+            style={{
+              padding: '6px 12px',
+              background: '#f3f4f6',
+              border: '1px solid #d1d5db',
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#6b7280',
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              opacity: disabled ? 0.6 : 1,
+            }}
+          >
+            건너뛰기
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={disabled || !value.trim()}
+            style={{
+              padding: '6px 12px',
+              background: '#FAE100',
+              border: '1px solid #FAE100',
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#1f2937',
+              cursor: (disabled || !value.trim()) ? 'not-allowed' : 'pointer',
+              opacity: (disabled || !value.trim()) ? 0.6 : 1,
+            }}
+          >
+            답변하기
+          </button>
+        </div>
       </div>
+      {voiceColumn}
     </div>
   );
 });
@@ -1564,6 +1688,9 @@ export default function ChatWindow() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [mounted, setMounted] = useState(false);
   const [input, setInput] = useState('');
+  const [echoAnswerValue, setEchoAnswerValue] = useState('');
+  const echoAnswerValueRef = useRef('');
+  useEffect(() => { echoAnswerValueRef.current = echoAnswerValue; }, [echoAnswerValue]);
   const [showQuickQ, setShowQuickQ] = useState(false);
   const [teaPersona, setTeaPersona] = useState<'lucia' | 'jack' | 'echo'>('lucia');
   const [luciaGreeting, setLuciaGreeting] = useState<string | null>(null);
@@ -1592,6 +1719,8 @@ export default function ChatWindow() {
   const queuedPersonasRef = useRef<{ msgId: string; set: Set<'ray' | 'jack' | 'lucia' | 'echo'> }>({ msgId: '', set: new Set() });
   const autoSendStepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleSendRef = useRef<() => void>(() => {});
+  // 음성 마이크가 ECHO 답변 모드일 때는 echoAnswerValue로, 일반 모드에서는 input으로 transcript를 라우팅
+  const activeInputUpdaterRef = useRef<(updater: (prev: string) => string) => void>(setInput);
 
   useEffect(() => {
     setSttSupported(isSTTSupported());
@@ -1668,7 +1797,7 @@ export default function ChatWindow() {
         }
       }
       if (transcript) {
-        setInput(prev => (prev ? prev.trimEnd() + ' ' + transcript : transcript));
+        activeInputUpdaterRef.current(prev => (prev ? prev.trimEnd() + ' ' + transcript : transcript));
         startAutoSendCountdown();
       }
     };
@@ -2223,7 +2352,30 @@ export default function ChatWindow() {
     handleSendWithPosition(content, null);
   }, [input, isLoading, handleSendWithPosition]);
 
-  useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
+  // ECHO 답변 제출 — echoAnswerValue 기반 (마이크 자동전송도 이 경로 사용)
+  const submitEchoAnswer = useCallback(() => {
+    const v = echoAnswerValueRef.current.trim();
+    if (!v || isLoading) return;
+    setEchoAnswerValue('');
+    handleSendWithPosition(v, null);
+  }, [isLoading, handleSendWithPosition]);
+
+  const skipEchoAnswer = useCallback(() => {
+    if (isLoading) return;
+    setEchoAnswerValue('');
+    handleSendWithPosition('', null);
+  }, [isLoading, handleSendWithPosition]);
+
+  // 모드별 라우팅: pendingEchoQuestion이면 마이크 transcript→echoAnswer, 자동전송→ECHO 답변 제출
+  useEffect(() => {
+    if (pendingEchoQuestion) {
+      activeInputUpdaterRef.current = setEchoAnswerValue;
+      handleSendRef.current = submitEchoAnswer;
+    } else {
+      activeInputUpdaterRef.current = setInput;
+      handleSendRef.current = handleSend;
+    }
+  }, [pendingEchoQuestion, handleSend, submitEchoAnswer]);
 
   const isSpeakingGlobal = useIsSpeaking();
   useEffect(() => {
@@ -2726,7 +2878,22 @@ export default function ChatWindow() {
                           {msgIdx === messages.length - 1 && hasText(msg.personas.echo) && !hasText(msg.personas.echo2) && msg.personas.echo!.includes('?') && (
                             <EchoAnswerInline
                               disabled={isLoading}
-                              onSubmit={(answer) => handleSendWithPosition(answer, null)}
+                              value={echoAnswerValue}
+                              onChange={(v) => { setEchoAnswerValue(v); cancelAutoSend(); }}
+                              onSubmit={submitEchoAnswer}
+                              onSkip={skipEchoAnswer}
+                              voiceColumn={
+                                <VoiceControlsColumn
+                                  sttSupported={sttSupported}
+                                  ttsSupported={ttsSupported}
+                                  isRecording={isRecording}
+                                  isLoading={isLoading}
+                                  autoSendCountdown={autoSendCountdown}
+                                  autoRead={autoRead}
+                                  onToggleRecording={toggleRecording}
+                                  onToggleAutoRead={() => setAutoRead(v => { if (v) stopSpeaking(); return !v; })}
+                                />
+                              }
                             />
                           )}
                         </>
@@ -3067,104 +3234,9 @@ export default function ChatWindow() {
         </div>
       )}
 
-      {hasUserSent && (
+      {hasUserSent && !pendingEchoQuestion && (
       <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
-        {ttsSupported && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
-            <button
-              type="button"
-              onClick={() => {
-                setAutoRead(v => {
-                  if (v) stopSpeaking();
-                  return !v;
-                });
-              }}
-              title={autoRead ? '자동 읽기 끄기' : '자동 읽기 켜기'}
-              style={{
-                background: autoRead ? '#dbeafe' : '#f3f4f6',
-                border: `1px solid ${autoRead ? '#93c5fd' : '#d1d5db'}`,
-                borderRadius: 999,
-                padding: '4px 10px',
-                fontSize: 11,
-                fontWeight: 700,
-                color: autoRead ? '#1e40af' : '#6b7280',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {autoRead ? '🔊 자동읽기 ON' : '🔇 자동읽기 OFF'}
-            </button>
-          </div>
-        )}
-        {autoSendCountdown !== null && (
-          <div
-            role="status"
-            aria-live="polite"
-            style={{
-              background: '#fef3c7',
-              border: '1px solid #fbbf24',
-              borderRadius: 10,
-              padding: '8px 12px',
-              marginBottom: 6,
-              fontSize: 12.5,
-              fontWeight: 700,
-              color: '#92400e',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 8,
-            }}
-          >
-            <span>⏱ {autoSendCountdown}초 후 자동 전송...</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#b45309' }}>
-              취소하려면 마이크 클릭
-            </span>
-          </div>
-        )}
-        {pendingEchoQuestion ? (
-          // ECHO 답변 모드 — 텍스트 입력은 위쪽 EchoAnswerInline에서 처리. 여기는 음성 컨트롤만 노출
-          sttSupported && (() => {
-            const inCountdown = autoSendCountdown !== null;
-            const bg = inCountdown ? '#fef3c7' : isRecording ? '#fee2e2' : '#f3f4f6';
-            const borderColor = inCountdown ? '#f59e0b' : isRecording ? '#dc2626' : '#d1d5db';
-            const fg = inCountdown ? '#92400e' : isRecording ? '#dc2626' : '#374151';
-            const label = inCountdown ? '자동 전송 취소' : isRecording ? '녹음 중지' : '음성으로 답변';
-            return (
-              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>
-                  {label}
-                </span>
-                <button
-                  type="button"
-                  onClick={toggleRecording}
-                  disabled={isLoading}
-                  title={label}
-                  style={{
-                    background: bg,
-                    border: `1px solid ${borderColor}`,
-                    borderRadius: 12,
-                    width: 56,
-                    minHeight: 56,
-                    height: 56,
-                    flexShrink: 0,
-                    boxSizing: 'border-box',
-                    fontSize: 22,
-                    cursor: isLoading ? 'not-allowed' : 'pointer',
-                    opacity: isLoading ? 0.5 : 1,
-                    color: fg,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  aria-label={label}
-                >
-                  🎤
-                </button>
-              </div>
-            );
-          })()
-        ) : (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
           <textarea
             ref={textareaRef}
             value={input}
@@ -3188,41 +3260,6 @@ export default function ChatWindow() {
             }}
             rows={1}
           />
-          {sttSupported && (() => {
-            const inCountdown = autoSendCountdown !== null;
-            const bg = inCountdown ? '#fef3c7' : isRecording ? '#fee2e2' : '#f3f4f6';
-            const borderColor = inCountdown ? '#f59e0b' : isRecording ? '#dc2626' : '#d1d5db';
-            const fg = inCountdown ? '#92400e' : isRecording ? '#dc2626' : '#374151';
-            const label = inCountdown ? '자동 전송 취소' : isRecording ? '녹음 중지' : '음성 입력';
-            return (
-              <button
-                type="button"
-                onClick={toggleRecording}
-                disabled={isLoading}
-                title={label}
-                style={{
-                  background: bg,
-                  border: `1px solid ${borderColor}`,
-                  borderRadius: 12,
-                  width: 56,
-                  minHeight: 56,
-                  height: 56,
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                  fontSize: 22,
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
-                  opacity: isLoading ? 0.5 : 1,
-                  color: fg,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                aria-label={label}
-              >
-                🎤
-              </button>
-            );
-          })()}
           <button
             onClick={() => handleSend()}
             disabled={!input.trim() || isLoading}
@@ -3243,8 +3280,17 @@ export default function ChatWindow() {
           >
             Send
           </button>
+          <VoiceControlsColumn
+            sttSupported={sttSupported}
+            ttsSupported={ttsSupported}
+            isRecording={isRecording}
+            isLoading={isLoading}
+            autoSendCountdown={autoSendCountdown}
+            autoRead={autoRead}
+            onToggleRecording={toggleRecording}
+            onToggleAutoRead={() => setAutoRead(v => { if (v) stopSpeaking(); return !v; })}
+          />
         </div>
-        )}
       </footer>
       )}
     </div>
