@@ -250,6 +250,31 @@ const toGeminiContents = (history: TeaMsg[]) => {
   return merged;
 };
 
+// ─────────────────────────────────────────────
+// ✅ '당신' 호칭 후처리 필터
+//   LLM이 가끔 '당신은/이/의/을/...'로 화자를 가리키는데,
+//   PersonaX는 친근한 1인칭 대화체 톤이 핵심이라 호칭을 통째로 제거.
+//   조사별 패턴을 먼저 제거하고, 단독 '당신'(앞뒤 공백 포함)도 정리.
+//   JSON 응답(오케스트레이터)에도 안전 — JSON 문법 문자(",{,} 등)와 충돌 없음.
+// ─────────────────────────────────────────────
+const removeDangsin = (text: string): string => {
+  return text
+    .replace(/당신은\s+/g, '')
+    .replace(/당신이\s+/g, '')
+    .replace(/당신의\s+/g, '')
+    .replace(/당신을\s+/g, '')
+    .replace(/당신에게\s+/g, '')
+    .replace(/당신과\s+/g, '')
+    .replace(/당신만\s+/g, '')
+    .replace(/당신도\s+/g, '')
+    .replace(/당신께\s+/g, '')
+    .replace(/당신\s+/g, '')
+    .replace(/\s+당신/g, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/^[ \t]+/gm, '')
+    .trim();
+};
+
 const callTeaPersona = async (
   persona: TeaPersonaKey,
   system: string,
@@ -262,7 +287,7 @@ const callTeaPersona = async (
   //   검색 grounding이 필요한 호출은 Gemini googleSearch tool로 직접 우회.
   if (!options?.enableSearch) {
     const claudeResult = await callClaudeHaiku(persona, system, history);
-    if (claudeResult) return claudeResult;
+    if (claudeResult) return removeDangsin(claudeResult);
     // Claude 실패 → Gemini Flash 폴백으로 진행
   }
 
@@ -328,7 +353,7 @@ const callTeaPersona = async (
         console.warn(`${tag} ${modelName} 빈 응답 (finishReason=${finishReason}) → 템플릿 폴백`);
         return null;
       }
-      return text.trim();
+      return removeDangsin(text.trim());
     } catch (err) {
       const retriable = isRetriableModelError(err);
       const anyErr = err as Error & { status?: number; statusText?: string; errorDetails?: unknown; response?: unknown };
