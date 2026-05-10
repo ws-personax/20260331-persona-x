@@ -11,6 +11,7 @@
   "dependencies": {
     "@ai-sdk/google": "^3.0.58",
     "@ai-sdk/openai": "^3.0.50",
+    "@anthropic-ai/sdk": "^0.95.1",
     "@google/generative-ai": "^0.21.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.0",

@@ -2,6 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
 import { GoogleGenerativeAI, type GenerationConfig, type Tool } from '@google/generative-ai';
+import Anthropic from '@anthropic-ai/sdk';
 
 // ✅ 분리된 모듈 import
 import type { Verdict } from '@/lib/personax/types';
@@ -114,6 +115,86 @@ const isRetriableModelError = (err: unknown): boolean => {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const teaGenAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '');
 
+// ─────────────────────────────────────────────
+// ✅ Claude Haiku 4.5 — Primary 모델 (Anthropic SDK)
+//   - 오케스트레이터 1차 호출 대상. 실패/타임아웃 시 Gemini Flash 폴백.
+//   - 검색(Google Search grounding) 요청은 Gemini로 우회 (Claude는 web_search 비활성).
+// ─────────────────────────────────────────────
+const CLAUDE_PRIMARY_MODEL = 'claude-haiku-4-5';
+const CLAUDE_TIMEOUT_MS = 30_000;
+const anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
+
+const toAnthropicMessages = (history: TeaMsg[]): Anthropic.MessageParam[] => {
+  const raw: Anthropic.MessageParam[] = history.map(m => ({
+    role: m.role === 'assistant' ? 'assistant' : 'user',
+    content: m.content,
+  }));
+  // 반드시 user로 시작
+  while (raw.length > 0 && raw[0].role !== 'user') raw.shift();
+  // 마지막은 user로 끝나야 응답 받음
+  while (raw.length > 0 && raw[raw.length - 1].role !== 'user') raw.pop();
+  return raw;
+};
+
+const callClaudeHaiku = async (
+  persona: TeaPersonaKey,
+  system: string,
+  history: TeaMsg[],
+): Promise<string | null> => {
+  const tag = `[tea:${persona}:claude]`;
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.warn(`${tag} ANTHROPIC_API_KEY 미설정 → Gemini 폴백`);
+    return null;
+  }
+  if (history.length === 0) {
+    console.warn(`${tag} 히스토리 0 → Gemini 폴백`);
+    return null;
+  }
+  const messages = toAnthropicMessages(history);
+  if (messages.length === 0) {
+    console.warn(`${tag} messages 무효 → Gemini 폴백`);
+    return null;
+  }
+  try {
+    const response = await Promise.race([
+      anthropicClient.messages.create({
+        model: CLAUDE_PRIMARY_MODEL,
+        max_tokens: 1200,
+        // 페르소나 시스템 프롬프트는 호출마다 동일 → 프롬프트 캐싱으로 비용/지연 절감
+        system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+        messages,
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`${CLAUDE_PRIMARY_MODEL} timeout after ${CLAUDE_TIMEOUT_MS}ms`)), CLAUDE_TIMEOUT_MS),
+      ),
+    ]);
+    if (response.stop_reason === 'refusal') {
+      console.warn(`${tag} ${CLAUDE_PRIMARY_MODEL} refusal → Gemini 폴백`);
+      return null;
+    }
+    const text = response.content
+      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .map(b => b.text)
+      .join('')
+      .trim();
+    if (!text) {
+      console.warn(`${tag} ${CLAUDE_PRIMARY_MODEL} 빈 응답 (stop_reason=${response.stop_reason}) → Gemini 폴백`);
+      return null;
+    }
+    return text;
+  } catch (err) {
+    const anyErr = err as Error & { status?: number };
+    if (err instanceof Anthropic.APIError) {
+      console.error(`${tag} ${CLAUDE_PRIMARY_MODEL} APIError status=${anyErr.status} → Gemini 폴백`, err.message);
+    } else if (err instanceof Error) {
+      console.error(`${tag} ${CLAUDE_PRIMARY_MODEL} 호출 실패 (${err.name}) → Gemini 폴백:`, err.message);
+    } else {
+      console.error(`${tag} ${CLAUDE_PRIMARY_MODEL} 호출 실패 (unknown) → Gemini 폴백:`, err);
+    }
+    return null;
+  }
+};
+
 type TeaPersonaKey = 'lucia' | 'jack' | 'echo' | 'ray';
 type TeaMsg = { role: 'user' | 'assistant'; content: string };
 
@@ -176,6 +257,15 @@ const callTeaPersona = async (
   options?: { enableSearch?: boolean },
 ): Promise<string | null> => {
   const tag = `[tea:${persona}]`;
+
+  // ✅ Primary: Claude Haiku 4.5 (검색 비요청 시에만)
+  //   검색 grounding이 필요한 호출은 Gemini googleSearch tool로 직접 우회.
+  if (!options?.enableSearch) {
+    const claudeResult = await callClaudeHaiku(persona, system, history);
+    if (claudeResult) return claudeResult;
+    // Claude 실패 → Gemini Flash 폴백으로 진행
+  }
+
   if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
     console.warn(`${tag} GOOGLE_GENERATIVE_AI_API_KEY 미설정 → 템플릿 폴백`);
     return null;
