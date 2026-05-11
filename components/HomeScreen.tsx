@@ -12,9 +12,9 @@ interface HomeScreenProps {
 
 export default function HomeScreen({ onSubmit }: HomeScreenProps) {
   const examples = [
-    { emoji: '💼', text: '출근이 너무 힘들어요' },
-    { emoji: '📈', text: '삼성전자 어떻게 할까요?' },
-    { emoji: '😴', text: '잠이 안 와요' },
+    { emoji: '💼', text: '출근이 너무 힘들어요', bg: '#FFF7E0', accent: '#F59E0B' },
+    { emoji: '📈', text: '삼성전자 어떻게 할까요?', bg: '#E0F2FE', accent: '#0EA5E9' },
+    { emoji: '😴', text: '잠이 안 와요', bg: '#F3E8FF', accent: '#A855F7' },
   ];
 
   return (
@@ -24,13 +24,10 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
         <Logo size="sm" />
       </header>
 
-      {/* 메인 콘텐츠 - 세로 중앙 정렬 */}
-      <div
-        className="flex-1 flex flex-col justify-center overflow-hidden"
-        style={{ minHeight: 0 }}
-      >
+      {/* 메인 콘텐츠 - 상단 정렬 */}
+      <div className="flex-1 flex flex-col overflow-hidden" style={{ minHeight: 0 }}>
         {/* 타이틀 + 부제 */}
-        <div className="px-6 py-4 text-center flex-shrink-0">
+        <div className="text-center flex-shrink-0" style={{ padding: '12px 24px 16px' }}>
           <h2
             className="font-black"
             style={{
@@ -56,8 +53,14 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
         </div>
 
         {/* 4명 페르소나 이미지 */}
-        <div className="px-5 py-4 flex justify-center flex-shrink-0">
-          <div className="w-full max-w-[260px] aspect-square rounded-2xl overflow-hidden bg-gray-50">
+        <div
+          className="flex justify-center flex-shrink-0"
+          style={{ padding: '0 20px 32px' }}
+        >
+          <div
+            className="w-full aspect-square overflow-hidden bg-gray-50"
+            style={{ maxWidth: '260px', borderRadius: '20px' }}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/scenes/personas-4.webp"
@@ -67,23 +70,32 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
           </div>
         </div>
 
-        {/* 자주 묻는 질문 카드 - 3개 가로 배열 */}
-        <div className="px-5 py-3 flex gap-2 flex-shrink-0">
+        {/* 자주 묻는 질문 카드 - 3개 가로 배열, 컬러 다양 */}
+        <div className="flex flex-shrink-0" style={{ padding: '0 16px', gap: '10px' }}>
           {examples.map((ex, i) => (
             <button
               key={i}
               type="button"
               onClick={() => onSubmit(ex.text)}
-              className="flex-1 flex flex-col items-center justify-center py-3 px-2 bg-gray-50 rounded-xl active:bg-gray-100 transition-colors gap-1"
+              className="flex-1 flex flex-col items-center justify-center active:scale-[0.98] transition-transform"
+              style={{
+                background: ex.bg,
+                borderRadius: '20px',
+                padding: '22px 8px',
+                minHeight: '140px',
+                border: 'none',
+                cursor: 'pointer',
+                gap: '10px',
+              }}
             >
-              <span style={{ fontSize: '22px' }}>{ex.emoji}</span>
+              <span style={{ fontSize: '32px', lineHeight: 1 }}>{ex.emoji}</span>
               <span
                 style={{
-                  fontSize: '11px',
-                  color: '#4a4a5a',
+                  fontSize: '12px',
+                  color: '#1a1a2e',
                   letterSpacing: '-0.3px',
-                  fontWeight: 600,
-                  lineHeight: 1.3,
+                  fontWeight: 700,
+                  lineHeight: 1.35,
                   textAlign: 'center',
                   wordBreak: 'keep-all',
                 }}
@@ -93,12 +105,18 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
             </button>
           ))}
         </div>
+
+        {/* 카드 아래 빈 공간 */}
+        <div className="flex-1"></div>
       </div>
 
-      {/* 입력창 - 하단 고정 (safe-area 대응) */}
+      {/* 입력창 - 하단 고정, 크고 눈에 띄게 */}
       <div
-        className="px-5 pt-3 flex-shrink-0"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}
+        className="flex-shrink-0"
+        style={{
+          padding: '12px 16px',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+        }}
       >
         <InputBar onSubmit={onSubmit} />
       </div>
@@ -117,7 +135,18 @@ function InputBar({ onSubmit }: { onSubmit: (text: string) => void }) {
   };
 
   return (
-    <div className="flex items-center gap-2.5 bg-white border-[1.5px] border-gray-300 rounded-2xl px-3.5 py-3">
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        background: '#ffffff',
+        border: '2px solid #1a1a2e',
+        borderRadius: '24px',
+        padding: '10px 12px 10px 18px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+      }}
+    >
       <input
         type="text"
         value={value}
@@ -126,15 +155,52 @@ function InputBar({ onSubmit }: { onSubmit: (text: string) => void }) {
           if (e.key === 'Enter') handleSubmit();
         }}
         placeholder="오늘 어떠세요?"
-        className="flex-1 bg-transparent outline-none text-[15px]"
+        style={{
+          flex: 1,
+          background: 'transparent',
+          outline: 'none',
+          border: 'none',
+          fontSize: '16px',
+          padding: '10px 0',
+          color: '#1a1a2e',
+          letterSpacing: '-0.3px',
+          minWidth: 0,
+        }}
       />
-      <button type="button" aria-label="Voice">
-        <i className="ti ti-microphone text-xl text-gray-500"></i>
+      <button
+        type="button"
+        aria-label="Voice"
+        style={{
+          width: '40px',
+          height: '40px',
+          borderRadius: '50%',
+          background: '#f3f4f6',
+          border: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          flexShrink: 0,
+        }}
+      >
+        <i className="ti ti-microphone" style={{ fontSize: '20px', color: '#6b7280' }}></i>
       </button>
       <button
         type="button"
         onClick={handleSubmit}
-        className="bg-[#7F77DD] text-white text-sm font-semibold rounded-xl px-4 py-2"
+        style={{
+          background: '#FEE500',
+          color: '#191919',
+          fontSize: '15px',
+          fontWeight: 800,
+          letterSpacing: '-0.3px',
+          borderRadius: '20px',
+          padding: '12px 20px',
+          border: 'none',
+          cursor: 'pointer',
+          flexShrink: 0,
+          boxShadow: '0 4px 12px rgba(254,229,0,0.4)',
+        }}
       >
         시작
       </button>
