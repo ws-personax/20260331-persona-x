@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import AuthButton from '@/components/AuthButton';
 import HistoryModal from '@/components/HistoryModal';
+import Logo from '@/components/Logo';
 import { createClient as createSupabaseBrowser } from '@/lib/supabase/client';
 import { PositionInput, buildPositionContext } from './PositionInput';
 import type { Position } from './PositionInput';
@@ -2325,44 +2326,42 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
         boxSizing: 'border-box',
       }}
     >
-      {hasUserSent && (
-        <header
-          style={{
-            background: 'rgba(178,199,218,0.95)',
-            padding: '12px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            borderBottom: '1px solid rgba(0,0,0,0.06)',
-            position: 'sticky',
-            top: 0,
-            zIndex: 10,
-          }}
-        >
-          <span style={{ fontWeight: 800, fontSize: 18, color: '#1f2937' }}>PersonaX</span>
+      <header
+        style={{
+          background: '#ffffff',
+          padding: '12px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid #f1f1f4',
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+        }}
+      >
+        <Logo size="sm" />
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: '60vw' }}>
-            <AuthButton />
-            <button
-              type="button"
-              onClick={() => setShowHistory(true)}
-              style={{
-                background: '#fff',
-                padding: '5px 12px',
-                borderRadius: 8,
-                fontSize: 12,
-                fontWeight: 700,
-                color: '#374151',
-                border: '1px solid #d1d5db',
-                whiteSpace: 'nowrap',
-                cursor: 'pointer',
-              }}
-            >
-              History
-            </button>
-          </div>
-        </header>
-      )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: '60vw' }}>
+          <AuthButton />
+          <button
+            type="button"
+            onClick={() => setShowHistory(true)}
+            style={{
+              background: '#fff',
+              padding: '5px 12px',
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#374151',
+              border: '1px solid #d1d5db',
+              whiteSpace: 'nowrap',
+              cursor: 'pointer',
+            }}
+          >
+            History
+          </button>
+        </div>
+      </header>
 
       {/* pointerEvents: none — 배너 자체는 클릭 가로채지 않도록 (아래 콘텐츠가 그대로 클릭됨). */}
       {isSpeakingGlobal && (
