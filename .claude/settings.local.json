@@ -41,7 +41,8 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://20260331-persona-x.vercel.app)",
       "Bash(curl *)",
       "Bash(python -c ' *)",
-      "Bash(NODE_OPTIONS=\"--max-old-space-size=8192\" node ./node_modules/typescript/bin/tsc --noEmit)"
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=8192\" node ./node_modules/typescript/bin/tsc --noEmit)",
+      "PowerShell(npm run *)"
     ]
   }
 }

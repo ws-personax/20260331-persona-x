@@ -38,8 +38,8 @@ export default function Logo({ size = 'md' }: LogoProps) {
             <stop offset="100%" stopColor="#7F77DD" />
           </linearGradient>
         </defs>
-        <line x1="12" y1="12" x2="48" y2="48" stroke="url(#x-line1)" strokeWidth="8" strokeLinecap="round" />
-        <line x1="48" y1="12" x2="12" y2="48" stroke="url(#x-line2)" strokeWidth="8" strokeLinecap="round" />
+        <line x1="12" y1="12" x2="48" y2="48" stroke="url(#x-line1)" strokeWidth="10" strokeLinecap="round" />
+        <line x1="48" y1="12" x2="12" y2="48" stroke="url(#x-line2)" strokeWidth="10" strokeLinecap="round" />
       </svg>
     </div>
   );

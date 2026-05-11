@@ -97,7 +97,13 @@ export default function Page() {
   }
 
   if (stage === 'login') {
-    return <LoginScreen onKakaoLogin={onKakaoLogin} onGoogleLogin={onGoogleLogin} />;
+    return (
+      <LoginScreen
+        onKakaoLogin={onKakaoLogin}
+        onGoogleLogin={onGoogleLogin}
+        onSkip={() => setStage('home')}
+      />
+    );
   }
 
   if (stage === 'home') {

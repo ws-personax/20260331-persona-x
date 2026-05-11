@@ -5,34 +5,36 @@ import Logo from './Logo';
 interface LoginScreenProps {
   onKakaoLogin: () => void;
   onGoogleLogin: () => void;
+  onSkip: () => void;
 }
 
-export default function LoginScreen({ onKakaoLogin, onGoogleLogin }: LoginScreenProps) {
+export default function LoginScreen({ onKakaoLogin, onGoogleLogin, onSkip }: LoginScreenProps) {
   return (
-    <div className="min-h-screen bg-white flex flex-col px-6 py-8">
+    <div className="min-h-screen bg-white flex flex-col items-center px-6 py-8">
       <div className="flex justify-center mt-12 mb-10">
         <Logo size="md" />
       </div>
 
       <div className="text-center mb-12">
         <h1
-          className="text-[32px] font-bold text-gray-900 leading-tight mb-3"
-          style={{ letterSpacing: '-0.5px' }}
+          className="text-[32px] font-bold leading-tight mb-3"
+          style={{ letterSpacing: '-0.5px', color: '#1a1a2e' }}
         >
           AI 사랑방
         </h1>
-        <p className="text-[15px] text-gray-500">
+        <p className="text-[15px]" style={{ color: '#4a4a5a' }}>
           4명이 함께 듣고, 같이 생각합니다
         </p>
       </div>
 
       <div className="flex-1"></div>
 
-      <div className="space-y-3 mb-6">
+      <div className="w-full flex gap-2 mb-6">
         <button
           type="button"
           onClick={onKakaoLogin}
-          className="w-full h-14 bg-[#FEE500] rounded-xl flex items-center justify-center gap-2.5 font-semibold text-[16px] text-[#191919] active:scale-[0.98] transition-transform"
+          className="flex-1 h-16 bg-[#FEE500] rounded-xl flex flex-col items-center justify-center gap-1 font-semibold text-[12px] active:scale-[0.98] transition-transform"
+          style={{ color: '#191919' }}
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
             <path
@@ -40,13 +42,14 @@ export default function LoginScreen({ onKakaoLogin, onGoogleLogin }: LoginScreen
               fill="#191919"
             />
           </svg>
-          카카오로 시작하기
+          카카오
         </button>
 
         <button
           type="button"
           onClick={onGoogleLogin}
-          className="w-full h-14 bg-white border-[1.5px] border-gray-200 rounded-xl flex items-center justify-center gap-2.5 font-medium text-[16px] text-gray-900 active:scale-[0.98] transition-transform"
+          className="flex-1 h-16 bg-white border-[1.5px] border-gray-200 rounded-xl flex flex-col items-center justify-center gap-1 font-medium text-[12px] active:scale-[0.98] transition-transform"
+          style={{ color: '#1a1a2e' }}
         >
           <svg width="20" height="20" viewBox="0 0 48 48">
             <path
@@ -66,11 +69,29 @@ export default function LoginScreen({ onKakaoLogin, onGoogleLogin }: LoginScreen
               fill="#1976D2"
             />
           </svg>
-          Google로 시작하기
+          Google
+        </button>
+
+        <button
+          type="button"
+          onClick={onSkip}
+          className="flex-1 h-16 bg-gray-50 border-[1.5px] border-gray-200 rounded-xl flex flex-col items-center justify-center gap-1 font-medium text-[12px] active:scale-[0.98] transition-transform"
+          style={{ color: '#4a4a5a' }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M9 6L15 12L9 18"
+              stroke="#4a4a5a"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          건너뛰기
         </button>
       </div>
 
-      <p className="text-center text-xs text-gray-400">
+      <p className="text-center text-xs" style={{ color: '#4a4a5a' }}>
         시작하면 이용약관에 동의하게 됩니다
       </p>
     </div>
