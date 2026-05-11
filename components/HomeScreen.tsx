@@ -10,70 +10,80 @@ interface HomeScreenProps {
   onOpenMenu?: () => void;
 }
 
-export default function HomeScreen({ userName, onSubmit, onOpenHistory, onOpenMenu }: HomeScreenProps) {
+export default function HomeScreen({ onSubmit }: HomeScreenProps) {
   const examples = [
-    { emoji: '💼', text: '출근이 너무 힘들어요' },
-    { emoji: '📈', text: '삼성전자 어떻게 할까요?' },
+    { emoji: '💼', text: '직장 고민' },
+    { emoji: '📈', text: '주식 투자' },
+    { emoji: '💝', text: '관계 고민' },
   ];
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      <header className="px-5 py-3.5 flex items-center justify-between border-b border-gray-100">
+    <div className="h-[100dvh] bg-white flex flex-col overflow-hidden">
+      {/* 헤더 */}
+      <header className="px-5 py-3.5 flex-shrink-0 flex items-center">
         <Logo size="sm" />
-        <div className="flex gap-3 text-gray-500">
-          <button type="button" aria-label="History" onClick={onOpenHistory}>
-            <i className="ti ti-history text-xl"></i>
-          </button>
-          <button type="button" aria-label="Menu" onClick={onOpenMenu}>
-            <i className="ti ti-menu-2 text-xl"></i>
-          </button>
-        </div>
       </header>
 
-      <div className="px-6 pt-8 pb-5">
-        <p className="text-sm text-gray-500 mb-2">
-          {userName ? `${userName} 님, 안녕하세요 👋` : '안녕하세요 👋'}
-        </p>
-        <h2
-          className="text-[22px] font-bold text-gray-900 leading-tight"
-          style={{ letterSpacing: '-0.5px' }}
-        >
-          오늘은 어떤 고민이<br />있으세요?
-        </h2>
-        <p className="text-[13px] text-gray-400 mt-3">AI 4명이 사랑방에서 기다려요</p>
-      </div>
-
-      <div className="px-5 pb-5">
-        <div className="bg-gray-50 aspect-square rounded-2xl overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/scenes/personas-4.webp"
-            alt="4명 페르소나"
-            className="w-full h-full object-cover"
-          />
+      {/* 메인 영역 */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* 타이틀 - 한 줄만 */}
+        <div className="px-6 pt-8 pb-4 text-center">
+          <h2
+            className="font-black"
+            style={{
+              fontSize: '24px',
+              letterSpacing: '-0.5px',
+              lineHeight: '1.3',
+              color: '#1a1a2e',
+            }}
+          >
+            오늘은 어떤 고민이 있으세요?
+          </h2>
         </div>
-      </div>
 
-      <div className="px-5 pb-3">
-        <p className="text-[13px] text-gray-500 mb-2.5 pl-1">자주 묻는 질문</p>
-        <div className="space-y-2">
+        {/* 4명 페르소나 이미지 - 축소 */}
+        <div className="px-5 pb-4 flex justify-center">
+          <div className="w-full max-w-[140px] aspect-square rounded-2xl overflow-hidden bg-gray-50">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/scenes/personas-4.webp"
+              alt="4명 페르소나"
+              className="w-full h-full object-cover"
+            />
+          </div>
+        </div>
+
+        {/* 자주 묻는 질문 카드 - 3개 가로 배열 */}
+        <div className="px-5 pb-3 flex gap-2">
           {examples.map((ex, i) => (
             <button
               key={i}
               type="button"
               onClick={() => onSubmit(ex.text)}
-              className="w-full text-left px-4 py-3.5 bg-gray-50 rounded-xl text-sm text-gray-700 active:bg-gray-100 transition-colors"
+              className="flex-1 flex flex-col items-center justify-center py-3 px-2 bg-gray-50 rounded-xl active:bg-gray-100 transition-colors gap-1"
             >
-              {ex.emoji} {ex.text}
+              <span style={{ fontSize: '22px' }}>{ex.emoji}</span>
+              <span
+                style={{
+                  fontSize: '12px',
+                  color: '#4a4a5a',
+                  letterSpacing: '-0.2px',
+                  whiteSpace: 'nowrap',
+                  fontWeight: 600,
+                }}
+              >
+                {ex.text}
+              </span>
             </button>
           ))}
         </div>
-      </div>
 
-      <div className="flex-1"></div>
+        <div className="flex-1"></div>
 
-      <div className="px-5 pt-4 pb-6 border-t border-gray-100">
-        <InputBar onSubmit={onSubmit} />
+        {/* 입력창 */}
+        <div className="px-5 pt-3 pb-6 flex-shrink-0">
+          <InputBar onSubmit={onSubmit} />
+        </div>
       </div>
     </div>
   );
