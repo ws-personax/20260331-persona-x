@@ -24,10 +24,13 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
         <Logo size="sm" />
       </header>
 
-      {/* 메인 영역 */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* 타이틀 - 한 줄만 */}
-        <div className="px-6 pt-8 pb-4 text-center">
+      {/* 메인 콘텐츠 - 세로 중앙 정렬 */}
+      <div
+        className="flex-1 flex flex-col justify-center overflow-hidden"
+        style={{ minHeight: 0 }}
+      >
+        {/* 타이틀 + 부제 */}
+        <div className="px-6 py-4 text-center flex-shrink-0">
           <h2
             className="font-black"
             style={{
@@ -39,10 +42,21 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
           >
             오늘은 어떤 고민이 있으세요?
           </h2>
+          <p
+            style={{
+              fontSize: '14px',
+              color: '#4a4a5a',
+              letterSpacing: '-0.3px',
+              marginTop: '8px',
+              fontWeight: 500,
+            }}
+          >
+            4명이 충돌하고, 당신이 결정합니다
+          </p>
         </div>
 
-        {/* 4명 페르소나 이미지 - 축소 */}
-        <div className="px-5 pb-4 flex justify-center">
+        {/* 4명 페르소나 이미지 */}
+        <div className="px-5 py-4 flex justify-center flex-shrink-0">
           <div className="w-full max-w-[140px] aspect-square rounded-2xl overflow-hidden bg-gray-50">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -54,7 +68,7 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
         </div>
 
         {/* 자주 묻는 질문 카드 - 3개 가로 배열 */}
-        <div className="px-5 pb-3 flex gap-2">
+        <div className="px-5 py-3 flex gap-2 flex-shrink-0">
           {examples.map((ex, i) => (
             <button
               key={i}
@@ -77,13 +91,11 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
             </button>
           ))}
         </div>
+      </div>
 
-        <div className="flex-1"></div>
-
-        {/* 입력창 */}
-        <div className="px-5 pt-3 pb-6 flex-shrink-0">
-          <InputBar onSubmit={onSubmit} />
-        </div>
+      {/* 입력창 - 하단 고정 */}
+      <div className="px-5 pt-3 pb-6 flex-shrink-0">
+        <InputBar onSubmit={onSubmit} />
       </div>
     </div>
   );
