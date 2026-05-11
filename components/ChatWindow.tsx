@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import AuthButton from '@/components/AuthButton';
 import HistoryModal from '@/components/HistoryModal';
-import HomeScreen from '@/components/HomeScreen';
 import { createClient as createSupabaseBrowser } from '@/lib/supabase/client';
 import { PositionInput, buildPositionContext } from './PositionInput';
 import type { Position } from './PositionInput';
@@ -1584,7 +1583,11 @@ const TeaTabContent = ({
   );
 };
 
-export default function ChatWindow() {
+interface ChatWindowProps {
+  initialMessage?: string;
+}
+
+export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [mounted, setMounted] = useState(false);
   const [input, setInput] = useState('');
@@ -2285,6 +2288,17 @@ export default function ChatWindow() {
     return () => document.removeEventListener('click', handler, true);
   }, [ttsSupported, isSpeakingGlobal]);
 
+  // ✅ HomeScreen에서 넘긴 첫 메시지 자동 전송 (mount 1회만)
+  const initialSentRef = useRef(false);
+  useEffect(() => {
+    if (initialSentRef.current) return;
+    if (!mounted) return;
+    const seed = initialMessage?.trim();
+    if (!seed) return;
+    initialSentRef.current = true;
+    handleSend(seed);
+  }, [mounted, initialMessage, handleSend]);
+
   if (!mounted) return null;
 
   return (
@@ -2406,36 +2420,7 @@ export default function ChatWindow() {
         </div>
       )}
 
-      {!hasUserSent && (
-        <HomeScreen
-          onSubmit={(text) => handleSend(text)}
-          onSetInput={(text) => { setInput(text); }}
-          onStartRecording={toggleRecording}
-          sttSupported={sttSupported}
-          rightSlot={
-            <>
-              <AuthButton />
-              <button
-                type="button"
-                onClick={() => setShowHistory(true)}
-                style={{
-                  background: 'rgba(255,255,255,0.06)',
-                  padding: '5px 12px',
-                  borderRadius: 8,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: '#e5e7eb',
-                  border: '1px solid rgba(255,255,255,0.18)',
-                  whiteSpace: 'nowrap',
-                  cursor: 'pointer',
-                }}
-              >
-                History
-              </button>
-            </>
-          }
-        />
-      )}
+      {/* HomeScreen은 app/page.tsx 레벨에서 분리 호스팅 — ChatWindow는 채팅 진입 후만 책임 */}
       {hasUserSent && (
       <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', padding: scrollPadding }}>
         {teaPersona !== 'lucia' && (() => {

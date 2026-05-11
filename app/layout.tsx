@@ -1,9 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Space_Grotesk } from "next/font/google";
+import { Space_Grotesk } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
   weight: ["500", "600", "700"],
@@ -47,8 +46,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko" className={`${inter.variable} ${spaceGrotesk.variable}`}>
+    <html lang="ko" className={spaceGrotesk.variable}>
       <head>
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/[email protected]/dist/web/static/pretendard.css"
+        />
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/@tabler/[email protected]/dist/tabler-icons.min.css"
+        />
         {CLARITY_ID && (
           <Script id="ms-clarity" strategy="afterInteractive">
             {`(function(c,l,a,r,i,t,y){
@@ -59,7 +66,7 @@ export default function RootLayout({
           </Script>
         )}
       </head>
-      <body className={inter.className}>
+      <body>
         {children}
       </body>
     </html>
