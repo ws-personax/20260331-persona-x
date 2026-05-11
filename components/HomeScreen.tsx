@@ -12,9 +12,9 @@ interface HomeScreenProps {
 
 export default function HomeScreen({ onSubmit }: HomeScreenProps) {
   const examples = [
-    { emoji: '💼', text: '직장 고민' },
-    { emoji: '📈', text: '주식 투자' },
-    { emoji: '💝', text: '관계 고민' },
+    { emoji: '💼', text: '출근이 너무 힘들어요' },
+    { emoji: '📈', text: '삼성전자 어떻게 할까요?' },
+    { emoji: '😴', text: '잠이 안 와요' },
   ];
 
   return (
@@ -57,7 +57,7 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
 
         {/* 4명 페르소나 이미지 */}
         <div className="px-5 py-4 flex justify-center flex-shrink-0">
-          <div className="w-full max-w-[140px] aspect-square rounded-2xl overflow-hidden bg-gray-50">
+          <div className="w-full max-w-[260px] aspect-square rounded-2xl overflow-hidden bg-gray-50">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/scenes/personas-4.webp"
@@ -79,11 +79,13 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
               <span style={{ fontSize: '22px' }}>{ex.emoji}</span>
               <span
                 style={{
-                  fontSize: '12px',
+                  fontSize: '11px',
                   color: '#4a4a5a',
-                  letterSpacing: '-0.2px',
-                  whiteSpace: 'nowrap',
+                  letterSpacing: '-0.3px',
                   fontWeight: 600,
+                  lineHeight: 1.3,
+                  textAlign: 'center',
+                  wordBreak: 'keep-all',
                 }}
               >
                 {ex.text}
@@ -93,8 +95,11 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
         </div>
       </div>
 
-      {/* 입력창 - 하단 고정 */}
-      <div className="px-5 pt-3 pb-6 flex-shrink-0">
+      {/* 입력창 - 하단 고정 (safe-area 대응) */}
+      <div
+        className="px-5 pt-3 flex-shrink-0"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}
+      >
         <InputBar onSubmit={onSubmit} />
       </div>
     </div>
