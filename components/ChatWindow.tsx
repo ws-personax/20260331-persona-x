@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import AuthButton from '@/components/AuthButton';
 import HistoryModal from '@/components/HistoryModal';
+import HomeScreen from '@/components/HomeScreen';
 import { createClient as createSupabaseBrowser } from '@/lib/supabase/client';
 import { PositionInput, buildPositionContext } from './PositionInput';
 import type { Position } from './PositionInput';
@@ -1583,107 +1584,6 @@ const TeaTabContent = ({
   );
 };
 
-const OnboardingTabs = ({
-  onSubmit,
-  onSetInput,
-  onStartRecording,
-  sttSupported,
-}: {
-  onSubmit: (text: string) => void;
-  onSetInput?: (text: string) => void;
-  onStartRecording?: () => void;
-  sttSupported?: boolean;
-}) => {
-  const [introInput, setIntroInput] = useState('');
-
-  const classifyAndEnter = (text: string) => {
-    const t = text.trim();
-    if (!t) return;
-    if (onSetInput) onSetInput(t);
-    onSubmit(t);
-  };
-
-  return (
-    <>
-      <style>{`
-        .px-intro-input:focus {
-          outline: none;
-          border-color: #6366f1;
-          box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
-        }
-      `}</style>
-
-      {/* 슬로건 한 줄 — 카드와 입력창을 자연스럽게 잇는 다리 */}
-      <p style={{ fontSize: 12.5, color: '#9ca3af', textAlign: 'center', margin: '2px 0 14px', fontWeight: 500, lineHeight: 1.5, padding: '0 8px' }}>
-        AI 대나무숲 — 말하면 4명이 충돌하고, 당신이 결정합니다
-      </p>
-
-      {/* 입력창 */}
-      <div style={{ width: '100%', maxWidth: 480, boxSizing: 'border-box' }}>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            className="px-intro-input"
-            type="text"
-            value={introInput}
-            onChange={e => setIntroInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') classifyAndEnter(introInput); }}
-            placeholder="무엇이든 물어보세요"
-            style={{
-              flex: 1,
-              padding: '11px 14px',
-              fontSize: 14,
-              border: '1px solid #d1d5db',
-              borderRadius: 10,
-              background: '#ffffff',
-              color: '#111827',
-              boxSizing: 'border-box',
-            }}
-          />
-          {sttSupported && onStartRecording && (
-            <button
-              type="button"
-              onClick={onStartRecording}
-              style={{
-                padding: '10px 12px',
-                background: '#f3f4f6',
-                border: '1px solid #d1d5db',
-                borderRadius: 10,
-                cursor: 'pointer',
-                fontSize: 18,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              🎤
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => classifyAndEnter(introInput)}
-            style={{
-              padding: '10px 18px',
-              background: '#FAE100',
-              border: 'none',
-              borderRadius: 10,
-              cursor: 'pointer',
-              fontSize: 13,
-              fontWeight: 700,
-              color: '#111827',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            시작
-          </button>
-        </div>
-        <p style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center', margin: '10px 0 0', lineHeight: 1.4 }}>
-          투자 권유·불법·욕설은 답변이 제한될 수 있어요
-        </p>
-      </div>
-    </>
-  );
-};
-
 export default function ChatWindow() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [mounted, setMounted] = useState(false);
@@ -2411,42 +2311,44 @@ export default function ChatWindow() {
         boxSizing: 'border-box',
       }}
     >
-      <header
-        style={{
-          background: 'rgba(178,199,218,0.95)',
-          padding: '12px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid rgba(0,0,0,0.06)',
-          position: 'sticky',
-          top: 0,
-          zIndex: 10,
-        }}
-      >
-        <span style={{ fontWeight: 800, fontSize: 18, color: '#1f2937' }}>PersonaX</span>
+      {hasUserSent && (
+        <header
+          style={{
+            background: 'rgba(178,199,218,0.95)',
+            padding: '12px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderBottom: '1px solid rgba(0,0,0,0.06)',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+          }}
+        >
+          <span style={{ fontWeight: 800, fontSize: 18, color: '#1f2937' }}>PersonaX</span>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: '60vw' }}>
-          <AuthButton />
-          <button
-            type="button"
-            onClick={() => setShowHistory(true)}
-            style={{
-              background: '#fff',
-              padding: '5px 12px',
-              borderRadius: 8,
-              fontSize: 12,
-              fontWeight: 700,
-              color: '#374151',
-              border: '1px solid #d1d5db',
-              whiteSpace: 'nowrap',
-              cursor: 'pointer',
-            }}
-          >
-            History
-          </button>
-        </div>
-      </header>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: '60vw' }}>
+            <AuthButton />
+            <button
+              type="button"
+              onClick={() => setShowHistory(true)}
+              style={{
+                background: '#fff',
+                padding: '5px 12px',
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#374151',
+                border: '1px solid #d1d5db',
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+              }}
+            >
+              History
+            </button>
+          </div>
+        </header>
+      )}
 
       {/* pointerEvents: none — 배너 자체는 클릭 가로채지 않도록 (아래 콘텐츠가 그대로 클릭됨). */}
       {isSpeakingGlobal && (
@@ -2505,107 +2407,34 @@ export default function ChatWindow() {
       )}
 
       {!hasUserSent && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center' }}>
-          {/* 페르소나 말풍선 2x2 — 첫 진입 시 4명 토론 구조를 한눈에 보여줌 */}
-          <div
-            style={{
-              width: '100%',
-              maxWidth: 420,
-              marginBottom: 14,
-              padding: '14px 14px 12px',
-              background: 'linear-gradient(180deg, #fafafa 0%, #f3f4f6 100%)',
-              border: '1px solid #e5e7eb',
-              borderRadius: 14,
-              boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
-            }}
-          >
-            <div style={{ fontSize: 13, fontWeight: 800, color: '#1f2937', marginBottom: 10 }}>
-              💬 삼성전자 지금 사도 될까?
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              {([
-                { key: 'ray',   text: 'PBR 1.1배, 역대 최저입니다. 외국인 순매수 3주 연속 12조원.' },
-                { key: 'jack',  text: 'RAY, 2022년부터 3년째 그 말 했잖아요. 결과가 어떻게 됐어요?' },
-                { key: 'lucia', text: 'JACK, 그럼 삼성전자 영원히 사지 말라는 거예요?' },
-                { key: 'echo',  text: '단기면 JACK, 장기면 LUCIA. 기간이 먼저입니다.' },
-              ] as { key: PersonaKey; text: string }[]).map(({ key, text }) => {
-                const p = PERSONAS[key];
-                return (
-                  <div
-                    key={key}
-                    style={{
-                      background: p.bubbleBg,
-                      border: `1px solid ${p.bubbleBorder}`,
-                      borderRadius: 10,
-                      padding: '7px 9px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 3,
-                      minHeight: 90,
-                      minWidth: 0,
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <div
-                        style={{
-                          width: 18,
-                          height: 18,
-                          borderRadius: 5,
-                          background: p.iconBg,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <span style={{ color: '#fff', fontWeight: 800, fontSize: 9 }}>{p.initial}</span>
-                      </div>
-                      <span style={{ fontWeight: 800, fontSize: 11, color: p.textColor }}>{p.name}</span>
-                    </div>
-                    <p style={{ margin: 0, fontSize: 11, lineHeight: 1.4, color: p.textColor, wordBreak: 'keep-all' }}>
-                      {text}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 예시 버튼 3개 — 재테크 / 감정 / 일상 대표 질문 */}
-          <div style={{ width: '100%', maxWidth: 420, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginBottom: 14 }}>
-            {[
-              '삼성전자 지금 사도 될까?',
-              '출근이 너무 힘들어요',
-              '내일 어린이날인데 어디 갈까요?',
-            ].map(text => (
+        <HomeScreen
+          onSubmit={(text) => handleSend(text)}
+          onSetInput={(text) => { setInput(text); }}
+          onStartRecording={toggleRecording}
+          sttSupported={sttSupported}
+          rightSlot={
+            <>
+              <AuthButton />
               <button
-                key={text}
                 type="button"
-                onClick={() => { setInput(text); handleSend(text); }}
+                onClick={() => setShowHistory(true)}
                 style={{
-                  padding: '8px 13px',
-                  background: '#f3f4f6',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 20,
-                  fontSize: 12.5,
-                  color: '#374151',
+                  background: 'rgba(255,255,255,0.06)',
+                  padding: '5px 12px',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#e5e7eb',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  whiteSpace: 'nowrap',
                   cursor: 'pointer',
-                  fontWeight: 500,
                 }}
               >
-                {text}
+                History
               </button>
-            ))}
-          </div>
-
-          <OnboardingTabs
-            onSubmit={(text) => handleSend(text)}
-            onSetInput={(text) => { setInput(text); }}
-            onStartRecording={toggleRecording}
-            sttSupported={sttSupported}
-          />
-        </div>
+            </>
+          }
+        />
       )}
       {hasUserSent && (
       <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', padding: scrollPadding }}>
