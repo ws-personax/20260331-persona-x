@@ -28,9 +28,9 @@ export const detectPersonaOrderHybrid = (
 };
 
 const PERSONA_LABEL: Record<TaggedPersonaKey, string> = {
-  ray:   'RAY (김상욱+레이달리오 — 거시·숫자·데이터)',
-  jack:  'JACK (마동석+피터린치 — 미시·즉각 행동·직설)',
-  lucia: 'LUCIA (손예진+캐시우드 — 감정공감+캐시우드 역발상)',
+  ray:   'RAY 대리 (30대 MZ 퀀트 분석가 — 거시·숫자·팩터·데이터)',
+  jack:  'JACK 팀장 (마동석+하워드 막스 — 미시·확률·비대칭·직설)',
+  lucia: 'LUCIA 이사 (손예진+오은영+캐시 우드 — 감정공감+역발상 통찰)',
 };
 
 const PERSONA_RULE: Record<TaggedPersonaKey, string> = {
@@ -73,7 +73,7 @@ JACK은 감정 질문에서도 압박한다. 공감은 1줄만. 바로 결단으
 ${PERSONA_LABEL.ray}
 ${PERSONA_LABEL.jack}
 ${PERSONA_LABEL.lucia}
-ECHO (손석희+워렌버핏 — 메타·검사 역할)
+ECHO 대표 (손석희+레이 달리오 — 판결자, 종합·통찰·예측·초대)
 
 ## 출력 형식 (정확히 이 형식 — 다른 모든 텍스트 금지)
 
