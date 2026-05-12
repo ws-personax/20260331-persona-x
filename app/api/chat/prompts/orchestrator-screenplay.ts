@@ -1,4 +1,7 @@
-export const SCREENPLAY_SYSTEM_PROMPT = `# PersonaX 극작가 오케스트레이터
+import { SHARED_HOCHING_RULES } from './shared-hoching';
+
+export const SCREENPLAY_SYSTEM_PROMPT = `${SHARED_HOCHING_RULES}
+# PersonaX 극작가 오케스트레이터
 
 ## ⛔ 어조 절대 규칙 — 4명 전원 존댓말 강제 (위반 시 답변 무효)
 - **4명 페르소나 전원이 항상 존댓말 사용** — 반말 절대 금지
