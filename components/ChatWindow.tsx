@@ -85,7 +85,7 @@ const PERSONAS: Record<
   }
 > = {
   jack: {
-    name: 'JACK',
+    name: 'JACK 팀장',
     label: '결단 · 전략',
     initial: 'J',
     iconBg: '#374151',
@@ -94,7 +94,7 @@ const PERSONAS: Record<
     textColor: '#111827',
   },
   lucia: {
-    name: 'LUCIA',
+    name: 'LUCIA 이사',
     label: '감정 · 공감',
     initial: 'L',
     iconBg: '#a855f7',
@@ -103,7 +103,7 @@ const PERSONAS: Record<
     textColor: '#1f2937',
   },
   ray: {
-    name: 'RAY',
+    name: 'RAY 대리',
     label: '데이터 · 분석',
     initial: 'R',
     iconBg: '#06b6d4',
@@ -112,7 +112,7 @@ const PERSONAS: Record<
     textColor: '#1f2937',
   },
   echo: {
-    name: 'ECHO',
+    name: 'ECHO 대표',
     label: '구조 · 원칙',
     initial: 'E',
     iconBg: '#d4a017',
@@ -1410,9 +1410,9 @@ const FinanceTabContent = ({ onOpenQuickPanel }: { onOpenQuickPanel: (panel: Fin
 };
 
 const TEA_PERSONAS_INFO: { key: 'lucia' | 'jack' | 'echo'; emoji: string; name: string; desc: string; border: string; bg: string; fg: string }[] = [
-  { key: 'lucia', emoji: '☕', name: 'LUCIA', desc: '따뜻하게 들어드릴게요',   border: '#fb923c', bg: '#fff7ed', fg: '#7c2d12' },
-  { key: 'jack',  emoji: '💪', name: 'JACK',  desc: '직설적으로 얘기해드릴게요', border: '#1f2937', bg: '#f3f4f6', fg: '#111827' },
-  { key: 'echo',  emoji: '🎯', name: 'ECHO',  desc: '핵심을 짚어드릴게요',     border: '#b45309', bg: '#fefce8', fg: '#78350f' },
+  { key: 'lucia', emoji: '☕', name: 'LUCIA 이사', desc: '따뜻하게 들어드릴게요',   border: '#fb923c', bg: '#fff7ed', fg: '#7c2d12' },
+  { key: 'jack',  emoji: '💪', name: 'JACK 팀장',  desc: '직설적으로 얘기해드릴게요', border: '#1f2937', bg: '#f3f4f6', fg: '#111827' },
+  { key: 'echo',  emoji: '🎯', name: 'ECHO 대표',  desc: '핵심을 짚어드릴게요',     border: '#b45309', bg: '#fefce8', fg: '#78350f' },
 ];
 
 const TEA_PERSONA_HEADLINES: Record<'lucia' | 'jack' | 'echo', { line1: string; line2: string; quote: string }> = {
