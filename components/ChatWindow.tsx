@@ -2319,7 +2319,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        background: '#b2c7da',
+        background: '#F5EFE0',
         fontFamily: 'sans-serif',
         paddingTop: 'env(safe-area-inset-top, 0px)',
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',

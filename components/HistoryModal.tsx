@@ -245,7 +245,7 @@ export default function HistoryModal({ onClose, supabaseClient }: HistoryModalPr
     position: 'fixed',
     inset: 0,
     zIndex: 1000,
-    background: '#b2c7da',
+    background: '#F5EFE0',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
