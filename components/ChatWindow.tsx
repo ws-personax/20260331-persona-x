@@ -248,7 +248,7 @@ const NoticeBox = ({
       )}
       {!hideDisclaimer && (
         <p style={{ fontSize: 10, color: '#2563eb', margin: '3px 0 0', lineHeight: 1.5, fontWeight: 600 }}>
-          💡 컨플루언스 가이드: 낮음 → 참고 · 보통 → 고려 · 높음 → 확신
+          💡 참고 가이드: 낮음 → 참고 · 보통 → 고려 · 높음 → 확신
         </p>
       )}
       {!hideDisclaimer && (
@@ -2390,7 +2390,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
             whiteSpace: 'nowrap',
           }}
         >
-          <span>🔊 읽는 중... (탭하면 중지)</span>
+          <span>🔊 읽는 중... (누르면 중지)</span>
         </div>
       )}
 
@@ -3091,7 +3091,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
               opacity: !input.trim() || isLoading ? 0.5 : 1,
             }}
           >
-            Send
+            보내기
           </button>
           <VoiceControlsColumn
             sttSupported={sttSupported}
