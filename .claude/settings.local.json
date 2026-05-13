@@ -42,7 +42,9 @@
       "Bash(curl *)",
       "Bash(python -c ' *)",
       "Bash(NODE_OPTIONS=\"--max-old-space-size=8192\" node ./node_modules/typescript/bin/tsc --noEmit)",
-      "PowerShell(npm run *)"
+      "PowerShell(npm run *)",
+      "PowerShell(Get-ChildItem -Path \"lib\",\"app\",\"components\" -Recurse -File | Where-Object { $_.Name -match \"prompt|persona\" } | Select-Object FullName)",
+      "PowerShell(New-Item *)"
     ]
   }
 }
