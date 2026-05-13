@@ -1145,11 +1145,13 @@ export async function POST(req: Request) {
             turns.push(`[유저: ${q}]`);
           }
         }
-        // ✅ V2 결함 #10 — 카테고리 변경 + 연결어 없음일 때 recentContext 약화
-        //   완전 삭제 X — 마지막 1턴 + 200자로 요약 (마스터 결정: "무조건 무시 아니다")
         if (shouldWeakenContext) {
-          const lastTurn = turns[turns.length - 1] || '';
-          return lastTurn.length > 200 ? lastTurn.slice(0, 200) + '...' : lastTurn;
+          // ✅ V2 결함 #10 보정 — 완전 차단 (라이브 검증으로 200자 요약 불충분 확인)
+          //   카테고리 변경 + 명시 연결어 없음 = 새 주제로 전환
+          //   이전 맥락 정보를 LLM에게 노출하지 않음 (끌어올 정보 자체를 차단)
+          //   마스터 통찰 보호: shouldWeakenContext 로직이 이미 "새 주제"만 감지하므로
+          //   명시 연결어/같은 카테고리는 영향 없음 (유지됨)
+          return '[새 주제로 전환 — 이전 맥락 무관, 마지막 메시지에만 집중]';
         }
         return turns.join(' → ');
       })();
