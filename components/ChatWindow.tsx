@@ -549,8 +549,17 @@ const PersonaBubble = memo(function PersonaBubble({
             justifyContent: 'center',
             flexShrink: 0,
             boxShadow: '0 2px 5px rgba(0,0,0,0.12)',
+            position: 'relative',
+            overflow: 'hidden',
           }}
         >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`/avatars/${personaKey}.webp`}
+            alt={p.name}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+          />
           <span style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>{p.initial}</span>
         </div>
 
@@ -733,8 +742,17 @@ const EchoBubble = memo(function EchoBubble({
             justifyContent: 'center',
             flexShrink: 0,
             boxShadow: '0 2px 5px rgba(0,0,0,0.12)',
+            position: 'relative',
+            overflow: 'hidden',
           }}
         >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/avatars/echo.webp"
+            alt={p.name}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+          />
           <span style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>{p.initial}</span>
         </div>
 
@@ -1120,8 +1138,17 @@ const TypingIndicator = ({ teaMode = false, teaPersona = null, userText = '', pe
                 justifyContent: 'center',
                 flexShrink: 0,
                 opacity: 0.85,
+                position: 'relative',
+                overflow: 'hidden',
               }}
             >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/avatars/${personaKey}.webp`}
+                alt={p.name}
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+              />
               <span style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>{p.initial}</span>
             </div>
             <div style={{ paddingTop: 8 }}>
@@ -1172,8 +1199,17 @@ const TypingIndicator = ({ teaMode = false, teaPersona = null, userText = '', pe
                   justifyContent: 'center',
                   flexShrink: 0,
                   opacity: 0.7,
+                  position: 'relative',
+                  overflow: 'hidden',
                 }}
               >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/avatars/${key}.webp`}
+                  alt={p.name}
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                />
                 <span style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>{p.initial}</span>
               </div>
               <div style={{ paddingTop: 8 }}>
@@ -1541,8 +1577,17 @@ const TeaTabContent = ({
                 fontWeight: 800,
                 flexShrink: 0,
                 boxShadow: '0 2px 6px rgba(168, 85, 247, 0.25)',
+                position: 'relative',
+                overflow: 'hidden',
               }}
             >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/avatars/lucia.webp"
+                alt={PERSONAS.lucia.name}
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+              />
               {PERSONAS.lucia.initial}
             </div>
             <div
