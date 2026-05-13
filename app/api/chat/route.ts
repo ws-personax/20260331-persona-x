@@ -864,6 +864,34 @@ export async function POST(req: Request) {
       if (CATEGORY_MAP.tech.test(text))    return 'tech';
       return 'general';
     };
+
+    // ✅ V2 결함 #10 — 명시 연결어 정밀 패턴 (옵션 A++)
+    //   유저가 이전 맥락을 명시적으로 이어가려는 신호 감지.
+    //   카테고리 변경 시에도 이 패턴 있으면 이전 맥락 유지.
+    const explicitConnectorPatterns = [
+      // 옵션 A++ 정밀 패턴 7개
+      /방금\s/,                            // "방금 그거", "방금 말한"
+      /아까\s/,                            // "아까 말씀하신"
+      /그거\s(?!뭐였|좋|싫|괜찮)/,           // "그거 X" 단, 혼잣말/감탄 제외
+      /위에서/,                            // "위에서 한 얘기"
+      /그때\s/,                            // "그때 했던"
+      /전에\s(말|얘기|언급|했)/,             // "전에 말한"
+      /방금\s말[^아]/,                     // "방금 말씀하신" 단 "말 안 함" 제외
+      // 짧은 후속 질문 패턴 5개
+      /더\s자세히/,                        // "더 자세히"
+      /^그래서\??$/,                       // "그래서?", "그래서"
+      /^왜\??$/,                           // "왜?", "왜"
+      /^어떻게\??$/,                       // "어떻게?"
+      /^어떤\s/,                           // "어떤..."
+      // 짧은 확인 질문 패턴 4개 (V2 결함 #10 보정)
+      /맞나요\??$/,                        // "맞나요?", "이거 맞나요"
+      /^정말\??$/,                         // "정말?", "정말"
+      /^진짜\??$/,                         // "진짜?", "진짜"
+      /^이거\s/,                           // "이거 X" 시작
+    ];
+    const hasExplicitConnector = (text: string): boolean =>
+      explicitConnectorPatterns.some(re => re.test(text));
+
     const LUCIA_ROUTING_MESSAGE: Record<string, string> = {
       finance: '재테크 질문이시군요! RAY와 JACK이 전문가예요. 바로 연결해드릴게요. 📊',
       sports:  '스포츠 승부 예측은 JACK이 제일 잘해요! 연결해드릴게요. ⚡',
@@ -876,7 +904,19 @@ export async function POST(req: Request) {
     };
 
     // ✅ LUCIA 허브 라우팅 결정 — teaMode 분기 이전 (모든 분기에서 공유)
+    // ✅ V2 결함 #10 — 이전 카테고리 vs 현재 카테고리 비교
+    //   마지막 메시지가 새 주제로 전환된 경우, recentContext를 약화시키기 위함.
+    //   AND 로직: 카테고리 변경 + 연결어 없음 모두 충족 시만 약화 (마스터 결정 보정 — 짧음은 부수 정보).
+    const _prevUserMsg = (messages as Array<{ role?: string; content?: string }>)
+      .slice(0, -1)
+      .reverse()
+      .find((m) => m?.role === 'user')?.content || '';
+    const prevCategory = _prevUserMsg ? detectCategory(_prevUserMsg) : null;
     const category = detectCategory(lastMsg);
+    const categoryChanged = !!(prevCategory && prevCategory !== category);
+    const _hasConnector = hasExplicitConnector(lastMsg);
+    // 맥락 약화 조건: 카테고리 변경 AND 연결어 없음 (진짜 신호는 명시 연결어, 짧음은 신뢰성 X)
+    const shouldWeakenContext = categoryChanged && !_hasConnector;
     const luciaRoutingMsg = LUCIA_ROUTING_MESSAGE[category];
     // ✅ 동일 카테고리 luciaIntro 중복 방지
     const _alreadyIntroduced = Array.isArray(messages) && (messages as Array<{
@@ -1104,6 +1144,12 @@ export async function POST(req: Request) {
           } else {
             turns.push(`[유저: ${q}]`);
           }
+        }
+        // ✅ V2 결함 #10 — 카테고리 변경 + 연결어 없음일 때 recentContext 약화
+        //   완전 삭제 X — 마지막 1턴 + 200자로 요약 (마스터 결정: "무조건 무시 아니다")
+        if (shouldWeakenContext) {
+          const lastTurn = turns[turns.length - 1] || '';
+          return lastTurn.length > 200 ? lastTurn.slice(0, 200) + '...' : lastTurn;
         }
         return turns.join(' → ');
       })();
