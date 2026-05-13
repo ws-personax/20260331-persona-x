@@ -2319,7 +2319,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        background: '#F5EFE0',
+        background: '#E8DCC0',
         fontFamily: 'sans-serif',
         paddingTop: 'env(safe-area-inset-top, 0px)',
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
@@ -2328,7 +2328,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
     >
       <header
         style={{
-          background: '#ffffff',
+          background: '#E8DCC0',
           padding: '12px 16px',
           display: 'flex',
           alignItems: 'center',

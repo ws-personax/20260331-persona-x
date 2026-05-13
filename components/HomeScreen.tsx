@@ -18,7 +18,7 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
   ];
 
   return (
-    <div className="h-[100dvh] bg-[#F5EFE0] flex flex-col overflow-hidden">
+    <div className="h-[100dvh] bg-[#E8DCC0] flex flex-col overflow-hidden">
       {/* 헤더 */}
       <header className="px-5 py-3.5 flex-shrink-0 flex items-center">
         <Logo size="sm" />

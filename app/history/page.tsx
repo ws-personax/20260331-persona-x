@@ -254,14 +254,14 @@ export default function HistoryPage() {
   }, [filteredItems]);
 
   if (loading) return (
-    <div style={{ minHeight: '100dvh', background: '#F5EFE0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
+    <div style={{ minHeight: '100dvh', background: '#E8DCC0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
       <p style={{ color: '#374151', fontWeight: 700 }}>히스토리 불러오는 중...</p>
     </div>
   );
 
   // ✅ 세션 없음 — 에러 대신 친절한 로그인 안내 (모바일 쿠키 미동기화 대응)
   if (error === 'NO_SESSION') return (
-    <div style={{ minHeight: '100dvh', background: '#F5EFE0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, overflow: 'auto', WebkitOverflowScrolling: 'touch', padding: '0 24px' }}>
+    <div style={{ minHeight: '100dvh', background: '#E8DCC0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, overflow: 'auto', WebkitOverflowScrolling: 'touch', padding: '0 24px' }}>
       <p style={{ color: '#374151', fontWeight: 700, textAlign: 'center', fontSize: 15, margin: 0, marginTop: 200 }}>
         로그인 후 히스토리를 볼 수 있어요.
       </p>
@@ -272,7 +272,7 @@ export default function HistoryPage() {
   );
 
   if (error) return (
-    <div style={{ minHeight: '100dvh', background: '#F5EFE0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
+    <div style={{ minHeight: '100dvh', background: '#E8DCC0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
       <p style={{ color: '#dc2626', fontWeight: 700, marginTop: 200 }}>{error}</p>
       <Link href="/" style={{ background: '#111827', color: '#fff', padding: '10px 20px', borderRadius: 10, textDecoration: 'none', fontWeight: 700 }}>
         홈으로
@@ -283,7 +283,7 @@ export default function HistoryPage() {
   return (
     // ✅ 모바일 대응: 100dvh로 iOS Safari dynamic toolbar 대응, overflow:auto 명시,
     //    iOS momentum scrolling 활성화로 스크롤 끊김 방지
-    <div style={{ minHeight: '100dvh', background: '#F5EFE0', fontFamily: 'sans-serif', overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
+    <div style={{ minHeight: '100dvh', background: '#E8DCC0', fontFamily: 'sans-serif', overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
       <header style={{ background: 'rgba(178,199,218,0.95)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(0,0,0,0.06)', position: 'sticky', top: 0, zIndex: 10 }}>
         <Link href="/" style={{ fontWeight: 800, fontSize: 18, color: '#1f2937', textDecoration: 'none' }}>
           ← PersonaX

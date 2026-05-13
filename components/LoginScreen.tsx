@@ -10,7 +10,7 @@ interface LoginScreenProps {
 
 export default function LoginScreen({ onKakaoLogin, onGoogleLogin, onSkip }: LoginScreenProps) {
   return (
-    <div className="h-[100dvh] bg-[#F5EFE0] flex flex-col px-5 overflow-hidden">
+    <div className="h-[100dvh] bg-[#E8DCC0] flex flex-col px-5 overflow-hidden">
       {/* 상단 영역: 비워둠 (균형용) */}
       <div className="h-12"></div>
 
