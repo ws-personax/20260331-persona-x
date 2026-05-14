@@ -36,10 +36,18 @@ import {
   buildTaggedRound2UserPrompt,
   parseTaggedRound1,
   parseTaggedRound2,
+  STAGE1_FALLBACK,
   type TaggedPersonaKey,
   type TaggedRound1Result,
   type TaggedRound2Result,
+  type Stage1Data,
+  type Stage1PersonaAnalysis,
 } from './prompts/orchestrator-tagged';
+
+// ✅ 1차 페르소나 분석 (재료 수집) — D-1 신규
+import { buildLuciaAnalysisPrompt } from './prompts/analysis-lucia';
+import { buildJackAnalysisPrompt } from './prompts/analysis-jack';
+import { buildRayAnalysisPrompt } from './prompts/analysis-ray';
 
 // ✅ 재테크 탭 고급 질문 — 4명 페르소나 투자 철학 프롬프트
 import { ADVANCED_SYSTEM_RAY } from './prompts/advanced-ray';
@@ -463,15 +471,73 @@ async function callScreenplayOrchestrator(
 //   2라운드: [FIRST_2] [SECOND_2] [THIRD_2] [ECHO_FINAL]
 //   하이브리드 순서: 감정 키워드 감지 시 LUCIA 먼저, 아니면 카테고리 기반.
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// ✅ 1차 페르소나 분석 (D-1 신규) — 각 페르소나 독립 분석
+//   LUCIA/JACK/RAY 3명 병렬 호출 → JSON 파싱 → Stage1Data 반환
+//   실패 시 폴백 (빈 데이터)으로 진행 가능
+// ─────────────────────────────────────────────
+const parseStage1JSON = (raw: string | null): Stage1PersonaAnalysis => {
+  if (!raw) return STAGE1_FALLBACK;
+  try {
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (!m) return STAGE1_FALLBACK;
+    const parsed = JSON.parse(m[0]) as Record<string, unknown>;
+    return {
+      insight: typeof parsed.insight === 'string' ? parsed.insight : '',
+      numbers: typeof parsed.numbers === 'string' ? parsed.numbers : '',
+      key_point: typeof parsed.key_point === 'string' ? parsed.key_point : '',
+    };
+  } catch (e) {
+    console.warn('[stage1] JSON 파싱 실패', e);
+    return STAGE1_FALLBACK;
+  }
+};
+
+const JSON_ONLY_SYSTEM = 'JSON 출력 머신. 다른 텍스트 금지. 코드펜스 금지. 반드시 { 로 시작 } 로 끝나는 JSON 한 덩어리만 출력.';
+
+async function runStage1Analysis(
+  userMessage: string,
+  recentContext: string,
+  plan: { lucia_angle: string; jack_angle: string; ray_angle: string },
+): Promise<Stage1Data> {
+  const t0 = Date.now();
+  const luciaPrompt = buildLuciaAnalysisPrompt(userMessage, plan.lucia_angle, recentContext);
+  const jackPrompt  = buildJackAnalysisPrompt(userMessage,  plan.jack_angle,  recentContext);
+  const rayPrompt   = buildRayAnalysisPrompt(userMessage,   plan.ray_angle,   recentContext);
+
+  const [luciaRaw, jackRaw, rayRaw] = await Promise.all([
+    callTeaPersona('lucia', JSON_ONLY_SYSTEM, [{ role: 'user', content: luciaPrompt }]).catch((e) => {
+      console.warn('[stage1:lucia] 호출 실패', e); return null;
+    }),
+    callTeaPersona('jack',  JSON_ONLY_SYSTEM, [{ role: 'user', content: jackPrompt  }]).catch((e) => {
+      console.warn('[stage1:jack] 호출 실패',  e); return null;
+    }),
+    callTeaPersona('ray',   JSON_ONLY_SYSTEM, [{ role: 'user', content: rayPrompt   }]).catch((e) => {
+      console.warn('[stage1:ray] 호출 실패',   e); return null;
+    }),
+  ]);
+
+  const stage1: Stage1Data = {
+    lucia: parseStage1JSON(luciaRaw),
+    jack:  parseStage1JSON(jackRaw),
+    ray:   parseStage1JSON(rayRaw),
+  };
+
+  const elapsed = Date.now() - t0;
+  console.log(`[stage1] 1차 분석 완료 (${elapsed}ms) — lucia.insight="${stage1.lucia.insight.slice(0, 60)}" / jack.insight="${stage1.jack.insight.slice(0, 60)}" / ray.insight="${stage1.ray.insight.slice(0, 60)}"`);
+  return stage1;
+}
+
 async function callTaggedRound1(
   userMessage: string,
   category: string,
   recentContext: string,
   order: TaggedPersonaKey[],
   enableSearch: boolean,
+  stage1Data?: Stage1Data,
 ): Promise<TaggedRound1Result | null> {
   try {
-    const systemPrompt = buildTaggedRound1SystemPrompt();
+    const systemPrompt = buildTaggedRound1SystemPrompt(stage1Data);
     const userPrompt = buildTaggedRound1UserPrompt(userMessage, category, recentContext, order);
     const llm = await callTeaPersona(
       'echo',
@@ -1235,7 +1301,15 @@ export async function POST(req: Request) {
         };
 
         if (isRound1) {
-          const r1 = await callTaggedRound1(msg, category, recentContext, order, enableSearchTagged);
+          // ✅ D-1 1차 분석 단계 — 3명 페르소나 독립 분석 (병렬, JSON)
+          //   plan(오케스트레이터)에서 각 페르소나 angle을 받아 분석 프롬프트 구성
+          //   실패 시 빈 데이터로 폴백 — 2차 대본 생성은 계속 진행
+          const stage1Data = await runStage1Analysis(msg, recentContext, {
+            lucia_angle: plan.lucia_angle,
+            jack_angle:  plan.jack_angle,
+            ray_angle:   plan.ray_angle,
+          });
+          const r1 = await callTaggedRound1(msg, category, recentContext, order, enableSearchTagged, stage1Data);
           if (r1) {
             const personaText: Record<TaggedPersonaKey, string> = {
               ray: '', jack: '', lucia: '',

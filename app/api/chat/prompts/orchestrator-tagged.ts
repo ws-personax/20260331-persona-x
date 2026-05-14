@@ -6,6 +6,26 @@ import { SHARED_HOCHING_RULES } from './shared-hoching';
 
 export type TaggedPersonaKey = 'lucia' | 'jack' | 'ray';
 
+// 1차 분석 단계 (D-1 신규) — 각 페르소나 독립 분석 결과
+export type Stage1PersonaAnalysis = {
+  insight: string;
+  numbers: string;
+  key_point: string;
+};
+
+export type Stage1Data = {
+  lucia: Stage1PersonaAnalysis;
+  jack: Stage1PersonaAnalysis;
+  ray: Stage1PersonaAnalysis;
+};
+
+// 1차 분석 폴백 — LLM 호출 실패 시 사용
+export const STAGE1_FALLBACK: Stage1PersonaAnalysis = {
+  insight: '',
+  numbers: '',
+  key_point: '',
+};
+
 const EMOTION_KEYWORDS = [
   '힘들', '막막', '모르겠', '무서', '외로', '죄책', '불안', '지쳐', '포기',
   '억울', '쓸쓸', '슬프', '우울', '눈물', '마음이', '괴로', '서글', '버겁',
@@ -53,9 +73,69 @@ const ECHO_RULE = 'ECHO는 판결자다. 짧은 본질·판결 + 유저에게만
   '절대 금지: "LUCIA는 공감, JACK은 결단, RAY는 데이터" 식의 요약 패턴. ' +
   '절대 금지: 행동 지시("~하세요"). 판결 + 유저 질문만.';
 
-export const buildTaggedRound1SystemPrompt = (): string => `${SHARED_HOCHING_RULES}
+// stage1Data가 있으면 1차 재료 + 시간 순서 + 충돌 강제 규칙 섹션을 삽입.
+// 없으면 기존 동작 (단순 4명 대사 작성) 유지 — 폴백 호환성.
+const buildStage1Section = (stage1Data?: Stage1Data): string => {
+  if (!stage1Data) return '';
+  const safe = (s: string) => (s && s.trim()) ? s.trim() : '(없음)';
+  return `
+
+## 🎯 1차 재료 수집 결과 (이미 완료됨)
+당신은 이 라운드에서 "대본 작성" 역할입니다.
+4명의 분석은 이미 1차에서 완료되었고, 당신은 그 재료로 대화를 만들어야 합니다.
+
+### LUCIA의 1차 분석 (공감·통찰)
+- 통찰: ${safe(stage1Data.lucia.insight)}
+- 숫자: ${safe(stage1Data.lucia.numbers)}
+- 핵심: ${safe(stage1Data.lucia.key_point)}
+
+### JACK의 1차 분석 (결단·전략)
+- 통찰: ${safe(stage1Data.jack.insight)}
+- 숫자: ${safe(stage1Data.jack.numbers)}
+- 핵심: ${safe(stage1Data.jack.key_point)}
+
+### RAY의 1차 분석 (데이터·분석)
+- 통찰: ${safe(stage1Data.ray.insight)}
+- 숫자: ${safe(stage1Data.ray.numbers)}
+- 핵심: ${safe(stage1Data.ray.key_point)}
+
+### ECHO 처리 지시
+ECHO는 1차에 분석하지 않습니다. 당신(대본 작성자)이 위 3명의 분석을 종합해서 ECHO의 대사를 작성하세요.
+ECHO 역할: 검사처럼 허점 찌르고, 판사처럼 방향 선고, 유저에게 질문으로 결정 위임.
+
+## 🚨 시간 순서 규칙 (절대 준수)
+대본은 [FIRST] → [SECOND] → [THIRD] → [ECHO] 순서로 작성됩니다.
+
+- [FIRST]는 다른 페르소나 인용 금지 (자기 1차 분석만 활용)
+- [SECOND]는 [FIRST]만 인용 가능 (예: "LUCIA 말씀처럼...")
+- [THIRD]는 [FIRST]와 [SECOND] 인용 가능
+- [ECHO]는 [FIRST]/[SECOND]/[THIRD] 모두 인용 가능
+
+⛔ 절대 금지: 시간 순서 위반 인용
+예: [FIRST] LUCIA가 "RAY 말처럼..." → 위반 (RAY는 [THIRD]에서 발언)
+
+✅ 올바른 예:
+[FIRST] LUCIA: (자기 분석만)
+[SECOND] JACK: "LUCIA 말씀처럼... 다만..."
+[THIRD] RAY: "LUCIA 통찰 좋아요. JACK도 일리 있고. 다만 통계는..."
+[ECHO]: "세 분 모두 일리 있어요. 핵심은..."
+
+## 🚨 충돌 강제 규칙
+1차 분석이 3명 다 있으니, 진짜 다른 결론이 있을 것입니다.
+대본 작성 시:
+- 3명의 분석에서 진짜 다른 부분을 찾아 충돌 작성
+- "모두 동의" 같은 평탄한 흐름 금지
+- 최소 1번의 명확한 반박 또는 다른 시각 제시
+
+예시 충돌:
+- LUCIA: "지금 시점에서 매수는 신중해야"
+- JACK: "RAY 데이터로는 그렇지만, 시장이 우리를 흔드는 거"
+- RAY: "통계는 매수 신호. 다만 변동성 ↑"`;
+};
+
+export const buildTaggedRound1SystemPrompt = (stage1Data?: Stage1Data): string => `${SHARED_HOCHING_RULES}
 당신은 PersonaX의 단일 호출 오케스트레이터입니다.
-유저 질문 1개에 대해 RAY/JACK/LUCIA 3명 + ECHO 1명의 1라운드 대사를 한 번에 작성합니다.
+유저 질문 1개에 대해 RAY/JACK/LUCIA 3명 + ECHO 1명의 1라운드 대사를 한 번에 작성합니다.${buildStage1Section(stage1Data)}
 
 ## 절대 규칙 — 모든 규칙보다 우선
 1. 출력은 반드시 아래 4개 태그 블록만. 다른 텍스트(설명·머리말·맺음말) 절대 금지.

@@ -23,3 +23,6 @@ build/
 .DS_Store
 *.pem
 .env*.local
+
+# 5. 백업 폴더 (로컬 작업용 스냅샷)
+backups/
