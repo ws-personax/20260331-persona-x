@@ -3568,34 +3568,6 @@ ${DISCLAIMER}`;
     // JACK: bear → 하락, else(bull/conflict) → 상승
     const jackMbtiPool = discussMode === 'bear' ? JACK_BEARISH : JACK_BULLISH;
 
-    // LUCIA (ENFP · 리스크·역발상) — 상승/하락
-    const LUCIA_BULLISH = [
-      '시장이 틀렸을 수 있어요. 5년 후를 보세요.',
-      'FOMO에 휩쓸리지 마세요.',
-      '남들이 탐욕스러울 때 냉정해지세요.',
-      '검증된 신호만 따라가세요.',
-      '서두름이 가장 큰 적이에요.',
-      '감정을 걸러내야 비로소 기회가 보여요.',
-      '좋은 흐름일수록 더 신중해야 해요.',
-      '군중이 낙관할 때가 가장 위험해요.',
-      '확인 후 진입이 항상 맞아요.',
-      '오를 때 리스크가 더 커요.',
-    ];
-    const LUCIA_BEARISH = [
-      '손실을 막는 게 수익을 내는 것보다 먼저예요.',
-      '지금은 지키는 게 맞아요.',
-      '공포가 최고의 매수 기회였던 역사를 잊지 마세요.',
-      '모두가 팔 때가 오히려 기회일 수 있어요.',
-      '현금이 최고의 포지션이에요.',
-      '용감한 투자자도 때론 쉬어야 해요.',
-      '손실을 줄이는 것도 수익이에요.',
-      '한 발 물러서는 것도 전략이에요.',
-      '무서울 때일수록 데이터를 보세요.',
-      '내일 더 좋은 기회가 올 수 있어요.',
-    ];
-    // LUCIA: bull → 상승(경고), else(bear/conflict) → 하락(지지/역발상)
-    const luciaMbtiPool = discussMode === 'bull' ? LUCIA_BULLISH : LUCIA_BEARISH;
-
     // RAY (INTP · 데이터 분석) — 중립 명언 8개
     const rayMbtiPhrases = [
       '데이터는 거짓말하지 않습니다. 해석이 거짓말할 뿐.',
@@ -3614,7 +3586,7 @@ ${DISCLAIMER}`;
 
     // ✅ 모든 페르소나 — [본문] → [MBTI 라인] → [TAIL] 순서 통일
     const finalJackOut  = finalJack  + '\n— ' + jackMbtiPool[mbtiIdx]   + JACK_TAIL;
-    const finalLuciaOut = finalLucia + '\n— ' + luciaMbtiPool[mbtiIdx]  + LUCIA_TAIL;
+    const finalLuciaOut = finalLucia + LUCIA_TAIL;
     const finalRayOut   = finalRay   + '\n— ' + rayMbtiPhrases[rayRotIdx] + RAY_TAIL;
 
     const finalReply = [finalRayOut, finalJackOut, finalLuciaOut, finalEcho].filter(Boolean).join('\n\n');
