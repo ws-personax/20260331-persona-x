@@ -3,7 +3,7 @@
  * route.ts detectCategory / orchestrator-tagged EMOTION_KEYWORDS 와 정합 (프롬프트 파일 미수정).
  */
 
-export { FEATURE_OPTION_D } from './market-facts';
+export const FEATURE_OPTION_D = true;
 
 export type PersonaName = 'LUCIA' | 'JACK' | 'RAY' | 'ECHO';
 export type MessageCategory = 'invest' | 'emotional' | 'casual' | 'complex';
