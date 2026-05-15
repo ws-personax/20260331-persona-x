@@ -586,7 +586,6 @@ async function callOptionD(
     const dataRaw = await callTeaPersona('echo', optionDSystem, [{ role: 'user', content: dataPrompt }]);
     const dataPack = extractOptionDTag(dataRaw, 'DATA_PACK');
     console.log('[optionD] 1차:', dataPack ? '성공' : '실패(null)');
-    if (!dataPack) return null;
 
     const analysisPrompt = buildPersonaAnalysisPrompt(messages, dataPack, category);
     const analysisRaw = await callTeaPersona('echo', optionDSystem, [{ role: 'user', content: analysisPrompt }]);
@@ -594,7 +593,6 @@ async function callOptionD(
     const jackView = extractOptionDTag(analysisRaw, 'JACK_VIEW');
     const rayView = extractOptionDTag(analysisRaw, 'RAY_VIEW');
     const echoView = extractOptionDTag(analysisRaw, 'ECHO_VIEW');
-    if (!luciaView || !jackView || !rayView || !echoView) return null;
 
     const personaViews = `[LUCIA_VIEW]\n${luciaView}\n\n[JACK_VIEW]\n${jackView}\n\n[RAY_VIEW]\n${rayView}\n\n[ECHO_VIEW]\n${echoView}`;
     console.log('[optionD] 2차:', personaViews ? '성공' : '실패(null)');
