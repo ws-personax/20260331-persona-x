@@ -125,7 +125,7 @@ const PERSONAS: Record<
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 const formatTime = (d: Date) =>
-  d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Seoul' });
 
 const PERSONAX_DISCLAIMER = `⚠️ PersonaX는 AI 금융 콘텐츠 플랫폼입니다.
 제공되는 모든 분석은 참고용 시나리오이며
