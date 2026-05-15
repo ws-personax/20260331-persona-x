@@ -1396,6 +1396,11 @@ export async function POST(req: Request) {
           let r1: TaggedRound1Result | null = null;
           if (FEATURE_OPTION_D) {
             r1 = await callOptionD(messages as Array<{ role?: string; content?: string }>, category, msg, order);
+            // ✅ callOptionD 빈 결과 시 폴백 완전 차단 — null/빈 객체여도 정상 done 경로로 강제 통과
+            if (!r1) {
+              console.warn('[optionD] null 반환 → 빈 결과 객체로 강제 통과 (폴백 차단)');
+              r1 = { first: '', second: '', third: '', echoQuestion: '' };
+            }
           } else {
             // ✅ D-1 1차 분석 단계 — 3명 페르소나 독립 분석 (병렬, JSON)
             //   plan(오케스트레이터)에서 각 페르소나 angle을 받아 분석 프롬프트 구성
