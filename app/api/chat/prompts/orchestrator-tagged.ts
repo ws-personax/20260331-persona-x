@@ -540,6 +540,138 @@ ${orderDesc}
 1라운드 내용 반복 금지. 새 각도로만. 위 순서로 4개 태그 블록만 출력. 다른 텍스트 절대 금지.`;
 };
 
+export const buildDataCollectionPrompt = (
+  messages: Array<{ role?: string; content?: string }>,
+  category: string,
+  lastMessage: string,
+): string => {
+  const conversation = messages
+    .map((m) => `${m.role || 'unknown'}: ${m.content || ''}`)
+    .filter((line) => line.trim() !== 'unknown:')
+    .join('\n');
+
+  return `당신은 PersonaX 3단계 오케스트레이터의 1단계 데이터 수집 담당입니다.
+목표는 대본을 쓰는 것이 아니라, 다음 단계가 쓸 raw data pack을 만드는 것입니다.
+
+카테고리: ${category}
+마지막 메시지: ${lastMessage}
+
+최근 대화:
+${conversation || '(없음)'}
+
+## 수집 규칙
+- 키워드를 추출하고 카테고리를 확정합니다.
+- 투자 질문이면 종목명, 가격, 추세, 거래량, 변동성, 핵심 이벤트를 모읍니다.
+- 감정 질문이면 핵심 감정 키워드, 맥락, 압박 요인, 반복되는 표현을 모읍니다.
+- 복합 질문이면 투자 데이터와 감정 맥락을 둘 다 모읍니다.
+- 확실하지 않은 값은 추정이라고 표시하고, 없는 데이터는 없다고 씁니다.
+- 판단, 위로, 대본, 페르소나 말투는 쓰지 않습니다.
+
+## 출력 형식
+[DATA_PACK]
+{키워드, 확정 카테고리, raw 데이터, 감정 맥락, 확인 필요 항목만 간결하게 작성}`;
+};
+
+export const buildPersonaAnalysisPrompt = (
+  messages: Array<{ role?: string; content?: string }>,
+  dataPack: string,
+  category: string,
+): string => {
+  const conversation = messages
+    .map((m) => `${m.role || 'unknown'}: ${m.content || ''}`)
+    .filter((line) => line.trim() !== 'unknown:')
+    .join('\n');
+
+  return `당신은 PersonaX 3단계 오케스트레이터의 2단계 관점 가공 담당입니다.
+같은 DATA_PACK을 4명 페르소나의 관점으로 분해합니다.
+
+카테고리: ${category}
+
+최근 대화:
+${conversation || '(없음)'}
+
+DATA_PACK:
+${dataPack}
+
+## 관점 규칙
+- LUCIA: 캐시우드 관점. 미시동향, 감정사이클, 역발상, 변화의 변곡점을 봅니다.
+- JACK: 하워드막스 관점. 사이클, 비대칭, 리스크, 결단 조건을 봅니다.
+- RAY: MZ 퀀트 관점. 팩터, 통계, 밸류에이션, 확률과 수치를 봅니다.
+- ECHO: 레이달리오 관점. 원칙, 사이클 위치, 본질, 판단 기준을 봅니다.
+- 아직 대본을 쓰지 않습니다. 각 관점의 재료만 정리합니다.
+
+## 출력 형식
+[LUCIA_VIEW]
+{LUCIA 관점 재료}
+
+[JACK_VIEW]
+{JACK 관점 재료}
+
+[RAY_VIEW]
+{RAY 관점 재료}
+
+[ECHO_VIEW]
+{ECHO 관점 재료}`;
+};
+
+export const buildScriptPrompt = (
+  messages: Array<{ role?: string; content?: string }>,
+  personaViews: string,
+  category: string,
+): string => {
+  const normalizedCategory = (category || '').toLowerCase();
+  const needsLuciaClose = [
+    'emotion',
+    'life',
+    'relationship',
+    'mixed',
+    'complex',
+    '감정',
+    '관계',
+    '복합',
+    '인생',
+  ].some((key) => normalizedCategory.includes(key));
+  const conversation = messages
+    .map((m) => `${m.role || 'unknown'}: ${m.content || ''}`)
+    .filter((line) => line.trim() !== 'unknown:')
+    .join('\n');
+
+  return `당신은 PersonaX 3단계 오케스트레이터의 3단계 대본 작성 담당입니다.
+4명 관점을 받아 자연스러운 회의처럼 흐름을 구성합니다.
+
+카테고리: ${category}
+
+최근 대화:
+${conversation || '(없음)'}
+
+PERSONA_VIEWS:
+${personaViews}
+
+## 대본 규칙
+- 순서를 고정하지 않습니다. 질문 성격과 관점 충돌에 따라 FIRST, SECOND, THIRD, CLOSER 담당을 결정합니다.
+- ECHO 마무리는 의무가 아닙니다. CLOSER는 질문 성격이 결정합니다.
+- 투자/데이터 질문의 CLOSER는 RAY 또는 ECHO가 적합합니다.
+- 감정/관계 질문의 CLOSER는 JACK 또는 LUCIA가 적합합니다.
+- 원칙/인생 질문의 CLOSER는 ECHO가 적합합니다.
+- 결단/행동 질문의 CLOSER는 JACK이 적합합니다.
+- 각 블록 첫 줄에 담당 페르소나명을 자연스럽게 드러내되, 태그는 아래 형식만 사용합니다.
+- 직접 매수/매도 지시, 수익 보장, 과도한 의존 유도는 금지합니다.
+${needsLuciaClose ? '- 감정/복합 카테고리이므로 [LUCIA_CLOSE]를 반드시 추가합니다.\n' : '- 감정/복합 카테고리가 아니므로 [LUCIA_CLOSE]를 출력하지 않습니다.\n'}
+## 출력 형식
+[FIRST]
+{첫 번째 발언}
+
+[SECOND]
+{두 번째 발언}
+
+[THIRD]
+{세 번째 발언}
+
+[CLOSER]
+{질문 성격에 맞는 마무리 담당 페르소나의 결론}
+${needsLuciaClose ? '\n[LUCIA_CLOSE]\n{1줄: LUCIA의 따뜻한 마무리}\n{1줄: 유저에게 부담 없는 작은 질문}' : ''}`;
+};
+
 const stripPersonaLabels = (s: string): string =>
   s
     .replace(/^\s*(?:RAY|JACK|LUCIA|ECHO)\s*[:：]\s*/gim, '')
