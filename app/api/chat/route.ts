@@ -607,8 +607,8 @@ async function callOptionD(
 - [SECOND], [THIRD], [CLOSER], [LUCIA_CLOSE] 블록은 출력하지 마십시오.
 - ${personaCall}의 PERSONA_VIEW를 충실히 반영해 자연스럽게 답합니다.`;
       const soloRaw = await callTeaPersona('echo', optionDSystem, [{ role: 'user', content: soloPrompt }]);
-      const soloText = extractOptionDTag(soloRaw, 'FIRST');
-      if (!soloText) return null;
+      let soloText = extractOptionDTag(soloRaw, 'FIRST');
+      if (!soloText) soloText = `${personaCall} 답변을 생성하지 못했습니다`;
 
       if (personaCall === 'ECHO') {
         return { first: '', second: '', third: '', echoQuestion: soloText };
@@ -625,12 +625,13 @@ async function callOptionD(
 기존 화면 표시 참고 순서: ${order.map((key, index) => `${index + 1}. ${key.toUpperCase()}`).join(' / ')}
 단, CLOSER 담당은 질문 성격으로 결정하고 ECHO 고정 마무리로 만들지 마십시오.`;
     const scriptRaw = await callTeaPersona('echo', optionDSystem, [{ role: 'user', content: scriptPrompt }]);
-    const first = extractOptionDTag(scriptRaw, 'FIRST');
-    const second = extractOptionDTag(scriptRaw, 'SECOND');
-    const third = extractOptionDTag(scriptRaw, 'THIRD');
-    const closer = extractOptionDTag(scriptRaw, 'CLOSER');
-    const luciaClose = extractOptionDTag(scriptRaw, 'LUCIA_CLOSE');
-    if (!first || !second || !third || !closer) return null;
+    const first = extractOptionDTag(scriptRaw, 'FIRST') || '';
+    const second = extractOptionDTag(scriptRaw, 'SECOND') || '';
+    const third = extractOptionDTag(scriptRaw, 'THIRD') || '';
+    const closer = extractOptionDTag(scriptRaw, 'CLOSER') || '';
+    const luciaClose = extractOptionDTag(scriptRaw, 'LUCIA_CLOSE') || '';
+
+    console.log('[optionD] 3차 완료, first:', first?.slice(0, 20), 'personaCall:', personaCall);
 
     return {
       first,
