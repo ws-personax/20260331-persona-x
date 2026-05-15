@@ -580,10 +580,12 @@ async function callOptionD(
       lastMessage,
     );
     const personaCall = routed.personaCall;
+    console.log('[optionD] 시작, personaCall:', routed?.personaCall);
 
     const dataPrompt = buildDataCollectionPrompt(messages, category, lastMessage);
     const dataRaw = await callTeaPersona('echo', optionDSystem, [{ role: 'user', content: dataPrompt }]);
     const dataPack = extractOptionDTag(dataRaw, 'DATA_PACK');
+    console.log('[optionD] 1차:', dataPack ? '성공' : '실패(null)');
     if (!dataPack) return null;
 
     const analysisPrompt = buildPersonaAnalysisPrompt(messages, dataPack, category);
@@ -595,6 +597,7 @@ async function callOptionD(
     if (!luciaView || !jackView || !rayView || !echoView) return null;
 
     const personaViews = `[LUCIA_VIEW]\n${luciaView}\n\n[JACK_VIEW]\n${jackView}\n\n[RAY_VIEW]\n${rayView}\n\n[ECHO_VIEW]\n${echoView}`;
+    console.log('[optionD] 2차:', personaViews ? '성공' : '실패(null)');
 
     // ✅ 페르소나 단독 응답 모드 — 호명된 페르소나만 답변, 나머지 블록 생략
     if (personaCall) {
