@@ -30,6 +30,9 @@ import { TEA_SYSTEM_RAY } from './prompts/tea-ray';
 import { SCREENPLAY_SYSTEM_PROMPT, buildScreenplayPrompt } from './prompts/orchestrator-screenplay';
 import {
   detectPersonaOrderHybrid,
+  buildDataCollectionPrompt,
+  buildPersonaAnalysisPrompt,
+  buildScriptPrompt,
   buildTaggedRound1SystemPrompt,
   buildTaggedRound2SystemPrompt,
   buildTaggedRound1UserPrompt,
@@ -43,6 +46,7 @@ import {
   type Stage1Data,
   type Stage1PersonaAnalysis,
 } from './prompts/orchestrator-tagged';
+import { FEATURE_OPTION_D } from '@/lib/personax/message-router';
 
 // ✅ 1차 페르소나 분석 (재료 수집) — D-1 신규
 import { buildLuciaAnalysisPrompt } from './prompts/analysis-lucia';
@@ -550,6 +554,60 @@ async function callTaggedRound1(
     return parseTaggedRound1(llm);
   } catch (e) {
     console.warn('[tagged-r1] 호출 실패', e);
+    return null;
+  }
+}
+
+const extractOptionDTag = (text: string | null, tag: string): string => {
+  if (!text) return '';
+  const re = new RegExp(`\\[${tag}\\][^\\S\\n]*\\n?([\\s\\S]*?)(?=\\n\\s*\\[(?:DATA_PACK|LUCIA_VIEW|JACK_VIEW|RAY_VIEW|ECHO_VIEW|FIRST|SECOND|THIRD|CLOSER|LUCIA_CLOSE)\\]|$)`, 'i');
+  const m = text.match(re);
+  return (m?.[1] || '').trim();
+};
+
+async function callOptionD(
+  messages: Array<{ role?: string; content?: string }>,
+  category: string,
+  lastMessage: string,
+  order: TaggedPersonaKey[],
+): Promise<TaggedRound1Result | null> {
+  try {
+    const optionDSystem = 'PersonaX 3단계 오케스트레이터입니다. 요청한 태그 블록만 출력하고, 코드펜스와 설명 문장은 금지합니다.';
+
+    const dataPrompt = buildDataCollectionPrompt(messages, category, lastMessage);
+    const dataRaw = await callTeaPersona('echo', optionDSystem, [{ role: 'user', content: dataPrompt }]);
+    const dataPack = extractOptionDTag(dataRaw, 'DATA_PACK');
+    if (!dataPack) return null;
+
+    const analysisPrompt = buildPersonaAnalysisPrompt(messages, dataPack, category);
+    const analysisRaw = await callTeaPersona('echo', optionDSystem, [{ role: 'user', content: analysisPrompt }]);
+    const luciaView = extractOptionDTag(analysisRaw, 'LUCIA_VIEW');
+    const jackView = extractOptionDTag(analysisRaw, 'JACK_VIEW');
+    const rayView = extractOptionDTag(analysisRaw, 'RAY_VIEW');
+    const echoView = extractOptionDTag(analysisRaw, 'ECHO_VIEW');
+    if (!luciaView || !jackView || !rayView || !echoView) return null;
+
+    const personaViews = `[LUCIA_VIEW]\n${luciaView}\n\n[JACK_VIEW]\n${jackView}\n\n[RAY_VIEW]\n${rayView}\n\n[ECHO_VIEW]\n${echoView}`;
+    const scriptPrompt = `${buildScriptPrompt(messages, personaViews, category)}
+
+기존 화면 표시 참고 순서: ${order.map((key, index) => `${index + 1}. ${key.toUpperCase()}`).join(' / ')}
+단, CLOSER 담당은 질문 성격으로 결정하고 ECHO 고정 마무리로 만들지 마십시오.`;
+    const scriptRaw = await callTeaPersona('echo', optionDSystem, [{ role: 'user', content: scriptPrompt }]);
+    const first = extractOptionDTag(scriptRaw, 'FIRST');
+    const second = extractOptionDTag(scriptRaw, 'SECOND');
+    const third = extractOptionDTag(scriptRaw, 'THIRD');
+    const closer = extractOptionDTag(scriptRaw, 'CLOSER');
+    const luciaClose = extractOptionDTag(scriptRaw, 'LUCIA_CLOSE');
+    if (!first || !second || !third || !closer) return null;
+
+    return {
+      first,
+      second,
+      third,
+      echoQuestion: [closer, luciaClose].filter(Boolean).join('\n\n'),
+    };
+  } catch (e) {
+    console.warn('[option-d] 3단계 호출 실패', e);
     return null;
   }
 }
@@ -1302,15 +1360,20 @@ export async function POST(req: Request) {
         };
 
         if (isRound1) {
-          // ✅ D-1 1차 분석 단계 — 3명 페르소나 독립 분석 (병렬, JSON)
-          //   plan(오케스트레이터)에서 각 페르소나 angle을 받아 분석 프롬프트 구성
-          //   실패 시 빈 데이터로 폴백 — 2차 대본 생성은 계속 진행
-          const stage1Data = await runStage1Analysis(msg, recentContext, {
-            lucia_angle: plan.lucia_angle,
-            jack_angle:  plan.jack_angle,
-            ray_angle:   plan.ray_angle,
-          });
-          const r1 = await callTaggedRound1(msg, category, recentContext, order, enableSearchTagged, stage1Data);
+          let r1: TaggedRound1Result | null = null;
+          if (FEATURE_OPTION_D) {
+            r1 = await callOptionD(messages as Array<{ role?: string; content?: string }>, category, msg, order);
+          } else {
+            // ✅ D-1 1차 분석 단계 — 3명 페르소나 독립 분석 (병렬, JSON)
+            //   plan(오케스트레이터)에서 각 페르소나 angle을 받아 분석 프롬프트 구성
+            //   실패 시 빈 데이터로 폴백 — 2차 대본 생성은 계속 진행
+            const stage1Data = await runStage1Analysis(msg, recentContext, {
+              lucia_angle: plan.lucia_angle,
+              jack_angle:  plan.jack_angle,
+              ray_angle:   plan.ray_angle,
+            });
+            r1 = await callTaggedRound1(msg, category, recentContext, order, enableSearchTagged, stage1Data);
+          }
           if (r1) {
             const personaText: Record<TaggedPersonaKey, string> = {
               ray: '', jack: '', lucia: '',
