@@ -537,7 +537,8 @@ async function callTaggedRound1(
   stage1Data?: Stage1Data,
 ): Promise<TaggedRound1Result | null> {
   try {
-    const systemPrompt = buildTaggedRound1SystemPrompt(stage1Data);
+    const nowKST = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
+    const systemPrompt = `현재 시각: ${nowKST} (KST)\n${buildTaggedRound1SystemPrompt(stage1Data)}`;
     const userPrompt = buildTaggedRound1UserPrompt(userMessage, category, recentContext, order);
     const llm = await callTeaPersona(
       'echo',
