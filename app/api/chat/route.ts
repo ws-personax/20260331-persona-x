@@ -1395,7 +1395,14 @@ export async function POST(req: Request) {
         if (isRound1) {
           let r1: TaggedRound1Result | null = null;
           if (FEATURE_OPTION_D) {
-            r1 = await callOptionD(messages as Array<{ role?: string; content?: string }>, category, msg, order);
+            // ✅ 카테고리 전환 시 이전 맥락 차단 — 마지막 메시지만 callOptionD에 전달
+            const optionDMessages = categoryChanged
+              ? (messages as Array<{ role?: string; content?: string }>).slice(-1)
+              : (messages as Array<{ role?: string; content?: string }>);
+            if (categoryChanged) {
+              console.log('[optionD] 카테고리 전환 감지 → 이전 맥락 제거, 마지막 메시지만 전달 (prev:', prevCategory, '→ now:', category, ')');
+            }
+            r1 = await callOptionD(optionDMessages, category, msg, order);
             // ✅ callOptionD 빈 결과 시 폴백 완전 차단 — null/빈 객체여도 정상 done 경로로 강제 통과
             if (!r1) {
               console.warn('[optionD] null 반환 → 빈 결과 객체로 강제 통과 (폴백 차단)');
