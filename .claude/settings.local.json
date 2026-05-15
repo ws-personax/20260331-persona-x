@@ -44,7 +44,13 @@
       "Bash(NODE_OPTIONS=\"--max-old-space-size=8192\" node ./node_modules/typescript/bin/tsc --noEmit)",
       "PowerShell(npm run *)",
       "PowerShell(Get-ChildItem -Path \"lib\",\"app\",\"components\" -Recurse -File | Where-Object { $_.Name -match \"prompt|persona\" } | Select-Object FullName)",
-      "PowerShell(New-Item *)"
+      "PowerShell(New-Item *)",
+      "Bash(mkdir -p \"backups/backup-20260514-D1-before\")",
+      "Bash(cp \"app/api/chat/route.ts\" \"backups/backup-20260514-D1-before/route.ts\")",
+      "Bash(cp \"app/api/chat/prompts/orchestrator-tagged.ts\" \"backups/backup-20260514-D1-before/orchestrator-tagged.ts\")",
+      "Bash(mkdir -p \"backups/backup-20260514-lucia-quotes-before\")",
+      "Bash(cp \"app/api/chat/prompts/tea-lucia.ts\" \"backups/backup-20260514-lucia-quotes-before/\")",
+      "Bash(cp \"app/api/chat/route.ts\" \"backups/backup-20260514-lucia-quotes-before/\")"
     ]
   }
 }

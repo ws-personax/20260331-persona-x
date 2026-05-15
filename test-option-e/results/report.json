@@ -1,0 +1,33 @@
+{
+  "testedAt": "2026-05-15T11:33:37.487Z",
+  "model": "claude-haiku-4-5",
+  "question": "삼성전자 PBR 어떤가요?",
+  "runs": 3,
+  "passCount": 3,
+  "passRate": "3/3",
+  "multiBlockPossible": true,
+  "allPass": true,
+  "details": [
+    {
+      "run": 1,
+      "ok": true,
+      "parsed": true,
+      "ms": 6638,
+      "issues": []
+    },
+    {
+      "run": 2,
+      "ok": true,
+      "parsed": true,
+      "ms": 5738,
+      "issues": []
+    },
+    {
+      "run": 3,
+      "ok": true,
+      "parsed": true,
+      "ms": 5444,
+      "issues": []
+    }
+  ]
+}
