@@ -46,7 +46,7 @@ import {
   type Stage1Data,
   type Stage1PersonaAnalysis,
 } from './prompts/orchestrator-tagged';
-import { FEATURE_OPTION_D } from '@/lib/personax/message-router';
+import { FEATURE_OPTION_D, routeMessage } from '@/lib/personax/message-router';
 
 // ✅ 1차 페르소나 분석 (재료 수집) — D-1 신규
 import { buildLuciaAnalysisPrompt } from './prompts/analysis-lucia';
@@ -574,6 +574,13 @@ async function callOptionD(
   try {
     const optionDSystem = 'PersonaX 3단계 오케스트레이터입니다. 요청한 태그 블록만 출력하고, 코드펜스와 설명 문장은 금지합니다.';
 
+    // ✅ 페르소나 호명 감지 — routeMessage 결과의 personaCall 활용
+    const routed = routeMessage(
+      (messages || []).map((m) => ({ role: m.role || '', content: m.content || '' })),
+      lastMessage,
+    );
+    const personaCall = routed.personaCall;
+
     const dataPrompt = buildDataCollectionPrompt(messages, category, lastMessage);
     const dataRaw = await callTeaPersona('echo', optionDSystem, [{ role: 'user', content: dataPrompt }]);
     const dataPack = extractOptionDTag(dataRaw, 'DATA_PACK');
@@ -588,6 +595,30 @@ async function callOptionD(
     if (!luciaView || !jackView || !rayView || !echoView) return null;
 
     const personaViews = `[LUCIA_VIEW]\n${luciaView}\n\n[JACK_VIEW]\n${jackView}\n\n[RAY_VIEW]\n${rayView}\n\n[ECHO_VIEW]\n${echoView}`;
+
+    // ✅ 페르소나 단독 응답 모드 — 호명된 페르소나만 답변, 나머지 블록 생략
+    if (personaCall) {
+      const soloPrompt = `${buildScriptPrompt(messages, personaViews, category)}
+
+## 🚨 단독 응답 모드 (최우선 — 다른 모든 규칙보다 우선)
+유저가 ${personaCall}을(를) 직접 호명했습니다. 이번 답변은 ${personaCall} 한 명만 답합니다.
+- [FIRST] 블록 하나에만 ${personaCall}의 답을 작성하십시오.
+- [SECOND], [THIRD], [CLOSER], [LUCIA_CLOSE] 블록은 출력하지 마십시오.
+- ${personaCall}의 PERSONA_VIEW를 충실히 반영해 자연스럽게 답합니다.`;
+      const soloRaw = await callTeaPersona('echo', optionDSystem, [{ role: 'user', content: soloPrompt }]);
+      const soloText = extractOptionDTag(soloRaw, 'FIRST');
+      if (!soloText) return null;
+
+      if (personaCall === 'ECHO') {
+        return { first: '', second: '', third: '', echoQuestion: soloText };
+      }
+      const calledKey = personaCall.toLowerCase() as TaggedPersonaKey;
+      const slotIndex = order.indexOf(calledKey);
+      const slots: [string, string, string] = ['', '', ''];
+      slots[slotIndex >= 0 && slotIndex < 3 ? slotIndex : 0] = soloText;
+      return { first: slots[0], second: slots[1], third: slots[2], echoQuestion: '' };
+    }
+
     const scriptPrompt = `${buildScriptPrompt(messages, personaViews, category)}
 
 기존 화면 표시 참고 순서: ${order.map((key, index) => `${index + 1}. ${key.toUpperCase()}`).join(' / ')}
