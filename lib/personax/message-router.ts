@@ -198,11 +198,13 @@ const baseHybridOrder = (
 
 const ensureFourPersonaOrder = (baseOrder: TaggedPersonaKey[]): TaggedPersonaKey[] => {
   const all: TaggedPersonaKey[] = ['ray', 'jack', 'lucia', 'echo'];
-  const arr = [...baseOrder, ...all].filter(
-    (key, index, self): key is TaggedPersonaKey =>
-      all.includes(key as TaggedPersonaKey) && self.indexOf(key) === index,
-  );
-  return arr;
+  const result = [...baseOrder];
+  for (const key of all) {
+    if (!result.includes(key)) {
+      result.push(key);
+    }
+  }
+  return result;
 };
 
 /**
