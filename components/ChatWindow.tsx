@@ -2711,7 +2711,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                             echoNews={msg.personas!.echoNews}
                             hideDisclaimer={msg.personas!.breakdown !== undefined}
                           />
-                          {msgIdx === messages.length - 1 && hasEcho && !hasText(msg.personas!.echo2) && msg.personas!.echo!.includes('?') && (
+                          {msgIdx === messages.length - 1 && hasEcho && !hasText(msg.personas!.echo2) && msg.personas!.echo!.includes('?') && (!Array.isArray(msg.personas!.order) || msg.personas!.order.length > 1) && (
                             <EchoAnswerInline
                               disabled={isLoading}
                               value={echoAnswerValue}
