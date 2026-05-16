@@ -27,7 +27,7 @@ export const FEATURE_OPTION_D = true;
 
 export type PersonaName = 'LUCIA' | 'JACK' | 'RAY' | 'ECHO';
 export type MessageCategory = 'invest' | 'emotional' | 'casual' | 'complex';
-export type TaggedPersonaKey = 'ray' | 'jack' | 'lucia';
+export type TaggedPersonaKey = 'ray' | 'jack' | 'lucia' | 'echo';
 
 export type ChatMessage = { role: string; content: string };
 
@@ -185,14 +185,23 @@ const baseHybridOrder = (
   hasEmotion: boolean,
   legacyCategory: string,
 ): TaggedPersonaKey[] => {
-  if (hasEmotion) return ['lucia', 'jack', 'ray'];
+  if (hasEmotion) return ['lucia', 'ray', 'echo', 'jack'];
   const cat = (legacyCategory || '').toLowerCase();
   if (['finance', 'stock', 'crypto', 'economy'].includes(cat)) {
-    return ['ray', 'jack', 'lucia'];
+    return ['ray', 'lucia', 'echo', 'jack'];
   }
-  if (cat === 'news') return ['ray', 'lucia', 'jack'];
-  if (cat === 'sports') return ['jack', 'ray', 'lucia'];
-  return ['lucia', 'jack', 'ray'];
+  if (cat === 'news') return ['ray', 'lucia', 'jack', 'echo'];
+  if (cat === 'sports') return ['jack', 'ray', 'lucia', 'echo'];
+  return ['lucia', 'ray', 'jack', 'echo'];
+};
+
+const ensureFourPersonaOrder = (baseOrder: TaggedPersonaKey[]): TaggedPersonaKey[] => {
+  const all: TaggedPersonaKey[] = ['ray', 'jack', 'lucia', 'echo'];
+  const arr = [...baseOrder, ...all].filter(
+    (key, index, self): key is TaggedPersonaKey =>
+      all.includes(key as TaggedPersonaKey) && self.indexOf(key) === index,
+  );
+  return arr;
 };
 
 /**
@@ -207,7 +216,7 @@ export const enforceOrder = (
   closerPersona: AllPersonaKey,
   categoryV3?: CategoryV3,
 ): TaggedPersonaKey[] => {
-  let arr = [...baseOrder];
+  let arr = ensureFourPersonaOrder(baseOrder);
   if (firstPersona !== 'echo') {
     const first = firstPersona as TaggedPersonaKey;
     if (arr.includes(first) && arr[0] !== first) {
@@ -221,10 +230,15 @@ export const enforceOrder = (
     }
   }
   if (categoryV3 === 'invest' || categoryV3 === 'emotional' || categoryV3 === 'principle') {
-    arr = [...arr.filter((k) => k !== 'jack'), 'jack'];
+    if (categoryV3 !== 'emotional' || closerPersona === 'jack') {
+      arr = [...arr.filter((k) => k !== 'echo' && k !== 'jack'), 'echo', 'jack'];
+    }
   }
   if (categoryV3 === 'action') {
-    arr = ['jack', ...arr.filter((k) => k !== 'jack')];
+    arr = [...arr.filter((k) => k !== 'echo'), 'echo'];
+  }
+  if (categoryV3 === 'emotional' && closerPersona === 'echo') {
+    arr = [...arr.filter((k) => k !== 'echo'), 'echo'];
   }
   return arr;
 };
@@ -389,18 +403,15 @@ export async function runRoutedRequest(
       ]);
       let soloText = extractTag(soloRaw, 'FIRST');
       if (!soloText) soloText = `${router.personaCall} 답변을 생성하지 못했습니다`;
-      if (router.personaCall === 'ECHO') {
-        return { first: '', second: '', third: '', echoQuestion: soloText };
-      }
       const calledKey = router.personaCall.toLowerCase() as TaggedPersonaKey;
       const slotIndex = router.order.indexOf(calledKey);
-      const slots: [string, string, string] = ['', '', ''];
-      slots[slotIndex >= 0 && slotIndex < 3 ? slotIndex : 0] = soloText;
+      const slots: [string, string, string, string] = ['', '', '', ''];
+      slots[slotIndex >= 0 && slotIndex < 4 ? slotIndex : 0] = soloText;
       return {
         first: slots[0],
         second: slots[1],
         third: slots[2],
-        echoQuestion: '',
+        echoQuestion: slots[3],
       };
     }
 

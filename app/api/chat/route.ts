@@ -41,7 +41,7 @@ import {
   parseTaggedRound1,
   parseTaggedRound2,
   STAGE1_FALLBACK,
-  type TaggedPersonaKey,
+  type TaggedPersonaKey as PromptTaggedPersonaKey,
   type TaggedRound1Result,
   type TaggedRound2Result,
   type Stage1Data,
@@ -54,6 +54,7 @@ import {
   enforceOrder,
   type RouterDecision,
   type LLMCaller,
+  type TaggedPersonaKey,
 } from '@/lib/personax/message-router';
 
 // ✅ Feature Flag — Router/3단계 호출/ECHO 선택/LUCIA 프레이밍 단계별 활성화
@@ -434,7 +435,7 @@ const getAdminSupabase = () => {
 //   실패 시 null 반환 → 호출부에서 기존 4-페르소나 LLM 폴백.
 // ─────────────────────────────────────────────
 type Screenplay = {
-  order: ('ray' | 'jack' | 'lucia')[];
+  order: TaggedPersonaKey[];
   ray: string;
   jack: string;
   lucia: string;
@@ -473,12 +474,12 @@ async function callScreenplayOrchestrator(
       }
       result[k] = v.trim();
     }
-    const validPersonas = ['ray', 'jack', 'lucia'] as const;
-    const isValidPersona = (s: unknown): s is 'ray' | 'jack' | 'lucia' =>
+    const validPersonas = ['ray', 'jack', 'lucia', 'echo'] as const;
+    const isValidPersona = (s: unknown): s is TaggedPersonaKey =>
       typeof s === 'string' && (validPersonas as readonly string[]).includes(s);
-    result.order = Array.isArray(parsed.order) && parsed.order.length === 3 && parsed.order.every(isValidPersona)
-      ? (parsed.order as ('ray' | 'jack' | 'lucia')[])
-      : ['ray', 'jack', 'lucia'];
+    result.order = Array.isArray(parsed.order) && parsed.order.length >= 3 && parsed.order.every(isValidPersona)
+      ? (parsed.order as TaggedPersonaKey[])
+      : ['ray', 'jack', 'lucia', 'echo'];
     return result as Screenplay;
   } catch (e) {
     console.warn('[screenplay] 호출 실패', e);
@@ -549,6 +550,56 @@ async function runStage1Analysis(
   return stage1;
 }
 
+const toPromptOrder = (order: TaggedPersonaKey[]): PromptTaggedPersonaKey[] => {
+  const nonEcho = order.filter((key): key is PromptTaggedPersonaKey => key !== 'echo');
+  return nonEcho.length === 3 ? nonEcho : ['ray', 'jack', 'lucia'];
+};
+
+const emptyPersonaText = (): Record<TaggedPersonaKey, string> => ({
+  ray: '',
+  jack: '',
+  lucia: '',
+  echo: '',
+});
+
+const mapOrderedRound1 = (
+  result: TaggedRound1Result,
+  order: TaggedPersonaKey[],
+): Record<TaggedPersonaKey, string> => {
+  const personaText = emptyPersonaText();
+  const slots = [result.first, result.second, result.third, result.echoQuestion];
+  order.slice(0, 4).forEach((key, index) => {
+    personaText[key] = slots[index] || '';
+  });
+  return personaText;
+};
+
+const mapLegacyEchoRound1 = (
+  result: TaggedRound1Result,
+  order: TaggedPersonaKey[],
+): Record<TaggedPersonaKey, string> => {
+  const personaText = emptyPersonaText();
+  const promptOrder = toPromptOrder(order);
+  personaText[promptOrder[0]] = result.first;
+  personaText[promptOrder[1]] = result.second;
+  personaText[promptOrder[2]] = result.third;
+  personaText.echo = result.echoQuestion;
+  return personaText;
+};
+
+const mapLegacyEchoRound2 = (
+  result: TaggedRound2Result,
+  order: TaggedPersonaKey[],
+): Record<TaggedPersonaKey, string> => {
+  const personaText = emptyPersonaText();
+  const promptOrder = toPromptOrder(order);
+  personaText[promptOrder[0]] = result.first;
+  personaText[promptOrder[1]] = result.second;
+  personaText[promptOrder[2]] = result.third;
+  personaText.echo = result.echoFinal;
+  return personaText;
+};
+
 async function callTaggedRound1(
   userMessage: string,
   category: string,
@@ -567,7 +618,7 @@ async function callTaggedRound1(
     // CLOSER는 caller에서 결정(FIRST와 충돌 시 폴백) — 미전달 시 getCloserPersona로 폴백
     const closer = closerPersona ?? getCloserPersona(categoryV3, firstPersona);
     const systemPrompt = `현재 시각: ${nowKST} (KST)\n${buildTaggedRound1SystemPrompt(stage1Data, firstPersona, categoryV3, hasPriorConversation, closer)}`;
-    const userPrompt = buildTaggedRound1UserPrompt(userMessage, category, recentContext, order);
+    const userPrompt = buildTaggedRound1UserPrompt(userMessage, category, recentContext, toPromptOrder(order));
     const llm = await callTeaPersona(
       'echo',
       systemPrompt,
@@ -610,7 +661,7 @@ async function callOptionD(
     router.firstPersona = firstPersona ?? router.firstPersona;
     router.closerPersona = closerPersona ?? router.closerPersona;
     router.hasPriorConversation = hasPriorConversation;
-    router.order = order as ('ray' | 'jack' | 'lucia')[];
+    router.order = order;
     router.legacyCategory = category;
   }
   const llmCaller: LLMCaller = (persona, sys, history, opts) =>
@@ -638,7 +689,7 @@ async function callTaggedRound2(
 ): Promise<TaggedRound2Result | null> {
   try {
     const systemPrompt = buildTaggedRound2SystemPrompt();
-    const userPrompt = buildTaggedRound2UserPrompt(userMessage, category, recentContext, order, round1, userAnswer);
+    const userPrompt = buildTaggedRound2UserPrompt(userMessage, category, recentContext, toPromptOrder(order), round1, userAnswer);
     const llm = await callTeaPersona(
       'echo',
       systemPrompt,
@@ -1071,8 +1122,8 @@ export async function POST(req: Request) {
     const _hasPriorConversation = _routerDecision.hasPriorConversation;
     // 모든 응답 경로(news/life/finance/tagged)에 공통 적용되는 FIRST+CLOSER 정렬 헬퍼.
     // 기존 order 배열을 받아 enforceOrder를 그대로 호출.
-    const applyV3OrderOverride = <T extends 'ray' | 'jack' | 'lucia'>(arr: T[]): T[] =>
-      enforceOrder(arr as ('ray' | 'jack' | 'lucia')[], _firstPersonaV3, _closerPersonaV3, _categoryV3) as T[];
+    const applyV3OrderOverride = (arr: TaggedPersonaKey[]): TaggedPersonaKey[] =>
+      enforceOrder(arr, _firstPersonaV3, _closerPersonaV3, _categoryV3);
     const luciaRoutingMsg = LUCIA_ROUTING_MESSAGE[category];
     // ✅ 동일 카테고리 luciaIntro 중복 방지
     const _alreadyIntroduced = Array.isArray(messages) && (messages as Array<{
@@ -1384,15 +1435,11 @@ export async function POST(req: Request) {
           let acc = '';
           for (const c of chunkText(full, 15)) {
             acc += c;
-            send({ type: 'persona', key, round: 1, text: acc });
-            await new Promise(r => setTimeout(r, 20));
-          }
-        };
-        const streamEchoTagged = async (full: string) => {
-          let acc = '';
-          for (const c of chunkText(full, 15)) {
-            acc += c;
-            send({ type: 'echo', round: 1, text: acc });
+            if (key === 'echo') {
+              send({ type: 'echo', round: 1, text: acc });
+            } else {
+              send({ type: 'persona', key, round: 1, text: acc });
+            }
             await new Promise(r => setTimeout(r, 20));
           }
         };
@@ -1412,28 +1459,11 @@ export async function POST(req: Request) {
               _hasPriorConversation,
               _closerPersonaV3,
             );
-            const personaText: Record<TaggedPersonaKey, string> = {
-              ray: '', jack: '', lucia: '',
-            };
-            let echoText = '';
-            if (soloResult) {
-              personaText[order[0]] = soloResult.first;
-              personaText[order[1]] = soloResult.second;
-              personaText[order[2]] = soloResult.third;
-              echoText = soloResult.echoQuestion;
-            }
+            const personaText = soloResult ? mapOrderedRound1(soloResult, order) : emptyPersonaText();
 
             const invoked = _routerDecision.invokedPersona;
-            const reply =
-              invoked === 'echo'
-                ? echoText
-                : personaText[invoked as TaggedPersonaKey] || '';
-            if (invoked === 'echo') {
-              await streamEchoTagged(reply);
-            } else {
-              await streamPersonaTagged(invoked as TaggedPersonaKey, reply);
-              echoText = '';
-            }
+            const reply = personaText[invoked] || '';
+            await streamPersonaTagged(invoked, reply);
 
             send({
               type: 'done',
@@ -1456,6 +1486,7 @@ export async function POST(req: Request) {
           }
 
           let r1: TaggedRound1Result | null = null;
+          let r1UsesOrderedSlots = false;
           if (FEATURE_OPTION_D) {
             // ✅ 카테고리 전환 시 이전 맥락 차단 — 마지막 메시지만 callOptionD에 전달
             const optionDMessages = categoryChanged
@@ -1465,6 +1496,7 @@ export async function POST(req: Request) {
               console.log('[optionD] 카테고리 전환 감지 → 이전 맥락 제거, 마지막 메시지만 전달 (prev:', prevCategory, '→ now:', category, ')');
             }
             r1 = await callOptionD(optionDMessages, category, msg, order, categoryV3Local, firstPersonaLocal, _hasPriorConversation, _closerPersonaV3);
+            r1UsesOrderedSlots = true;
             // ✅ callOptionD 빈 결과 시 폴백 완전 차단 — null/빈 객체여도 정상 done 경로로 강제 통과
             if (!r1) {
               console.warn('[optionD] null 반환 → 빈 결과 객체로 강제 통과 (폴백 차단)');
@@ -1482,17 +1514,13 @@ export async function POST(req: Request) {
             r1 = await callTaggedRound1(msg, category, recentContext, order, enableSearchTagged, stage1Data, _hasPriorConversation, _closerPersonaV3);
           }
           if (r1) {
-            const personaText: Record<TaggedPersonaKey, string> = {
-              ray: '', jack: '', lucia: '',
-            };
-            personaText[order[0]] = r1.first;
-            personaText[order[1]] = r1.second;
-            personaText[order[2]] = r1.third;
+            const personaText = r1UsesOrderedSlots
+              ? mapOrderedRound1(r1, order)
+              : mapLegacyEchoRound1(r1, order);
 
             for (const key of order) {
               await streamPersonaTagged(key, personaText[key]);
             }
-            await streamEchoTagged(r1.echoQuestion);
 
             try {
               const adminSupabase = getAdminSupabase();
@@ -1510,12 +1538,12 @@ export async function POST(req: Request) {
 
             send({
               type: 'done',
-              reply: [r1.first, r1.second, r1.third, r1.echoQuestion].filter(Boolean).join('\n\n'),
+              reply: order.map((key) => personaText[key]).filter(Boolean).join('\n\n'),
               personas: {
                 ray: personaText.ray,
                 jack: personaText.jack,
                 lucia: personaText.lucia,
-                echo: r1.echoQuestion,
+                echo: personaText.echo,
                 ray2: null, jack2: null, lucia2: null, echo2: null,
                 order,
                 verdict: '관망',
@@ -1551,19 +1579,21 @@ export async function POST(req: Request) {
           }
           return null;
         })();
-        const priorOrder: TaggedPersonaKey[] = (priorAssistant?.personas?.order && priorAssistant.personas.order.length === 3)
-          ? priorAssistant.personas.order
+        const priorOrder: TaggedPersonaKey[] = (priorAssistant?.personas?.order && priorAssistant.personas.order.length >= 3)
+          ? applyV3OrderOverride(priorAssistant.personas.order)
           : order;
         const priorText: Record<TaggedPersonaKey, string> = {
           ray:   priorAssistant?.personas?.ray   || '',
           jack:  priorAssistant?.personas?.jack  || '',
           lucia: priorAssistant?.personas?.lucia || '',
+          echo:  priorAssistant?.personas?.echo  || '',
         };
+        const promptPriorOrder = toPromptOrder(priorOrder);
         const priorRound1: TaggedRound1Result = {
-          first: priorText[priorOrder[0]] || '',
-          second: priorText[priorOrder[1]] || '',
-          third: priorText[priorOrder[2]] || '',
-          echoQuestion: priorAssistant?.personas?.echo || '',
+          first: priorText[promptPriorOrder[0]] || '',
+          second: priorText[promptPriorOrder[1]] || '',
+          third: priorText[promptPriorOrder[2]] || '',
+          echoQuestion: priorText.echo,
         };
         // 원 질문 (가장 최근 user msg 두 개 중 앞의 것 — 즉 1라운드 진입 질문)
         const priorUserQuestion = (() => {
@@ -1584,17 +1614,11 @@ export async function POST(req: Request) {
         );
 
         if (r2) {
-          const personaText2: Record<TaggedPersonaKey, string> = {
-            ray: '', jack: '', lucia: '',
-          };
-          personaText2[priorOrder[0]] = r2.first;
-          personaText2[priorOrder[1]] = r2.second;
-          personaText2[priorOrder[2]] = r2.third;
+          const personaText2 = mapLegacyEchoRound2(r2, priorOrder);
 
           for (const key of priorOrder) {
             await streamPersonaTagged(key, personaText2[key]);
           }
-          await streamEchoTagged(r2.echoFinal);
 
           try {
             const adminSupabase = getAdminSupabase();
@@ -1612,12 +1636,12 @@ export async function POST(req: Request) {
 
           send({
             type: 'done',
-            reply: [r2.first, r2.second, r2.third, r2.echoFinal].filter(Boolean).join('\n\n'),
+            reply: priorOrder.map((key) => personaText2[key]).filter(Boolean).join('\n\n'),
             personas: {
               ray: personaText2.ray,
               jack: personaText2.jack,
               lucia: personaText2.lucia,
-              echo: r2.echoFinal,
+              echo: personaText2.echo,
               ray2: null, jack2: null, lucia2: null, echo2: null,
               order: priorOrder,
               verdict: '관망',
@@ -1665,35 +1689,30 @@ export async function POST(req: Request) {
 
         if (screenplay && isScreenplayCategory) {
           // 페르소나 round 1·2 진행형 스트리밍 — 누적 텍스트로 send (클라이언트는 replace 방식)
-          const streamPersona = async (key: 'ray' | 'jack' | 'lucia', round: 1 | 2, full: string) => {
+          const streamPersona = async (key: TaggedPersonaKey, round: 1 | 2, full: string) => {
             let acc = '';
             for (const c of chunkText(full, 15)) {
               acc += c;
-              send({ type: 'persona', key, round, text: acc });
-              await new Promise(r => setTimeout(r, 20));
-            }
-          };
-          const streamEcho = async (round: 1 | 2, full: string) => {
-            let acc = '';
-            for (const c of chunkText(full, 15)) {
-              acc += c;
-              send({ type: 'echo', round, text: acc });
+              if (key === 'echo') {
+                send({ type: 'echo', round, text: acc });
+              } else {
+                send({ type: 'persona', key, round, text: acc });
+              }
               await new Promise(r => setTimeout(r, 20));
             }
           };
 
           // 1라운드: order 기반 순서
-          const streamOrder = screenplay.order;
+          const streamOrder = applyV3OrderOverride(screenplay.order);
           for (const key of streamOrder) {
             await streamPersona(key, 1, screenplay[key]);
           }
-          await streamEcho(1, screenplay.echo);
 
           // 2라운드: order 기반 순서
           for (const key of streamOrder) {
-            await streamPersona(key, 2, screenplay[`${key}2` as 'ray2' | 'jack2' | 'lucia2']);
+            const secondKey = key === 'echo' ? 'echo2' : `${key}2` as 'ray2' | 'jack2' | 'lucia2';
+            await streamPersona(key, 2, screenplay[secondKey]);
           }
-          await streamEcho(2, screenplay.echo2);
 
           try {
             const adminSupabase = getAdminSupabase();
@@ -1721,7 +1740,7 @@ export async function POST(req: Request) {
               jack2:  screenplay.jack2  || null,
               lucia2: screenplay.lucia2 || null,
               echo2:  screenplay.echo2  || null,
-              order:  applyV3OrderOverride(screenplay.order || plan.order),
+              order:  streamOrder,
               verdict: '관망',
               confidence: 0,
               breakdown: '재테크 일반',
