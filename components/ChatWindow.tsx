@@ -1074,28 +1074,15 @@ const EchoAnswerInline = memo(function EchoAnswerInline({
   );
 });
 
-const TEA_TYPING_TEXT: Record<'lucia' | 'jack' | 'echo', string> = {
-  lucia: '💜 LUCIA가 당신의 마음을 읽고 있어요...',
-  jack: 'JACK이 생각을 정리하고 있어요...',
-  echo: 'ECHO가 핵심을 찾고 있어요...',
+// ✅ FIRST 페르소나 기반 로딩 문구 — 아바타와 말풍선 텍스트 일치 보장
+const PERSONA_LOADING_TEXT: Record<PersonaKey, string> = {
+  lucia: '🌿 LUCIA가 귀 기울이고 있어요...',
+  jack: '💪 JACK이 생각 중이에요...',
+  ray: '📊 RAY가 데이터 보고 있어요...',
+  echo: '🎯 ECHO가 본질 짚는 중이에요...',
 };
 
-// ✅ 카테고리 키워드 기반 로딩 문구 — teaPersona가 명시 픽이 아닐 때 사용
-const getLoadingMessage = (text: string) => {
-  if (/주식|펀드|코스피|비트코인|ETF|배당|환율|금리|삼성전자|테슬라|엔비디아/.test(text))
-    return '📊 RAY가 데이터를 분석하고 있어요...';
-  if (/뉴스|정세|전쟁|이란|중동|트럼프|호르무즈|HMM|유가|금값/.test(text))
-    return '🔍 RAY가 최신 정보를 확인하고 있어요...';
-  if (/야구|축구|농구|경기|선수|승부|리그|골프/.test(text))
-    return '⚡ JACK이 승부를 읽고 있어요...';
-  if (/명퇴|은퇴|요양원|치매|무릎|허리|부모님|자녀|노후/.test(text))
-    return '🌿 LUCIA와 함께 생각하고 있어요...';
-  if (/법률|세금|계약|소송|퇴직금|실업급여/.test(text))
-    return '⚖️ ECHO가 구조를 짚고 있어요...';
-  return '🌿 LUCIA가 귀 기울이고 있어요...';
-};
-
-// ✅ 카테고리 키워드 기반 로딩 페르소나 — getLoadingMessage와 동일 키워드 매핑 (아이콘/색상 분기용)
+// ✅ 카테고리 키워드 기반 로딩 페르소나 fallback — pendingOrder 미정 시 아이콘/색상 분기용
 const getLoadingPersona = (text: string): PersonaKey => {
   if (/주식|펀드|코스피|비트코인|ETF|배당|환율|금리|삼성전자|테슬라|엔비디아|돈이|돈은|돈을|살까|팔까|물렸|손실|수익|올랐|하락/.test(text)) return 'ray';
   if (/뉴스|정세|전쟁|이란|중동|트럼프|호르무즈|HMM|유가|금값/.test(text)) return 'ray';
@@ -1114,9 +1101,7 @@ const TypingIndicator = ({ teaMode = false, teaPersona = null, userText = '', pe
         ? pendingOrder[0]
         : getLoadingPersona(userText);
     const p = PERSONAS[personaKey];
-    const text = teaPersona === 'jack' || teaPersona === 'echo'
-      ? TEA_TYPING_TEXT[teaPersona]
-      : getLoadingMessage(userText);
+    const text = PERSONA_LOADING_TEXT[personaKey];
     return (
       <>
         <style>{`
