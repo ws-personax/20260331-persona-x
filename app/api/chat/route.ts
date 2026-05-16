@@ -1122,8 +1122,9 @@ export async function POST(req: Request) {
     const _hasPriorConversation = _routerDecision.hasPriorConversation;
     // 모든 응답 경로(news/life/finance/tagged)에 공통 적용되는 FIRST+CLOSER 정렬 헬퍼.
     // 기존 order 배열을 받아 enforceOrder를 그대로 호출.
+    const _orderCategory = _routerDecision.category === 'invest' ? 'invest' : _categoryV3;
     const applyV3OrderOverride = (arr: TaggedPersonaKey[]): TaggedPersonaKey[] =>
-      enforceOrder(arr, _firstPersonaV3, _closerPersonaV3, _categoryV3);
+      enforceOrder(arr, _firstPersonaV3, _closerPersonaV3, _orderCategory);
     const luciaRoutingMsg = LUCIA_ROUTING_MESSAGE[category];
     // ✅ 동일 카테고리 luciaIntro 중복 방지
     const _alreadyIntroduced = Array.isArray(messages) && (messages as Array<{

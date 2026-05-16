@@ -28,6 +28,7 @@ export const FEATURE_OPTION_D = true;
 export type PersonaName = 'LUCIA' | 'JACK' | 'RAY' | 'ECHO';
 export type MessageCategory = 'invest' | 'emotional' | 'casual' | 'complex';
 export type TaggedPersonaKey = 'ray' | 'jack' | 'lucia' | 'echo';
+type OrderCategory = CategoryV3 | MessageCategory;
 
 export type ChatMessage = { role: string; content: string };
 
@@ -214,7 +215,7 @@ export const enforceOrder = (
   baseOrder: TaggedPersonaKey[],
   firstPersona: AllPersonaKey,
   closerPersona: AllPersonaKey,
-  categoryV3?: CategoryV3,
+  categoryV3?: OrderCategory,
 ): TaggedPersonaKey[] => {
   let arr = ensureFourPersonaOrder(baseOrder);
   if (firstPersona !== 'echo') {
@@ -263,13 +264,14 @@ export const routeMessage = (
     (strategyResult.invokedPersona ? (strategyResult.invokedPersona.toUpperCase() as PersonaName) : null);
   const hasEmotion = hasEmotionSignal(text);
   const baseOrder = baseHybridOrder(hasEmotion, legacyCategory);
-  const order = enforceOrder(baseOrder, firstPersona, closerPersona, categoryV3);
   const priorUser = (messages || [])
     .slice(0, -1)
     .reverse()
     .find((m) => m?.role === 'user');
   const hasPriorConversation = !!(priorUser?.content && priorUser.content.trim());
   const category = detectMessageCategory(messages || [], text);
+  const orderCategory: OrderCategory = category === 'invest' ? 'invest' : categoryV3;
+  const order = enforceOrder(baseOrder, firstPersona, closerPersona, orderCategory);
   return {
     personaCall,
     invokedPersona: strategyResult.invokedPersona,
