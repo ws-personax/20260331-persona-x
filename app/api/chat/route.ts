@@ -34,6 +34,7 @@ import {
   buildPersonaAnalysisPrompt,
   buildScriptPrompt,
   buildTaggedRound1SystemPrompt,
+  buildCategoryVocabBlockRule,
   detectCategoryV3,
   getFirstPersona,
   buildTaggedRound2SystemPrompt,
@@ -550,13 +551,14 @@ async function callTaggedRound1(
   order: TaggedPersonaKey[],
   enableSearch: boolean,
   stage1Data?: Stage1Data,
+  hasPriorConversation: boolean = false,
 ): Promise<TaggedRound1Result | null> {
   try {
     const nowKST = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
     // ✅ FIRST 페르소나 결정 — CategoryV3 매트릭스 기반 (invest→RAY / action→JACK / emotional→LUCIA / principle→ECHO, 복합/모호→LUCIA)
     const categoryV3 = detectCategoryV3(userMessage);
     const firstPersona = getFirstPersona(categoryV3);
-    const systemPrompt = `현재 시각: ${nowKST} (KST)\n${buildTaggedRound1SystemPrompt(stage1Data, firstPersona, categoryV3)}`;
+    const systemPrompt = `현재 시각: ${nowKST} (KST)\n${buildTaggedRound1SystemPrompt(stage1Data, firstPersona, categoryV3, hasPriorConversation)}`;
     const userPrompt = buildTaggedRound1UserPrompt(userMessage, category, recentContext, order);
     const llm = await callTeaPersona(
       'echo',
@@ -586,6 +588,7 @@ async function callOptionD(
   order: TaggedPersonaKey[],
   categoryV3?: import('./prompts/orchestrator-tagged').CategoryV3,
   firstPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
+  hasPriorConversation: boolean = false,
 ): Promise<TaggedRound1Result | null> {
   try {
     const optionDSystem = 'PersonaX 3단계 오케스트레이터입니다. 요청한 태그 블록만 출력하고, 코드펜스와 설명 문장은 금지합니다.';
@@ -615,7 +618,7 @@ async function callOptionD(
 
     // ✅ 페르소나 단독 응답 모드 — 호명된 페르소나만 답변, 나머지 블록 생략
     if (personaCall) {
-      const soloPrompt = `${buildScriptPrompt(messages, personaViews, category, firstPersona, categoryV3)}
+      const soloPrompt = `${buildScriptPrompt(messages, personaViews, category, firstPersona, categoryV3, hasPriorConversation)}
 
 ## 🚨 단독 응답 모드 (최우선 — 다른 모든 규칙보다 우선)
 유저가 ${personaCall}을(를) 직접 호명했습니다. 이번 답변은 ${personaCall} 한 명만 답합니다.
@@ -636,7 +639,7 @@ async function callOptionD(
       return { first: slots[0], second: slots[1], third: slots[2], echoQuestion: '' };
     }
 
-    const scriptPrompt = `${buildScriptPrompt(messages, personaViews, category, firstPersona, categoryV3)}
+    const scriptPrompt = `${buildScriptPrompt(messages, personaViews, category, firstPersona, categoryV3, hasPriorConversation)}
 
 기존 화면 표시 참고 순서: ${order.map((key, index) => `${index + 1}. ${key.toUpperCase()}`).join(' / ')}
 단, CLOSER 담당은 질문 성격으로 결정하고 ECHO 고정 마무리로 만들지 마십시오.
@@ -1092,6 +1095,23 @@ export async function POST(req: Request) {
     const _hasConnector = hasExplicitConnector(lastMsg);
     // 맥락 약화 조건: 카테고리 변경 AND 연결어 없음 (진짜 신호는 명시 연결어, 짧음은 신뢰성 X)
     const shouldWeakenContext = categoryChanged && !_hasConnector;
+
+    // ✅ FIRST 페르소나 V3 강제 정렬 — 모든 응답 경로(news/life/finance/tagged)에 공통 적용
+    //   카테고리 변경 시에도 마지막 메시지 기준으로 항상 V3 매트릭스가 우선.
+    //   ECHO(principle)는 [ECHO_QUESTION] 슬롯이라 reorder 대상 외 — 기존 순서 유지.
+    const _categoryV3 = detectCategoryV3(lastMsg);
+    const _firstPersonaV3 = getFirstPersona(_categoryV3);
+    const applyV3OrderOverride = <T extends 'ray' | 'jack' | 'lucia'>(arr: T[]): T[] => {
+      if (_firstPersonaV3 === 'echo') return arr;
+      const first = _firstPersonaV3 as T;
+      const idx = arr.indexOf(first);
+      if (idx <= 0) return arr;
+      return [first, ...arr.filter((k) => k !== first)] as T[];
+    };
+
+    // ✅ 안부 톤 강제 조건 — 이전 user 메시지가 실제로 존재할 때만 허용.
+    //   첫 질문이면 안부 톤 자체를 프롬프트에서 금지.
+    const _hasPriorConversation = !!_prevUserMsg;
     const luciaRoutingMsg = LUCIA_ROUTING_MESSAGE[category];
     // ✅ 동일 카테고리 luciaIntro 중복 방지
     const _alreadyIntroduced = Array.isArray(messages) && (messages as Array<{
@@ -1389,26 +1409,12 @@ export async function POST(req: Request) {
         //   - 라운드 분리는 teaRound 파라미터로 결정 (클라이언트가 메시지 수로 계산).
         // ─────────────────────────────────────────────
         const rawOrder = detectPersonaOrderHybrid(msg, category);
-        // ✅ FIRST 페르소나 강제 정렬 — CategoryV3 매트릭스 기반
-        //   invest→RAY / action→JACK / emotional→LUCIA / principle→ECHO
-        //   ECHO는 [FIRST] 슬롯에 들어갈 수 없으므로(아키텍처상 [ECHO_QUESTION] 위치) 기존 순서 유지
-        //   ray/jack/lucia 중 하나면 해당 페르소나를 order[0]로 이동
-        const categoryV3Local = detectCategoryV3(msg);
-        const firstPersonaLocal = getFirstPersona(categoryV3Local);
-        const reorderToFirst = (
-          arr: TaggedPersonaKey[],
-          first: TaggedPersonaKey,
-        ): TaggedPersonaKey[] => {
-          const idx = arr.indexOf(first);
-          if (idx <= 0) return arr;
-          return [first, ...arr.filter((k) => k !== first)];
-        };
-        const order: TaggedPersonaKey[] =
-          firstPersonaLocal !== 'echo'
-            ? reorderToFirst(rawOrder, firstPersonaLocal as TaggedPersonaKey)
-            : rawOrder;
+        // ✅ FIRST 페르소나 V3 강제 정렬 — 상위 helper 재사용
+        const categoryV3Local = _categoryV3;
+        const firstPersonaLocal = _firstPersonaV3;
+        const order: TaggedPersonaKey[] = applyV3OrderOverride(rawOrder);
         if (order[0] !== rawOrder[0]) {
-          console.log('[first-persona] 순서 강제 정렬:', rawOrder, '→', order, '(category:', categoryV3Local, ')');
+          console.log('[first-persona/tagged] 순서 강제 정렬:', rawOrder, '→', order, '(categoryV3:', categoryV3Local, ')');
         }
         const enableSearchTagged = ['finance', 'stock', 'crypto', 'economy', 'news'].includes(category);
         const isRound1 = !teaRound || teaRound <= 1;
@@ -1440,7 +1446,7 @@ export async function POST(req: Request) {
             if (categoryChanged) {
               console.log('[optionD] 카테고리 전환 감지 → 이전 맥락 제거, 마지막 메시지만 전달 (prev:', prevCategory, '→ now:', category, ')');
             }
-            r1 = await callOptionD(optionDMessages, category, msg, order, categoryV3Local, firstPersonaLocal);
+            r1 = await callOptionD(optionDMessages, category, msg, order, categoryV3Local, firstPersonaLocal, _hasPriorConversation);
             // ✅ callOptionD 빈 결과 시 폴백 완전 차단 — null/빈 객체여도 정상 done 경로로 강제 통과
             if (!r1) {
               console.warn('[optionD] null 반환 → 빈 결과 객체로 강제 통과 (폴백 차단)');
@@ -1455,7 +1461,7 @@ export async function POST(req: Request) {
               jack_angle:  plan.jack_angle,
               ray_angle:   plan.ray_angle,
             });
-            r1 = await callTaggedRound1(msg, category, recentContext, order, enableSearchTagged, stage1Data);
+            r1 = await callTaggedRound1(msg, category, recentContext, order, enableSearchTagged, stage1Data, _hasPriorConversation);
           }
           if (r1) {
             const personaText: Record<TaggedPersonaKey, string> = {
@@ -1697,7 +1703,7 @@ export async function POST(req: Request) {
               jack2:  screenplay.jack2  || null,
               lucia2: screenplay.lucia2 || null,
               echo2:  screenplay.echo2  || null,
-              order:  screenplay.order || plan.order,
+              order:  applyV3OrderOverride(screenplay.order || plan.order),
               verdict: '관망',
               confidence: 0,
               breakdown: '재테크 일반',
@@ -1857,7 +1863,7 @@ export async function POST(req: Request) {
             jack2:  jackText2  || null,
             lucia2: luciaText2 || null,
             echo2:  echoText2  || null,
-            order:  plan.order,
+            order:  applyV3OrderOverride(plan.order),
             verdict: '관망',
             confidence: 0,
             breakdown: '재테크 일반',
@@ -1898,10 +1904,12 @@ export async function POST(req: Request) {
         const newsAngleLucia = newsPlan.lucia_angle ? `LUCIA 집중점: ${newsPlan.lucia_angle}.\n` : '';
         const newsConflict   = newsPlan.conflict_point ? `핵심 충돌 쟁점: ${newsPlan.conflict_point}.\n` : '';
 
+        // ✅ 카테고리 어휘 차단 — news 카테고리는 시사/뉴스이므로 invest/emotional 어휘 금지
+        const newsVocabGuard = buildCategoryVocabBlockRule(_categoryV3);
         // ✅ 페르소나별 역할 분리 prefix — 동일 질문에 다른 시각으로 답하도록 유도
-        const rayHistory:   TeaMsg[] = [{ role: 'user', content: `${newsPrefix}${newsAngleRay}${newsConflict}[역할: 질문에 직접 답해라. 핵심 숫자 2개만. 절대 3줄 초과 금지. 목록·불릿 금지.]\n${lastMsg}` }];
-        const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${newsPrefix}${newsAngleJack}${newsConflict}[역할: 이 상황에서 지금 당장 행동해야 할 것 하나만 짧고 투박하게 말해줘. 배경 설명 없이. 절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]\n${lastMsg}` }];
-        const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${newsPrefix}${newsAngleLucia}[역할: 이 뉴스가 40~50대 일반인에게 감정적으로 어떤 의미인지, 인간적 시각으로만 2~3줄로 말해줘. 경제 분석 없이. 절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]\n${lastMsg}` }];
+        const rayHistory:   TeaMsg[] = [{ role: 'user', content: `${newsPrefix}${newsVocabGuard}${newsAngleRay}${newsConflict}[역할: 질문에 직접 답해라. 핵심 숫자 2개만. 절대 3줄 초과 금지. 목록·불릿 금지.]\n${lastMsg}` }];
+        const jackHistory:  TeaMsg[] = [{ role: 'user', content: `${newsPrefix}${newsVocabGuard}${newsAngleJack}${newsConflict}[역할: 이 상황에서 지금 당장 행동해야 할 것 하나만 짧고 투박하게 말해줘. 배경 설명 없이. 절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]\n${lastMsg}` }];
+        const luciaHistory: TeaMsg[] = [{ role: 'user', content: `${newsPrefix}${newsVocabGuard}${newsAngleLucia}[역할: 이 뉴스가 40~50대 일반인에게 감정적으로 어떤 의미인지, 인간적 시각으로만 2~3줄로 말해줘. 경제 분석 없이. 절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]\n${lastMsg}` }];
 
         const [rayLLM, jackLLM, luciaLLM] = await Promise.all([
           callTeaPersona('ray',   TEA_SYSTEM_RAY,   rayHistory,   { enableSearch: true }),
@@ -2000,7 +2008,7 @@ export async function POST(req: Request) {
             jack2:  jackText2  || null,
             lucia2: luciaText2 || null,
             echo2:  echoText2  || null,
-            order:  newsPlan.order,
+            order:  applyV3OrderOverride(newsPlan.order),
             verdict: '관망' as Verdict,
             confidence: 0,
             breakdown: '시사 분석',
@@ -2022,9 +2030,11 @@ export async function POST(req: Request) {
         const lifeConflict   = lifePlan.conflict_point ? `핵심 충돌 쟁점: ${lifePlan.conflict_point}.\n` : '';
 
         const lifeLengthRule = '[절대 3줄 초과 금지. 불릿·목록 사용 금지. 핵심만.]\n';
-        const lifeJackHistory: TeaMsg[] = [{ role: 'user', content: `${lifeAngleJack}${lifeConflict}${lifeLengthRule}${lastMsg}` }];
-        const lifeLuciaHistory: TeaMsg[] = [{ role: 'user', content: `${lifeAngleLucia}${lifeLengthRule}${lastMsg}` }];
-        const lifeRayHistory: TeaMsg[] = [{ role: 'user', content: `${lifeAngleRay}${lifeConflict}[역할: 질문에 직접 답해라. 핵심 숫자 2개만. 절대 3줄 초과 금지. 목록·불릿 금지.]\n${lastMsg}` }];
+        // ✅ 카테고리 어휘 차단 — life 카테고리 (인생/감정/관계)는 invest 어휘 금지
+        const lifeVocabGuard = buildCategoryVocabBlockRule(_categoryV3);
+        const lifeJackHistory: TeaMsg[] = [{ role: 'user', content: `${lifeVocabGuard}${lifeAngleJack}${lifeConflict}${lifeLengthRule}${lastMsg}` }];
+        const lifeLuciaHistory: TeaMsg[] = [{ role: 'user', content: `${lifeVocabGuard}${lifeAngleLucia}${lifeLengthRule}${lastMsg}` }];
+        const lifeRayHistory: TeaMsg[] = [{ role: 'user', content: `${lifeVocabGuard}${lifeAngleRay}${lifeConflict}[역할: 질문에 직접 답해라. 핵심 숫자 2개만. 절대 3줄 초과 금지. 목록·불릿 금지.]\n${lastMsg}` }];
 
         const [rayLLM, jackLLM, luciaLLM] = await Promise.all([
           callTeaPersona('ray',   TEA_SYSTEM_RAY,   lifeRayHistory),
@@ -2120,7 +2130,7 @@ export async function POST(req: Request) {
             jack2:  lifeJackText2  || null,
             lucia2: lifeLuciaText2 || null,
             echo2:  lifeEchoText2  || null,
-            order:  lifePlan.order,
+            order:  applyV3OrderOverride(lifePlan.order),
             verdict: '관망' as Verdict,
             confidence: 0,
             breakdown: '인생 후반전 고민',
