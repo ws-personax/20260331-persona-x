@@ -2056,7 +2056,17 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
     messagesRef.current = nextMessages;
     setMessages(nextMessages);
     setIsLoading(true);
-    setPendingOrder(null); // 새 요청마다 초기화
+    // ✅ solo 호명 즉시 감지 → pendingOrder 선반영 (로딩 메시지가 올바른 페르소나로 표시).
+    //   서버 routeMessage의 detectPersonaInvocation과 동일 패턴 (단어 경계 + 영문 비-인접).
+    //   긴 이름(LUCIA→ECHO→JACK→RAY) 순서로 평가 — 부분 매치 방지.
+    const SOLO_DETECT_RULES: Array<{ key: PersonaKey; re: RegExp }> = [
+      { key: 'lucia', re: /(?:^|[^a-zA-Z])LUCIA(?![a-zA-Z])/i },
+      { key: 'echo',  re: /(?:^|[^a-zA-Z])ECHO(?![a-zA-Z])/i },
+      { key: 'jack',  re: /(?:^|[^a-zA-Z])JACK(?![a-zA-Z])/i },
+      { key: 'ray',   re: /(?:^|[^a-zA-Z])RAY(?![a-zA-Z])/i },
+    ];
+    const soloMatch = SOLO_DETECT_RULES.find(({ re }) => re.test(text));
+    setPendingOrder(soloMatch ? [soloMatch.key] : null); // 새 요청마다 초기화 (solo면 즉시 호명 페르소나)
     if (isAdvanced) setIsAdvancedLoading(true);
     setInput('');
 

@@ -22,6 +22,10 @@ import {
   type AllPersonaKey,
   type CallStrategy,
 } from '@/app/api/chat/prompts/orchestrator-tagged';
+import { TEA_SYSTEM_JACK } from '@/app/api/chat/prompts/tea-jack';
+import { TEA_SYSTEM_LUCIA } from '@/app/api/chat/prompts/tea-lucia';
+import { TEA_SYSTEM_RAY } from '@/app/api/chat/prompts/tea-ray';
+import { TEA_SYSTEM_ECHO } from '@/app/api/chat/prompts/tea-echo';
 
 export const FEATURE_OPTION_D = true;
 
@@ -361,6 +365,16 @@ export async function runRoutedRequest(
     if (effectiveSoloPersona) {
       router.order = [effectiveSoloPersona as TaggedPersonaKey];
       const display = effectiveSoloPersona.toUpperCase();
+      // ✅ 페르소나별 톤 시스템 프롬프트 — solo 응답에서 캐릭터 톤 유지 보장.
+      //   TEA_SYSTEM_* 는 각 페르소나의 어조/말투/위계/금지 표현 등 정체성 핵심.
+      //   OPTION_D_SYSTEM의 "태그 블록만 출력" 지시와 결합해 [FIRST] 태그 + 페르소나 톤 둘 다 강제.
+      const personaSystem: Record<AllPersonaKey, string> = {
+        jack: TEA_SYSTEM_JACK,
+        lucia: TEA_SYSTEM_LUCIA,
+        ray: TEA_SYSTEM_RAY,
+        echo: TEA_SYSTEM_ECHO,
+      };
+      const soloSystem = `${personaSystem[effectiveSoloPersona]}\n\n---\n\n${OPTION_D_SYSTEM}`;
       console.log(
         '[runRoutedRequest] solo 단축 경로 — 1 LLM call only',
         '| persona:', display,
@@ -382,9 +396,10 @@ export async function runRoutedRequest(
 유저가 ${display}을(를) 직접 호명했습니다. 이번 답변은 ${display} 한 명만 답합니다.
 - [FIRST] 블록 하나에만 ${display}의 답을 작성하십시오.
 - [SECOND], [THIRD], [CLOSER], [LUCIA_CLOSE] 블록은 출력하지 마십시오.
-- ${display}의 톤·관점·말투를 그대로 살려 자연스럽게 답합니다.
+- ${display}의 톤·관점·말투를 그대로 살려 자연스럽게 답합니다. (시스템 프롬프트의 ${display} 캐릭터 규칙 엄수)
 - 다른 페르소나(${(['LUCIA','JACK','RAY','ECHO'].filter((p) => p !== display)).join('/')})는 절대 언급·인용하지 않습니다.`;
-      const soloRaw = await callLLM('echo', OPTION_D_SYSTEM, [
+      // callLLM의 persona 인자도 effectiveSoloPersona로 — 모델·로깅 일관성.
+      const soloRaw = await callLLM(effectiveSoloPersona, soloSystem, [
         { role: 'user', content: soloPrompt },
       ]);
       let soloText = extractTag(soloRaw, 'FIRST');
