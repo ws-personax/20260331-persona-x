@@ -800,10 +800,22 @@ const buildPersonaToneAndConflictRules = (): string => `
   - ✅ "RAY, 통계는 그런데 현실은 달라요"
 - ⛔ "OO 말처럼" / "OO 말씀처럼" / "맞는 말이에요" 동의 추임새 금지 — 충돌이 아니라 합창임
 
-## 📚 Few-shot 예시 — 톤·갈등·합성 참고용
-⚠️ 아래는 톤·갈등 구조 학습용 대화 예시입니다.
-   실제 출력은 [FIRST]/[SECOND]/[THIRD]/[CLOSER] 4블록 형식만 사용 — "RAY:" "JACK:" 같은 이름 헤더 출력 금지.
-   여러 줄 토론은 4블록에 핵심 충돌만 압축해서 담을 것.
+## 🚨🚨🚨 Few-shot 예시 — 톤·갈등·합성 참고용 (출력 형식은 절대 따라하지 말 것)
+
+⛔ **출력 형식 절대 규칙 (위반 시 답변 무효 — 다른 모든 규칙보다 우선)**:
+- 아래 예시의 "RAY:" "JACK:" "LUCIA:" "ECHO:" 헤더는 **읽기 편하라고 붙인 라벨일 뿐**, 실제 출력 형식이 아닙니다.
+- 실제 출력은 \`[FIRST]\` \`[SECOND]\` \`[THIRD]\` \`[CLOSER]\` (감정/복합이면 \`[LUCIA_CLOSE]\` 추가) **태그 블록만** 사용.
+- 각 블록 본문 안에 다음 형태는 **모두 금지** — 출력 시 자동 무효 처리:
+  - \`RAY:\` \`JACK:\` \`LUCIA:\` \`ECHO:\` (이름 + 콜론)
+  - \`**RAY**:\` \`**JACK**:\` \`**LUCIA**:\` \`**ECHO**:\` (볼드 + 콜론)
+  - \`RAY :\` \`JACK ：\` (공백·전각 콜론 포함 모든 변종)
+  - \`잭:\` \`루시아:\` \`에코:\` (한국어 별칭 + 콜론)
+- 블록 본문은 담당 페르소나의 발화만 **이름 헤더 없이** 바로 시작.
+  - ❌ \`[SECOND]\nJACK: LUCIA, 그게 몇 %예요?\`
+  - ✅ \`[SECOND]\nLUCIA, 그게 몇 %예요?\` (담당이 JACK인 [SECOND] 블록 — 자기 이름 안 붙이고 LUCIA만 호명)
+- 여러 줄 토론은 [FIRST]→[SECOND]→[THIRD]→[CLOSER] 4블록에 **핵심 충돌만 압축**해서 담을 것 (예시의 8~9턴 그대로 옮기지 말 것).
+
+📖 아래 예시는 **갈등 흐름·톤·호명 반박 스타일만 학습**하는 용도입니다. 형식은 위 4-블록만 사용.
 
 ### 예시 1: 삼성전자 (투자 — RAY·JACK 격돌 + LUCIA 중재 → JACK 재공격 → ECHO 판결)
 Q: "삼성전자 지금 사도 될까?"
@@ -1120,12 +1132,28 @@ export type RouterDecision = {
   reason: string;
 };
 
+/**
+ * 호명 패턴 빌더 — 경계 조건 통일.
+ * 매치 성공 조건:
+ *  - 앞: 줄 시작 OR 한글/영문 비-인접 (단어 내 부분매치 차단)
+ *  - 뒤: 줄 끝 OR 비-한글/영문(공백·구두점) OR 한국어 조사(은/는/이/가/을/를/의/야/아/도/만/씨/님/과/와/로/께)
+ * 효과:
+ *  ✅ "에코는 어떻게?" / "잭이 봤어요" / "루시아의 의견" / "RAY," — 매칭
+ *  ✅ "에코 어떻게?" / "JACK 너는?" — 매칭 (공백·구두점)
+ *  ⛔ "에코백/루시퍼/레이저/잭슨/JACKET" — 차단 (compound 명사/영어 부분매치)
+ */
+const buildInvocationPattern = (alternation: string): RegExp =>
+  new RegExp(
+    `(?:^|[^가-힣a-zA-Z])(?:${alternation})(?:$|[^가-힣a-zA-Z]|(?=[은는이가을를의야아도만씨님과와로께]))`,
+    'i',
+  );
+
 const PERSONA_INVOCATION_PATTERNS: ReadonlyArray<{ key: AllPersonaKey; re: RegExp }> = [
-  // 단어 경계 또는 한글/공백 인접 — 단독 호명 감지
-  { key: 'echo',  re: /(?:^|[^a-zA-Z])ECHO(?![a-zA-Z])/i },
-  { key: 'lucia', re: /(?:^|[^a-zA-Z])LUCIA(?![a-zA-Z])/i },
-  { key: 'jack',  re: /(?:^|[^a-zA-Z])JACK(?![a-zA-Z])/i },
-  { key: 'ray',   re: /(?:^|[^a-zA-Z])RAY(?![a-zA-Z])/i },
+  // 긴 별칭 먼저 (alternation 좌→우 평가) — "루시아"가 "루시"보다 우선
+  { key: 'lucia', re: buildInvocationPattern('LUCIA|루시아|루이사|루누님|루시') },
+  { key: 'echo',  re: buildInvocationPattern('ECHO|에코') },
+  { key: 'jack',  re: buildInvocationPattern('JACK|째앵|째액|잭|짹') },
+  { key: 'ray',   re: buildInvocationPattern('RAY|레이꾼|레\\s+대리|레이') },
 ];
 
 /** 유저 메시지에서 페르소나 호명 감지 — 첫 번째 매치 1명 반환, 없으면 null */

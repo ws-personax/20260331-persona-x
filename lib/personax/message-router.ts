@@ -105,17 +105,26 @@ const isComplexMessage = (text: string): boolean => countComplexThemes(text) >= 
 /**
  * 페르소나 직접 호출 검출 — detectPersonaInvocation과 동일한 느슨한 패턴.
  *
- * 매칭 조건: 페르소나 이름 앞·뒤 모두 letter 비-인접 (단어 경계).
- *  예) "JACK 너는 어때?" / "RAY 의견 줘" / "ECHO," / "LUCIA 님" — 모두 매칭
- *  반례) "JACKET" / "RAYBAN" 같은 영어 단어 일부는 미매칭
- *  한글 인접은 매칭 허용 ("JACK팀장", "JACK야" 등 — 호명 의도 자연스러움)
+ * 영문 + 한국어 호명 동시 인식 (orchestrator-tagged.ts buildInvocationPattern과 동기화).
+ * 경계 조건:
+ *  - 앞: 줄 시작 OR 한글/영문 비-인접 (단어 내 부분매치 차단)
+ *  - 뒤: 줄 끝 OR 비-한글/영문(공백·구두점) OR 한국어 조사(은/는/이/가/을/를/의/야/아/도/만/씨/님/과/와/로/께)
+ * 효과:
+ *  ✅ "에코는 어떻게?" / "잭이 봤어요" / "루시아의 의견" / "RAY," — 매칭
+ *  ⛔ "에코백/루시퍼/레이저/잭슨/JACKET" — 차단 (compound 명사/영어 부분매치)
+ * 긴 별칭 먼저 (alternation 좌→우 평가) — "루시아"가 "루시"보다 우선.
  */
+const buildPersonaCallPattern = (alternation: string): RegExp =>
+  new RegExp(
+    `(?:^|[^가-힣a-zA-Z])(?:${alternation})(?:$|[^가-힣a-zA-Z]|(?=[은는이가을를의야아도만씨님과와로께]))`,
+    'i',
+  );
+
 const PERSONA_CALL_PATTERNS: ReadonlyArray<{ persona: PersonaName; re: RegExp }> = [
-  // 긴 이름 우선 (LUCIA가 LUC* / RAY를 우선 매칭하지 않도록)
-  { persona: 'LUCIA', re: /(?:^|[^a-zA-Z])LUCIA(?![a-zA-Z])/i },
-  { persona: 'ECHO',  re: /(?:^|[^a-zA-Z])ECHO(?![a-zA-Z])/i },
-  { persona: 'JACK',  re: /(?:^|[^a-zA-Z])JACK(?![a-zA-Z])/i },
-  { persona: 'RAY',   re: /(?:^|[^a-zA-Z])RAY(?![a-zA-Z])/i },
+  { persona: 'LUCIA', re: buildPersonaCallPattern('LUCIA|루시아|루이사|루누님|루시') },
+  { persona: 'ECHO',  re: buildPersonaCallPattern('ECHO|에코') },
+  { persona: 'JACK',  re: buildPersonaCallPattern('JACK|째앵|째액|잭|짹') },
+  { persona: 'RAY',   re: buildPersonaCallPattern('RAY|레이꾼|레\\s+대리|레이') },
 ];
 
 export const detectExplicitPersonaCall = (message: string): PersonaName | null => {
@@ -301,6 +310,18 @@ export type RoutedRequestResult = {
 const OPTION_D_SYSTEM =
   'PersonaX 3단계 오케스트레이터입니다. 요청한 태그 블록만 출력하고, 코드펜스와 설명 문장은 금지합니다.';
 
+/**
+ * 페르소나 라벨 방어 스트리핑.
+ * LLM이 few-shot 예시를 따라 본문에 "JACK:", "**LUCIA**:", "RAY :" 같은 헤더를 출력하면
+ * 그 라벨이 다른 페르소나 버블(예: LUCIA 슬롯)에 그대로 표시되는 버그를 방지.
+ * 라인 시작(^, m 플래그)에서만 스트리핑 — 본문 인용("OO이 'JACK은 옳다'고")은 보존.
+ */
+const PERSONA_LABEL_LINE_RE =
+  /^\s*\**\s*(?:RAY|JACK|LUCIA|ECHO|루시아|루이사|루누님|루시|잭|짹|째앵|째액|레이꾼|레이|에코)\s*\**\s*[:：][^\S\n]*/gim;
+
+const stripPersonaLabelLines = (s: string): string =>
+  s.replace(PERSONA_LABEL_LINE_RE, '').trim();
+
 const extractTag = (text: string | null, tag: string): string => {
   if (!text) return '';
   const re = new RegExp(
@@ -308,7 +329,7 @@ const extractTag = (text: string | null, tag: string): string => {
     'i',
   );
   const m = text.match(re);
-  return (m?.[1] || '').trim();
+  return stripPersonaLabelLines((m?.[1] || '').trim());
 };
 
 /**

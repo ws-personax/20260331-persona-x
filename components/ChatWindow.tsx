@@ -2057,13 +2057,21 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
     setMessages(nextMessages);
     setIsLoading(true);
     // ✅ solo 호명 즉시 감지 → pendingOrder 선반영 (로딩 메시지가 올바른 페르소나로 표시).
-    //   서버 routeMessage의 detectPersonaInvocation과 동일 패턴 (단어 경계 + 영문 비-인접).
-    //   긴 이름(LUCIA→ECHO→JACK→RAY) 순서로 평가 — 부분 매치 방지.
+    //   서버 routeMessage의 detectPersonaInvocation/PERSONA_CALL_PATTERNS와 동일 패턴 (영문 + 한국어).
+    //   경계 조건: 앞 비-한글/영문, 뒤 비-한글/영문 OR 한국어 조사(은/는/이/가/을/를/의/야/아/도/만/씨/님/과/와/로/께).
+    //   ✅ "에코는 어떻게?" / "잭이 봤어요" / "루시아 의견" — 매칭
+    //   ⛔ "에코백/루시퍼/레이저/잭슨/JACKET" — 차단
+    //   긴 별칭 우선 (alternation 좌→우 평가) — "루시아"가 "루시"보다 우선.
+    const buildSoloPattern = (alternation: string): RegExp =>
+      new RegExp(
+        `(?:^|[^가-힣a-zA-Z])(?:${alternation})(?:$|[^가-힣a-zA-Z]|(?=[은는이가을를의야아도만씨님과와로께]))`,
+        'i',
+      );
     const SOLO_DETECT_RULES: Array<{ key: PersonaKey; re: RegExp }> = [
-      { key: 'lucia', re: /(?:^|[^a-zA-Z])LUCIA(?![a-zA-Z])/i },
-      { key: 'echo',  re: /(?:^|[^a-zA-Z])ECHO(?![a-zA-Z])/i },
-      { key: 'jack',  re: /(?:^|[^a-zA-Z])JACK(?![a-zA-Z])/i },
-      { key: 'ray',   re: /(?:^|[^a-zA-Z])RAY(?![a-zA-Z])/i },
+      { key: 'lucia', re: buildSoloPattern('LUCIA|루시아|루이사|루누님|루시') },
+      { key: 'echo',  re: buildSoloPattern('ECHO|에코') },
+      { key: 'jack',  re: buildSoloPattern('JACK|째앵|째액|잭|짹') },
+      { key: 'ray',   re: buildSoloPattern('RAY|레이꾼|레\\s+대리|레이') },
     ];
     const soloMatch = SOLO_DETECT_RULES.find(({ re }) => re.test(text));
     setPendingOrder(soloMatch ? [soloMatch.key] : null); // 새 요청마다 초기화 (solo면 즉시 호명 페르소나)
