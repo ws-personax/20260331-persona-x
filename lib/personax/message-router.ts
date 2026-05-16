@@ -310,6 +310,10 @@ export type RoutedRequestResult = {
   closerContent?: string;
   /** [CLOSER] 담당 페르소나 */
   closerKey?: TaggedPersonaKey;
+  /** solo 호출 시 단일 응답 본문 */
+  soloContent?: string;
+  /** solo 호출 시 단일 응답 페르소나 */
+  soloKey?: TaggedPersonaKey;
 };
 
 const OPTION_D_SYSTEM =
@@ -341,6 +345,13 @@ export async function runRoutedRequest(
     lastMessage: string;
     /** 미전달 시 routeMessage로 자동 계산 */
     router?: RouterDecision;
+    /**
+     * 호출자가 강제하는 solo 페르소나 (외부 invokedPersona 결정 권한 위임).
+     * 지정 시 router.personaCall(strict 검출) 결과를 무시하고 solo 모드 강제.
+     * detectExplicitPersonaCall(엄격)과 detectPersonaInvocation(느슨)의 검출 차이로
+     * outer가 solo 판정했는데 inner가 일반 4명 경로로 빠지는 문제 차단.
+     */
+    soloPersona?: AllPersonaKey;
   },
 ): Promise<RoutedRequestResult | null> {
   try {
@@ -389,8 +400,12 @@ export async function runRoutedRequest(
     const personaViews = `[LUCIA_VIEW]\n${luciaView}\n\n[JACK_VIEW]\n${jackView}\n\n[RAY_VIEW]\n${rayView}\n\n[ECHO_VIEW]\n${echoView}`;
     console.log('[runRoutedRequest] Stage 2:', personaViews ? '성공' : '실패');
 
-    // Stage 3 — solo (페르소나 호명 시)
-    if (router.personaCall) {
+    // Stage 3 — solo: 호출자 지정(params.soloPersona) 우선, 없으면 router.personaCall(strict) 폴백.
+    const effectiveSoloPersona: AllPersonaKey | null =
+      params.soloPersona ??
+      (router.personaCall ? (router.personaCall.toLowerCase() as AllPersonaKey) : null);
+    if (effectiveSoloPersona) {
+      const display = effectiveSoloPersona.toUpperCase();
       const soloPrompt = `${buildScriptPrompt(
         messages,
         personaViews,
@@ -402,24 +417,22 @@ export async function runRoutedRequest(
       )}
 
 ## 🚨 단독 응답 모드 (최우선 — 다른 모든 규칙보다 우선)
-유저가 ${router.personaCall}을(를) 직접 호명했습니다. 이번 답변은 ${router.personaCall} 한 명만 답합니다.
-- [FIRST] 블록 하나에만 ${router.personaCall}의 답을 작성하십시오.
+유저가 ${display}을(를) 직접 호명했습니다. 이번 답변은 ${display} 한 명만 답합니다.
+- [FIRST] 블록 하나에만 ${display}의 답을 작성하십시오.
 - [SECOND], [THIRD], [CLOSER], [LUCIA_CLOSE] 블록은 출력하지 마십시오.
-- ${router.personaCall}의 PERSONA_VIEW를 충실히 반영해 자연스럽게 답합니다.`;
+- ${display}의 PERSONA_VIEW를 충실히 반영해 자연스럽게 답합니다.`;
       const soloRaw = await callLLM('echo', OPTION_D_SYSTEM, [
         { role: 'user', content: soloPrompt },
       ]);
       let soloText = extractTag(soloRaw, 'FIRST');
-      if (!soloText) soloText = `${router.personaCall} 답변을 생성하지 못했습니다`;
-      const calledKey = router.personaCall.toLowerCase() as TaggedPersonaKey;
-      const slotIndex = router.order.indexOf(calledKey);
-      const slots: [string, string, string, string] = ['', '', '', ''];
-      slots[slotIndex >= 0 && slotIndex < 4 ? slotIndex : 0] = soloText;
+      if (!soloText) soloText = `${display} 답변을 생성하지 못했습니다`;
       return {
-        first: slots[0],
-        second: slots[1],
-        third: slots[2],
-        echoQuestion: slots[3],
+        first: '',
+        second: '',
+        third: '',
+        echoQuestion: '',
+        soloContent: soloText,
+        soloKey: effectiveSoloPersona as TaggedPersonaKey,
       };
     }
 

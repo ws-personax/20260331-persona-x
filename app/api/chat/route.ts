@@ -565,6 +565,8 @@ const emptyPersonaText = (): Record<TaggedPersonaKey, string> => ({
 type OptionDRound1Result = TaggedRound1Result & {
   closerContent?: string;
   closerKey?: TaggedPersonaKey;
+  soloContent?: string;
+  soloKey?: TaggedPersonaKey;
 };
 
 const mapOrderedRound1 = (
@@ -657,6 +659,7 @@ async function callOptionD(
   firstPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
   hasPriorConversation: boolean = false,
   closerPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
+  soloPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
 ): Promise<TaggedRound1Result | null> {
   const normalizedMessages = (messages || []).map((m) => ({
     role: m.role || '',
@@ -688,6 +691,7 @@ async function callOptionD(
     messages: normalizedMessages,
     lastMessage,
     router,
+    soloPersona,
   });
 }
 
@@ -1463,6 +1467,9 @@ export async function POST(req: Request) {
             const optionDMessages = categoryChanged
               ? (messages as Array<{ role?: string; content?: string }>).slice(-1)
               : (messages as Array<{ role?: string; content?: string }>);
+            const invoked = _routerDecision.invokedPersona;
+            // ✅ invokedPersona를 callOptionD에 명시 전달 — runRoutedRequest 내부의
+            //   strict 검출(personaCall) 미스매치를 무시하고 solo 모드 강제.
             const soloResult = await callOptionD(
               optionDMessages,
               category,
@@ -1472,11 +1479,11 @@ export async function POST(req: Request) {
               firstPersonaLocal,
               _hasPriorConversation,
               _closerPersonaV3,
+              invoked,
             );
-            const personaText = soloResult ? mapOrderedRound1(soloResult, order) : emptyPersonaText();
-
-            const invoked = _routerDecision.invokedPersona;
-            const reply = personaText[invoked] || '';
+            const reply = soloResult?.soloKey === invoked
+              ? soloResult.soloContent || ''
+              : '';
             await streamPersonaTagged(invoked, reply);
 
             send({
@@ -1488,7 +1495,7 @@ export async function POST(req: Request) {
                 lucia: invoked === 'lucia' ? reply : '',
                 echo: invoked === 'echo' ? reply : '',
                 ray2: null, jack2: null, lucia2: null, echo2: null,
-                order,
+                order: [invoked],
                 verdict: '관망',
                 confidence: 0,
                 breakdown: '재테크 일반',
