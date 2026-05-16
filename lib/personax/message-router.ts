@@ -322,6 +322,90 @@ const PERSONA_LABEL_LINE_RE =
 const stripPersonaLabelLines = (s: string): string =>
   s.replace(PERSONA_LABEL_LINE_RE, '').trim();
 
+// ──────────────────────────────────────────────────────────────────────────
+// postProcessPersonaOutput — LLM 출력 후 4가지 안전 필터 일괄 적용.
+//   1) few-shot 누수 감지 → 빈 문자열 반환 (재생성 트리거용)
+//   2) 투자 법적 표현 교체 (직접 행동 지시 → 정보 제공 형태)
+//   3) 자기 지칭(3인칭) 제거 — 페르소나별 정확히 자기 이름만
+//   4) 자기 호칭(형/오빠/누나/언니) → "제가"로 치환
+// runRoutedRequest의 solo·full 경로 양쪽 호출에서 사용.
+// ──────────────────────────────────────────────────────────────────────────
+
+// 투자 법적 표현 교체 — 더 긴/구체적인 패턴 우선 (매수하세요 → 사세요 순)
+const LEGAL_REPLACEMENTS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/매수하세요/g, '진입을 고려해볼 수 있어요'],
+  [/매도하세요/g, '비중 축소를 검토해볼 수 있어요'],
+  [/사세요/g, '진입을 고려해볼 수 있어요'],
+  [/파세요/g, '비중 축소를 검토해볼 수 있어요'],
+  [/반드시\s*오릅니다/g, '상승 신호가 보여요'],
+  [/오릅니다/g, '상승 가능성이 있어요'],
+  [/내립니다/g, '하락 가능성이 있어요'],
+  [/무조건/g, '확률적으로'],
+];
+
+// 자기 지칭 — 페르소나별 (영문 + 한국어 별칭). 해당 페르소나 슬롯에서만 제거.
+// 매치 시 트레일링 구두점·공백까지 함께 제거해 자연스러운 문장 유지.
+const SELF_REF_PATTERNS: Record<AllPersonaKey, RegExp> = {
+  jack:  /(?<![가-힣a-zA-Z])(?:JACK|잭|짹|째앵|째액)(?:이|가|은|는)?\s*(?:한\s*마디(?:\s*할게요|\s*할\s*게요)?|보기엔|보면|봤을\s*때|말하면|분석하면|판단하면)\s*[,.]?\s*/gi,
+  lucia: /(?<![가-힣a-zA-Z])(?:LUCIA|루시아|루이사|루누님|루시)(?:가|는|이|은)?\s*(?:한\s*번|보기엔|보면|봤을\s*때|말하면|분석하면)\s*[,.]?\s*/gi,
+  ray:   /(?<![가-힣a-zA-Z])(?:RAY|레이꾼|레이)(?:가|는|이|은)?\s*(?:분석하면|보면|보기엔|봤을\s*때|말하면|판단하면)\s*[,.]?\s*/gi,
+  echo:  /(?<![가-힣a-zA-Z])(?:ECHO|에코)(?:가|는|이|은)?\s*(?:말하면|보면|판결하면|보기엔|봤을\s*때)\s*[,.]?\s*/gi,
+};
+
+// 자기 호칭 — 모든 페르소나 공통. 형/오빠/누나/언니 → 제가 치환.
+// lookbehind로 "큰형/작은오빠" 같은 합성어 매치 차단.
+const SELF_TITLE_RE =
+  /(?<![가-힣])(?:형|오빠|누나|언니)(?:이|가)\s+(보기엔|봤을\s*때|말하면|보면|분석하면)/g;
+
+// Few-shot 예시 직접 복사 감지 — 매치 시 빈 문자열 반환 (재생성 트리거)
+const FEW_SHOT_LEAK_PATTERNS: ReadonlyArray<RegExp> = [
+  /지난번\s*투자\s*얘기\s*이어서네요\.?\s*숫자로는\s*저점이라고\s*하는데/,
+  /지난번\s*투자\s*얘기에서\s*나눴던\s*것들이\s*계속\s*맴도는\s*거네요/,
+  /그\s*동안\s*생각해보신\s*게\s*있으신가요\?\s*아니면\s*지금\s*한\s*번\s*더/,
+];
+
+export const postProcessPersonaOutput = (
+  text: string,
+  personaKey: AllPersonaKey,
+): string => {
+  if (!text) return text;
+
+  // 1) Few-shot 누수 감지 — 매치 시 빈 문자열 (caller가 fallback 처리)
+  for (const pat of FEW_SHOT_LEAK_PATTERNS) {
+    if (pat.test(text)) {
+      console.warn(
+        '[postProcessPersonaOutput] few-shot 누수 감지 — 빈 문자열 반환',
+        '| persona:', personaKey,
+        '| pattern:', pat.source.slice(0, 40),
+        '| text 30자:', text.slice(0, 30),
+      );
+      return '';
+    }
+  }
+
+  let out = text;
+
+  // 2) 투자 법적 표현 교체 (모든 페르소나 공통)
+  for (const [pat, replacement] of LEGAL_REPLACEMENTS) {
+    out = out.replace(pat, replacement);
+  }
+
+  // 3) 자기 지칭 제거 — 해당 페르소나 슬롯에서만 자기 이름 제거
+  //    (cross-reference "RAY가 봤을 때"는 JACK 슬롯에선 보존 — 호명 반박이 의도된 충돌)
+  const selfRefRe = SELF_REF_PATTERNS[personaKey];
+  if (selfRefRe) {
+    out = out.replace(selfRefRe, '');
+  }
+
+  // 4) 자기 호칭 치환 — 형/오빠/누나/언니 + 이/가 + 동사 → 제가 + 동사
+  out = out.replace(SELF_TITLE_RE, '제가 $1');
+
+  // 연속 공백·줄바꿈 정리
+  out = out.replace(/[^\S\n]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+
+  return out;
+};
+
 const extractTag = (text: string | null, tag: string): string => {
   if (!text) return '';
   const re = new RegExp(
@@ -608,6 +692,8 @@ ${
         { role: 'user', content: soloPrompt },
       ]);
       let soloText = extractTag(soloRaw, 'FIRST');
+      // ✅ 후처리 필터 — 법적 표현 교체 / 자기 지칭 제거 / 호칭 치환 / few-shot 누수 차단
+      soloText = postProcessPersonaOutput(soloText, effectiveSoloPersona);
       if (!soloText) soloText = `${display} 답변을 생성하지 못했습니다`;
       console.log('[runRoutedRequest] solo 완료 — first 20자:', soloText.slice(0, 20));
       return {
@@ -675,12 +761,19 @@ ${
     const scriptRaw = await callLLM('echo', OPTION_D_SYSTEM, [
       { role: 'user', content: scriptPrompt },
     ]);
-    const first = extractTag(scriptRaw, 'FIRST') || '';
-    const second = extractTag(scriptRaw, 'SECOND') || '';
-    const third = extractTag(scriptRaw, 'THIRD') || '';
-    const closer = extractTag(scriptRaw, 'CLOSER') || '';
-    const luciaClose = extractTag(scriptRaw, 'LUCIA_CLOSE') || '';
-    const echoQuestion = extractTag(scriptRaw, 'ECHO_QUESTION') || '';
+    // ✅ 후처리 필터 — 슬롯별 페르소나 키로 postProcessPersonaOutput 적용.
+    //    first/second/third → router.order[0/1/2], closer → router.closerPersona,
+    //    luciaClose → 'lucia' 고정, echoQuestion → 'echo' 고정.
+    const firstKey = (router.order[0] || 'lucia') as AllPersonaKey;
+    const secondKey = (router.order[1] || 'jack') as AllPersonaKey;
+    const thirdKey = (router.order[2] || 'ray') as AllPersonaKey;
+    const closerKeyForFilter = (router.closerPersona || 'jack') as AllPersonaKey;
+    const first = postProcessPersonaOutput(extractTag(scriptRaw, 'FIRST') || '', firstKey);
+    const second = postProcessPersonaOutput(extractTag(scriptRaw, 'SECOND') || '', secondKey);
+    const third = postProcessPersonaOutput(extractTag(scriptRaw, 'THIRD') || '', thirdKey);
+    const closer = postProcessPersonaOutput(extractTag(scriptRaw, 'CLOSER') || '', closerKeyForFilter);
+    const luciaClose = postProcessPersonaOutput(extractTag(scriptRaw, 'LUCIA_CLOSE') || '', 'lucia');
+    const echoQuestion = postProcessPersonaOutput(extractTag(scriptRaw, 'ECHO_QUESTION') || '', 'echo');
 
     console.log('[runRoutedRequest] Stage 3 완료 — first:', first?.slice(0, 20));
 
