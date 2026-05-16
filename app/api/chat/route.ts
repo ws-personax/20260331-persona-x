@@ -562,20 +562,28 @@ const emptyPersonaText = (): Record<TaggedPersonaKey, string> => ({
   echo: '',
 });
 
+type OptionDRound1Result = TaggedRound1Result & {
+  closerContent?: string;
+  closerKey?: TaggedPersonaKey;
+};
+
 const mapOrderedRound1 = (
-  result: TaggedRound1Result,
+  result: OptionDRound1Result,
   order: TaggedPersonaKey[],
 ): Record<TaggedPersonaKey, string> => {
   const personaText = emptyPersonaText();
   const nonEchoSlots = [result.first, result.second, result.third];
   let nonEchoIdx = 0;
-  order.slice(0, 4).forEach((key, index) => {
-    if (key === 'echo') {
-      personaText[key] = result.echoQuestion || '';
+  order.slice(0, 4).forEach((key) => {
+    if (result.closerKey === key && result.closerContent) {
+      personaText[key] = result.closerContent;
     } else {
       personaText[key] = nonEchoSlots[nonEchoIdx++] || '';
     }
   });
+  if (result.echoQuestion) {
+    personaText.echo = result.echoQuestion;
+  }
   return personaText;
 };
 
@@ -614,7 +622,7 @@ async function callTaggedRound1(
   stage1Data?: Stage1Data,
   hasPriorConversation: boolean = false,
   closerPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
-): Promise<TaggedRound1Result | null> {
+): Promise<OptionDRound1Result | null> {
   try {
     const nowKST = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
     // ✅ FIRST 페르소나 결정 — CategoryV3 매트릭스 기반 (invest→RAY / action→JACK / emotional→LUCIA / principle→ECHO, 복합/모호→LUCIA)
@@ -1491,7 +1499,7 @@ export async function POST(req: Request) {
             return;
           }
 
-          let r1: TaggedRound1Result | null = null;
+          let r1: OptionDRound1Result | null = null;
           let r1UsesOrderedSlots = false;
           if (FEATURE_OPTION_D) {
             // ✅ 카테고리 전환 시 이전 맥락 차단 — 마지막 메시지만 callOptionD에 전달

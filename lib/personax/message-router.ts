@@ -304,8 +304,12 @@ export type RoutedRequestResult = {
   first: string;
   second: string;
   third: string;
-  /** [CLOSER] + [LUCIA_CLOSE] 연결 — 기존 echoQuestion 슬롯에 대응 */
+  /** [ECHO_QUESTION] 전용 슬롯 */
   echoQuestion: string;
+  /** [CLOSER] + [LUCIA_CLOSE] 연결 */
+  closerContent?: string;
+  /** [CLOSER] 담당 페르소나 */
+  closerKey?: TaggedPersonaKey;
 };
 
 const OPTION_D_SYSTEM =
@@ -314,7 +318,7 @@ const OPTION_D_SYSTEM =
 const extractTag = (text: string | null, tag: string): string => {
   if (!text) return '';
   const re = new RegExp(
-    `\\[${tag}\\][^\\S\\n]*\\n?([\\s\\S]*?)(?=\\n\\s*\\[(?:DATA_PACK|LUCIA_VIEW|JACK_VIEW|RAY_VIEW|ECHO_VIEW|FIRST|SECOND|THIRD|CLOSER|LUCIA_CLOSE)\\]|$)`,
+    `\\[${tag}\\][^\\S\\n]*\\n?([\\s\\S]*?)(?=\\n\\s*\\[(?:DATA_PACK|LUCIA_VIEW|JACK_VIEW|RAY_VIEW|ECHO_VIEW|FIRST|SECOND|THIRD|CLOSER|LUCIA_CLOSE|ECHO_QUESTION)\\]|$)`,
     'i',
   );
   const m = text.match(re);
@@ -441,6 +445,7 @@ export async function runRoutedRequest(
     const third = extractTag(scriptRaw, 'THIRD') || '';
     const closer = extractTag(scriptRaw, 'CLOSER') || '';
     const luciaClose = extractTag(scriptRaw, 'LUCIA_CLOSE') || '';
+    const echoQuestion = extractTag(scriptRaw, 'ECHO_QUESTION') || '';
 
     console.log('[runRoutedRequest] Stage 3 완료 — first:', first?.slice(0, 20));
 
@@ -448,7 +453,9 @@ export async function runRoutedRequest(
       first,
       second,
       third,
-      echoQuestion: [closer, luciaClose].filter(Boolean).join('\n\n'),
+      echoQuestion,
+      closerContent: [closer, luciaClose].filter(Boolean).join('\n\n'),
+      closerKey: router.closerPersona as TaggedPersonaKey,
     };
   } catch (e) {
     console.warn('[runRoutedRequest] 실행 실패', e);
