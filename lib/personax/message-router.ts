@@ -340,15 +340,75 @@ export async function runRoutedRequest(
       routeMessage(messages, lastMessage, '');
     const legacyCategory = router.legacyCategory || '';
 
+    // ──────────────────────────────────────────────────────────────
+    // SOLO 우선순위 결정 — Stage 1·2 진입 전에 평가.
+    //   1) params.soloPersona (호출자 명시)
+    //   2) router.personaCall (detectExplicitPersonaCall 결과)
+    //   3) router.invokedPersona (decideCallStrategy/detectPersonaInvocation 결과)
+    // 3단계 폴백으로 검출 미스매치 시에도 solo 모드 보장.
+    // ──────────────────────────────────────────────────────────────
+    const effectiveSoloPersona: AllPersonaKey | null =
+      params.soloPersona ??
+      (router.personaCall ? (router.personaCall.toLowerCase() as AllPersonaKey) : null) ??
+      router.invokedPersona ??
+      null;
+
+    // ──────────────────────────────────────────────────────────────
+    // SOLO 단축 경로 — Stage 1(데이터 수집)·Stage 2(4-persona 관점) 스킵.
+    //   1개 페르소나만 응답하면 되므로 4-persona views 불필요 → LLM 호출 1회.
+    //   router.order는 [effectiveSoloPersona] 단일 슬롯으로 강제 (로그·디버그 일관성).
+    // ──────────────────────────────────────────────────────────────
+    if (effectiveSoloPersona) {
+      router.order = [effectiveSoloPersona as TaggedPersonaKey];
+      const display = effectiveSoloPersona.toUpperCase();
+      console.log(
+        '[runRoutedRequest] solo 단축 경로 — 1 LLM call only',
+        '| persona:', display,
+        '| order:', router.order,
+        '| categoryV3:', router.categoryV3,
+      );
+      // Stage 3만 실행 — personaViews는 빈 문자열로 buildScriptPrompt 통과 (style/vocab 가드 유지).
+      const soloPrompt = `${buildScriptPrompt(
+        messages,
+        '',
+        legacyCategory,
+        router.firstPersona,
+        router.categoryV3,
+        router.hasPriorConversation,
+        router.closerPersona,
+      )}
+
+## 🚨 단독 응답 모드 (최우선 — 다른 모든 규칙보다 우선)
+유저가 ${display}을(를) 직접 호명했습니다. 이번 답변은 ${display} 한 명만 답합니다.
+- [FIRST] 블록 하나에만 ${display}의 답을 작성하십시오.
+- [SECOND], [THIRD], [CLOSER], [LUCIA_CLOSE] 블록은 출력하지 마십시오.
+- ${display}의 톤·관점·말투를 그대로 살려 자연스럽게 답합니다.
+- 다른 페르소나(${(['LUCIA','JACK','RAY','ECHO'].filter((p) => p !== display)).join('/')})는 절대 언급·인용하지 않습니다.`;
+      const soloRaw = await callLLM('echo', OPTION_D_SYSTEM, [
+        { role: 'user', content: soloPrompt },
+      ]);
+      let soloText = extractTag(soloRaw, 'FIRST');
+      if (!soloText) soloText = `${display} 답변을 생성하지 못했습니다`;
+      console.log('[runRoutedRequest] solo 완료 — first 20자:', soloText.slice(0, 20));
+      return {
+        first: '',
+        second: '',
+        third: '',
+        echoQuestion: '',
+        soloContent: soloText,
+        soloKey: effectiveSoloPersona as TaggedPersonaKey,
+      };
+    }
+
     console.log(
-      '[runRoutedRequest] start — personaCall:', router.personaCall,
+      '[runRoutedRequest] full 경로 — personaCall:', router.personaCall,
       'categoryV3:', router.categoryV3,
       'first:', router.firstPersona,
       'closer:', router.closerPersona,
       'order:', router.order,
     );
 
-    // Stage 1: 데이터 수집
+    // Stage 1: 데이터 수집 (full 경로만)
     const dataPrompt = buildDataCollectionPrompt(
       messages,
       legacyCategory,
@@ -361,7 +421,7 @@ export async function runRoutedRequest(
     const dataPack = extractTag(dataRaw, 'DATA_PACK');
     console.log('[runRoutedRequest] Stage 1:', dataPack ? '성공' : '실패(빈 DATA_PACK)');
 
-    // Stage 2: 페르소나 관점 분해
+    // Stage 2: 페르소나 관점 분해 (full 경로만)
     const analysisPrompt = buildPersonaAnalysisPrompt(
       messages,
       dataPack,
@@ -377,48 +437,6 @@ export async function runRoutedRequest(
     const echoView = extractTag(analysisRaw, 'ECHO_VIEW');
     const personaViews = `[LUCIA_VIEW]\n${luciaView}\n\n[JACK_VIEW]\n${jackView}\n\n[RAY_VIEW]\n${rayView}\n\n[ECHO_VIEW]\n${echoView}`;
     console.log('[runRoutedRequest] Stage 2:', personaViews ? '성공' : '실패');
-
-    // Stage 3 — solo 우선순위:
-    //   1) params.soloPersona (호출자 명시)
-    //   2) router.personaCall (detectExplicitPersonaCall 결과)
-    //   3) router.invokedPersona (decideCallStrategy/detectPersonaInvocation 결과)
-    //   3단계 폴백으로 검출 미스매치 시에도 solo 모드 보장.
-    const effectiveSoloPersona: AllPersonaKey | null =
-      params.soloPersona ??
-      (router.personaCall ? (router.personaCall.toLowerCase() as AllPersonaKey) : null) ??
-      router.invokedPersona ??
-      null;
-    if (effectiveSoloPersona) {
-      const display = effectiveSoloPersona.toUpperCase();
-      const soloPrompt = `${buildScriptPrompt(
-        messages,
-        personaViews,
-        legacyCategory,
-        router.firstPersona,
-        router.categoryV3,
-        router.hasPriorConversation,
-        router.closerPersona,
-      )}
-
-## 🚨 단독 응답 모드 (최우선 — 다른 모든 규칙보다 우선)
-유저가 ${display}을(를) 직접 호명했습니다. 이번 답변은 ${display} 한 명만 답합니다.
-- [FIRST] 블록 하나에만 ${display}의 답을 작성하십시오.
-- [SECOND], [THIRD], [CLOSER], [LUCIA_CLOSE] 블록은 출력하지 마십시오.
-- ${display}의 PERSONA_VIEW를 충실히 반영해 자연스럽게 답합니다.`;
-      const soloRaw = await callLLM('echo', OPTION_D_SYSTEM, [
-        { role: 'user', content: soloPrompt },
-      ]);
-      let soloText = extractTag(soloRaw, 'FIRST');
-      if (!soloText) soloText = `${display} 답변을 생성하지 못했습니다`;
-      return {
-        first: '',
-        second: '',
-        third: '',
-        echoQuestion: '',
-        soloContent: soloText,
-        soloKey: effectiveSoloPersona as TaggedPersonaKey,
-      };
-    }
 
     // Stage 3 — 일반 (4명 대본)
     const scriptPrompt = `${buildScriptPrompt(
