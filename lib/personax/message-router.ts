@@ -230,16 +230,16 @@ export const enforceOrder = (
       arr = [...arr.filter((k) => k !== closer), closer];
     }
   }
-  if (categoryV3 === 'invest' || categoryV3 === 'emotional' || categoryV3 === 'principle') {
-    if (categoryV3 !== 'emotional' || closerPersona === 'jack') {
-      arr = [...arr.filter((k) => k !== 'echo' && k !== 'jack'), 'echo', 'jack'];
-    }
+  if (categoryV3 === 'invest' || categoryV3 === 'principle') {
+    const withoutJackEcho = arr.filter((k) => k !== 'jack' && k !== 'echo');
+    arr = [...withoutJackEcho, 'echo', 'jack'];
+  }
+  if (categoryV3 === 'emotional') {
+    const withoutJack = arr.filter((k) => k !== 'jack');
+    arr = [...withoutJack, 'jack'];
   }
   if (categoryV3 === 'action') {
-    arr = [...arr.filter((k) => k !== 'echo'), 'echo'];
-  }
-  if (categoryV3 === 'emotional' && closerPersona === 'echo') {
-    arr = [...arr.filter((k) => k !== 'echo'), 'echo'];
+    arr = ['jack', ...arr.filter((k) => k !== 'jack')];
   }
   return arr;
 };
