@@ -98,49 +98,27 @@ const countComplexThemes = (text: string): number =>
 
 const isComplexMessage = (text: string): boolean => countComplexThemes(text) >= 2;
 
-/** 페르소나 직접 호출 — 긴 패턴 우선 (JACK팀장 등) */
-const PERSONA_CALL_RULES: ReadonlyArray<{ persona: PersonaName; patterns: RegExp[] }> = [
-  {
-    persona: 'ECHO',
-    patterns: [
-      /(?:^|[\s,，])ECHO\s*[,，]/i,
-      /(?:^|[\s,，])ECHO\s*야\b/i,
-      /(?:^|[\s,，])ECHO\s*(?:어떻게|생각|의견|봐|말)/i,
-    ],
-  },
-  {
-    persona: 'LUCIA',
-    patterns: [
-      /(?:^|[\s,，])LUCIA\s*님/i,
-      /(?:^|[\s,，])LUCIA\s*[,，]/i,
-      /(?:^|[\s,，])LUCIA\s*야\b/i,
-      /(?:^|[\s,，])LUCIA\s*(?:어떻게|생각|의견|봐|말)/i,
-    ],
-  },
-  {
-    persona: 'RAY',
-    patterns: [
-      /(?:^|[\s,，])RAY\s*[,，]/i,
-      /(?:^|[\s,，])RAY\s*야\b/i,
-      /(?:^|[\s,，])RAY\s*(?:어떻게|봐|의견|생각|말)/i,
-    ],
-  },
-  {
-    persona: 'JACK',
-    patterns: [
-      /(?:^|[\s,，])JACK\s*팀장/i,
-      /(?:^|[\s,，])JACK\s*[,，]/i,
-      /(?:^|[\s,，])JACK\s*야\b/i,
-      /(?:^|[\s,，])JACK\s*(?:어떻게|봐|의견|생각|말)/i,
-    ],
-  },
+/**
+ * 페르소나 직접 호출 검출 — detectPersonaInvocation과 동일한 느슨한 패턴.
+ *
+ * 매칭 조건: 페르소나 이름 앞·뒤 모두 letter 비-인접 (단어 경계).
+ *  예) "JACK 너는 어때?" / "RAY 의견 줘" / "ECHO," / "LUCIA 님" — 모두 매칭
+ *  반례) "JACKET" / "RAYBAN" 같은 영어 단어 일부는 미매칭
+ *  한글 인접은 매칭 허용 ("JACK팀장", "JACK야" 등 — 호명 의도 자연스러움)
+ */
+const PERSONA_CALL_PATTERNS: ReadonlyArray<{ persona: PersonaName; re: RegExp }> = [
+  // 긴 이름 우선 (LUCIA가 LUC* / RAY를 우선 매칭하지 않도록)
+  { persona: 'LUCIA', re: /(?:^|[^a-zA-Z])LUCIA(?![a-zA-Z])/i },
+  { persona: 'ECHO',  re: /(?:^|[^a-zA-Z])ECHO(?![a-zA-Z])/i },
+  { persona: 'JACK',  re: /(?:^|[^a-zA-Z])JACK(?![a-zA-Z])/i },
+  { persona: 'RAY',   re: /(?:^|[^a-zA-Z])RAY(?![a-zA-Z])/i },
 ];
 
 export const detectExplicitPersonaCall = (message: string): PersonaName | null => {
   const t = (message || '').trim();
   if (!t) return null;
-  for (const { persona, patterns } of PERSONA_CALL_RULES) {
-    if (patterns.some((re) => re.test(t))) return persona;
+  for (const { persona, re } of PERSONA_CALL_PATTERNS) {
+    if (re.test(t)) return persona;
   }
   return null;
 };
@@ -400,10 +378,16 @@ export async function runRoutedRequest(
     const personaViews = `[LUCIA_VIEW]\n${luciaView}\n\n[JACK_VIEW]\n${jackView}\n\n[RAY_VIEW]\n${rayView}\n\n[ECHO_VIEW]\n${echoView}`;
     console.log('[runRoutedRequest] Stage 2:', personaViews ? '성공' : '실패');
 
-    // Stage 3 — solo: 호출자 지정(params.soloPersona) 우선, 없으면 router.personaCall(strict) 폴백.
+    // Stage 3 — solo 우선순위:
+    //   1) params.soloPersona (호출자 명시)
+    //   2) router.personaCall (detectExplicitPersonaCall 결과)
+    //   3) router.invokedPersona (decideCallStrategy/detectPersonaInvocation 결과)
+    //   3단계 폴백으로 검출 미스매치 시에도 solo 모드 보장.
     const effectiveSoloPersona: AllPersonaKey | null =
       params.soloPersona ??
-      (router.personaCall ? (router.personaCall.toLowerCase() as AllPersonaKey) : null);
+      (router.personaCall ? (router.personaCall.toLowerCase() as AllPersonaKey) : null) ??
+      router.invokedPersona ??
+      null;
     if (effectiveSoloPersona) {
       const display = effectiveSoloPersona.toUpperCase();
       const soloPrompt = `${buildScriptPrompt(
