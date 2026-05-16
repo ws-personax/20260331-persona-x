@@ -827,3 +827,135 @@ export const parseTaggedRound2 = (raw: string): TaggedRound2Result | null => {
   if (!first || !second || !third || !echoFinal) return null;
   return { first, second, third, echoFinal };
 };
+
+// ──────────────────────────────────────────────────────────────────────────
+// 카테고리 V3 (4분류) + Router 패턴 + 호명 인식
+// 마스터 명세: 카테고리 강화 / Router / 호명 / Feature Flag 단계로 사용
+// ──────────────────────────────────────────────────────────────────────────
+
+export type CategoryV3 = 'invest' | 'action' | 'emotional' | 'principle';
+
+export type AllPersonaKey = 'lucia' | 'jack' | 'ray' | 'echo';
+
+/** 카테고리 V3 키워드 사전 */
+const CATEGORY_V3_KEYWORDS: Record<CategoryV3, RegExp> = {
+  invest: /주식|투자|돈|종목|ETF|펀드|부동산|코인|비트코인|매수|매도|배당|환율|금리|수익|손실|포트폴리오|매도|매수|상승|하락|올랐|떨어|물렸|삼성전자|SK하이닉스|테슬라|애플|엔비디아|코스피|코스닥|나스닥|S&P/,
+  action: /퇴사|이직|결단|결정|도전|스포츠|야구|축구|농구|골프|경기|승부|선수|이길|우승|시작할|그만둘|바꿀|옮길|뛰어들|승부|뛸까/,
+  emotional: /감정|관계|일상|걱정|가족|경사|좋은소식|기쁜|슬프|우울|불안|외로|힘들|지쳐|피곤|마음|위로|공감|가족|부모|자녀|남편|아내|친구|동료|선배|후배|시댁|처가|결혼|이혼|아이|손주|손자|손녀|기뻐|기쁘|설레|행복|축하|경사|반가/,
+  principle: /인생|원칙|철학|판단|방향|의미|가치|본질|삶|살아간|어떻게 살|왜 사|어떤 사람|어떤 길|선택의 기준|기준이 뭐|무엇이 옳|옳은가|맞는가|진리|진정/,
+};
+
+/** 키워드 매치 카운트 */
+const countCategoryMatches = (text: string): Record<CategoryV3, number> => {
+  const counts: Record<CategoryV3, number> = {
+    invest: 0,
+    action: 0,
+    emotional: 0,
+    principle: 0,
+  };
+  (Object.keys(CATEGORY_V3_KEYWORDS) as CategoryV3[]).forEach((k) => {
+    const re = CATEGORY_V3_KEYWORDS[k];
+    const matches = text.match(new RegExp(re.source, re.flags + 'g'));
+    counts[k] = matches ? matches.length : 0;
+  });
+  return counts;
+};
+
+/**
+ * 카테고리 감지 V3 — invest / action / emotional / principle 4분류.
+ * 규칙:
+ *  - 2개 이상 카테고리 동시 매치 → 복합 질문으로 보고 emotional 처리
+ *  - 매치 0개 → 모호한 질문으로 보고 emotional 기본값
+ *  - 단일 매치 → 해당 카테고리
+ */
+export const detectCategoryV3 = (msg: string): CategoryV3 => {
+  const text = (msg || '').trim();
+  if (!text) return 'emotional';
+  const counts = countCategoryMatches(text);
+  const matched = (Object.keys(counts) as CategoryV3[]).filter((k) => counts[k] > 0);
+  if (matched.length === 0) return 'emotional';
+  if (matched.length >= 2) return 'emotional';
+  return matched[0];
+};
+
+/** Router 호출 전략 */
+export type CallStrategy = 'solo' | 'light' | 'standard' | 'full';
+
+export type RouterDecision = {
+  strategy: CallStrategy;
+  category: CategoryV3;
+  invokedPersona: AllPersonaKey | null;
+  reason: string;
+};
+
+const PERSONA_INVOCATION_PATTERNS: ReadonlyArray<{ key: AllPersonaKey; re: RegExp }> = [
+  // 단어 경계 또는 한글/공백 인접 — 단독 호명 감지
+  { key: 'echo',  re: /(?:^|[^a-zA-Z])ECHO(?![a-zA-Z])/i },
+  { key: 'lucia', re: /(?:^|[^a-zA-Z])LUCIA(?![a-zA-Z])/i },
+  { key: 'jack',  re: /(?:^|[^a-zA-Z])JACK(?![a-zA-Z])/i },
+  { key: 'ray',   re: /(?:^|[^a-zA-Z])RAY(?![a-zA-Z])/i },
+];
+
+/** 유저 메시지에서 페르소나 호명 감지 — 첫 번째 매치 1명 반환, 없으면 null */
+export const detectPersonaInvocation = (msg: string): AllPersonaKey | null => {
+  const t = (msg || '').trim();
+  if (!t) return null;
+  for (const { key, re } of PERSONA_INVOCATION_PATTERNS) {
+    if (re.test(t)) return key;
+  }
+  return null;
+};
+
+/** 짧은 단일 질문 여부 — 50자 이내, 물음표 0~1개, 줄바꿈 0~1줄 */
+const isLightQuestion = (msg: string): boolean => {
+  const t = (msg || '').trim();
+  if (!t) return false;
+  if (t.length > 50) return false;
+  const qMarks = (t.match(/[?？]/g) || []).length;
+  if (qMarks > 1) return false;
+  const lines = t.split(/\n/).filter((l) => l.trim()).length;
+  if (lines > 1) return false;
+  return true;
+};
+
+/**
+ * Router 결정 — 호명 우선, 카테고리 + 메시지 형태로 호출 전략 결정.
+ *  - 호명 감지 → solo (단독 답변, 4명 자동 출동 금지)
+ *  - 가벼운 단일 질문 → light (1~2명)
+ *  - 명확한 카테고리 (invest/action/principle 중 1개만) → standard (3명 협업)
+ *  - 복합/모호 (emotional 기본값) → full (4명 3단계)
+ */
+export const decideCallStrategy = (msg: string): RouterDecision => {
+  const invokedPersona = detectPersonaInvocation(msg);
+  if (invokedPersona) {
+    return {
+      strategy: 'solo',
+      category: detectCategoryV3(msg),
+      invokedPersona,
+      reason: `페르소나 호명 감지: ${invokedPersona.toUpperCase()}`,
+    };
+  }
+  const category = detectCategoryV3(msg);
+  if (isLightQuestion(msg)) {
+    return {
+      strategy: 'light',
+      category,
+      invokedPersona: null,
+      reason: '가벼운 단일 질문 → 1~2명 호출',
+    };
+  }
+  if (category === 'emotional') {
+    return {
+      strategy: 'full',
+      category,
+      invokedPersona: null,
+      reason: '복합/모호 질문 → 4명 3단계 호출',
+    };
+  }
+  return {
+    strategy: 'standard',
+    category,
+    invokedPersona: null,
+    reason: `명확한 카테고리(${category}) → 3명 협업`,
+  };
+};

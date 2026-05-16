@@ -48,6 +48,15 @@ import {
 } from './prompts/orchestrator-tagged';
 import { FEATURE_OPTION_D, routeMessage } from '@/lib/personax/message-router';
 
+// ✅ Feature Flag — Router/3단계 호출/ECHO 선택/LUCIA 프레이밍 단계별 활성화
+// router만 우선 활성화. 나머지는 다음 단계에서 켠다.
+const FEATURES = {
+  router: true,
+  threeStageCall: false,
+  echoOptional: false,
+  luciaFraming: false,
+} as const;
+
 // ✅ 1차 페르소나 분석 (재료 수집) — D-1 신규
 import { buildLuciaAnalysisPrompt } from './prompts/analysis-lucia';
 import { buildJackAnalysisPrompt } from './prompts/analysis-jack';
