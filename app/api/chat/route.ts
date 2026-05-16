@@ -567,9 +567,14 @@ const mapOrderedRound1 = (
   order: TaggedPersonaKey[],
 ): Record<TaggedPersonaKey, string> => {
   const personaText = emptyPersonaText();
-  const slots = [result.first, result.second, result.third, result.echoQuestion];
+  const nonEchoSlots = [result.first, result.second, result.third];
+  let nonEchoIdx = 0;
   order.slice(0, 4).forEach((key, index) => {
-    personaText[key] = slots[index] || '';
+    if (key === 'echo') {
+      personaText[key] = result.echoQuestion || '';
+    } else {
+      personaText[key] = nonEchoSlots[nonEchoIdx++] || '';
+    }
   });
   return personaText;
 };
