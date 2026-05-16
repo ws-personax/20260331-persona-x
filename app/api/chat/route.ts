@@ -30,9 +30,6 @@ import { TEA_SYSTEM_RAY } from './prompts/tea-ray';
 import { SCREENPLAY_SYSTEM_PROMPT, buildScreenplayPrompt } from './prompts/orchestrator-screenplay';
 import {
   detectPersonaOrderHybrid,
-  buildDataCollectionPrompt,
-  buildPersonaAnalysisPrompt,
-  buildScriptPrompt,
   buildTaggedRound1SystemPrompt,
   buildCategoryVocabBlockRule,
   detectCategoryV3,
@@ -50,7 +47,14 @@ import {
   type Stage1Data,
   type Stage1PersonaAnalysis,
 } from './prompts/orchestrator-tagged';
-import { FEATURE_OPTION_D, routeMessage } from '@/lib/personax/message-router';
+import {
+  FEATURE_OPTION_D,
+  routeMessage,
+  runRoutedRequest,
+  enforceOrder,
+  type RouterDecision,
+  type LLMCaller,
+} from '@/lib/personax/message-router';
 
 // ✅ Feature Flag — Router/3단계 호출/ECHO 선택/LUCIA 프레이밍 단계별 활성화
 // router만 우선 활성화. 나머지는 다음 단계에서 켠다.
@@ -578,13 +582,8 @@ async function callTaggedRound1(
   }
 }
 
-const extractOptionDTag = (text: string | null, tag: string): string => {
-  if (!text) return '';
-  const re = new RegExp(`\\[${tag}\\][^\\S\\n]*\\n?([\\s\\S]*?)(?=\\n\\s*\\[(?:DATA_PACK|LUCIA_VIEW|JACK_VIEW|RAY_VIEW|ECHO_VIEW|FIRST|SECOND|THIRD|CLOSER|LUCIA_CLOSE)\\]|$)`, 'i');
-  const m = text.match(re);
-  return (m?.[1] || '').trim();
-};
-
+// callOptionD는 runRoutedRequest로 흡수됨.
+// route.ts는 LLM 호출자(callTeaPersona)를 주입하는 얇은 wrapper만 유지.
 async function callOptionD(
   messages: Array<{ role?: string; content?: string }>,
   category: string,
@@ -595,79 +594,37 @@ async function callOptionD(
   hasPriorConversation: boolean = false,
   closerPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
 ): Promise<TaggedRound1Result | null> {
-  try {
-    const optionDSystem = 'PersonaX 3단계 오케스트레이터입니다. 요청한 태그 블록만 출력하고, 코드펜스와 설명 문장은 금지합니다.';
-
-    // ✅ 페르소나 호명 감지 — routeMessage 결과의 personaCall 활용
-    const routed = routeMessage(
-      (messages || []).map((m) => ({ role: m.role || '', content: m.content || '' })),
-      lastMessage,
-    );
-    const personaCall = routed.personaCall;
-    console.log('[optionD] 시작, personaCall:', routed?.personaCall);
-
-    const dataPrompt = buildDataCollectionPrompt(messages, category, lastMessage, categoryV3);
-    const dataRaw = await callTeaPersona('echo', optionDSystem, [{ role: 'user', content: dataPrompt }]);
-    const dataPack = extractOptionDTag(dataRaw, 'DATA_PACK');
-    console.log('[optionD] 1차:', dataPack ? '성공' : '실패(null)');
-
-    const analysisPrompt = buildPersonaAnalysisPrompt(messages, dataPack, category, categoryV3);
-    const analysisRaw = await callTeaPersona('echo', optionDSystem, [{ role: 'user', content: analysisPrompt }]);
-    const luciaView = extractOptionDTag(analysisRaw, 'LUCIA_VIEW');
-    const jackView = extractOptionDTag(analysisRaw, 'JACK_VIEW');
-    const rayView = extractOptionDTag(analysisRaw, 'RAY_VIEW');
-    const echoView = extractOptionDTag(analysisRaw, 'ECHO_VIEW');
-
-    const personaViews = `[LUCIA_VIEW]\n${luciaView}\n\n[JACK_VIEW]\n${jackView}\n\n[RAY_VIEW]\n${rayView}\n\n[ECHO_VIEW]\n${echoView}`;
-    console.log('[optionD] 2차:', personaViews ? '성공' : '실패(null)');
-
-    // ✅ 페르소나 단독 응답 모드 — 호명된 페르소나만 답변, 나머지 블록 생략
-    if (personaCall) {
-      const soloPrompt = `${buildScriptPrompt(messages, personaViews, category, firstPersona, categoryV3, hasPriorConversation, closerPersona)}
-
-## 🚨 단독 응답 모드 (최우선 — 다른 모든 규칙보다 우선)
-유저가 ${personaCall}을(를) 직접 호명했습니다. 이번 답변은 ${personaCall} 한 명만 답합니다.
-- [FIRST] 블록 하나에만 ${personaCall}의 답을 작성하십시오.
-- [SECOND], [THIRD], [CLOSER], [LUCIA_CLOSE] 블록은 출력하지 마십시오.
-- ${personaCall}의 PERSONA_VIEW를 충실히 반영해 자연스럽게 답합니다.`;
-      const soloRaw = await callTeaPersona('echo', optionDSystem, [{ role: 'user', content: soloPrompt }]);
-      let soloText = extractOptionDTag(soloRaw, 'FIRST');
-      if (!soloText) soloText = `${personaCall} 답변을 생성하지 못했습니다`;
-
-      if (personaCall === 'ECHO') {
-        return { first: '', second: '', third: '', echoQuestion: soloText };
-      }
-      const calledKey = personaCall.toLowerCase() as TaggedPersonaKey;
-      const slotIndex = order.indexOf(calledKey);
-      const slots: [string, string, string] = ['', '', ''];
-      slots[slotIndex >= 0 && slotIndex < 3 ? slotIndex : 0] = soloText;
-      return { first: slots[0], second: slots[1], third: slots[2], echoQuestion: '' };
-    }
-
-    const scriptPrompt = `${buildScriptPrompt(messages, personaViews, category, firstPersona, categoryV3, hasPriorConversation, closerPersona)}
-
-기존 화면 표시 참고 순서: ${order.map((key, index) => `${index + 1}. ${key.toUpperCase()}`).join(' / ')}
-⛔ 위 "FIRST 페르소나 행동 규칙"이 활성화된 경우, [FIRST] 블록은 반드시 그 페르소나(${(firstPersona || 'lucia').toUpperCase()}) 톤으로 작성하십시오. 순서는 ${order.map((k) => k.toUpperCase()).join(' → ')} 입니다.
-⛔ 위 "CLOSER 페르소나 결정 규칙"이 활성화된 경우, [CLOSER] 블록은 반드시 그 페르소나(${(closerPersona || 'jack').toUpperCase()}) 톤으로 작성하십시오. FIRST(${(firstPersona || 'lucia').toUpperCase()})는 CLOSER 불가.`;
-    const scriptRaw = await callTeaPersona('echo', optionDSystem, [{ role: 'user', content: scriptPrompt }]);
-    const first = extractOptionDTag(scriptRaw, 'FIRST') || '';
-    const second = extractOptionDTag(scriptRaw, 'SECOND') || '';
-    const third = extractOptionDTag(scriptRaw, 'THIRD') || '';
-    const closer = extractOptionDTag(scriptRaw, 'CLOSER') || '';
-    const luciaClose = extractOptionDTag(scriptRaw, 'LUCIA_CLOSE') || '';
-
-    console.log('[optionD] 3차 완료, first:', first?.slice(0, 20), 'personaCall:', personaCall);
-
-    return {
-      first,
-      second,
-      third,
-      echoQuestion: [closer, luciaClose].filter(Boolean).join('\n\n'),
-    };
-  } catch (e) {
-    console.warn('[option-d] 3단계 호출 실패', e);
-    return null;
+  const normalizedMessages = (messages || []).map((m) => ({
+    role: m.role || '',
+    content: m.content || '',
+  }));
+  // route.ts 호출 측이 이미 계산한 V3 결정을 그대로 RouterDecision으로 재구성.
+  // 미전달 시 runRoutedRequest 내부 routeMessage 호출 폴백 (구간 안전망).
+  const router: RouterDecision | undefined =
+    categoryV3 && firstPersona && closerPersona
+      ? routeMessage(normalizedMessages, lastMessage, category)
+      : undefined;
+  // 상위 호출자가 V3 정렬한 order를 사용 (news/life 등 다른 경로와의 일관성을 위해).
+  if (router) {
+    router.categoryV3 = categoryV3 ?? router.categoryV3;
+    router.firstPersona = firstPersona ?? router.firstPersona;
+    router.closerPersona = closerPersona ?? router.closerPersona;
+    router.hasPriorConversation = hasPriorConversation;
+    router.order = order as ('ray' | 'jack' | 'lucia')[];
+    router.legacyCategory = category;
   }
+  const llmCaller: LLMCaller = (persona, sys, history, opts) =>
+    callTeaPersona(
+      persona as TeaPersonaKey,
+      sys,
+      history as TeaMsg[],
+      opts,
+    );
+  return runRoutedRequest(llmCaller, {
+    messages: normalizedMessages,
+    lastMessage,
+    router,
+  });
 }
 
 async function callTaggedRound2(
@@ -1101,25 +1058,21 @@ export async function POST(req: Request) {
     // 맥락 약화 조건: 카테고리 변경 AND 연결어 없음 (진짜 신호는 명시 연결어, 짧음은 신뢰성 X)
     const shouldWeakenContext = categoryChanged && !_hasConnector;
 
-    // ✅ FIRST 페르소나 V3 강제 정렬 — 모든 응답 경로(news/life/finance/tagged)에 공통 적용
-    //   카테고리 변경 시에도 마지막 메시지 기준으로 항상 V3 매트릭스가 우선.
-    //   ECHO(principle)는 [ECHO_QUESTION] 슬롯이라 reorder 대상 외 — 기존 순서 유지.
-    const _categoryV3 = detectCategoryV3(lastMsg);
-    const _firstPersonaV3 = getFirstPersona(_categoryV3);
-    // ✅ CLOSER 페르소나 — invest→JACK / action→ECHO / emotional→JACK 또는 ECHO / principle→JACK
-    //   FIRST와 충돌 시 폴백 체인 자동 적용.
-    const _closerPersonaV3 = getCloserPersona(_categoryV3, _firstPersonaV3);
-    const applyV3OrderOverride = <T extends 'ray' | 'jack' | 'lucia'>(arr: T[]): T[] => {
-      if (_firstPersonaV3 === 'echo') return arr;
-      const first = _firstPersonaV3 as T;
-      const idx = arr.indexOf(first);
-      if (idx <= 0) return arr;
-      return [first, ...arr.filter((k) => k !== first)] as T[];
-    };
-
-    // ✅ 안부 톤 강제 조건 — 이전 user 메시지가 실제로 존재할 때만 허용.
-    //   첫 질문이면 안부 톤 자체를 프롬프트에서 금지.
-    const _hasPriorConversation = !!_prevUserMsg;
+    // ✅ Stage 0 단일 진입점 — routeMessage가 V3/FIRST/CLOSER/strategy/order 일괄 결정.
+    //   FIRST=order[0], CLOSER=order[last] 코드 레벨 정렬은 routeMessage 내부에서 적용됨.
+    const _routerDecision: RouterDecision = routeMessage(
+      messages as Array<{ role: string; content: string }>,
+      lastMsg,
+      category,
+    );
+    const _categoryV3 = _routerDecision.categoryV3;
+    const _firstPersonaV3 = _routerDecision.firstPersona;
+    const _closerPersonaV3 = _routerDecision.closerPersona;
+    const _hasPriorConversation = _routerDecision.hasPriorConversation;
+    // 모든 응답 경로(news/life/finance/tagged)에 공통 적용되는 FIRST+CLOSER 정렬 헬퍼.
+    // 기존 order 배열을 받아 enforceOrder를 그대로 호출.
+    const applyV3OrderOverride = <T extends 'ray' | 'jack' | 'lucia'>(arr: T[]): T[] =>
+      enforceOrder(arr as ('ray' | 'jack' | 'lucia')[], _firstPersonaV3, _closerPersonaV3) as T[];
     const luciaRoutingMsg = LUCIA_ROUTING_MESSAGE[category];
     // ✅ 동일 카테고리 luciaIntro 중복 방지
     const _alreadyIntroduced = Array.isArray(messages) && (messages as Array<{

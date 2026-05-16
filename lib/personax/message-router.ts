@@ -1,21 +1,40 @@
 /**
- * 메시지 라우팅 — 페르소나 직접 호출 + 카테고리(invest/emotional/casual/complex)
- * route.ts detectCategory / orchestrator-tagged EMOTION_KEYWORDS 와 정합 (프롬프트 파일 미수정).
+ * 메시지 라우팅 + 3단계 호출 단일 진입점.
+ *
+ * Stage 0 (routeMessage): 카테고리 V3 / FIRST / CLOSER / 호명 / strategy /
+ *   hasPriorConversation / order (FIRST·CLOSER 코드 레벨 정렬 포함) 결정.
+ * Stage 1 (runRoutedRequest): 데이터 수집 → 페르소나 관점 분해 → 대본.
+ *   LLM 호출자는 주입(dependency injection) — lib은 app에 의존하지 않음.
+ *
+ * 기존 callOptionD의 실행 로직은 runRoutedRequest로 흡수.
+ * route.ts는 callOptionD를 얇은 wrapper로 유지하며 callTeaPersona를 주입.
  */
+
+import {
+  detectCategoryV3,
+  decideCallStrategy as _decideCallStrategy,
+  getFirstPersona,
+  getCloserPersona,
+  buildDataCollectionPrompt,
+  buildPersonaAnalysisPrompt,
+  buildScriptPrompt,
+  type CategoryV3,
+  type AllPersonaKey,
+  type CallStrategy,
+} from '@/app/api/chat/prompts/orchestrator-tagged';
 
 export const FEATURE_OPTION_D = true;
 
 export type PersonaName = 'LUCIA' | 'JACK' | 'RAY' | 'ECHO';
 export type MessageCategory = 'invest' | 'emotional' | 'casual' | 'complex';
+export type TaggedPersonaKey = 'ray' | 'jack' | 'lucia';
 
 export type ChatMessage = { role: string; content: string };
 
-export type MessageRouterResult = {
-  personaCall: ReturnType<typeof detectExplicitPersonaCall>;
-  category: ReturnType<typeof detectMessageCategory>;
-};
+// ──────────────────────────────────────────────────────────────────────────
+// 키워드 사전 (route.ts CATEGORY_MAP / orchestrator-tagged EMOTION_KEYWORDS 정합)
+// ──────────────────────────────────────────────────────────────────────────
 
-// orchestrator-tagged.ts EMOTION_KEYWORDS (V2 포함)
 const EMOTION_KEYWORDS: readonly string[] = [
   '힘들', '막막', '모르겠', '무서', '외로', '죄책', '불안', '지쳐', '포기',
   '억울', '쓸쓸', '슬프', '우울', '눈물', '마음이', '괴로', '서글', '버겁',
@@ -24,9 +43,8 @@ const EMOTION_KEYWORDS: readonly string[] = [
   '한숨', '답답', '미치겠', '못 살', '못살겠',
 ];
 
-// route.ts CATEGORY_MAP (907~915행) — 라우트 카테고리 판별용
 const CATEGORY_MAP = {
-  finance:  /주식|펀드|ETF|종목|코스피|코스닥|나스닥|NASDAQ|S&P500|SP500|S&P|다우존스|다우|항셍|닛케이|원달러|달러|금|채권|포트폴리오|수익|손절|매수|매도|배당|금리|환율|가상화폐|비트코인|저축|예금|적금|퇴직금|연금|삼성전자|SK하이닉스|카카오뱅크|카카오게임즈|카카오|네이버|현대차|기아차|기아|LG전자|LG|엘지전자|엘지|삼성바이오|셀트리온|포스코|크래프톤|넷마블|하이브|두산|롯데|한화|SK|KT|CJ|GS|KB금융|신한지주|하나금융|테슬라|애플|엔비디아|구글|아마존|마이크로소프트|돈이|돈은|돈을|살까|팔까|투자할까|넣을까|빼야|수익|손실|올랐|떨어졌|물렸|상승|하락/,
+  finance:  /주식|펀드|ETF|종목|코스피|코스닥|나스닥|NASDAQ|S&P500|SP500|S&P|다우존스|다우|항셍|닛케이|원달러|달러|금|채권|포트폴리오|수익|손절|매수|매도|배당|금리|환율|가상화폐|비트코인|저축|예금|적금|퇴직금|연금|삼성전자|SK하이닉스|카카오뱅크|카카오게임즈|카카오|네이버|현대차|기아차|기아|LG전자|LG|엘지전자|엘지|삼성바이오|셀트리온|포스코|크래프톤|넥슨|넷마블|하이브|두산|롯데|한화|SK|KT|CJ|GS|KB금융|신한지주|하나금융|테슬라|애플|엔비디아|구글|아마존|마이크로소프트|돈이|돈은|돈을|살까|팔까|투자할까|넣을까|빼야|수익|손실|올랐|떨어졌|물렸|상승|하락/,
   sports:   /야구|축구|농구|배구|골프|올림픽|경기|이길|승부|우승|선수|리그|기아|삼성라이온즈|두산|LG트윈스|롯데|한화|KT|SSG|NC|키움/,
   news:     /정세|뉴스|전쟁|분쟁|중동|러시아|우크라이나|미중|외교|정치|대통령|선거|경제뉴스|시황|금융뉴스|증시|환경|기후|재난|사건|사고|테러|유가|원유|석유|에너지|OPEC|산유국|천연가스|인플레이션|금리정책|연준|Fed|미연준|기준금리|호르무즈|이란|이스라엘|하마스|헤즈볼라|가자|레바논|트럼프|바이든|시진핑|푸틴|북한|미사일|핵|제재|관세|무역전쟁|환율전쟁|HMM|화물선|해운|공급망|반도체규제|AI규제|빅테크|실리콘밸리|연방|의회|상원|하원|탄핵|대선|총선|보궐|여당|야당|국회|법안|정책/,
   life:     /명퇴|명예퇴직|희망퇴직|퇴직 권유|권고사직|은퇴|조기퇴직|퇴직 후|제2인생|요양원|치매|부모님 건강|어머니 건강|아버지 건강|무릎|허리|혈압|당뇨|갱년기|근감소|건강검진|병원|아이 대학|자녀 취업|자녀 결혼|아들 걱정|딸 걱정|황혼이혼|부부 갈등|노후|노후준비|노후자금|은퇴자금|막막|가장으로서|생계|카드론|노후파산|노후빈곤|황혼육아|손자|손녀|며느리|사위|시댁|처가|이혼숙려|졸혼|별거/,
@@ -120,7 +138,6 @@ const PERSONA_CALL_RULES: ReadonlyArray<{ persona: PersonaName; patterns: RegExp
 export const detectExplicitPersonaCall = (message: string): PersonaName | null => {
   const t = (message || '').trim();
   if (!t) return null;
-
   for (const { persona, patterns } of PERSONA_CALL_RULES) {
     if (patterns.some((re) => re.test(t))) return persona;
   }
@@ -137,20 +154,281 @@ export const detectMessageCategory = (
     '';
 
   if (!text) return 'casual';
-
   if (isComplexMessage(text)) return 'complex';
-
   const routeCat = detectRouteCategory(text);
   if (routeCat === 'finance') return 'invest';
   if (routeCat === 'emotion' || hasEmotionSignal(text)) return 'emotional';
-
   return 'casual';
 };
 
+// ──────────────────────────────────────────────────────────────────────────
+// Stage 0: Router 결정 (단일 진입점)
+// ──────────────────────────────────────────────────────────────────────────
+
+export type RouterDecision = {
+  personaCall: PersonaName | null;
+  category: MessageCategory;          // 레거시 4분류 (호환용)
+  categoryV3: CategoryV3;             // V3 4분류 (invest/action/emotional/principle)
+  firstPersona: AllPersonaKey;
+  closerPersona: AllPersonaKey;
+  strategy: CallStrategy;
+  hasPriorConversation: boolean;
+  /** FIRST=order[0], CLOSER=order[last] 로 코드 레벨 정렬된 ray/jack/lucia 순서 */
+  order: TaggedPersonaKey[];
+  /** route.ts 레거시 카테고리 (finance/sports/news 등) — 프롬프트 빌더 호환용 */
+  legacyCategory: string;
+};
+
+/** 하이브리드 기본 순서 — 감정 키워드 우선, 그 다음 레거시 카테고리 */
+const baseHybridOrder = (
+  hasEmotion: boolean,
+  legacyCategory: string,
+): TaggedPersonaKey[] => {
+  if (hasEmotion) return ['lucia', 'jack', 'ray'];
+  const cat = (legacyCategory || '').toLowerCase();
+  if (['finance', 'stock', 'crypto', 'economy'].includes(cat)) {
+    return ['ray', 'jack', 'lucia'];
+  }
+  if (cat === 'news') return ['ray', 'lucia', 'jack'];
+  if (cat === 'sports') return ['jack', 'ray', 'lucia'];
+  return ['lucia', 'jack', 'ray'];
+};
+
+/**
+ * FIRST·CLOSER 코드 레벨 정렬.
+ *  - FIRST가 ray/jack/lucia이면 order[0]로 이동
+ *  - CLOSER가 ray/jack/lucia이고 FIRST와 다르면 order[2]로 이동
+ *  - ECHO인 경우 order 배열 조작 불가 (ECHO는 [ECHO_QUESTION] 슬롯)
+ */
+export const enforceOrder = (
+  baseOrder: TaggedPersonaKey[],
+  firstPersona: AllPersonaKey,
+  closerPersona: AllPersonaKey,
+): TaggedPersonaKey[] => {
+  let arr = [...baseOrder];
+  if (firstPersona !== 'echo') {
+    const first = firstPersona as TaggedPersonaKey;
+    if (arr.includes(first) && arr[0] !== first) {
+      arr = [first, ...arr.filter((k) => k !== first)];
+    }
+  }
+  if (closerPersona !== 'echo' && closerPersona !== firstPersona) {
+    const closer = closerPersona as TaggedPersonaKey;
+    if (arr.includes(closer) && arr[arr.length - 1] !== closer) {
+      arr = [...arr.filter((k) => k !== closer), closer];
+    }
+  }
+  return arr;
+};
+
+/**
+ * Stage 0: 단일 진입점 라우터.
+ * 카테고리 V3, FIRST, CLOSER, 호명, strategy, hasPriorConversation,
+ * 정렬된 order 모두 한 번에 계산해서 반환.
+ */
 export const routeMessage = (
   messages: ChatMessage[],
   lastMessage: string,
-): MessageRouterResult => ({
-  personaCall: detectExplicitPersonaCall(lastMessage),
-  category: detectMessageCategory(messages, lastMessage),
-});
+  legacyCategory: string = '',
+): RouterDecision => {
+  const text = (lastMessage || '').trim();
+  const categoryV3 = detectCategoryV3(text);
+  const firstPersona = getFirstPersona(categoryV3);
+  const closerPersona = getCloserPersona(categoryV3, firstPersona);
+  const personaCall = detectExplicitPersonaCall(text);
+  const strategyResult = _decideCallStrategy(text);
+  const hasEmotion = hasEmotionSignal(text);
+  const baseOrder = baseHybridOrder(hasEmotion, legacyCategory);
+  const order = enforceOrder(baseOrder, firstPersona, closerPersona);
+  const priorUser = (messages || [])
+    .slice(0, -1)
+    .reverse()
+    .find((m) => m?.role === 'user');
+  const hasPriorConversation = !!(priorUser?.content && priorUser.content.trim());
+  const category = detectMessageCategory(messages || [], text);
+  return {
+    personaCall,
+    category,
+    categoryV3,
+    firstPersona,
+    closerPersona,
+    strategy: strategyResult.strategy,
+    hasPriorConversation,
+    order,
+    legacyCategory,
+  };
+};
+
+// ──────────────────────────────────────────────────────────────────────────
+// Stage 1-3: LLM 호출 오케스트레이션 (3단계 흡수)
+// ──────────────────────────────────────────────────────────────────────────
+
+/** 주입되는 LLM 호출자 시그니처 (route.ts의 callTeaPersona와 호환) */
+export type LLMCaller = (
+  persona: string,
+  systemPrompt: string,
+  history: Array<{ role: string; content: string }>,
+  options?: { enableSearch?: boolean },
+) => Promise<string | null>;
+
+export type RoutedRequestResult = {
+  first: string;
+  second: string;
+  third: string;
+  /** [CLOSER] + [LUCIA_CLOSE] 연결 — 기존 echoQuestion 슬롯에 대응 */
+  echoQuestion: string;
+};
+
+const OPTION_D_SYSTEM =
+  'PersonaX 3단계 오케스트레이터입니다. 요청한 태그 블록만 출력하고, 코드펜스와 설명 문장은 금지합니다.';
+
+const extractTag = (text: string | null, tag: string): string => {
+  if (!text) return '';
+  const re = new RegExp(
+    `\\[${tag}\\][^\\S\\n]*\\n?([\\s\\S]*?)(?=\\n\\s*\\[(?:DATA_PACK|LUCIA_VIEW|JACK_VIEW|RAY_VIEW|ECHO_VIEW|FIRST|SECOND|THIRD|CLOSER|LUCIA_CLOSE)\\]|$)`,
+    'i',
+  );
+  const m = text.match(re);
+  return (m?.[1] || '').trim();
+};
+
+/**
+ * 3단계 호출 단일 실행자 — 기존 callOptionD의 본문 흡수.
+ *
+ *  Stage 1: 데이터 수집 (DATA_PACK)
+ *  Stage 2: 페르소나 관점 분해 (LUCIA/JACK/RAY/ECHO_VIEW)
+ *  Stage 3: 대본 작성 (FIRST/SECOND/THIRD/CLOSER/LUCIA_CLOSE) 또는 solo
+ *
+ * LLM 호출자는 dependency injection으로 주입 — lib은 app에 비의존적.
+ */
+export async function runRoutedRequest(
+  callLLM: LLMCaller,
+  params: {
+    messages: ChatMessage[];
+    lastMessage: string;
+    /** 미전달 시 routeMessage로 자동 계산 */
+    router?: RouterDecision;
+  },
+): Promise<RoutedRequestResult | null> {
+  try {
+    const messages = params.messages;
+    const lastMessage = params.lastMessage;
+    const router =
+      params.router ||
+      routeMessage(messages, lastMessage, '');
+    const legacyCategory = router.legacyCategory || '';
+
+    console.log(
+      '[runRoutedRequest] start — personaCall:', router.personaCall,
+      'categoryV3:', router.categoryV3,
+      'first:', router.firstPersona,
+      'closer:', router.closerPersona,
+      'order:', router.order,
+    );
+
+    // Stage 1: 데이터 수집
+    const dataPrompt = buildDataCollectionPrompt(
+      messages,
+      legacyCategory,
+      lastMessage,
+      router.categoryV3,
+    );
+    const dataRaw = await callLLM('echo', OPTION_D_SYSTEM, [
+      { role: 'user', content: dataPrompt },
+    ]);
+    const dataPack = extractTag(dataRaw, 'DATA_PACK');
+    console.log('[runRoutedRequest] Stage 1:', dataPack ? '성공' : '실패(빈 DATA_PACK)');
+
+    // Stage 2: 페르소나 관점 분해
+    const analysisPrompt = buildPersonaAnalysisPrompt(
+      messages,
+      dataPack,
+      legacyCategory,
+      router.categoryV3,
+    );
+    const analysisRaw = await callLLM('echo', OPTION_D_SYSTEM, [
+      { role: 'user', content: analysisPrompt },
+    ]);
+    const luciaView = extractTag(analysisRaw, 'LUCIA_VIEW');
+    const jackView = extractTag(analysisRaw, 'JACK_VIEW');
+    const rayView = extractTag(analysisRaw, 'RAY_VIEW');
+    const echoView = extractTag(analysisRaw, 'ECHO_VIEW');
+    const personaViews = `[LUCIA_VIEW]\n${luciaView}\n\n[JACK_VIEW]\n${jackView}\n\n[RAY_VIEW]\n${rayView}\n\n[ECHO_VIEW]\n${echoView}`;
+    console.log('[runRoutedRequest] Stage 2:', personaViews ? '성공' : '실패');
+
+    // Stage 3 — solo (페르소나 호명 시)
+    if (router.personaCall) {
+      const soloPrompt = `${buildScriptPrompt(
+        messages,
+        personaViews,
+        legacyCategory,
+        router.firstPersona,
+        router.categoryV3,
+        router.hasPriorConversation,
+        router.closerPersona,
+      )}
+
+## 🚨 단독 응답 모드 (최우선 — 다른 모든 규칙보다 우선)
+유저가 ${router.personaCall}을(를) 직접 호명했습니다. 이번 답변은 ${router.personaCall} 한 명만 답합니다.
+- [FIRST] 블록 하나에만 ${router.personaCall}의 답을 작성하십시오.
+- [SECOND], [THIRD], [CLOSER], [LUCIA_CLOSE] 블록은 출력하지 마십시오.
+- ${router.personaCall}의 PERSONA_VIEW를 충실히 반영해 자연스럽게 답합니다.`;
+      const soloRaw = await callLLM('echo', OPTION_D_SYSTEM, [
+        { role: 'user', content: soloPrompt },
+      ]);
+      let soloText = extractTag(soloRaw, 'FIRST');
+      if (!soloText) soloText = `${router.personaCall} 답변을 생성하지 못했습니다`;
+      if (router.personaCall === 'ECHO') {
+        return { first: '', second: '', third: '', echoQuestion: soloText };
+      }
+      const calledKey = router.personaCall.toLowerCase() as TaggedPersonaKey;
+      const slotIndex = router.order.indexOf(calledKey);
+      const slots: [string, string, string] = ['', '', ''];
+      slots[slotIndex >= 0 && slotIndex < 3 ? slotIndex : 0] = soloText;
+      return {
+        first: slots[0],
+        second: slots[1],
+        third: slots[2],
+        echoQuestion: '',
+      };
+    }
+
+    // Stage 3 — 일반 (4명 대본)
+    const scriptPrompt = `${buildScriptPrompt(
+      messages,
+      personaViews,
+      legacyCategory,
+      router.firstPersona,
+      router.categoryV3,
+      router.hasPriorConversation,
+      router.closerPersona,
+    )}
+
+기존 화면 표시 참고 순서: ${router.order.map((key, index) => `${index + 1}. ${key.toUpperCase()}`).join(' / ')}
+⛔ [FIRST] 블록은 반드시 ${(router.firstPersona || 'lucia').toUpperCase()} 톤. 순서는 ${router.order.map((k) => k.toUpperCase()).join(' → ')}.
+⛔ [CLOSER] 블록은 반드시 ${(router.closerPersona || 'jack').toUpperCase()} 톤. FIRST(${(router.firstPersona || 'lucia').toUpperCase()})는 CLOSER 불가.`;
+    const scriptRaw = await callLLM('echo', OPTION_D_SYSTEM, [
+      { role: 'user', content: scriptPrompt },
+    ]);
+    const first = extractTag(scriptRaw, 'FIRST') || '';
+    const second = extractTag(scriptRaw, 'SECOND') || '';
+    const third = extractTag(scriptRaw, 'THIRD') || '';
+    const closer = extractTag(scriptRaw, 'CLOSER') || '';
+    const luciaClose = extractTag(scriptRaw, 'LUCIA_CLOSE') || '';
+
+    console.log('[runRoutedRequest] Stage 3 완료 — first:', first?.slice(0, 20));
+
+    return {
+      first,
+      second,
+      third,
+      echoQuestion: [closer, luciaClose].filter(Boolean).join('\n\n'),
+    };
+  } catch (e) {
+    console.warn('[runRoutedRequest] 실행 실패', e);
+    return null;
+  }
+}
+
+// 호환용 wrapper — 기존 import 경로 유지
+export type MessageRouterResult = RouterDecision;
