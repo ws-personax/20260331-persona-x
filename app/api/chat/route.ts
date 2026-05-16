@@ -1940,7 +1940,9 @@ export async function POST(req: Request) {
     //     · 새 세션 (teaRound 없음) → 일반 4명 분기 빠지기 전 차단
     //     · 이어지는 세션 (teaRound>=2) → 2라운드 분기 진입 전 차단
     // ──────────────────────────────────────────────────────────────
+    console.log('[solo-check] strategy:', _routerDecision?.strategy, 'invoked:', _routerDecision?.invokedPersona);
     if (_routerDecision.strategy === 'solo' && _routerDecision.invokedPersona) {
+      console.log('[solo-early] strategy:', _routerDecision?.strategy, 'invokedPersona:', _routerDecision?.invokedPersona, 'msg:', lastMsg?.slice(0, 30));
       const invoked = _routerDecision.invokedPersona;
       const soloMessages = categoryChanged
         ? (messages as Array<{ role?: string; content?: string }>).slice(-1)
