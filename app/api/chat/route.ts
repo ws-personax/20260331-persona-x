@@ -1933,6 +1933,68 @@ export async function POST(req: Request) {
       });
     };
 
+    // ──────────────────────────────────────────────────────────────
+    // ✅ 보편 solo 조기 종료 — teaMode/category/teaRound와 무관하게 우선 처리.
+    //   호명 감지(_routerDecision.invokedPersona)가 있으면 해당 페르소나 1명만 응답.
+    //   ⚠️ 반드시 모든 카테고리/teaRound 분기보다 먼저 위치할 것.
+    //     · 새 세션 (teaRound 없음) → 일반 4명 분기 빠지기 전 차단
+    //     · 이어지는 세션 (teaRound>=2) → 2라운드 분기 진입 전 차단
+    // ──────────────────────────────────────────────────────────────
+    if (_routerDecision.strategy === 'solo' && _routerDecision.invokedPersona) {
+      const invoked = _routerDecision.invokedPersona;
+      const soloMessages = categoryChanged
+        ? (messages as Array<{ role?: string; content?: string }>).slice(-1)
+        : (messages as Array<{ role?: string; content?: string }>);
+      // order 인자는 callOptionD 내부 routeMessage 재구성에 쓰임 — invoked가 echo면
+      // TaggedPersonaKey(3-key) 범위 밖이라 더미 'lucia'로 채움.
+      const dummyOrder: TaggedPersonaKey[] =
+        invoked === 'echo' ? ['lucia', 'jack', 'ray'] : [invoked, 'jack', 'lucia'].filter((k, i, a) => a.indexOf(k) === i) as TaggedPersonaKey[];
+      return streamRespond(async (send) => {
+        const soloResult = await callOptionD(
+          soloMessages,
+          category,
+          lastMsg,
+          dummyOrder,
+          _categoryV3,
+          _firstPersonaV3,
+          _hasPriorConversation,
+          _closerPersonaV3,
+          invoked,
+        );
+        const reply = soloResult?.soloKey === invoked
+          ? soloResult.soloContent || ''
+          : '';
+        // 스트리밍 — echo면 echo 이벤트, 그 외 페르소나는 persona 이벤트
+        let acc = '';
+        for (const c of chunkText(reply, 15)) {
+          acc += c;
+          if (invoked === 'echo') {
+            send({ type: 'echo', round: 1, text: acc });
+          } else {
+            send({ type: 'persona', key: invoked as 'ray' | 'jack' | 'lucia', round: 1, text: acc });
+          }
+          await new Promise((r) => setTimeout(r, 20));
+        }
+        send({
+          type: 'done',
+          reply,
+          personas: {
+            ray:   invoked === 'ray'   ? reply : '',
+            jack:  invoked === 'jack'  ? reply : '',
+            lucia: invoked === 'lucia' ? reply : '',
+            echo:  invoked === 'echo'  ? reply : '',
+            ray2: null, jack2: null, lucia2: null, echo2: null,
+            order: [invoked],
+            verdict: '관망',
+            confidence: 0,
+            breakdown: 'solo',
+            positionSizing: '0%',
+            jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
+          },
+        });
+      });
+    }
+
     // ✅ 차 한잔 모드 — LLM 기반 3 페르소나 응답 (Gemini 2.0 Flash, 병렬 호출)
     //   Round 1: LUCIA 단독 (감정 수용 단계)
     //   Round 2+: LUCIA + JACK + ECHO (세 API Promise.all 병렬)
