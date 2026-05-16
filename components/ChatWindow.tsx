@@ -2656,7 +2656,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                   // 오케스트레이터가 결정한 발언 순서 사용. 미지정 시 RAY→JACK→LUCIA 폴백.
                   const validKeys: PersonaKey[] = ['ray', 'jack', 'lucia', 'echo'];
                   const order: PersonaKey[] =
-                    Array.isArray(msg.personas.order) && msg.personas.order.length >= 4 &&
+                    Array.isArray(msg.personas.order) && msg.personas.order.length > 0 &&
                     msg.personas.order.every(k => (validKeys as string[]).includes(k))
                       ? msg.personas.order
                       : validKeys;
@@ -2719,6 +2719,11 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                     else if (key === 'jack')  { raw = jackText;            news = msg.personas!.jackNews;  details = msg.personas!.jackDetails; }
                     else                      { raw = luciaText;           news = msg.personas!.luciaNews; details = msg.personas!.luciaDetails; }
 
+                    // ✅ solo 응답(order 길이 < 3)에서 빈 페르소나 버블 렌더링 차단.
+                    //   호명 응답은 order=[invoked] 1-element로 도착 → 다른 페르소나 슬롯은
+                    //   빈 문자열이지만 loading 텍스트로 false-render되는 문제 방지.
+                    if (order.length < 3 && !hasText(raw)) return null;
+
                     const ready = hasText(raw);
                     const displayText = ready ? raw : loadingText[key];
                     const bubbleKey = `r1-${key}-${ready ? 'real' : 'loading'}`;
@@ -2742,6 +2747,8 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                     const value = msg.personas![field];
                     // null = 아직 round 2 시작 전 (ECHO 1 미도착) → 렌더 안 함
                     if (value === null || value === undefined) return null;
+                    // ✅ solo 응답에서 빈 라운드 2 버블 렌더링 차단 (round 1과 동일 방어).
+                    if (order.length < 3 && !hasText(value)) return null;
                     const ready = hasText(value);
                     const displayText = ready ? value : loadingText[key];
                     const bubbleKey = `r2-${key}-${ready ? 'real' : 'loading'}`;
