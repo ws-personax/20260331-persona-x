@@ -922,6 +922,9 @@ export type TaggedRound1Result = {
   second: string;
   third: string;
   echoQuestion: string;
+  // solo 모드 — 호명된 페르소나가 ECHO일 수도 있으므로 AllPersonaKey(4-key) 사용.
+  soloKey?: AllPersonaKey;
+  soloContent?: string;
 };
 
 export type TaggedRound2Result = {
