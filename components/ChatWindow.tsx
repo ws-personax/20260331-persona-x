@@ -1985,6 +1985,11 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
     if (messages.length === 0) return false;
     const last = messages[messages.length - 1];
     if (last.role !== 'assistant' || !last.personas) return false;
+    // ✅ solo 응답(order.length === 1)은 ECHO 답변이어도 2라운드 입력창 차단.
+    //   호명된 1명만 답하는 모드이므로 ECHO 질문→2라운드 흐름 자체가 없음.
+    //   (예: "에코는 어떻게 봐요?" → ECHO solo 답변. 질문창 추가 노출 시 대화창 2개로 보이는 버그.)
+    const order = last.personas.order;
+    if (Array.isArray(order) && order.length === 1) return false;
     const echo = last.personas.echo;
     const echo2 = last.personas.echo2;
     const hasEcho = typeof echo === 'string' && echo.trim().length > 0;
