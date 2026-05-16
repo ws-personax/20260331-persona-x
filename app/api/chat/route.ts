@@ -37,6 +37,7 @@ import {
   buildCategoryVocabBlockRule,
   detectCategoryV3,
   getFirstPersona,
+  getCloserPersona,
   buildTaggedRound2SystemPrompt,
   buildTaggedRound1UserPrompt,
   buildTaggedRound2UserPrompt,
@@ -552,13 +553,16 @@ async function callTaggedRound1(
   enableSearch: boolean,
   stage1Data?: Stage1Data,
   hasPriorConversation: boolean = false,
+  closerPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
 ): Promise<TaggedRound1Result | null> {
   try {
     const nowKST = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
     // ✅ FIRST 페르소나 결정 — CategoryV3 매트릭스 기반 (invest→RAY / action→JACK / emotional→LUCIA / principle→ECHO, 복합/모호→LUCIA)
     const categoryV3 = detectCategoryV3(userMessage);
     const firstPersona = getFirstPersona(categoryV3);
-    const systemPrompt = `현재 시각: ${nowKST} (KST)\n${buildTaggedRound1SystemPrompt(stage1Data, firstPersona, categoryV3, hasPriorConversation)}`;
+    // CLOSER는 caller에서 결정(FIRST와 충돌 시 폴백) — 미전달 시 getCloserPersona로 폴백
+    const closer = closerPersona ?? getCloserPersona(categoryV3, firstPersona);
+    const systemPrompt = `현재 시각: ${nowKST} (KST)\n${buildTaggedRound1SystemPrompt(stage1Data, firstPersona, categoryV3, hasPriorConversation, closer)}`;
     const userPrompt = buildTaggedRound1UserPrompt(userMessage, category, recentContext, order);
     const llm = await callTeaPersona(
       'echo',
@@ -589,6 +593,7 @@ async function callOptionD(
   categoryV3?: import('./prompts/orchestrator-tagged').CategoryV3,
   firstPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
   hasPriorConversation: boolean = false,
+  closerPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
 ): Promise<TaggedRound1Result | null> {
   try {
     const optionDSystem = 'PersonaX 3단계 오케스트레이터입니다. 요청한 태그 블록만 출력하고, 코드펜스와 설명 문장은 금지합니다.';
@@ -618,7 +623,7 @@ async function callOptionD(
 
     // ✅ 페르소나 단독 응답 모드 — 호명된 페르소나만 답변, 나머지 블록 생략
     if (personaCall) {
-      const soloPrompt = `${buildScriptPrompt(messages, personaViews, category, firstPersona, categoryV3, hasPriorConversation)}
+      const soloPrompt = `${buildScriptPrompt(messages, personaViews, category, firstPersona, categoryV3, hasPriorConversation, closerPersona)}
 
 ## 🚨 단독 응답 모드 (최우선 — 다른 모든 규칙보다 우선)
 유저가 ${personaCall}을(를) 직접 호명했습니다. 이번 답변은 ${personaCall} 한 명만 답합니다.
@@ -639,11 +644,11 @@ async function callOptionD(
       return { first: slots[0], second: slots[1], third: slots[2], echoQuestion: '' };
     }
 
-    const scriptPrompt = `${buildScriptPrompt(messages, personaViews, category, firstPersona, categoryV3, hasPriorConversation)}
+    const scriptPrompt = `${buildScriptPrompt(messages, personaViews, category, firstPersona, categoryV3, hasPriorConversation, closerPersona)}
 
 기존 화면 표시 참고 순서: ${order.map((key, index) => `${index + 1}. ${key.toUpperCase()}`).join(' / ')}
-단, CLOSER 담당은 질문 성격으로 결정하고 ECHO 고정 마무리로 만들지 마십시오.
-⛔ 위 "FIRST 페르소나 행동 규칙"이 활성화된 경우, [FIRST] 블록은 반드시 그 페르소나(${(firstPersona || 'lucia').toUpperCase()}) 톤으로 작성하십시오. 순서는 ${order.map((k) => k.toUpperCase()).join(' → ')} 입니다.`;
+⛔ 위 "FIRST 페르소나 행동 규칙"이 활성화된 경우, [FIRST] 블록은 반드시 그 페르소나(${(firstPersona || 'lucia').toUpperCase()}) 톤으로 작성하십시오. 순서는 ${order.map((k) => k.toUpperCase()).join(' → ')} 입니다.
+⛔ 위 "CLOSER 페르소나 결정 규칙"이 활성화된 경우, [CLOSER] 블록은 반드시 그 페르소나(${(closerPersona || 'jack').toUpperCase()}) 톤으로 작성하십시오. FIRST(${(firstPersona || 'lucia').toUpperCase()})는 CLOSER 불가.`;
     const scriptRaw = await callTeaPersona('echo', optionDSystem, [{ role: 'user', content: scriptPrompt }]);
     const first = extractOptionDTag(scriptRaw, 'FIRST') || '';
     const second = extractOptionDTag(scriptRaw, 'SECOND') || '';
@@ -1101,6 +1106,9 @@ export async function POST(req: Request) {
     //   ECHO(principle)는 [ECHO_QUESTION] 슬롯이라 reorder 대상 외 — 기존 순서 유지.
     const _categoryV3 = detectCategoryV3(lastMsg);
     const _firstPersonaV3 = getFirstPersona(_categoryV3);
+    // ✅ CLOSER 페르소나 — invest→JACK / action→ECHO / emotional→JACK 또는 ECHO / principle→JACK
+    //   FIRST와 충돌 시 폴백 체인 자동 적용.
+    const _closerPersonaV3 = getCloserPersona(_categoryV3, _firstPersonaV3);
     const applyV3OrderOverride = <T extends 'ray' | 'jack' | 'lucia'>(arr: T[]): T[] => {
       if (_firstPersonaV3 === 'echo') return arr;
       const first = _firstPersonaV3 as T;
@@ -1446,7 +1454,7 @@ export async function POST(req: Request) {
             if (categoryChanged) {
               console.log('[optionD] 카테고리 전환 감지 → 이전 맥락 제거, 마지막 메시지만 전달 (prev:', prevCategory, '→ now:', category, ')');
             }
-            r1 = await callOptionD(optionDMessages, category, msg, order, categoryV3Local, firstPersonaLocal, _hasPriorConversation);
+            r1 = await callOptionD(optionDMessages, category, msg, order, categoryV3Local, firstPersonaLocal, _hasPriorConversation, _closerPersonaV3);
             // ✅ callOptionD 빈 결과 시 폴백 완전 차단 — null/빈 객체여도 정상 done 경로로 강제 통과
             if (!r1) {
               console.warn('[optionD] null 반환 → 빈 결과 객체로 강제 통과 (폴백 차단)');
@@ -1461,7 +1469,7 @@ export async function POST(req: Request) {
               jack_angle:  plan.jack_angle,
               ray_angle:   plan.ray_angle,
             });
-            r1 = await callTaggedRound1(msg, category, recentContext, order, enableSearchTagged, stage1Data, _hasPriorConversation);
+            r1 = await callTaggedRound1(msg, category, recentContext, order, enableSearchTagged, stage1Data, _hasPriorConversation, _closerPersonaV3);
           }
           if (r1) {
             const personaText: Record<TaggedPersonaKey, string> = {
