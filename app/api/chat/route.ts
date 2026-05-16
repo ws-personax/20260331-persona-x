@@ -34,6 +34,8 @@ import {
   buildPersonaAnalysisPrompt,
   buildScriptPrompt,
   buildTaggedRound1SystemPrompt,
+  detectCategoryV3,
+  getFirstPersona,
   buildTaggedRound2SystemPrompt,
   buildTaggedRound1UserPrompt,
   buildTaggedRound2UserPrompt,
@@ -551,7 +553,10 @@ async function callTaggedRound1(
 ): Promise<TaggedRound1Result | null> {
   try {
     const nowKST = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
-    const systemPrompt = `현재 시각: ${nowKST} (KST)\n${buildTaggedRound1SystemPrompt(stage1Data)}`;
+    // ✅ FIRST 페르소나 결정 — CategoryV3 매트릭스 기반 (invest→RAY / action→JACK / emotional→LUCIA / principle→ECHO, 복합/모호→LUCIA)
+    const categoryV3 = detectCategoryV3(userMessage);
+    const firstPersona = getFirstPersona(categoryV3);
+    const systemPrompt = `현재 시각: ${nowKST} (KST)\n${buildTaggedRound1SystemPrompt(stage1Data, firstPersona, categoryV3)}`;
     const userPrompt = buildTaggedRound1UserPrompt(userMessage, category, recentContext, order);
     const llm = await callTeaPersona(
       'echo',
