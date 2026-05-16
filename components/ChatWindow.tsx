@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import { Fragment, useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import AuthButton from '@/components/AuthButton';
 import HistoryModal from '@/components/HistoryModal';
 import Logo from '@/components/Logo';
@@ -41,7 +41,7 @@ interface PersonaData {
   jack2?: string | null;
   lucia2?: string | null;
   echo2?: string | null;
-  order?: ('ray' | 'jack' | 'lucia')[];
+  order?: ('ray' | 'jack' | 'lucia' | 'echo')[];
 }
 
 type ErrorType = 'market_data_unavailable' | 'keyword_not_recognized' | 'analysis_failed';
@@ -1092,7 +1092,7 @@ const getLoadingPersona = (text: string): PersonaKey => {
   return 'lucia';
 };
 
-const TypingIndicator = ({ teaMode = false, teaPersona = null, userText = '', pendingOrder = null }: { teaMode?: boolean; teaPersona?: 'lucia' | 'jack' | 'echo' | null; userText?: string; pendingOrder?: ('ray' | 'jack' | 'lucia')[] | null }) => {
+const TypingIndicator = ({ teaMode = false, teaPersona = null, userText = '', pendingOrder = null }: { teaMode?: boolean; teaPersona?: 'lucia' | 'jack' | 'echo' | null; userText?: string; pendingOrder?: PersonaKey[] | null }) => {
   if (teaMode) {
     // 명시 픽(jack/echo)이면 페르소나 고정, 그 외(lucia/null)는 order 첫 발화자 → 키워드 fallback
     const personaKey: PersonaKey = teaPersona === 'jack' || teaPersona === 'echo'
@@ -1965,7 +1965,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
   const [pendingText, setPendingText] = useState('');
   const [pendingKeyword, setPendingKeyword] = useState('');
   const [pendingInitialPosition, setPendingInitialPosition] = useState<Partial<Position> | null>(null);
-  const [pendingOrder, setPendingOrder] = useState<('ray' | 'jack' | 'lucia')[] | null>(null);
+  const [pendingOrder, setPendingOrder] = useState<PersonaKey[] | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -2654,18 +2654,19 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                   }
 
                   // 오케스트레이터가 결정한 발언 순서 사용. 미지정 시 RAY→JACK→LUCIA 폴백.
-                  const validKeys: ('ray' | 'jack' | 'lucia')[] = ['ray', 'jack', 'lucia'];
-                  const order: ('ray' | 'jack' | 'lucia')[] =
-                    Array.isArray(msg.personas.order) && msg.personas.order.length === 3 &&
+                  const validKeys: PersonaKey[] = ['ray', 'jack', 'lucia', 'echo'];
+                  const order: PersonaKey[] =
+                    Array.isArray(msg.personas.order) && msg.personas.order.length >= 4 &&
                     msg.personas.order.every(k => (validKeys as string[]).includes(k))
                       ? msg.personas.order
                       : validKeys;
 
                   // 스트리밍 로딩 텍스트 — 페르소나별 대기 메시지
-                  const loadingText: Record<'ray' | 'jack' | 'lucia', string> = {
+                  const loadingText: Record<PersonaKey, string> = {
                     ray: 'RAY가 분석 중...',
                     jack: 'JACK이 판단 중...',
                     lucia: 'LUCIA가 공감 중...',
+                    echo: 'ECHO가 판결 중...',
                   };
 
                   // 1글자라도 도착하면 즉시 실제 텍스트로 전환. key를 loading↔real로 바꿔서
@@ -2673,52 +2674,21 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                   const hasText = (s: string | null | undefined): s is string =>
                     typeof s === 'string' && s.trim().length > 0;
 
-                  const renderRound1 = (key: 'ray' | 'jack' | 'lucia') => {
-                    let raw: string | null | undefined;
-                    let news: NewsLink | null | undefined;
-                    let details: string | null | undefined;
-                    if (key === 'ray')        { raw = msg.personas!.ray;   news = msg.personas!.rayNews;   details = msg.personas!.rayDetails; }
-                    else if (key === 'jack')  { raw = jackText;            news = msg.personas!.jackNews;  details = msg.personas!.jackDetails; }
-                    else                      { raw = luciaText;           news = msg.personas!.luciaNews; details = msg.personas!.luciaDetails; }
-
-                    const ready = hasText(raw);
-                    const displayText = ready ? raw : loadingText[key];
-                    const bubbleKey = `r1-${key}-${ready ? 'real' : 'loading'}`;
-                    return <PersonaBubble key={bubbleKey} personaKey={key} text={displayText} timestamp={msg.timestamp} newsItem={news} details={details} />;
-                  };
-
-                  const renderRound2 = (key: 'ray' | 'jack' | 'lucia') => {
-                    const field = `${key}2` as 'ray2' | 'jack2' | 'lucia2';
-                    const value = msg.personas![field];
-                    // null = 아직 round 2 시작 전 (ECHO 1 미도착) → 렌더 안 함
-                    if (value === null || value === undefined) return null;
-                    const ready = hasText(value);
-                    const displayText = ready ? value : loadingText[key];
-                    const bubbleKey = `r2-${key}-${ready ? 'real' : 'loading'}`;
-                    return <PersonaBubble key={bubbleKey} personaKey={key} text={displayText} timestamp={msg.timestamp} />;
-                  };
-
-                  // 단계별 진행 상태 — 스트리밍 중에도 자연스러운 노출 흐름
-                  const allR1Done = !!(msg.personas.ray && msg.personas.jack && msg.personas.lucia);
-                  const allR2Done = !!(msg.personas.ray2 && msg.personas.jack2 && msg.personas.lucia2);
-                  const showEcho1 = !!msg.personas.echo || allR1Done;
-                  const showEcho2 = !!msg.personas.echo2 || (!!msg.personas.echo && allR2Done);
-
-                  return (
-                    <>
-                      {order.map(renderRound1)}
-                      {showEcho1 && (
-                        <>
+                  const renderRound1 = (key: PersonaKey) => {
+                    if (key === 'echo') {
+                      if (!showEcho1) return null;
+                      const hasEcho = hasText(msg.personas!.echo);
+                      return (
+                        <Fragment key={`echo1-wrap-${hasEcho ? 'real' : 'loading'}`}>
                           <EchoBubble
-                            key={`echo1-${hasText(msg.personas.echo) ? 'real' : 'loading'}`}
-                            summary={hasText(msg.personas.echo) ? msg.personas.echo : 'ECHO가 판결 중...'}
-                            details={msg.personas.echoDetails}
+                            key={`echo1-${hasEcho ? 'real' : 'loading'}`}
+                            summary={hasEcho ? msg.personas!.echo : loadingText.echo}
+                            details={msg.personas!.echoDetails}
                             timestamp={msg.timestamp}
-                            echoNews={msg.personas.echoNews}
-                            hideDisclaimer={msg.personas.breakdown !== undefined}
+                            echoNews={msg.personas!.echoNews}
+                            hideDisclaimer={msg.personas!.breakdown !== undefined}
                           />
-                          {/* ✅ ECHO_QUESTION 직후 인라인 답변 입력창 — ECHO 1라운드에 질문(?)이 포함된 경우에만 노출 */}
-                          {msgIdx === messages.length - 1 && hasText(msg.personas.echo) && !hasText(msg.personas.echo2) && msg.personas.echo!.includes('?') && (
+                          {msgIdx === messages.length - 1 && hasEcho && !hasText(msg.personas!.echo2) && msg.personas!.echo!.includes('?') && (
                             <EchoAnswerInline
                               disabled={isLoading}
                               value={echoAnswerValue}
@@ -2739,17 +2709,55 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                               }
                             />
                           )}
-                        </>
-                      )}
-                      {order.map(renderRound2)}
-                      {showEcho2 && (
+                        </Fragment>
+                      );
+                    }
+                    let raw: string | null | undefined;
+                    let news: NewsLink | null | undefined;
+                    let details: string | null | undefined;
+                    if (key === 'ray')        { raw = msg.personas!.ray;   news = msg.personas!.rayNews;   details = msg.personas!.rayDetails; }
+                    else if (key === 'jack')  { raw = jackText;            news = msg.personas!.jackNews;  details = msg.personas!.jackDetails; }
+                    else                      { raw = luciaText;           news = msg.personas!.luciaNews; details = msg.personas!.luciaDetails; }
+
+                    const ready = hasText(raw);
+                    const displayText = ready ? raw : loadingText[key];
+                    const bubbleKey = `r1-${key}-${ready ? 'real' : 'loading'}`;
+                    return <PersonaBubble key={bubbleKey} personaKey={key} text={displayText} timestamp={msg.timestamp} newsItem={news} details={details} />;
+                  };
+
+                  const renderRound2 = (key: PersonaKey) => {
+                    if (key === 'echo') {
+                      if (!showEcho2) return null;
+                      const hasEcho2 = hasText(msg.personas!.echo2);
+                      return (
                         <EchoBubble
-                          key={`echo2-${hasText(msg.personas.echo2) ? 'real' : 'loading'}`}
-                          summary={hasText(msg.personas.echo2) ? msg.personas.echo2! : 'ECHO가 최후 판결 중...'}
+                          key={`echo2-${hasEcho2 ? 'real' : 'loading'}`}
+                          summary={hasEcho2 ? msg.personas!.echo2! : 'ECHO가 최후 판결 중...'}
                           timestamp={msg.timestamp}
                           hideDisclaimer
                         />
-                      )}
+                      );
+                    }
+                    const field = `${key}2` as 'ray2' | 'jack2' | 'lucia2';
+                    const value = msg.personas![field];
+                    // null = 아직 round 2 시작 전 (ECHO 1 미도착) → 렌더 안 함
+                    if (value === null || value === undefined) return null;
+                    const ready = hasText(value);
+                    const displayText = ready ? value : loadingText[key];
+                    const bubbleKey = `r2-${key}-${ready ? 'real' : 'loading'}`;
+                    return <PersonaBubble key={bubbleKey} personaKey={key} text={displayText} timestamp={msg.timestamp} />;
+                  };
+
+                  // 단계별 진행 상태 — 스트리밍 중에도 자연스러운 노출 흐름
+                  const allR1Done = !!(msg.personas.ray && msg.personas.jack && msg.personas.lucia);
+                  const allR2Done = !!(msg.personas.ray2 && msg.personas.jack2 && msg.personas.lucia2);
+                  const showEcho1 = !!msg.personas.echo || allR1Done;
+                  const showEcho2 = !!msg.personas.echo2 || (!!msg.personas.echo && allR2Done);
+
+                  return (
+                    <>
+                      {order.map(renderRound1)}
+                      {order.map(renderRound2)}
                     </>
                   );
                 })() : null}
