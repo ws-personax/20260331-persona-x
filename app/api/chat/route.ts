@@ -584,6 +584,8 @@ async function callOptionD(
   category: string,
   lastMessage: string,
   order: TaggedPersonaKey[],
+  categoryV3?: import('./prompts/orchestrator-tagged').CategoryV3,
+  firstPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
 ): Promise<TaggedRound1Result | null> {
   try {
     const optionDSystem = 'PersonaX 3단계 오케스트레이터입니다. 요청한 태그 블록만 출력하고, 코드펜스와 설명 문장은 금지합니다.';
@@ -596,12 +598,12 @@ async function callOptionD(
     const personaCall = routed.personaCall;
     console.log('[optionD] 시작, personaCall:', routed?.personaCall);
 
-    const dataPrompt = buildDataCollectionPrompt(messages, category, lastMessage);
+    const dataPrompt = buildDataCollectionPrompt(messages, category, lastMessage, categoryV3);
     const dataRaw = await callTeaPersona('echo', optionDSystem, [{ role: 'user', content: dataPrompt }]);
     const dataPack = extractOptionDTag(dataRaw, 'DATA_PACK');
     console.log('[optionD] 1차:', dataPack ? '성공' : '실패(null)');
 
-    const analysisPrompt = buildPersonaAnalysisPrompt(messages, dataPack, category);
+    const analysisPrompt = buildPersonaAnalysisPrompt(messages, dataPack, category, categoryV3);
     const analysisRaw = await callTeaPersona('echo', optionDSystem, [{ role: 'user', content: analysisPrompt }]);
     const luciaView = extractOptionDTag(analysisRaw, 'LUCIA_VIEW');
     const jackView = extractOptionDTag(analysisRaw, 'JACK_VIEW');
@@ -613,7 +615,7 @@ async function callOptionD(
 
     // ✅ 페르소나 단독 응답 모드 — 호명된 페르소나만 답변, 나머지 블록 생략
     if (personaCall) {
-      const soloPrompt = `${buildScriptPrompt(messages, personaViews, category)}
+      const soloPrompt = `${buildScriptPrompt(messages, personaViews, category, firstPersona, categoryV3)}
 
 ## 🚨 단독 응답 모드 (최우선 — 다른 모든 규칙보다 우선)
 유저가 ${personaCall}을(를) 직접 호명했습니다. 이번 답변은 ${personaCall} 한 명만 답합니다.
@@ -634,10 +636,11 @@ async function callOptionD(
       return { first: slots[0], second: slots[1], third: slots[2], echoQuestion: '' };
     }
 
-    const scriptPrompt = `${buildScriptPrompt(messages, personaViews, category)}
+    const scriptPrompt = `${buildScriptPrompt(messages, personaViews, category, firstPersona, categoryV3)}
 
 기존 화면 표시 참고 순서: ${order.map((key, index) => `${index + 1}. ${key.toUpperCase()}`).join(' / ')}
-단, CLOSER 담당은 질문 성격으로 결정하고 ECHO 고정 마무리로 만들지 마십시오.`;
+단, CLOSER 담당은 질문 성격으로 결정하고 ECHO 고정 마무리로 만들지 마십시오.
+⛔ 위 "FIRST 페르소나 행동 규칙"이 활성화된 경우, [FIRST] 블록은 반드시 그 페르소나(${(firstPersona || 'lucia').toUpperCase()}) 톤으로 작성하십시오. 순서는 ${order.map((k) => k.toUpperCase()).join(' → ')} 입니다.`;
     const scriptRaw = await callTeaPersona('echo', optionDSystem, [{ role: 'user', content: scriptPrompt }]);
     const first = extractOptionDTag(scriptRaw, 'FIRST') || '';
     const second = extractOptionDTag(scriptRaw, 'SECOND') || '';
@@ -1385,7 +1388,28 @@ export async function POST(req: Request) {
         //   - 하이브리드 순서: 감정 키워드 시 LUCIA 먼저, 아니면 카테고리 기반.
         //   - 라운드 분리는 teaRound 파라미터로 결정 (클라이언트가 메시지 수로 계산).
         // ─────────────────────────────────────────────
-        const order = detectPersonaOrderHybrid(msg, category);
+        const rawOrder = detectPersonaOrderHybrid(msg, category);
+        // ✅ FIRST 페르소나 강제 정렬 — CategoryV3 매트릭스 기반
+        //   invest→RAY / action→JACK / emotional→LUCIA / principle→ECHO
+        //   ECHO는 [FIRST] 슬롯에 들어갈 수 없으므로(아키텍처상 [ECHO_QUESTION] 위치) 기존 순서 유지
+        //   ray/jack/lucia 중 하나면 해당 페르소나를 order[0]로 이동
+        const categoryV3Local = detectCategoryV3(msg);
+        const firstPersonaLocal = getFirstPersona(categoryV3Local);
+        const reorderToFirst = (
+          arr: TaggedPersonaKey[],
+          first: TaggedPersonaKey,
+        ): TaggedPersonaKey[] => {
+          const idx = arr.indexOf(first);
+          if (idx <= 0) return arr;
+          return [first, ...arr.filter((k) => k !== first)];
+        };
+        const order: TaggedPersonaKey[] =
+          firstPersonaLocal !== 'echo'
+            ? reorderToFirst(rawOrder, firstPersonaLocal as TaggedPersonaKey)
+            : rawOrder;
+        if (order[0] !== rawOrder[0]) {
+          console.log('[first-persona] 순서 강제 정렬:', rawOrder, '→', order, '(category:', categoryV3Local, ')');
+        }
         const enableSearchTagged = ['finance', 'stock', 'crypto', 'economy', 'news'].includes(category);
         const isRound1 = !teaRound || teaRound <= 1;
 
@@ -1416,7 +1440,7 @@ export async function POST(req: Request) {
             if (categoryChanged) {
               console.log('[optionD] 카테고리 전환 감지 → 이전 맥락 제거, 마지막 메시지만 전달 (prev:', prevCategory, '→ now:', category, ')');
             }
-            r1 = await callOptionD(optionDMessages, category, msg, order);
+            r1 = await callOptionD(optionDMessages, category, msg, order, categoryV3Local, firstPersonaLocal);
             // ✅ callOptionD 빈 결과 시 폴백 완전 차단 — null/빈 객체여도 정상 done 경로로 강제 통과
             if (!r1) {
               console.warn('[optionD] null 반환 → 빈 결과 객체로 강제 통과 (폴백 차단)');
