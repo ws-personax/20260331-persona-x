@@ -167,6 +167,7 @@ export const detectMessageCategory = (
 
 export type RouterDecision = {
   personaCall: PersonaName | null;
+  invokedPersona: AllPersonaKey | null;
   category: MessageCategory;          // 레거시 4분류 (호환용)
   categoryV3: CategoryV3;             // V3 4분류 (invest/action/emotional/principle)
   firstPersona: AllPersonaKey;
@@ -204,6 +205,7 @@ export const enforceOrder = (
   baseOrder: TaggedPersonaKey[],
   firstPersona: AllPersonaKey,
   closerPersona: AllPersonaKey,
+  categoryV3?: CategoryV3,
 ): TaggedPersonaKey[] => {
   let arr = [...baseOrder];
   if (firstPersona !== 'echo') {
@@ -217,6 +219,12 @@ export const enforceOrder = (
     if (arr.includes(closer) && arr[arr.length - 1] !== closer) {
       arr = [...arr.filter((k) => k !== closer), closer];
     }
+  }
+  if (categoryV3 === 'invest' || categoryV3 === 'emotional' || categoryV3 === 'principle') {
+    arr = [...arr.filter((k) => k !== 'jack'), 'jack'];
+  }
+  if (categoryV3 === 'action') {
+    arr = ['jack', ...arr.filter((k) => k !== 'jack')];
   }
   return arr;
 };
@@ -235,11 +243,13 @@ export const routeMessage = (
   const categoryV3 = detectCategoryV3(text);
   const firstPersona = getFirstPersona(categoryV3);
   const closerPersona = getCloserPersona(categoryV3, firstPersona);
-  const personaCall = detectExplicitPersonaCall(text);
   const strategyResult = _decideCallStrategy(text);
+  const personaCall =
+    detectExplicitPersonaCall(text) ??
+    (strategyResult.invokedPersona ? (strategyResult.invokedPersona.toUpperCase() as PersonaName) : null);
   const hasEmotion = hasEmotionSignal(text);
   const baseOrder = baseHybridOrder(hasEmotion, legacyCategory);
-  const order = enforceOrder(baseOrder, firstPersona, closerPersona);
+  const order = enforceOrder(baseOrder, firstPersona, closerPersona, categoryV3);
   const priorUser = (messages || [])
     .slice(0, -1)
     .reverse()
@@ -248,6 +258,7 @@ export const routeMessage = (
   const category = detectMessageCategory(messages || [], text);
   return {
     personaCall,
+    invokedPersona: strategyResult.invokedPersona,
     category,
     categoryV3,
     firstPersona,

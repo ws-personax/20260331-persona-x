@@ -1072,7 +1072,7 @@ export async function POST(req: Request) {
     // 모든 응답 경로(news/life/finance/tagged)에 공통 적용되는 FIRST+CLOSER 정렬 헬퍼.
     // 기존 order 배열을 받아 enforceOrder를 그대로 호출.
     const applyV3OrderOverride = <T extends 'ray' | 'jack' | 'lucia'>(arr: T[]): T[] =>
-      enforceOrder(arr as ('ray' | 'jack' | 'lucia')[], _firstPersonaV3, _closerPersonaV3) as T[];
+      enforceOrder(arr as ('ray' | 'jack' | 'lucia')[], _firstPersonaV3, _closerPersonaV3, _categoryV3) as T[];
     const luciaRoutingMsg = LUCIA_ROUTING_MESSAGE[category];
     // ✅ 동일 카테고리 luciaIntro 중복 방지
     const _alreadyIntroduced = Array.isArray(messages) && (messages as Array<{
@@ -1398,6 +1398,63 @@ export async function POST(req: Request) {
         };
 
         if (isRound1) {
+          if (_routerDecision.strategy === 'solo' && _routerDecision.invokedPersona) {
+            const optionDMessages = categoryChanged
+              ? (messages as Array<{ role?: string; content?: string }>).slice(-1)
+              : (messages as Array<{ role?: string; content?: string }>);
+            const soloResult = await callOptionD(
+              optionDMessages,
+              category,
+              msg,
+              order,
+              categoryV3Local,
+              firstPersonaLocal,
+              _hasPriorConversation,
+              _closerPersonaV3,
+            );
+            const personaText: Record<TaggedPersonaKey, string> = {
+              ray: '', jack: '', lucia: '',
+            };
+            let echoText = '';
+            if (soloResult) {
+              personaText[order[0]] = soloResult.first;
+              personaText[order[1]] = soloResult.second;
+              personaText[order[2]] = soloResult.third;
+              echoText = soloResult.echoQuestion;
+            }
+
+            const invoked = _routerDecision.invokedPersona;
+            const reply =
+              invoked === 'echo'
+                ? echoText
+                : personaText[invoked as TaggedPersonaKey] || '';
+            if (invoked === 'echo') {
+              await streamEchoTagged(reply);
+            } else {
+              await streamPersonaTagged(invoked as TaggedPersonaKey, reply);
+              echoText = '';
+            }
+
+            send({
+              type: 'done',
+              reply,
+              personas: {
+                ray: invoked === 'ray' ? reply : '',
+                jack: invoked === 'jack' ? reply : '',
+                lucia: invoked === 'lucia' ? reply : '',
+                echo: invoked === 'echo' ? reply : '',
+                ray2: null, jack2: null, lucia2: null, echo2: null,
+                order,
+                verdict: '관망',
+                confidence: 0,
+                breakdown: '재테크 일반',
+                positionSizing: '0%',
+                jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
+              },
+            });
+            return;
+          }
+
           let r1: TaggedRound1Result | null = null;
           if (FEATURE_OPTION_D) {
             // ✅ 카테고리 전환 시 이전 맥락 차단 — 마지막 메시지만 callOptionD에 전달
