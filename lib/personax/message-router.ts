@@ -340,6 +340,7 @@ export type RoutedRequestResult = {
   soloKey?: TaggedPersonaKey;
 };
 
+// Stage 3 (대본 작성) 전용 — 갈등 토론 6대 규칙
 const OPTION_D_SYSTEM = `PersonaX 4인 갈등 토론 대본 작성자입니다.
 
 반드시 지켜야 할 규칙:
@@ -350,6 +351,13 @@ const OPTION_D_SYSTEM = `PersonaX 4인 갈등 토론 대본 작성자입니다.
 4. [CLOSER]는 싸움 멈추고 본질 찌르기
 5. 최소 1회 직접 호명 반박 필수
 6. 태그 블록만 출력. 마크다운 금지.`;
+
+// Stage 1 (데이터 수집) / Stage 2 (페르소나 관점 분해) 전용 — 갈등 규칙 제외, 태그 추출 안정성 우선
+const OPTION_D_SYSTEM_DATA =
+  'PersonaX 데이터 수집·분석 오케스트레이터입니다. ' +
+  '요청한 태그 블록만 출력하고, ' +
+  '코드펜스와 설명 문장은 금지합니다. ' +
+  '⛔ 마크다운 사용 절대 금지.';
 
 /**
  * 페르소나 라벨 방어 스트리핑.
@@ -795,7 +803,7 @@ ${
       lastMessage,
       router.categoryV3,
     );
-    const dataRaw = await callLLM('echo', OPTION_D_SYSTEM, [
+    const dataRaw = await callLLM('echo', OPTION_D_SYSTEM_DATA, [
       { role: 'user', content: dataPrompt },
     ], { enableSearch: isInvest });
     const dataPack = extractTag(dataRaw, 'DATA_PACK');
@@ -808,7 +816,7 @@ ${
       legacyCategory,
       router.categoryV3,
     );
-    const analysisRaw = await callLLM('echo', OPTION_D_SYSTEM, [
+    const analysisRaw = await callLLM('echo', OPTION_D_SYSTEM_DATA, [
       { role: 'user', content: analysisPrompt },
     ]);
     const luciaView = extractTag(analysisRaw, 'LUCIA_VIEW');
