@@ -26,6 +26,25 @@ import { TEA_SYSTEM_JACK } from '@/app/api/chat/prompts/tea-jack';
 import { TEA_SYSTEM_LUCIA } from '@/app/api/chat/prompts/tea-lucia';
 import { TEA_SYSTEM_RAY } from '@/app/api/chat/prompts/tea-ray';
 import { TEA_SYSTEM_ECHO } from '@/app/api/chat/prompts/tea-echo';
+import OpenAI from 'openai';
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+/**
+ * Stage 3 전용 GPT-4o-mini 호출자.
+ * (system, user) → string. 빈 응답 시 빈 문자열 반환.
+ * full 경로 Stage 3 대본 생성에만 사용 — solo·Stage 1·Stage 2는 기존 callLLM 유지.
+ */
+async function callGPTMini(system: string, user: string): Promise<string> {
+  const res = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+  });
+  return res.choices[0]?.message?.content ?? '';
+}
 
 export const FEATURE_OPTION_D = true;
 
@@ -783,9 +802,8 @@ ${
 기존 화면 표시 참고 순서: ${router.order.map((key, index) => `${index + 1}. ${key.toUpperCase()}`).join(' / ')}
 ⛔ [FIRST] 블록은 반드시 ${(router.firstPersona || 'lucia').toUpperCase()} 톤. 순서는 ${router.order.map((k) => k.toUpperCase()).join(' → ')}.
 ⛔ [CLOSER] 블록은 반드시 ${(router.closerPersona || 'jack').toUpperCase()} 톤. FIRST(${(router.firstPersona || 'lucia').toUpperCase()})는 CLOSER 불가.`;
-    const scriptRaw = await callLLM('echo', OPTION_D_SYSTEM, [
-      { role: 'user', content: scriptPrompt },
-    ]);
+    // Stage 3 — GPT-4o-mini 사용 (full 경로만). solo·Stage 1·Stage 2는 기존 callLLM 유지.
+    const scriptRaw = await callGPTMini(OPTION_D_SYSTEM, scriptPrompt);
     // ✅ 후처리 필터 — 슬롯별 페르소나 키로 postProcessPersonaOutput 적용.
     //    first/second/third → router.order[0/1/2], closer → router.closerPersona,
     //    luciaClose → 'lucia' 고정, echoQuestion → 'echo' 고정.
