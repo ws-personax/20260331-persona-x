@@ -827,7 +827,12 @@ ${
     console.log('[runRoutedRequest] Stage 2:', personaViews ? '성공' : '실패');
 
     // Stage 3 — 일반 (4명 대본)
-    const scriptPrompt = `${buildScriptPrompt(
+    // Stage 1 실시간 수집 데이터(dataPack)를 Stage 3에 명시적으로 주입.
+    // Stage 2 personaViews 가공 과정에서 숫자가 희석되어 GPT가 감으로만 반박하는 문제 차단.
+    const dataContext = dataPack
+      ? `\n\n## 실시간 수집 데이터 (반박 시 이 숫자 사용 필수)\n${dataPack}\n\n⛔ 위 실시간 데이터의 숫자를 반박 시 반드시 인용할 것. 데이터에 없는 숫자를 만들어내지 말 것.\n\n`
+      : '';
+    const scriptPrompt = `${dataContext}${buildScriptPrompt(
       messages,
       personaViews,
       legacyCategory,
