@@ -352,6 +352,17 @@ const SELF_REF_PATTERNS: Record<AllPersonaKey, RegExp> = {
   echo:  /(?<![가-힣a-zA-Z])(?:ECHO|에코)(?:가|는|이|은)?\s*(?:말하면|보면|판결하면|보기엔|봤을\s*때)\s*[,.]?\s*/gi,
 };
 
+// 자기 이름 + 쉼표 호명 — "LUCIA, 그게..." / "잭, 그건..." 같이 줄 시작에서
+// 자기 자신을 부르고 들어오는 패턴 제거. 라인 시작(^)에서만 매치 — 다른 페르소나
+// 호명(예: JACK 슬롯의 "RAY, 그 논리면...")은 건드리지 않음.
+// 영문 대문자: 쉼표 필수 / 한국어: 쉼표 선택(자연 문장 흐름 고려).
+const SELF_NAME_LINE_PATTERNS: Record<AllPersonaKey, ReadonlyArray<RegExp>> = {
+  lucia: [/^LUCIA[,，]\s*/gim, /^루시아[,，]?\s*/gim],
+  jack:  [/^JACK[,，]\s*/gim,  /^잭[,，]?\s*/gim],
+  ray:   [/^RAY[,，]\s*/gim,   /^레이[,，]?\s*/gim],
+  echo:  [/^ECHO[,，]\s*/gim,  /^에코[,，]?\s*/gim],
+};
+
 // 자기 호칭 — 모든 페르소나 공통. 형/오빠/누나/언니 → 제가 치환.
 // lookbehind로 "큰형/작은오빠" 같은 합성어 매치 차단.
 const SELF_TITLE_RE =
@@ -395,6 +406,15 @@ export const postProcessPersonaOutput = (
   const selfRefRe = SELF_REF_PATTERNS[personaKey];
   if (selfRefRe) {
     out = out.replace(selfRefRe, '');
+  }
+
+  // 3-1) 라인 시작 자기 이름 + 쉼표 호명 제거 — "LUCIA, 그게..." / "잭, 그건..."
+  //      다른 페르소나 호명("RAY, 그 논리면...")은 슬롯이 다르므로 건드리지 않음.
+  const selfNameLineRes = SELF_NAME_LINE_PATTERNS[personaKey];
+  if (selfNameLineRes) {
+    for (const re of selfNameLineRes) {
+      out = out.replace(re, '');
+    }
   }
 
   // 4) 자기 호칭 치환 — 형/오빠/누나/언니 + 이/가 + 동사 → 제가 + 동사
