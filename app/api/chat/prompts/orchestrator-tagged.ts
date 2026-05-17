@@ -939,7 +939,9 @@ export const buildScriptPrompt = (
   closerPersona?: AllPersonaKey,
 ): string => {
   const normalizedCategory = (category || '').toLowerCase();
-  const needsLuciaClose = [
+  // categoryV3가 'emotional'이면 legacy category 키워드 무관하게 LUCIA_CLOSE 활성화.
+  // (예: "잠이 안 와요" → legacy='general' / categoryV3='emotional' 케이스 보강)
+  const needsLuciaClose = categoryV3 === 'emotional' || [
     'emotion',
     'life',
     'relationship',
