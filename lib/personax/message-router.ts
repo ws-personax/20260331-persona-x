@@ -51,6 +51,7 @@ async function callGPTMini(system: string, user: string): Promise<string> {
   const client = getOpenAIClient();
   const res = await client.chat.completions.create({
     model: 'gpt-4o-mini',
+    temperature: 0.95, // 갈등/스파크/개그 다양성 극대화
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user },
@@ -340,7 +341,8 @@ export type RoutedRequestResult = {
 };
 
 const OPTION_D_SYSTEM =
-  'PersonaX 3단계 오케스트레이터입니다. 요청한 태그 블록만 출력하고, 코드펜스와 설명 문장은 금지합니다.';
+  'PersonaX 3단계 오케스트레이터입니다. 요청한 태그 블록만 출력하고, 코드펜스와 설명 문장은 금지합니다.\n' +
+  '⛔ 마크다운 사용 절대 금지: ** (볼드), * (이탤릭), # (헤더), ~~ (취소선), __ (밑줄). 일반 텍스트로만 출력할 것.';
 
 /**
  * 페르소나 라벨 방어 스트리핑.
@@ -451,6 +453,14 @@ export const postProcessPersonaOutput = (
 
   // 4) 자기 호칭 치환 — 형/오빠/누나/언니 + 이/가 + 동사 → 제가 + 동사
   out = out.replace(SELF_TITLE_RE, '제가 $1');
+
+  // 5) 마크다운 제거 — GPT-4o-mini 등 마크다운 강조 성향 모델 대응.
+  //    **볼드**, *이탤릭*, ## 헤더, ~~취소선~~, __밑줄__ 모두 일반 텍스트로.
+  out = out.replace(/\*\*([^*]+)\*\*/g, '$1');                    // **볼드**
+  out = out.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '$1');         // *이탤릭*
+  out = out.replace(/#{1,6}\s/g, '');                             // ## 헤더
+  out = out.replace(/~~([^~]+)~~/g, '$1');                        // ~~취소선~~
+  out = out.replace(/__([^_]+)__/g, '$1');                        // __밑줄__
 
   // 연속 공백·줄바꿈 정리
   out = out.replace(/[^\S\n]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
