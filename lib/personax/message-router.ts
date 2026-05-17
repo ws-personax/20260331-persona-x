@@ -28,7 +28,19 @@ import { TEA_SYSTEM_RAY } from '@/app/api/chat/prompts/tea-ray';
 import { TEA_SYSTEM_ECHO } from '@/app/api/chat/prompts/tea-echo';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// 지연 초기화 — 모듈 로드 시점이 아닌 첫 호출 시점에 OpenAI 클라이언트 생성.
+// 빌드 단계에서 OPENAI_API_KEY가 없어도 throw하지 않도록 함.
+let openaiClient: OpenAI | null = null;
+function getOpenAIClient(): OpenAI {
+  if (!openaiClient) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error('OPENAI_API_KEY 환경변수가 없습니다');
+    }
+    openaiClient = new OpenAI({ apiKey });
+  }
+  return openaiClient;
+}
 
 /**
  * Stage 3 전용 GPT-4o-mini 호출자.
@@ -36,7 +48,8 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
  * full 경로 Stage 3 대본 생성에만 사용 — solo·Stage 1·Stage 2는 기존 callLLM 유지.
  */
 async function callGPTMini(system: string, user: string): Promise<string> {
-  const res = await openai.chat.completions.create({
+  const client = getOpenAIClient();
+  const res = await client.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [
       { role: 'system', content: system },
