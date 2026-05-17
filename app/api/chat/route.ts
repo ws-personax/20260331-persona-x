@@ -521,11 +521,16 @@ async function runStage1Analysis(
   userMessage: string,
   recentContext: string,
   plan: { lucia_angle: string; jack_angle: string; ray_angle: string },
+  options?: { isInvest?: boolean },
 ): Promise<Stage1Data> {
   const t0 = Date.now();
   const luciaPrompt = buildLuciaAnalysisPrompt(userMessage, plan.lucia_angle, recentContext);
   const jackPrompt  = buildJackAnalysisPrompt(userMessage,  plan.jack_angle,  recentContext);
   const rayPrompt   = buildRayAnalysisPrompt(userMessage,   plan.ray_angle,   recentContext);
+
+  // ✅ invest 카테고리일 때 RAY만 웹 검색 ON — 실시간 가격/시세를 수집하고
+  //    JACK/LUCIA는 RAY가 수집한 데이터를 관점 가공만 함 (검색 OFF, 비용 통제).
+  const rayEnableSearch = options?.isInvest === true;
 
   const [luciaRaw, jackRaw, rayRaw] = await Promise.all([
     callTeaPersona('lucia', JSON_ONLY_SYSTEM, [{ role: 'user', content: luciaPrompt }]).catch((e) => {
@@ -534,7 +539,7 @@ async function runStage1Analysis(
     callTeaPersona('jack',  JSON_ONLY_SYSTEM, [{ role: 'user', content: jackPrompt  }]).catch((e) => {
       console.warn('[stage1:jack] 호출 실패',  e); return null;
     }),
-    callTeaPersona('ray',   JSON_ONLY_SYSTEM, [{ role: 'user', content: rayPrompt   }]).catch((e) => {
+    callTeaPersona('ray',   JSON_ONLY_SYSTEM, [{ role: 'user', content: rayPrompt   }], { enableSearch: rayEnableSearch }).catch((e) => {
       console.warn('[stage1:ray] 호출 실패',   e); return null;
     }),
   ]);
@@ -1446,7 +1451,14 @@ export async function POST(req: Request) {
         if (order[0] !== rawOrder[0]) {
           console.log('[first-persona/tagged] 순서 강제 정렬:', rawOrder, '→', order, '(categoryV3:', categoryV3Local, ')');
         }
-        const enableSearchTagged = ['finance', 'stock', 'crypto', 'economy', 'news'].includes(category);
+        // ✅ V3 invest 카테고리 + legacy finance/news 시 웹 검색 ON
+        //    'stock' | 'crypto' | 'economy' 는 legacy detectCategory 반환값에 없어 데드 코드지만,
+        //    화이트리스트 확장 가능성 고려해 주석으로 보존 (향후 detectCategory 보강 시 활성화).
+        const enableSearchTagged =
+          _routerDecision.categoryV3 === 'invest' ||
+          category === 'finance' ||
+          category === 'news';
+          // || ['stock', 'crypto', 'economy'].includes(category)  // legacy dead branches — 보존
         const isRound1 = !teaRound || teaRound <= 1;
 
         const streamPersonaTagged = async (key: TaggedPersonaKey, full: string) => {
@@ -1531,7 +1543,7 @@ export async function POST(req: Request) {
               lucia_angle: plan.lucia_angle,
               jack_angle:  plan.jack_angle,
               ray_angle:   plan.ray_angle,
-            });
+            }, { isInvest: _routerDecision.categoryV3 === 'invest' });
             r1 = await callTaggedRound1(msg, category, recentContext, order, enableSearchTagged, stage1Data, _hasPriorConversation, _closerPersonaV3);
           }
           if (r1) {

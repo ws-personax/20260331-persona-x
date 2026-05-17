@@ -688,9 +688,12 @@ ${
     : ''
 }`;
       // callLLM의 persona 인자도 effectiveSoloPersona로 — 모델·로깅 일관성.
+      // ✅ RAY 단독 + invest 카테고리일 때만 웹 검색 ON (실시간 시세 반영).
+      const soloEnableSearch =
+        effectiveSoloPersona === 'ray' && router.categoryV3 === 'invest';
       const soloRaw = await callLLM(effectiveSoloPersona, soloSystem, [
         { role: 'user', content: soloPrompt },
-      ]);
+      ], { enableSearch: soloEnableSearch });
       let soloText = extractTag(soloRaw, 'FIRST');
       // ✅ 후처리 필터 — 법적 표현 교체 / 자기 지칭 제거 / 호칭 치환 / few-shot 누수 차단
       soloText = postProcessPersonaOutput(soloText, effectiveSoloPersona);
@@ -715,6 +718,8 @@ ${
     );
 
     // Stage 1: 데이터 수집 (full 경로만)
+    // ✅ invest 카테고리일 때 데이터 수집 단계에 웹 검색 ON — 실시간 가격/시세 반영.
+    const isInvest = router.categoryV3 === 'invest';
     const dataPrompt = buildDataCollectionPrompt(
       messages,
       legacyCategory,
@@ -723,7 +728,7 @@ ${
     );
     const dataRaw = await callLLM('echo', OPTION_D_SYSTEM, [
       { role: 'user', content: dataPrompt },
-    ]);
+    ], { enableSearch: isInvest });
     const dataPack = extractTag(dataRaw, 'DATA_PACK');
     console.log('[runRoutedRequest] Stage 1:', dataPack ? '성공' : '실패(빈 DATA_PACK)');
 
