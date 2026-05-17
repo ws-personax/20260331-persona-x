@@ -42,6 +42,8 @@ interface PersonaData {
   lucia2?: string | null;
   echo2?: string | null;
   order?: ('ray' | 'jack' | 'lucia' | 'echo')[];
+  /** 감정/복합 카테고리 — ECHO 이후 LUCIA 마무리 버블 (액자 구조 닫기) */
+  lucia_close?: string | null;
 }
 
 type ErrorType = 'market_data_unavailable' | 'keyword_not_recognized' | 'analysis_failed';
@@ -505,6 +507,7 @@ const PersonaBubble = memo(function PersonaBubble({
   isRebuttal = false,
   details,
   hideEchoTag = false,
+  bgOverride,
 }: {
   personaKey: PersonaKey;
   text: string;
@@ -514,6 +517,8 @@ const PersonaBubble = memo(function PersonaBubble({
   isRebuttal?: boolean;
   details?: string | null;
   hideEchoTag?: boolean;
+  /** 버블 배경색 override — LUCIA_CLOSE처럼 같은 페르소나의 별도 슬롯 시각 구분용 */
+  bgOverride?: string;
 }) {
   const p = PERSONAS[personaKey];
   const isEcho = personaKey === 'echo';
@@ -584,7 +589,7 @@ const PersonaBubble = memo(function PersonaBubble({
             <div
               style={{
                 position: 'relative',
-                background: p.bubbleBg,
+                background: bgOverride || p.bubbleBg,
                 opacity: isRebuttal ? 0.92 : 1,
                 borderRadius: '0 14px 14px 14px',
                 padding: isEcho ? '14px 16px' : '11px 14px',
@@ -2784,9 +2789,20 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                   const showEcho1 = !!msg.personas.echo || allR1Done;
                   const showEcho2 = !!msg.personas.echo2 || (!!msg.personas.echo && allR2Done);
 
+                  const luciaCloseText = (msg.personas as PersonaData & { lucia_close?: string | null })?.lucia_close;
+                  const hasLuciaClose = !!luciaCloseText && luciaCloseText.trim().length > 0;
                   return (
                     <>
                       {order.map(renderRound1)}
+                      {hasLuciaClose && (
+                        <PersonaBubble
+                          key="lucia-close"
+                          personaKey="lucia"
+                          text={luciaCloseText as string}
+                          timestamp={msg.timestamp}
+                          bgOverride="#faf5ff"
+                        />
+                      )}
                       {order.map(renderRound2)}
                     </>
                   );

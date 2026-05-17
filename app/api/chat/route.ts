@@ -572,6 +572,8 @@ type OptionDRound1Result = TaggedRound1Result & {
   closerKey?: TaggedPersonaKey;
   soloContent?: string;
   soloKey?: TaggedPersonaKey;
+  /** [LUCIA_CLOSE] 액자 구조 — 감정/복합 카테고리 전용 별도 LUCIA 버블 */
+  luciaClose?: string;
 };
 
 const mapOrderedRound1 = (
@@ -1584,6 +1586,7 @@ export async function POST(req: Request) {
                 breakdown: '재테크 일반',
                 positionSizing: '0%',
                 jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
+                lucia_close: r1.luciaClose || null,
               },
             });
             return;

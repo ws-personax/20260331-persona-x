@@ -330,10 +330,12 @@ export type RoutedRequestResult = {
   third: string;
   /** [ECHO_QUESTION] 전용 슬롯 */
   echoQuestion: string;
-  /** [CLOSER] + [LUCIA_CLOSE] 연결 */
+  /** [CLOSER] 전용 — 감정/복합 카테고리에서도 LUCIA_CLOSE와 합치지 않음 */
   closerContent?: string;
   /** [CLOSER] 담당 페르소나 */
   closerKey?: TaggedPersonaKey;
+  /** [LUCIA_CLOSE] — 감정/복합 카테고리 액자 구조 닫기 (별도 LUCIA 버블) */
+  luciaClose?: string;
   /** solo 호출 시 단일 응답 본문 */
   soloContent?: string;
   /** solo 호출 시 단일 응답 페르소나 */
@@ -885,8 +887,9 @@ ${
       second,
       third,
       echoQuestion,
-      closerContent: [closer, luciaClose].filter(Boolean).join('\n\n'),
+      closerContent: closer,
       closerKey: router.closerPersona as TaggedPersonaKey,
+      luciaClose,
     };
   } catch (e) {
     console.warn('[runRoutedRequest] 실행 실패', e);
