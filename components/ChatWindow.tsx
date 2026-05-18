@@ -1995,6 +1995,11 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
     //   (예: "에코는 어떻게 봐요?" → ECHO solo 답변. 질문창 추가 노출 시 대화창 2개로 보이는 버그.)
     const order = last.personas.order;
     if (Array.isArray(order) && order.length === 1) return false;
+    // ✅ ECHO가 CLOSER(order 마지막)가 아니면 pendingEchoQuestion 비활성.
+    //   예: order=['ray','lucia','echo','jack'] — JACK이 마지막. ECHO 중간 발화가
+    //   '?'로 끝나도 대화 마무리가 아니므로 하단 입력창을 숨기지 않음.
+    //   (이 가드가 없으면 2번째 응답 이후 입력창이 사라져 유저가 대화 못 함.)
+    if (Array.isArray(order) && order.length > 0 && order[order.length - 1] !== 'echo') return false;
     const echo = last.personas.echo;
     const echo2 = last.personas.echo2;
     const hasEcho = typeof echo === 'string' && echo.trim().length > 0;
