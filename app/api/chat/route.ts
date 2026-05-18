@@ -41,6 +41,7 @@ import {
   parseTaggedRound1,
   parseTaggedRound2,
   STAGE1_FALLBACK,
+  detectEmotionalSubtypeHee,
   type TaggedPersonaKey as PromptTaggedPersonaKey,
   type TaggedRound1Result,
   type TaggedRound2Result,
@@ -726,9 +727,22 @@ const hasEchoSelfReference = (text: string): boolean => {
   return /ECHO\s*[는가]/.test(text) || /에코\s*[는가]/.test(text);
 };
 
+// 희(喜) 모드 전용 금지어휘 — RAY/JACK이 기쁨을 깎는 어휘로 빠지면 재생성 트리거.
+//   RAY: 준비/환경/부담/리스크/책임/결정 — "다음 스텝" 영역 침범으로 분위기 깎음
+//   JACK: 불안/리스크/부담/현실/걱정 — 마동석 짧은 인정 톤이 깨지고 무게로 빠짐
+const HEE_RAY_BAN_WORDS = /준비|환경|부담|리스크|책임|결정/;
+const HEE_JACK_BAN_WORDS = /불안|리스크|부담|현실|걱정/;
+
+const hasHeeRayBannedWord = (text: string): boolean =>
+  !!text && HEE_RAY_BAN_WORDS.test(text);
+
+const hasHeeJackBannedWord = (text: string): boolean =>
+  !!text && HEE_JACK_BAN_WORDS.test(text);
+
 const detectStage3GuardViolations = (
   result: TaggedRound1Result,
   order: TaggedPersonaKey[],
+  isHeeMode: boolean = false,
 ): string[] => {
   const reasons: string[] = [];
   // solo 모드 — soloKey/soloContent에서 직접 검사
@@ -739,12 +753,24 @@ const detectStage3GuardViolations = (
     if (result.soloKey === 'echo' && hasEchoSelfReference(result.soloContent || '')) {
       reasons.push('ECHO 자기 3인칭(solo)');
     }
+    if (isHeeMode) {
+      if (result.soloKey === 'ray' && hasHeeRayBannedWord(result.soloContent || '')) {
+        reasons.push('희(喜) RAY 금지어휘(solo)');
+      }
+      if (result.soloKey === 'jack' && hasHeeJackBannedWord(result.soloContent || '')) {
+        reasons.push('희(喜) JACK 금지어휘(solo)');
+      }
+    }
     return reasons;
   }
   // full 모드 — 기존 매핑 헬퍼로 페르소나별 텍스트 분리 후 검사
   const personaText = mapOrderedRound1(result as OptionDRound1Result, order);
   if (hasJackYoEnding(personaText.jack)) reasons.push('JACK ~요 종결');
   if (hasEchoSelfReference(personaText.echo)) reasons.push('ECHO 자기 3인칭');
+  if (isHeeMode) {
+    if (hasHeeRayBannedWord(personaText.ray)) reasons.push('희(喜) RAY 금지어휘');
+    if (hasHeeJackBannedWord(personaText.jack)) reasons.push('희(喜) JACK 금지어휘');
+  }
   return reasons;
 };
 
@@ -759,13 +785,17 @@ async function callOptionDWithStage3Guard(
   closerPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
   soloPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
 ): Promise<TaggedRound1Result | null> {
+  // 희(喜) 모드 감지 — emotional + 좋은 소식 키워드. RAY/JACK 금지어휘 가드 활성화 조건.
+  const isHeeMode =
+    categoryV3 === 'emotional' && detectEmotionalSubtypeHee(lastMessage);
+
   const first = await callOptionD(
     messages, category, lastMessage, order, categoryV3, firstPersona,
     hasPriorConversation, closerPersona, soloPersona,
   );
   if (!first) return first;
 
-  const reasons = detectStage3GuardViolations(first, order);
+  const reasons = detectStage3GuardViolations(first, order, isHeeMode);
   if (reasons.length === 0) return first;
 
   // Stage 1+2 캐시 재사용 — Stage 3(GPT-4o-mini)만 재호출.
@@ -781,7 +811,7 @@ async function callOptionDWithStage3Guard(
       console.warn('[stage3-guard] 재생성 결과 null → 1차 결과 사용');
       return first;
     }
-    const retryReasons = detectStage3GuardViolations(retry, order);
+    const retryReasons = detectStage3GuardViolations(retry, order, isHeeMode);
     if (retryReasons.length === 0) {
       console.log('[stage3-guard] 재생성 성공 (Stage 3만 재실행)');
     } else {
@@ -800,7 +830,7 @@ async function callOptionDWithStage3Guard(
     console.warn('[stage3-guard] 재생성 결과 null → 1차 결과 사용');
     return first;
   }
-  const retryReasons = detectStage3GuardViolations(retry, order);
+  const retryReasons = detectStage3GuardViolations(retry, order, isHeeMode);
   if (retryReasons.length === 0) {
     console.log('[stage3-guard] 재생성 성공(solo)');
   } else {
