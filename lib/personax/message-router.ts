@@ -913,6 +913,12 @@ ${
           ', 웹검색', isInvest ? 'ON' : 'OFF',
           '):', dataPack ? '성공' : '실패(빈 DATA_PACK)',
         );
+        // [DEBUG_DATAPACK] 임시 디버그 — 확인 후 제거 (grep '\[DEBUG_DATAPACK\]')
+        if (process.env.DEBUG_DATAPACK === '1') {
+          console.log('[DEBUG_DATAPACK][stage1] dataRaw 원문 길이:', dataRaw?.length ?? 0);
+          console.log('[DEBUG_DATAPACK][stage1] DATA_PACK 추출 길이:', dataPack.length);
+          console.log('[DEBUG_DATAPACK][stage1] DATA_PACK 내용:\n', dataPack);
+        }
       }
 
       // Stage 2: 페르소나 관점 분해 (full 경로만)
@@ -952,6 +958,12 @@ ${
 기존 화면 표시 참고 순서: ${router.order.map((key, index) => `${index + 1}. ${key.toUpperCase()}`).join(' / ')}
 ⛔ [FIRST] 블록은 반드시 ${(router.firstPersona || 'lucia').toUpperCase()} 톤. 순서는 ${router.order.map((k) => k.toUpperCase()).join(' → ')}.
 ⛔ [CLOSER] 블록은 반드시 ${(router.closerPersona || 'jack').toUpperCase()} 톤. FIRST(${(router.firstPersona || 'lucia').toUpperCase()})는 CLOSER 불가.`;
+    // [DEBUG_DATAPACK] 임시 디버그 — 확인 후 제거 (grep '\[DEBUG_DATAPACK\]')
+    if (process.env.DEBUG_DATAPACK === '1') {
+      console.log('[DEBUG_DATAPACK][stage3] dataContext prepend 여부:', !!dataContext, '/ length:', dataContext.length);
+      console.log('[DEBUG_DATAPACK][stage3] scriptPrompt 앞 1200자:\n', scriptPrompt.slice(0, 1200));
+      console.log('[DEBUG_DATAPACK][stage3] scriptPrompt 총 길이:', scriptPrompt.length);
+    }
     // Stage 3 — GPT-4o-mini 사용 (full 경로만). solo·Stage 1·Stage 2는 기존 callLLM 유지.
     const scriptRaw = await callGPTMini(OPTION_D_SYSTEM, scriptPrompt);
     // ✅ 후처리 필터 — 슬롯별 페르소나 키로 postProcessPersonaOutput 적용.
