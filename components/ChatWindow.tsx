@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import AuthButton from '@/components/AuthButton';
 import HistoryModal from '@/components/HistoryModal';
 import Logo from '@/components/Logo';
@@ -705,27 +705,23 @@ const EchoBubble = memo(function EchoBubble({
   details,
   timestamp,
   echoNews,
-  hideDisclaimer = false,
 }: {
   summary: string;
   details?: string | null;
   timestamp: Date;
   echoNews?: NewsLink | null;
-  hideDisclaimer?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const p = PERSONAS.echo;
 
-  const { summaryText, detailsText, dataSource, marketClosedNote } = useMemo(() => {
+  const { summaryText, detailsText } = useMemo(() => {
     const summaryParsed = parseEchoParts(summary || '');
     const detailsParsed = details
       ? parseEchoParts(details)
-      : { content: '', dataSource: '', marketClosedNote: '' };
+      : { content: '' };
     return {
       summaryText: summaryParsed.content,
       detailsText: detailsParsed.content,
-      dataSource: detailsParsed.dataSource || summaryParsed.dataSource,
-      marketClosedNote: detailsParsed.marketClosedNote || summaryParsed.marketClosedNote,
     };
   }, [summary, details]);
 
@@ -858,8 +854,6 @@ const EchoBubble = memo(function EchoBubble({
       </div>
 
       {echoNews?.url && <EchoNewsChip news={echoNews} />}
-
-      <NoticeBox dataSource={dataSource} marketClosedNote={marketClosedNote} hideDisclaimer={hideDisclaimer} />
     </div>
   );
 });
@@ -975,106 +969,6 @@ const VoiceControlsColumn = memo(function VoiceControlsColumn({
           {autoRead ? '🔊 ON' : '🔊 OFF'}
         </button>
       )}
-    </div>
-  );
-});
-
-const EchoAnswerInline = memo(function EchoAnswerInline({
-  value,
-  onChange,
-  onSubmit,
-  onSkip,
-  disabled,
-  voiceColumn,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  onSubmit: () => void;
-  onSkip: () => void;
-  disabled?: boolean;
-  voiceColumn?: React.ReactNode;
-}) {
-  const submit = () => {
-    if (!value.trim()) return;
-    onSubmit();
-  };
-  return (
-    <div style={{
-      margin: '4px 12px 16px 56px',
-      padding: 10,
-      background: '#fffbea',
-      border: '1px solid #fbbf24',
-      borderRadius: 12,
-      maxWidth: 620,
-      display: 'flex',
-      gap: 8,
-      alignItems: 'flex-start',
-    }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              if (!disabled) submit();
-            }
-          }}
-          placeholder="ECHO의 질문에 답해주세요..."
-          disabled={disabled}
-          rows={2}
-          style={{
-            width: '100%',
-            padding: 8,
-            border: '1px solid #d1d5db',
-            borderRadius: 8,
-            fontSize: 13,
-            resize: 'none',
-            boxSizing: 'border-box',
-            fontFamily: 'inherit',
-            outline: 'none',
-          }}
-        />
-        <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
-          <button
-            type="button"
-            onClick={onSkip}
-            disabled={disabled}
-            style={{
-              padding: '6px 12px',
-              background: '#f3f4f6',
-              border: '1px solid #d1d5db',
-              borderRadius: 8,
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#6b7280',
-              cursor: disabled ? 'not-allowed' : 'pointer',
-              opacity: disabled ? 0.6 : 1,
-            }}
-          >
-            건너뛰기
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={disabled || !value.trim()}
-            style={{
-              padding: '6px 12px',
-              background: '#FAE100',
-              border: '1px solid #FAE100',
-              borderRadius: 8,
-              fontSize: 12,
-              fontWeight: 700,
-              color: '#1f2937',
-              cursor: (disabled || !value.trim()) ? 'not-allowed' : 'pointer',
-              opacity: (disabled || !value.trim()) ? 0.6 : 1,
-            }}
-          >
-            답변하기
-          </button>
-        </div>
-      </div>
-      {voiceColumn}
     </div>
   );
 });
@@ -1684,9 +1578,6 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [mounted, setMounted] = useState(false);
   const [input, setInput] = useState('');
-  const [echoAnswerValue, setEchoAnswerValue] = useState('');
-  const echoAnswerValueRef = useRef('');
-  useEffect(() => { echoAnswerValueRef.current = echoAnswerValue; }, [echoAnswerValue]);
   const [showQuickQ, setShowQuickQ] = useState(false);
   const [teaPersona, setTeaPersona] = useState<'lucia' | 'jack' | 'echo'>('lucia');
   const [luciaGreeting, setLuciaGreeting] = useState<string | null>(null);
@@ -1715,7 +1606,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
   const queuedPersonasRef = useRef<{ msgId: string; set: Set<'ray' | 'jack' | 'lucia' | 'echo'> }>({ msgId: '', set: new Set() });
   const autoSendStepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleSendRef = useRef<() => void>(() => {});
-  // 음성 마이크가 ECHO 답변 모드일 때는 echoAnswerValue로, 일반 모드에서는 input으로 transcript를 라우팅
+  // 음성 마이크 transcript는 항상 일반 입력창(input)으로 라우팅.
   const activeInputUpdaterRef = useRef<(updater: (prev: string) => string) => void>(setInput);
 
   useEffect(() => {
@@ -2042,28 +1933,6 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
 
   const hasUserSent = useMemo(() => messages.some(m => m.role === 'user'), [messages]);
 
-  // ECHO 질문이 살아있는 동안에는 메인 입력창을 숨기고 EchoAnswerInline만 노출
-  const pendingEchoQuestion = useMemo(() => {
-    if (messages.length === 0) return false;
-    const last = messages[messages.length - 1];
-    if (last.role !== 'assistant' || !last.personas) return false;
-    // ✅ solo 응답(order.length === 1)은 ECHO 답변이어도 2라운드 입력창 차단.
-    //   호명된 1명만 답하는 모드이므로 ECHO 질문→2라운드 흐름 자체가 없음.
-    //   (예: "에코는 어떻게 봐요?" → ECHO solo 답변. 질문창 추가 노출 시 대화창 2개로 보이는 버그.)
-    const order = last.personas.order;
-    if (Array.isArray(order) && order.length === 1) return false;
-    // ✅ ECHO가 CLOSER(order 마지막)가 아니면 pendingEchoQuestion 비활성.
-    //   예: order=['ray','lucia','echo','jack'] — JACK이 마지막. ECHO 중간 발화가
-    //   '?'로 끝나도 대화 마무리가 아니므로 하단 입력창을 숨기지 않음.
-    //   (이 가드가 없으면 2번째 응답 이후 입력창이 사라져 유저가 대화 못 함.)
-    if (Array.isArray(order) && order.length > 0 && order[order.length - 1] !== 'echo') return false;
-    const echo = last.personas.echo;
-    const echo2 = last.personas.echo2;
-    const hasEcho = typeof echo === 'string' && echo.trim().length > 0;
-    const hasEcho2 = typeof echo2 === 'string' && echo2.trim().length > 0;
-    return hasEcho && !hasEcho2 && echo!.includes('?');
-  }, [messages]);
-
   const scrollPadding = hasUserSent ? '20px 0 140px' : '16px 0 140px';
 
   useEffect(() => {
@@ -2376,30 +2245,10 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
     handleSendWithPosition(content, null);
   }, [input, isLoading, handleSendWithPosition]);
 
-  // ECHO 답변 제출 — echoAnswerValue 기반 (마이크 자동전송도 이 경로 사용)
-  const submitEchoAnswer = useCallback(() => {
-    const v = echoAnswerValueRef.current.trim();
-    if (!v || isLoading) return;
-    setEchoAnswerValue('');
-    handleSendWithPosition(v, null);
-  }, [isLoading, handleSendWithPosition]);
-
-  const skipEchoAnswer = useCallback(() => {
-    if (isLoading) return;
-    setEchoAnswerValue('');
-    handleSendWithPosition('', null);
-  }, [isLoading, handleSendWithPosition]);
-
-  // 모드별 라우팅: pendingEchoQuestion이면 마이크 transcript→echoAnswer, 자동전송→ECHO 답변 제출
+  // 마이크 자동전송 — 항상 일반 입력창의 handleSend 사용 (ECHO 인라인 질문창 제거됨).
   useEffect(() => {
-    if (pendingEchoQuestion) {
-      activeInputUpdaterRef.current = setEchoAnswerValue;
-      handleSendRef.current = submitEchoAnswer;
-    } else {
-      activeInputUpdaterRef.current = setInput;
-      handleSendRef.current = handleSend;
-    }
-  }, [pendingEchoQuestion, handleSend, submitEchoAnswer]);
+    handleSendRef.current = handleSend;
+  }, [handleSend]);
 
   const isSpeakingGlobal = useIsSpeaking();
   useEffect(() => {
@@ -2713,6 +2562,14 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                     const jackRebuttalText = jackText.slice(jackSplitIdx + 1).trim();
                     const luciaSplitIdx = luciaText.indexOf('\n↳ ');
                     const luciaMain = luciaSplitIdx !== -1 ? luciaText.slice(0, luciaSplitIdx).trim() : luciaText;
+                    // 턴 종료 NoticeBox — 메시지 마지막(=CLOSER 페르소나 아래) 한 번만 렌더.
+                    const summaryParsed = parseEchoParts(msg.personas.echo || '');
+                    const detailsParsed = msg.personas.echoDetails
+                      ? parseEchoParts(msg.personas.echoDetails)
+                      : { dataSource: '', marketClosedNote: '' };
+                    const noticeDataSource = detailsParsed.dataSource || summaryParsed.dataSource;
+                    const noticeMarketClosed = detailsParsed.marketClosedNote || summaryParsed.marketClosedNote;
+                    const noticeHideDisclaimer = msg.personas.breakdown !== undefined;
 
                     return (
                       <>
@@ -2725,7 +2582,6 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                           details={msg.personas.echoDetails}
                           timestamp={msg.timestamp}
                           echoNews={msg.personas.echoNews}
-                          hideDisclaimer={msg.personas.breakdown !== undefined}
                         />
                         {msg.personas.ray2 && (
                           <PersonaBubble personaKey="ray" text={msg.personas.ray2} timestamp={msg.timestamp} />
@@ -2737,8 +2593,13 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                           <PersonaBubble personaKey="lucia" text={msg.personas.lucia2} timestamp={msg.timestamp} />
                         )}
                         {msg.personas.echo2 && (
-                          <EchoBubble summary={msg.personas.echo2} timestamp={msg.timestamp} hideDisclaimer />
+                          <EchoBubble summary={msg.personas.echo2} timestamp={msg.timestamp} />
                         )}
+                        <NoticeBox
+                          dataSource={noticeDataSource}
+                          marketClosedNote={noticeMarketClosed}
+                          hideDisclaimer={noticeHideDisclaimer}
+                        />
                       </>
                     );
                   }
@@ -2769,40 +2630,13 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                       if (!showEcho1) return null;
                       const hasEcho = hasText(msg.personas!.echo);
                       return (
-                        <Fragment key={`echo1-wrap-${hasEcho ? 'real' : 'loading'}`}>
-                          <EchoBubble
-                            key={`echo1-${hasEcho ? 'real' : 'loading'}`}
-                            summary={hasEcho ? msg.personas!.echo : loadingText.echo}
-                            details={msg.personas!.echoDetails}
-                            timestamp={msg.timestamp}
-                            echoNews={msg.personas!.echoNews}
-                            hideDisclaimer={msg.personas!.breakdown !== undefined}
-                          />
-                          {/* ECHO 인라인 질문창은 ECHO가 CLOSER(order 마지막)일 때만.
-                              ECHO 다음에 다른 페르소나(예: JACK이 마지막)가 있으면
-                              아직 마무리가 아니므로 인라인 질문창 노출 차단. */}
-                          {msgIdx === messages.length - 1 && hasEcho && !hasText(msg.personas!.echo2) && msg.personas!.echo!.includes('?') && (!Array.isArray(msg.personas!.order) || msg.personas!.order.length > 1) && order[order.length - 1] === 'echo' && (
-                            <EchoAnswerInline
-                              disabled={isLoading}
-                              value={echoAnswerValue}
-                              onChange={(v) => { setEchoAnswerValue(v); cancelAutoSend(); }}
-                              onSubmit={submitEchoAnswer}
-                              onSkip={skipEchoAnswer}
-                              voiceColumn={
-                                <VoiceControlsColumn
-                                  sttSupported={sttSupported}
-                                  ttsSupported={ttsSupported}
-                                  isRecording={isRecording}
-                                  isLoading={isLoading}
-                                  autoSendCountdown={autoSendCountdown}
-                                  autoRead={autoRead}
-                                  onToggleRecording={toggleRecording}
-                                  onToggleAutoRead={() => setAutoRead(v => { if (v) stopSpeaking(); return !v; })}
-                                />
-                              }
-                            />
-                          )}
-                        </Fragment>
+                        <EchoBubble
+                          key={`echo1-${hasEcho ? 'real' : 'loading'}`}
+                          summary={hasEcho ? msg.personas!.echo : loadingText.echo}
+                          details={msg.personas!.echoDetails}
+                          timestamp={msg.timestamp}
+                          echoNews={msg.personas!.echoNews}
+                        />
                       );
                     }
                     let raw: string | null | undefined;
@@ -2832,7 +2666,6 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                           key={`echo2-${hasEcho2 ? 'real' : 'loading'}`}
                           summary={hasEcho2 ? msg.personas!.echo2! : 'ECHO가 최후 판결 중...'}
                           timestamp={msg.timestamp}
-                          hideDisclaimer
                         />
                       );
                     }
@@ -2856,6 +2689,15 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
 
                   const luciaCloseText = (msg.personas as PersonaData & { lucia_close?: string | null })?.lucia_close;
                   const hasLuciaClose = !!luciaCloseText && luciaCloseText.trim().length > 0;
+                  // 턴 종료 NoticeBox — 메시지 마지막(=CLOSER 페르소나 아래) 한 번만 렌더.
+                  // 데이터 출처/장 마감 알림은 ECHO 텍스트에서 파싱 (구조 보존).
+                  const summaryParsed = parseEchoParts(msg.personas.echo || '');
+                  const detailsParsed = msg.personas.echoDetails
+                    ? parseEchoParts(msg.personas.echoDetails)
+                    : { dataSource: '', marketClosedNote: '' };
+                  const noticeDataSource = detailsParsed.dataSource || summaryParsed.dataSource;
+                  const noticeMarketClosed = detailsParsed.marketClosedNote || summaryParsed.marketClosedNote;
+                  const noticeHideDisclaimer = msg.personas.breakdown !== undefined;
                   return (
                     <>
                       {order.map(renderRound1)}
@@ -2869,6 +2711,11 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                         />
                       )}
                       {order.map(renderRound2)}
+                      <NoticeBox
+                        dataSource={noticeDataSource}
+                        marketClosedNote={noticeMarketClosed}
+                        hideDisclaimer={noticeHideDisclaimer}
+                      />
                     </>
                   );
                 })() : null}
@@ -3196,7 +3043,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
         </div>
       )}
 
-      {hasUserSent && !pendingEchoQuestion && (
+      {hasUserSent && (
       <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
           <textarea
