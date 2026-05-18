@@ -2716,7 +2716,10 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                             echoNews={msg.personas!.echoNews}
                             hideDisclaimer={msg.personas!.breakdown !== undefined}
                           />
-                          {msgIdx === messages.length - 1 && hasEcho && !hasText(msg.personas!.echo2) && msg.personas!.echo!.includes('?') && (!Array.isArray(msg.personas!.order) || msg.personas!.order.length > 1) && (
+                          {/* ECHO 인라인 질문창은 ECHO가 CLOSER(order 마지막)일 때만.
+                              ECHO 다음에 다른 페르소나(예: JACK이 마지막)가 있으면
+                              아직 마무리가 아니므로 인라인 질문창 노출 차단. */}
+                          {msgIdx === messages.length - 1 && hasEcho && !hasText(msg.personas!.echo2) && msg.personas!.echo!.includes('?') && (!Array.isArray(msg.personas!.order) || msg.personas!.order.length > 1) && order[order.length - 1] === 'echo' && (
                             <EchoAnswerInline
                               disabled={isLoading}
                               value={echoAnswerValue}
