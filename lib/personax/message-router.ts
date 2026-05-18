@@ -12,6 +12,7 @@
 
 import {
   detectCategoryV3,
+  detectEmotionalSubtypeHee,
   decideCallStrategy as _decideCallStrategy,
   getFirstPersona,
   getCloserPersona,
@@ -283,7 +284,12 @@ export const routeMessage = (
   const text = (lastMessage || '').trim();
   const categoryV3 = detectCategoryV3(text);
   const firstPersona = getFirstPersona(categoryV3);
-  const closerPersona = getCloserPersona(categoryV3, firstPersona);
+  // 희(喜) 모드 — emotional 서브타입. CLOSER=ECHO + order=[lucia,jack,ray,echo] 강제.
+  // 기쁜 소식은 본질 짚기(ECHO 마무리)가 위로(LUCIA)·결단(JACK)보다 자연스러움.
+  const isHeeMode = categoryV3 === 'emotional' && detectEmotionalSubtypeHee(text);
+  const closerPersona: AllPersonaKey = isHeeMode
+    ? 'echo'
+    : getCloserPersona(categoryV3, firstPersona);
   const strategyResult = _decideCallStrategy(text);
   const personaCall =
     detectExplicitPersonaCall(text) ??
@@ -297,7 +303,9 @@ export const routeMessage = (
   const hasPriorConversation = !!(priorUser?.content && priorUser.content.trim());
   const category = detectMessageCategory(messages || [], text);
   const orderCategory: OrderCategory = category === 'invest' ? 'invest' : categoryV3;
-  const order = enforceOrder(baseOrder, firstPersona, closerPersona, orderCategory);
+  const order: TaggedPersonaKey[] = isHeeMode
+    ? ['lucia', 'jack', 'ray', 'echo']
+    : enforceOrder(baseOrder, firstPersona, closerPersona, orderCategory);
   return {
     personaCall,
     invokedPersona: strategyResult.invokedPersona,
