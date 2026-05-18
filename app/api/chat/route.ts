@@ -702,6 +702,70 @@ async function callOptionD(
   });
 }
 
+// ──────────────────────────────────────────────────────────────────────────
+// Stage 3 응답 품질 가드 — 다음 두 조건 감지 시 1회 callOptionD 재호출.
+//   1) JACK 발화에 ~요로 끝나는 문장 — JACK은 짧고 강한 ~다/~입니다만 허용
+//   2) ECHO 발화에 "ECHO는/가" / "에코는/가" 자기 3인칭 언급
+// 재생성도 위반이면 재생성 결과를 그대로 사용 (LLM 한 번 더 기회 부여 의미).
+// ──────────────────────────────────────────────────────────────────────────
+const hasJackYoEnding = (text: string): boolean => {
+  if (!text) return false;
+  const sentences = text.split(/[.!?\n]+/).map((s) => s.trim()).filter(Boolean);
+  return sentences.some((s) => /요$/.test(s));
+};
+
+const hasEchoSelfReference = (text: string): boolean => {
+  if (!text) return false;
+  return /ECHO\s*[는가]/.test(text) || /에코\s*[는가]/.test(text);
+};
+
+const detectStage3GuardViolations = (
+  result: TaggedRound1Result,
+  order: TaggedPersonaKey[],
+): string[] => {
+  const reasons: string[] = [];
+  // solo 모드 — soloKey/soloContent에서 직접 검사
+  if (result.soloKey) {
+    if (result.soloKey === 'jack' && hasJackYoEnding(result.soloContent || '')) {
+      reasons.push('JACK ~요 종결(solo)');
+    }
+    if (result.soloKey === 'echo' && hasEchoSelfReference(result.soloContent || '')) {
+      reasons.push('ECHO 자기 3인칭(solo)');
+    }
+    return reasons;
+  }
+  // full 모드 — 기존 매핑 헬퍼로 페르소나별 텍스트 분리 후 검사
+  const personaText = mapOrderedRound1(result as OptionDRound1Result, order);
+  if (hasJackYoEnding(personaText.jack)) reasons.push('JACK ~요 종결');
+  if (hasEchoSelfReference(personaText.echo)) reasons.push('ECHO 자기 3인칭');
+  return reasons;
+};
+
+async function callOptionDWithStage3Guard(
+  ...args: Parameters<typeof callOptionD>
+): Promise<TaggedRound1Result | null> {
+  const order = args[3];
+  const first = await callOptionD(...args);
+  if (!first) return first;
+
+  const reasons = detectStage3GuardViolations(first, order);
+  if (reasons.length === 0) return first;
+
+  console.warn('[stage3-guard] 위반 감지 → 1회 재생성:', reasons.join(', '));
+  const retry = await callOptionD(...args);
+  if (!retry) {
+    console.warn('[stage3-guard] 재생성 결과 null → 1차 결과 사용');
+    return first;
+  }
+  const retryReasons = detectStage3GuardViolations(retry, order);
+  if (retryReasons.length === 0) {
+    console.log('[stage3-guard] 재생성 성공');
+  } else {
+    console.warn('[stage3-guard] 재생성도 위반:', retryReasons.join(', '), '— 재생성 결과 사용');
+  }
+  return retry;
+}
+
 async function callTaggedRound2(
   userMessage: string,
   category: string,
@@ -1484,7 +1548,7 @@ export async function POST(req: Request) {
             const invoked = _routerDecision.invokedPersona;
             // ✅ invokedPersona를 callOptionD에 명시 전달 — runRoutedRequest 내부의
             //   strict 검출(personaCall) 미스매치를 무시하고 solo 모드 강제.
-            const soloResult = await callOptionD(
+            const soloResult = await callOptionDWithStage3Guard(
               optionDMessages,
               category,
               msg,
@@ -1530,7 +1594,7 @@ export async function POST(req: Request) {
             if (categoryChanged) {
               console.log('[optionD] 카테고리 전환 감지 → 이전 맥락 제거, 마지막 메시지만 전달 (prev:', prevCategory, '→ now:', category, ')');
             }
-            r1 = await callOptionD(optionDMessages, category, msg, order, categoryV3Local, firstPersonaLocal, _hasPriorConversation, _closerPersonaV3);
+            r1 = await callOptionDWithStage3Guard(optionDMessages, category, msg, order, categoryV3Local, firstPersonaLocal, _hasPriorConversation, _closerPersonaV3);
             r1UsesOrderedSlots = true;
             // ✅ callOptionD 빈 결과 시 폴백 완전 차단 — null/빈 객체여도 정상 done 경로로 강제 통과
             if (!r1) {
@@ -1968,7 +2032,7 @@ export async function POST(req: Request) {
       const dummyOrder: TaggedPersonaKey[] =
         invoked === 'echo' ? ['lucia', 'jack', 'ray'] : [invoked, 'jack', 'lucia'].filter((k, i, a) => a.indexOf(k) === i) as TaggedPersonaKey[];
       return streamRespond(async (send) => {
-        const soloResult = await callOptionD(
+        const soloResult = await callOptionDWithStage3Guard(
           soloMessages,
           category,
           lastMsg,
