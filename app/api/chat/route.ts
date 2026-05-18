@@ -574,6 +574,11 @@ type OptionDRound1Result = TaggedRound1Result & {
   soloKey?: TaggedPersonaKey;
   /** [LUCIA_CLOSE] 액자 구조 — 감정/복합 카테고리 전용 별도 LUCIA 버블 */
   luciaClose?: string;
+  /** Stage 1+2 캐시 — 품질 가드 위반 시 Stage 3만 재호출하는 데 사용 (full 경로만 존재) */
+  _stage12Cache?: {
+    dataPack: string;
+    personaViews: string;
+  };
 };
 
 const mapOrderedRound1 = (
@@ -667,6 +672,7 @@ async function callOptionD(
   hasPriorConversation: boolean = false,
   closerPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
   soloPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
+  precomputedStages?: { dataPack: string; personaViews: string },
 ): Promise<TaggedRound1Result | null> {
   const normalizedMessages = (messages || []).map((m) => ({
     role: m.role || '',
@@ -699,6 +705,7 @@ async function callOptionD(
     lastMessage,
     router,
     soloPersona,
+    precomputedStages,
   });
 }
 
@@ -742,26 +749,62 @@ const detectStage3GuardViolations = (
 };
 
 async function callOptionDWithStage3Guard(
-  ...args: Parameters<typeof callOptionD>
+  messages: Array<{ role?: string; content?: string }>,
+  category: string,
+  lastMessage: string,
+  order: TaggedPersonaKey[],
+  categoryV3?: import('./prompts/orchestrator-tagged').CategoryV3,
+  firstPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
+  hasPriorConversation: boolean = false,
+  closerPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
+  soloPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
 ): Promise<TaggedRound1Result | null> {
-  const order = args[3];
-  const first = await callOptionD(...args);
+  const first = await callOptionD(
+    messages, category, lastMessage, order, categoryV3, firstPersona,
+    hasPriorConversation, closerPersona, soloPersona,
+  );
   if (!first) return first;
 
   const reasons = detectStage3GuardViolations(first, order);
   if (reasons.length === 0) return first;
 
-  console.warn('[stage3-guard] 위반 감지 → 1회 재생성:', reasons.join(', '));
-  const retry = await callOptionD(...args);
+  // Stage 1+2 캐시 재사용 — Stage 3(GPT-4o-mini)만 재호출.
+  // full 경로면 _stage12Cache 존재, solo 경로면 없음 → 없으면 전체 재호출로 폴백.
+  const cache = (first as OptionDRound1Result)._stage12Cache;
+  if (cache) {
+    console.warn('[stage3-guard] 위반 감지 → Stage 3만 재호출 (Stage 1+2 캐시 재사용):', reasons.join(', '));
+    const retry = await callOptionD(
+      messages, category, lastMessage, order, categoryV3, firstPersona,
+      hasPriorConversation, closerPersona, soloPersona, cache,
+    );
+    if (!retry) {
+      console.warn('[stage3-guard] 재생성 결과 null → 1차 결과 사용');
+      return first;
+    }
+    const retryReasons = detectStage3GuardViolations(retry, order);
+    if (retryReasons.length === 0) {
+      console.log('[stage3-guard] 재생성 성공 (Stage 3만 재실행)');
+    } else {
+      console.warn('[stage3-guard] 재생성도 위반:', retryReasons.join(', '), '— 재생성 결과 사용');
+    }
+    return retry;
+  }
+
+  // solo 경로 — Stages 1+2가 원래 없으므로 전체 재호출 (사실상 1개 LLM 호출만 재실행).
+  console.warn('[stage3-guard] 위반 감지(solo) → 전체 재호출:', reasons.join(', '));
+  const retry = await callOptionD(
+    messages, category, lastMessage, order, categoryV3, firstPersona,
+    hasPriorConversation, closerPersona, soloPersona,
+  );
   if (!retry) {
     console.warn('[stage3-guard] 재생성 결과 null → 1차 결과 사용');
     return first;
   }
   const retryReasons = detectStage3GuardViolations(retry, order);
   if (retryReasons.length === 0) {
-    console.log('[stage3-guard] 재생성 성공');
+    console.log('[stage3-guard] 재생성 성공(solo)');
   } else {
-    console.warn('[stage3-guard] 재생성도 위반:', retryReasons.join(', '), '— 재생성 결과 사용');
+    console.warn('[stage3-guard] 재생성도 위반(solo):', retryReasons.join(', '), '— 재생성 결과 사용');
   }
   return retry;
 }

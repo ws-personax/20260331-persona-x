@@ -340,6 +340,16 @@ export type RoutedRequestResult = {
   soloContent?: string;
   /** solo 호출 시 단일 응답 페르소나 */
   soloKey?: TaggedPersonaKey;
+  /**
+   * Stage 1(데이터 수집)+Stage 2(페르소나 관점) 결과 캐시 — full 경로만 채워짐.
+   * 호출자가 Stage 3 결과가 품질 가드(JACK ~요 종결 / ECHO 자기 3인칭 등) 위반을 감지하면
+   * 이 캐시를 `precomputedStages`로 다시 넣어 Stage 3만 재호출 가능 (Stage 1+2 LLM 호출 절감).
+   * solo 경로는 Stages 1+2가 없으므로 undefined.
+   */
+  _stage12Cache?: {
+    dataPack: string;
+    personaViews: string;
+  };
 };
 
 // Stage 3 (대본 작성) 전용 — 갈등 토론 6대 규칙 + 존댓말 절대 규칙
@@ -571,6 +581,15 @@ export async function runRoutedRequest(
      * outer가 solo 판정했는데 inner가 일반 4명 경로로 빠지는 문제 차단.
      */
     soloPersona?: AllPersonaKey;
+    /**
+     * Stage 1+2 결과 사전 주입 — 제공 시 데이터 수집·관점 분해 LLM 호출 스킵하고
+     * Stage 3(대본 생성)만 실행. 호출자(route.ts)가 품질 가드 위반 감지 후 Stage 3만
+     * 재호출하는 데 사용. solo 경로에는 영향 없음(원래 Stages 1+2 없음).
+     */
+    precomputedStages?: {
+      dataPack: string;
+      personaViews: string;
+    };
   },
 ): Promise<RoutedRequestResult | null> {
   try {
@@ -849,37 +868,47 @@ ${
       'order:', router.order,
     );
 
-    // Stage 1: 데이터 수집 (full 경로만)
-    // ✅ invest 카테고리일 때 데이터 수집 단계에 웹 검색 ON — 실시간 가격/시세 반영.
-    const isInvest = router.categoryV3 === 'invest';
-    const dataPrompt = buildDataCollectionPrompt(
-      messages,
-      legacyCategory,
-      lastMessage,
-      router.categoryV3,
-    );
-    const dataRaw = await callLLM('echo', OPTION_D_SYSTEM_DATA, [
-      { role: 'user', content: dataPrompt },
-    ], { enableSearch: isInvest });
-    const dataPack = extractTag(dataRaw, 'DATA_PACK');
-    console.log('[runRoutedRequest] Stage 1:', dataPack ? '성공' : '실패(빈 DATA_PACK)');
+    // Stage 1+2 — precomputedStages 제공 시 LLM 호출 스킵하고 그대로 사용.
+    //   품질 가드 위반 후 Stage 3만 재호출하는 경로에서 사용. solo 경로는 이 블록 자체에 도달하지 않음.
+    let dataPack: string;
+    let personaViews: string;
+    if (params.precomputedStages) {
+      dataPack = params.precomputedStages.dataPack;
+      personaViews = params.precomputedStages.personaViews;
+      console.log('[runRoutedRequest] Stage 1+2 스킵 — precomputedStages 사용 (재생성 경로)');
+    } else {
+      // Stage 1: 데이터 수집 (full 경로만)
+      // ✅ invest 카테고리일 때 데이터 수집 단계에 웹 검색 ON — 실시간 가격/시세 반영.
+      const isInvest = router.categoryV3 === 'invest';
+      const dataPrompt = buildDataCollectionPrompt(
+        messages,
+        legacyCategory,
+        lastMessage,
+        router.categoryV3,
+      );
+      const dataRaw = await callLLM('echo', OPTION_D_SYSTEM_DATA, [
+        { role: 'user', content: dataPrompt },
+      ], { enableSearch: isInvest });
+      dataPack = extractTag(dataRaw, 'DATA_PACK');
+      console.log('[runRoutedRequest] Stage 1:', dataPack ? '성공' : '실패(빈 DATA_PACK)');
 
-    // Stage 2: 페르소나 관점 분해 (full 경로만)
-    const analysisPrompt = buildPersonaAnalysisPrompt(
-      messages,
-      dataPack,
-      legacyCategory,
-      router.categoryV3,
-    );
-    const analysisRaw = await callLLM('echo', OPTION_D_SYSTEM_DATA, [
-      { role: 'user', content: analysisPrompt },
-    ]);
-    const luciaView = extractTag(analysisRaw, 'LUCIA_VIEW');
-    const jackView = extractTag(analysisRaw, 'JACK_VIEW');
-    const rayView = extractTag(analysisRaw, 'RAY_VIEW');
-    const echoView = extractTag(analysisRaw, 'ECHO_VIEW');
-    const personaViews = `[LUCIA_VIEW]\n${luciaView}\n\n[JACK_VIEW]\n${jackView}\n\n[RAY_VIEW]\n${rayView}\n\n[ECHO_VIEW]\n${echoView}`;
-    console.log('[runRoutedRequest] Stage 2:', personaViews ? '성공' : '실패');
+      // Stage 2: 페르소나 관점 분해 (full 경로만)
+      const analysisPrompt = buildPersonaAnalysisPrompt(
+        messages,
+        dataPack,
+        legacyCategory,
+        router.categoryV3,
+      );
+      const analysisRaw = await callLLM('echo', OPTION_D_SYSTEM_DATA, [
+        { role: 'user', content: analysisPrompt },
+      ]);
+      const luciaView = extractTag(analysisRaw, 'LUCIA_VIEW');
+      const jackView = extractTag(analysisRaw, 'JACK_VIEW');
+      const rayView = extractTag(analysisRaw, 'RAY_VIEW');
+      const echoView = extractTag(analysisRaw, 'ECHO_VIEW');
+      personaViews = `[LUCIA_VIEW]\n${luciaView}\n\n[JACK_VIEW]\n${jackView}\n\n[RAY_VIEW]\n${rayView}\n\n[ECHO_VIEW]\n${echoView}`;
+      console.log('[runRoutedRequest] Stage 2:', personaViews ? '성공' : '실패');
+    }
 
     // Stage 3 — 일반 (4명 대본)
     // Stage 1 실시간 수집 데이터(dataPack)를 Stage 3에 명시적으로 주입.
@@ -926,6 +955,8 @@ ${
       closerContent: closer,
       closerKey: router.closerPersona as TaggedPersonaKey,
       luciaClose,
+      // 품질 가드 위반 시 Stage 3만 재호출하도록 Stage 1+2 결과 노출.
+      _stage12Cache: { dataPack, personaViews },
     };
   } catch (e) {
     console.warn('[runRoutedRequest] 실행 실패', e);
