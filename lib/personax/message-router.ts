@@ -885,20 +885,27 @@ ${
       personaViews = params.precomputedStages.personaViews;
       console.log('[runRoutedRequest] Stage 1+2 스킵 — precomputedStages 사용 (재생성 경로)');
     } else {
-      // Stage 1: 데이터 수집 (full 경로만)
-      // ✅ invest 카테고리일 때 데이터 수집 단계에 웹 검색 ON — 실시간 가격/시세 반영.
+      // Stage 1: 데이터 수집 — invest 카테고리만 실행. emotional/action/principle은 스킵.
+      //   · invest: 웹 검색 ON으로 실시간 가격/시세/PBR/순매수 등 수집 → Stage 2/3 반박 근거.
+      //   · 비-invest(emotional/action/principle): 실시간 데이터 불필요 + 웹검색 OFF였으므로
+      //     LLM 호출 자체를 스킵해 비용·지연 절감. Stage 2는 dataPack 없이도 페르소나 관점 분해 가능.
       const isInvest = router.categoryV3 === 'invest';
-      const dataPrompt = buildDataCollectionPrompt(
-        messages,
-        legacyCategory,
-        lastMessage,
-        router.categoryV3,
-      );
-      const dataRaw = await callLLM('echo', OPTION_D_SYSTEM_DATA, [
-        { role: 'user', content: dataPrompt },
-      ], { enableSearch: isInvest });
-      dataPack = extractTag(dataRaw, 'DATA_PACK');
-      console.log('[runRoutedRequest] Stage 1:', dataPack ? '성공' : '실패(빈 DATA_PACK)');
+      if (isInvest) {
+        const dataPrompt = buildDataCollectionPrompt(
+          messages,
+          legacyCategory,
+          lastMessage,
+          router.categoryV3,
+        );
+        const dataRaw = await callLLM('echo', OPTION_D_SYSTEM_DATA, [
+          { role: 'user', content: dataPrompt },
+        ], { enableSearch: true });
+        dataPack = extractTag(dataRaw, 'DATA_PACK');
+        console.log('[runRoutedRequest] Stage 1(invest, 웹검색 ON):', dataPack ? '성공' : '실패(빈 DATA_PACK)');
+      } else {
+        dataPack = '';
+        console.log('[runRoutedRequest] Stage 1 스킵 — categoryV3=', router.categoryV3, '(실시간 데이터 불필요)');
+      }
 
       // Stage 2: 페르소나 관점 분해 (full 경로만)
       const analysisPrompt = buildPersonaAnalysisPrompt(
