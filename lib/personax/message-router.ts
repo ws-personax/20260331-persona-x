@@ -53,6 +53,8 @@ async function callGPTMini(system: string, user: string): Promise<string> {
   const res = await client.chat.completions.create({
     model: 'gpt-4o-mini',
     temperature: 0.95, // 갈등/스파크/개그 다양성 극대화
+    presence_penalty: 0.3,
+    frequency_penalty: 0.2,
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user },
