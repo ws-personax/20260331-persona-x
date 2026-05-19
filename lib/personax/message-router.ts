@@ -932,11 +932,6 @@ ${
 ⛔ [CLOSER] 블록은 반드시 ${(router.closerPersona || 'jack').toUpperCase()} 톤. FIRST(${(router.firstPersona || 'lucia').toUpperCase()})는 CLOSER 불가.`;
     // Stage 3 — GPT-4.1-mini 사용 (full 경로만). solo·Stage 1·Stage 2는 기존 callLLM 유지.
     const scriptRaw = await callGPTMini(OPTION_D_SYSTEM, scriptPrompt);
-    // [TEMP DEBUG] [ECHO_QUESTION] 태그 포함 여부 검증용 — DEBUG_SCRIPT_RAW=1 일 때만 출력.
-    //   invest 경로 EchoBubble 누락 디버깅 후 제거 예정.
-    if (process.env.DEBUG_SCRIPT_RAW === '1') {
-      console.warn('[script-raw]', scriptRaw.slice(0, 500));
-    }
     // ✅ 후처리 필터 — 슬롯별 페르소나 키로 postProcessPersonaOutput 적용.
     //    first/second/third → router.order[0/1/2], closer → router.closerPersona,
     //    luciaClose → 'lucia' 고정, echoQuestion → 'echo' 고정.
