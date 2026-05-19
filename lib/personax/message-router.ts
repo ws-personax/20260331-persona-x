@@ -239,6 +239,8 @@ const ensureFourPersonaOrder = (baseOrder: TaggedPersonaKey[]): TaggedPersonaKey
  *  - FIRST가 ray/jack/lucia이면 order[0]로 이동
  *  - CLOSER가 ray/jack/lucia이고 FIRST와 다르면 order[2]로 이동
  *  - ECHO인 경우 order 배열 조작 불가 (ECHO는 [ECHO_QUESTION] 슬롯)
+ *  - invest는 ECHO를 order에서 제외하고 [ray, jack, lucia] 3원소로 반환
+ *    (ECHO_QUESTION 하드코딩 슬롯과 중복/누락 방지)
  */
 export const enforceOrder = (
   baseOrder: TaggedPersonaKey[],
@@ -259,7 +261,13 @@ export const enforceOrder = (
       arr = [...arr.filter((k) => k !== closer), closer];
     }
   }
-  if (categoryV3 === 'invest' || categoryV3 === 'principle') {
+  if (categoryV3 === 'invest') {
+    // ECHO는 [ECHO_QUESTION] 하드코딩 슬롯에 별도로 등장 → order에서 제외.
+    // order에 포함하면 tagged 경로에서 THIRD/ECHO_QUESTION 중복 + JACK 누락 버그 발생.
+    const remaining = arr.filter((k) => k !== 'jack' && k !== 'echo' && k !== 'ray');
+    arr = ['ray', 'jack', ...remaining];
+  }
+  if (categoryV3 === 'principle') {
     const withoutJackEcho = arr.filter((k) => k !== 'jack' && k !== 'echo');
     arr = [...withoutJackEcho, 'echo', 'jack'];
   }
