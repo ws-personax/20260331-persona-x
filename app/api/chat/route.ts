@@ -1158,29 +1158,6 @@ export async function POST(req: Request) {
     const { messages, positionContext, teaMode, teaRound, teaPersona, isAdvancedQuestion } = await req.json();
     const lastMsg = messages.at(-1)?.content || "";
 
-    // ✅ V2 위기 감지 — 자살/자해/극단 표현 감지 시 코드 레벨에서 LUCIA 단독 모드로 강제 분기
-    // 이 분기는 LLM 자율 판단보다 우선 (법적/윤리적 안전망)
-    const CRISIS_KEYWORDS = [
-      // 직접 자살 표현
-      '죽고 싶', '죽고싶', '자살', '자해',
-      // 간접 자살 표현 (가장 자주 누락되는 패턴)
-      '죽을 것 같', '죽을것같', '죽을 거 같', '죽을거같',
-      '끝내고 싶', '끝내고싶', '그만하고 싶', '그만하고싶',
-      // 존재 부정
-      '살기 싫', '살기싫', '살고 싶지 않',
-      '사라지고 싶', '없어지고 싶', '없어졌으면',
-      // 한계 표현
-      '다 포기', '더 이상 못', '더는 못',
-      '혼자 해결', '마지막 부탁',
-      // 신체적 압박 표현
-      '놓아 버리', '놓아버리', '내려놓고 싶',
-      '숨 막혀', '숨막혀', '숨 쉬기 힘',
-    ];
-    const detectCrisis = (text: string): boolean => {
-      if (!text) return false;
-      return CRISIS_KEYWORDS.some(k => text.includes(k));
-    };
-
     // ✅ LUCIA 허브 — 카테고리 감지 및 페르소나 라우팅
     const CATEGORY_MAP = {
       finance:  /주식|펀드|ETF|종목|코스피|코스닥|나스닥|NASDAQ|S&P500|SP500|S&P|다우존스|다우|항셍|닛케이|원달러|달러|금|채권|포트폴리오|수익|손절|매수|매도|배당|금리|환율|가상화폐|비트코인|저축|예금|적금|퇴직금|연금|삼성전자|SK하이닉스|카카오뱅크|카카오게임즈|카카오|네이버|현대차|기아차|기아|LG전자|LG|엘지전자|엘지|삼성바이오|셀트리온|포스코|크래프톤|넥슨|넷마블|하이브|두산|롯데|한화|SK|KT|CJ|GS|KB금융|신한지주|하나금융|테슬라|애플|엔비디아|구글|아마존|마이크로소프트|돈이|돈은|돈을|살까|팔까|투자할까|넣을까|빼야|수익|손실|올랐|떨어졌|물렸|상승|하락/,
