@@ -811,8 +811,7 @@ async function callOptionDWithStage3Guard(
       return first;
     }
     const retryReasons = detectStage3GuardViolations(retry, order, isHeeMode);
-    if (retryReasons.length === 0) {
-    } else {
+    if (retryReasons.length > 0) {
       console.warn('[stage3-guard] 재생성도 위반:', retryReasons.join(', '), '— 재생성 결과 사용');
     }
     return retry;
@@ -829,8 +828,7 @@ async function callOptionDWithStage3Guard(
     return first;
   }
   const retryReasons = detectStage3GuardViolations(retry, order, isHeeMode);
-  if (retryReasons.length === 0) {
-  } else {
+  if (retryReasons.length > 0) {
     console.warn('[stage3-guard] 재생성도 위반(solo):', retryReasons.join(', '), '— 재생성 결과 사용');
   }
   return retry;
@@ -940,7 +938,6 @@ const saveHistory = async (params: {
 
     if (insertError) {
       console.error('[saveHistory] 저장 실패:', insertError.message, insertError.code);
-    } else {
     }
   } catch (err) { console.error('[saveHistory] 예외:', err); }
 };
@@ -1581,8 +1578,6 @@ export async function POST(req: Request) {
         const categoryV3Local = _categoryV3;
         const firstPersonaLocal = _firstPersonaV3;
         const order: TaggedPersonaKey[] = applyV3OrderOverride(rawOrder);
-        if (order[0] !== rawOrder[0]) {
-        }
         // ✅ V3 invest 카테고리 + legacy finance/news 시 웹 검색 ON
         //    'stock' | 'crypto' | 'economy' 는 legacy detectCategory 반환값에 없어 데드 코드지만,
         //    화이트리스트 확장 가능성 고려해 주석으로 보존 (향후 detectCategory 보강 시 활성화).
@@ -1657,8 +1652,6 @@ export async function POST(req: Request) {
             const optionDMessages = categoryChanged
               ? (messages as Array<{ role?: string; content?: string }>).slice(-1)
               : (messages as Array<{ role?: string; content?: string }>);
-            if (categoryChanged) {
-            }
             r1 = await callOptionDWithStage3Guard(optionDMessages, category, msg, order, categoryV3Local, firstPersonaLocal, _hasPriorConversation, _closerPersonaV3);
             r1UsesOrderedSlots = true;
             // ✅ callOptionD 빈 결과 시 폴백 완전 차단 — null/빈 객체여도 정상 done 경로로 강제 통과
@@ -2664,15 +2657,11 @@ export async function POST(req: Request) {
       });
     }
 
-    // ✅ V2 위기 모드 — 자살/자해/극단 표현 감지 시 isCrisisMode 플래그만 세팅
+    // ✅ V2 위기 모드 — 자살/자해/극단 표현 감지 처리는 orchestrator-tagged.ts 170-189줄에 일임.
     //   PersonaX 근본 원칙: 4명 출동 = 차별성 = 티키타카.
     //   위기 모드에서도 4명이 출동하되, 위기 톤으로 역할 분담:
     //     LUCIA(마음 받기) / JACK(109·1393 안내) / RAY(전화 권유) / ECHO(부드러운 권유)
-    //   이 분담 로직은 orchestrator-tagged.ts 170-189줄에 이미 구현됨.
-    //   여기서는 플래그만 세팅하고, 흐름은 그대로 4명 토론 분기로 보냄.
-    const isCrisisMode = detectCrisis(lastMsg);
-    if (isCrisisMode) {
-    }
+    //   별도 분기 없이 그대로 4명 토론 분기로 보냄.
 
     // ✅ 감정/일반 대화 가드 — teaMode=false 로 들어와도 종목 추출 차단
     //   teaMode 블록은 teaMode=true 만 처리하므로, teaMode=false + emotion/general 케이스가
