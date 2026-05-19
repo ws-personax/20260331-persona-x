@@ -981,6 +981,8 @@ ${
 
     // [TEMP DEBUG] echoQuestionRaw 실값 검증용 — 재요청 분기 fire 여부 추적 후 제거 예정.
     console.warn('[echo-question-raw]', echoQuestionRaw.slice(0, 100));
+    // [TEMP DEBUG] postProcessPersonaOutput 통과 후 최종 반환 echoQuestion 값 — stage3-guard 재생성 경로 검증용.
+    console.warn('[echo-question-final]', echoQuestion?.slice(0, 80));
     console.log('[runRoutedRequest] Stage 3 완료 — first:', first?.slice(0, 20));
 
     return {
