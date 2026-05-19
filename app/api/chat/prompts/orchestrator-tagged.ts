@@ -1627,7 +1627,7 @@ const countCategoryMatches = (text: string): Record<CategoryV3, number> => {
  *  - 매치 시 LUCIA(감정증폭) → JACK(다음스텝) → RAY(의미데이터) → ECHO(본질) 순서 강제
  */
 const HEE_KEYWORDS =
-  /합격|승진|진급|영전|결혼|약혼|상견례|혼인|출산|임신|돌잔치|돌잡이|취직|취업|입사|등단|당첨|투자수익|수익\s*났|이익\s*났|차익|배당받|보너스|성과급|승리|우승|입상|상\s*받|개업|개원|진학|입학|장학금|졸업|기쁜\s*소식|좋은\s*소식|경사\s*났|축하|드디어|꿈을\s*이뤘|해냈/;
+  /합격|승진|진급|영전|결혼|약혼|상견례|혼인|출산|임신|돌잔치|돌잡이|취직|취업|입사|등단|당첨|투자수익|수익[이가을\s]*?났|이익[이가을\s]*?났|차익[이가을\s]*?났|첫\s*수익|처음[\s,으로]*?수익|돈\s*벌었|벌었어요|벌었습니|차익|배당받|보너스|성과급|승리|우승|입상|상\s*받|개업|개원|진학|입학|장학금|졸업|기쁜\s*소식|좋은\s*소식|경사\s*났|축하|드디어|꿈을\s*이뤘|해냈/;
 
 export const detectEmotionalSubtypeHee = (msg: string): boolean => {
   const text = (msg || '').trim();
@@ -1638,6 +1638,9 @@ export const detectEmotionalSubtypeHee = (msg: string): boolean => {
 export const detectCategoryV3 = (msg: string): CategoryV3 => {
   const text = (msg || '').trim();
   if (!text) return 'emotional';
+  // 희(喜) 우선 단락 — 수익/성과 + 성취 표현("났/벌었/받았")은 invest 키워드보다 우선해 emotional로.
+  // 이유: hee 서브타입은 emotional 하위에서만 활성화되므로 invest로 빠지면 축하 모드가 꺼진다.
+  if (detectEmotionalSubtypeHee(text)) return 'emotional';
   const counts = countCategoryMatches(text);
   const matched = (Object.keys(counts) as CategoryV3[]).filter((k) => counts[k] > 0);
   if (matched.length === 0) return 'emotional';
