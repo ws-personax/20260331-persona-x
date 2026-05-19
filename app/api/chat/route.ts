@@ -552,7 +552,6 @@ async function runStage1Analysis(
   };
 
   const elapsed = Date.now() - t0;
-  console.log(`[stage1] 1차 분석 완료 (${elapsed}ms) — lucia.insight="${stage1.lucia.insight.slice(0, 60)}" / jack.insight="${stage1.jack.insight.slice(0, 60)}" / ray.insight="${stage1.ray.insight.slice(0, 60)}"`);
   return stage1;
 }
 
@@ -813,7 +812,6 @@ async function callOptionDWithStage3Guard(
     }
     const retryReasons = detectStage3GuardViolations(retry, order, isHeeMode);
     if (retryReasons.length === 0) {
-      console.log('[stage3-guard] 재생성 성공 (Stage 3만 재실행)');
     } else {
       console.warn('[stage3-guard] 재생성도 위반:', retryReasons.join(', '), '— 재생성 결과 사용');
     }
@@ -832,7 +830,6 @@ async function callOptionDWithStage3Guard(
   }
   const retryReasons = detectStage3GuardViolations(retry, order, isHeeMode);
   if (retryReasons.length === 0) {
-    console.log('[stage3-guard] 재생성 성공(solo)');
   } else {
     console.warn('[stage3-guard] 재생성도 위반(solo):', retryReasons.join(', '), '— 재생성 결과 사용');
   }
@@ -889,8 +886,6 @@ const saveHistory = async (params: {
   ipAddress?: string | null; userId?: string | null; volIsHigh?: boolean;
 }): Promise<void> => {
   try {
-    console.log('[saveHistory] userId:', params.userId);
-    console.log('[saveHistory] keyword:', params.keyword);
     const supabase = getSupabase();
     if (!supabase) {
       console.warn('[saveHistory] supabase client null — 환경변수 확인 필요');
@@ -946,7 +941,6 @@ const saveHistory = async (params: {
     if (insertError) {
       console.error('[saveHistory] 저장 실패:', insertError.message, insertError.code);
     } else {
-      console.log('[saveHistory] 저장 성공');
     }
   } catch (err) { console.error('[saveHistory] 예외:', err); }
 };
@@ -1588,7 +1582,6 @@ export async function POST(req: Request) {
         const firstPersonaLocal = _firstPersonaV3;
         const order: TaggedPersonaKey[] = applyV3OrderOverride(rawOrder);
         if (order[0] !== rawOrder[0]) {
-          console.log('[first-persona/tagged] 순서 강제 정렬:', rawOrder, '→', order, '(categoryV3:', categoryV3Local, ')');
         }
         // ✅ V3 invest 카테고리 + legacy finance/news 시 웹 검색 ON
         //    'stock' | 'crypto' | 'economy' 는 legacy detectCategory 반환값에 없어 데드 코드지만,
@@ -1665,7 +1658,6 @@ export async function POST(req: Request) {
               ? (messages as Array<{ role?: string; content?: string }>).slice(-1)
               : (messages as Array<{ role?: string; content?: string }>);
             if (categoryChanged) {
-              console.log('[optionD] 카테고리 전환 감지 → 이전 맥락 제거, 마지막 메시지만 전달 (prev:', prevCategory, '→ now:', category, ')');
             }
             r1 = await callOptionDWithStage3Guard(optionDMessages, category, msg, order, categoryV3Local, firstPersonaLocal, _hasPriorConversation, _closerPersonaV3);
             r1UsesOrderedSlots = true;
@@ -2092,9 +2084,7 @@ export async function POST(req: Request) {
     //     · 새 세션 (teaRound 없음) → 일반 4명 분기 빠지기 전 차단
     //     · 이어지는 세션 (teaRound>=2) → 2라운드 분기 진입 전 차단
     // ──────────────────────────────────────────────────────────────
-    console.log('[solo-check] strategy:', _routerDecision?.strategy, 'invoked:', _routerDecision?.invokedPersona);
     if (_routerDecision.strategy === 'solo' && _routerDecision.invokedPersona) {
-      console.log('[solo-early] strategy:', _routerDecision?.strategy, 'invokedPersona:', _routerDecision?.invokedPersona, 'msg:', lastMsg?.slice(0, 30));
       const invoked = _routerDecision.invokedPersona;
       // ✅ solo는 categoryChanged 슬라이싱 적용 안 함 — 이전 대화 맥락이 안부 질문의
       //   자연스러운 전환 문장("○○ 얘기하시다가 저한테 물어보시네요")에 필요.
@@ -2682,7 +2672,6 @@ export async function POST(req: Request) {
     //   여기서는 플래그만 세팅하고, 흐름은 그대로 4명 토론 분기로 보냄.
     const isCrisisMode = detectCrisis(lastMsg);
     if (isCrisisMode) {
-      console.log('[V2 CRISIS MODE] 위기 키워드 감지 → 4명 위기 톤 분담 모드');
     }
 
     // ✅ 감정/일반 대화 가드 — teaMode=false 로 들어와도 종목 추출 차단
@@ -3215,11 +3204,6 @@ ${DISCLAIMER}`;
           status: (getUserErr as { status?: number }).status,
         });
       }
-      console.log('[saveHistory:getUser] result:', {
-        hasUser: !!user,
-        userId: user?.id ?? null,
-        email: user?.email ?? null,
-      });
       userId = user?.id ?? null;
       if (!userId) {
         console.warn('[saveHistory:getUser] userId null — 히스토리 저장 스킵 예정 (서버 쿠키 미동기화 가능)');
