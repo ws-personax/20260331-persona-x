@@ -984,7 +984,40 @@ ${
     const third = postProcessPersonaOutput(extractTag(scriptRaw, 'THIRD') || '', thirdKey);
     const closer = postProcessPersonaOutput(extractTag(scriptRaw, 'CLOSER') || '', closerKeyForFilter);
     const luciaClose = postProcessPersonaOutput(extractTag(scriptRaw, 'LUCIA_CLOSE') || '', 'lucia');
-    const echoQuestion = postProcessPersonaOutput(extractTag(scriptRaw, 'ECHO_QUESTION') || '', 'echo');
+
+    // ECHO_QUESTION 누락 감지 — invest/action/principle(=비-emotional) 카테고리에서만 보정.
+    //   emotional은 [LUCIA_CLOSE] 액자 구조라 ECHO_QUESTION이 의도적으로 부재.
+    //   1차 추출이 빈 값이면 ECHO_QUESTION만 별도 재요청, 그것도 실패 시 invest 폴백 문장 사용.
+    const expectsEchoQuestion = router.categoryV3 !== 'emotional';
+    let echoQuestionRaw = extractTag(scriptRaw, 'ECHO_QUESTION') || '';
+    if (expectsEchoQuestion && !echoQuestionRaw.trim()) {
+      console.warn('[runRoutedRequest] ECHO_QUESTION 누락 → 별도 재요청');
+      const firstRaw = extractTag(scriptRaw, 'FIRST') || '';
+      const secondRaw = extractTag(scriptRaw, 'SECOND') || '';
+      const thirdRaw = extractTag(scriptRaw, 'THIRD') || '';
+      const closerRaw = extractTag(scriptRaw, 'CLOSER') || '';
+      const orderUpper = router.order.map((k) => k.toUpperCase());
+      const closerLabel = (router.closerPersona || 'jack').toUpperCase();
+      const retryPrompt = `[1] ${orderUpper[0] || 'RAY'}: ${firstRaw}
+[2] ${orderUpper[1] || 'JACK'}: ${secondRaw}
+[3] ${orderUpper[2] || 'LUCIA'}: ${thirdRaw}
+[CLOSER] ${closerLabel}: ${closerRaw}
+
+위 대화에서 RAY/JACK/LUCIA 발언을 보고 ECHO 대표로서 본질 판결 1줄 + 유저에게 구체적 질문 1개를 작성하라.
+추상/철학 질문 금지. 양자택일 또는 숫자 질문.
+[ECHO_QUESTION] 태그로 감싸서 출력. 2줄 이내. ?로 끝낼 것.`;
+      try {
+        const retryRaw = await callGPTMini(OPTION_D_SYSTEM, retryPrompt);
+        echoQuestionRaw = extractTag(retryRaw, 'ECHO_QUESTION') || '';
+      } catch (e) {
+        console.warn('[runRoutedRequest] ECHO_QUESTION 재요청 실패', e);
+      }
+      if (!echoQuestionRaw.trim()) {
+        console.warn('[runRoutedRequest] ECHO_QUESTION 재요청도 빈 값 → 폴백 사용');
+        echoQuestionRaw = '지금 손절선 정해놓으셨어요?';
+      }
+    }
+    const echoQuestion = postProcessPersonaOutput(echoQuestionRaw, 'echo');
 
     console.log('[runRoutedRequest] Stage 3 완료 — first:', first?.slice(0, 20));
 
