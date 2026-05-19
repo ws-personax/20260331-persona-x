@@ -979,6 +979,8 @@ ${
     }
     const echoQuestion = postProcessPersonaOutput(echoQuestionRaw, 'echo');
 
+    // [TEMP DEBUG] echoQuestionRaw 실값 검증용 — 재요청 분기 fire 여부 추적 후 제거 예정.
+    console.warn('[echo-question-raw]', echoQuestionRaw.slice(0, 100));
     console.log('[runRoutedRequest] Stage 3 완료 — first:', first?.slice(0, 20));
 
     return {
