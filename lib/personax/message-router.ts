@@ -934,7 +934,10 @@ ${
         // salvage 미적용 — [FIRST] 누락 raw 응답은 분류 혼동으로 broken content일 확률 높음
         //   (verbatim 예시 복사 등). UX 정확성 위해 fallback 메시지 유지. 빈 응답 자체는
         //   상위 솔로 ECHO fallback이 닫는 질문으로 보완하므로 사용자 경험상 자연스럽게 닫힘.
-        soloText = `${display} 답변을 생성하지 못했습니다`;
+        // [TEMP DEBUG] 내부 진단 — Vercel 로그 직접 접근 안되므로 fallback에 인라인.
+        const _diag = `rawLen=${(soloRaw || '').length},hasFirstTag=${/\[FIRST\]/i.test(soloRaw || '')},extLen=${soloExtracted.length}`;
+        const _rawHead = (soloRaw || '').slice(0, 160).replace(/\s+/g, ' ');
+        soloText = `${display} 답변을 생성하지 못했습니다 [DEBUG ${_diag} | rawHead=${_rawHead}]`;
       }
       if (process.env.DEBUG_MODE === '1') {
         console.log('[runRoutedRequest] solo 완료 — first 20자:', soloText.slice(0, 20));
