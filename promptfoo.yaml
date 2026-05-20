@@ -95,3 +95,90 @@ tests:
           const r = JSON.parse(output);
           const echo = (r.echo || '').trim();
           return echo.endsWith('?');
+
+  - description: "emotional 관계 — 남편이랑 사이가 안 좋아요"
+    vars:
+      prompt: "남편이랑 사이가 안 좋아요"
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const echo = r.echo || '';
+          return !/(LUCIA|RAY|JACK)[^?!.]{0,30}궤변/.test(echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const echo = (r.echo || '').trim();
+          return echo.endsWith('?');
+
+  - description: "invest 암호화폐 — 비트코인 지금 사도 될까요?"
+    vars:
+      prompt: "비트코인 지금 사도 될까요?"
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: not-contains
+        value: "세 분 모두 일리"
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const all = (r.ray || '') + (r.jack || '') + (r.lucia || '') + (r.echo || '');
+          return all.includes('손절선') || all.includes('지지선');
+
+  - description: "hee 직장 — 승진했어요!"
+    vars:
+      prompt: "승진했어요!"
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const all = (r.ray || '') + (r.jack || '') + (r.lucia || '') + (r.echo || '');
+          return !/리스크|손절/.test(all);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const all = (r.ray || '') + (r.jack || '') + (r.lucia || '') + (r.echo || '');
+          return all.includes('축하') || all.includes('기뻐');
+
+  - description: "action 커리어 — 명퇴 권유 받았어요"
+    vars:
+      prompt: "명퇴 권유 받았어요"
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const echo = (r.echo || '').trim();
+          return echo.endsWith('?');
+
+  - description: "emotional 가족/무거운 — 부모님 요양원 모셔야 할지 모르겠어요"
+    vars:
+      prompt: "부모님 요양원 모셔야 할지 모르겠어요"
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const echo = r.echo || '';
+          return !/(LUCIA|RAY|JACK)[^?!.]{0,30}궤변/.test(echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const echo = (r.echo || '').trim();
+          return echo.endsWith('?');

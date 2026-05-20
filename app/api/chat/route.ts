@@ -2135,7 +2135,7 @@ export async function POST(req: Request) {
     //   LLM 실패 시 round/카테고리 기반 템플릿으로 자동 폴백.
     //   ⚠️ 재테크 탭(teaMode=false)은 아래 블록을 건너뛰므로 동작 변화 없음.
     //   ⚠️ finance 카테고리는 teaMode=true 일 때 RAY 로 자동 라우팅 (재테크 탭은 그대로 풀 분석).
-    if (teaMode || category === 'sports' || category === 'news' || category === 'life' || category === 'legal' || category === 'tech') {
+    if (teaMode || category === 'sports' || category === 'news' || category === 'life' || category === 'legal' || category === 'tech' || category === 'emotion' || category === 'general') {
       // ── ✅ news 카테고리 — 4명 페르소나 병렬 응답 (Google Search grounding) ──
       //   기존: RAY 1명만 답변 (단일 페르소나 dispatch). 시사·정세는 다각도 분석이 필요해
       //   RAY/JACK/LUCIA/ECHO 4명 동시 응답으로 변경. teaPersona가 명시 픽(jack/echo/ray)
