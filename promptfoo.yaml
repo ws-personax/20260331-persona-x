@@ -11,18 +11,7 @@ providers:
         messages:
           - role: user
             content: "{{prompt}}"
-      transformResponse: |
-        const lines = String(text || '').split('\n');
-        let personas = null;
-        for (const line of lines) {
-          if (line.startsWith('data:')) {
-            try {
-              const j = JSON.parse(line.slice(5).trim());
-              if (j && j.type === 'done' && j.personas) personas = j.personas;
-            } catch (e) {}
-          }
-        }
-        return JSON.stringify(personas || {});
+      transformResponse: file://promptfoo-transform.js
 
 tests:
   - description: "invest — 삼성전자 지금 사도 될까요?"
