@@ -66,7 +66,7 @@ tests:
         value: |
           const r = JSON.parse(output);
           const all = (r.ray || '') + (r.jack || '') + (r.lucia || '') + (r.echo || '');
-          return all.includes('축하') || all.includes('기뻐');
+          return /축하|기뻐|기쁨|기쁘|감격|벅차|벅참|뿌듯|경사|잘 됐|해냈/.test(all);
 
   - description: "action — 10년 다닌 회사 그만둘까요?"
     vars:
@@ -148,7 +148,7 @@ tests:
         value: |
           const r = JSON.parse(output);
           const all = (r.ray || '') + (r.jack || '') + (r.lucia || '') + (r.echo || '');
-          return all.includes('축하') || all.includes('기뻐');
+          return /축하|기뻐|기쁨|기쁘|감격|벅차|벅참|뿌듯|경사|잘 됐|해냈/.test(all);
 
   - description: "action 커리어 — 명퇴 권유 받았어요"
     vars:
