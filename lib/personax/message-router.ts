@@ -891,6 +891,9 @@ ${
           ', 웹검색', isInvest ? 'ON' : 'OFF',
           '):', dataPack ? '성공' : '실패(빈 DATA_PACK)',
         );
+        // [TEMP DEBUG] dataPack 실내용 확인 — 웹검색 그라운딩 결과/현재가 포함 여부 추적용. 검증 후 제거.
+        console.warn('[stage1-datapack-raw]', (dataRaw || '').slice(0, 300));
+        console.warn('[stage1-datapack-extracted]', dataPack.slice(0, 500));
       }
 
       // Stage 2: 페르소나 관점 분해 (full 경로만)
@@ -932,6 +935,9 @@ ${
 ⛔ [CLOSER] 블록은 반드시 ${(router.closerPersona || 'jack').toUpperCase()} 톤. FIRST(${(router.firstPersona || 'lucia').toUpperCase()})는 CLOSER 불가.`;
     // Stage 3 — GPT-4.1-mini 사용 (full 경로만). solo·Stage 1·Stage 2는 기존 callLLM 유지.
     const scriptRaw = await callGPTMini(OPTION_D_SYSTEM, scriptPrompt);
+    // [TEMP DEBUG] Stage 3 입력/출력 확인 — dataContext 주입 후 GPT가 실제 현재가 인용했는지 추적용. 검증 후 제거.
+    console.warn('[stage3-script-prompt-head]', scriptPrompt.slice(0, 400));
+    console.warn('[stage3-script-raw-head]', (scriptRaw || '').slice(0, 400));
     // ✅ 후처리 필터 — 슬롯별 페르소나 키로 postProcessPersonaOutput 적용.
     //    first/second/third → router.order[0/1/2], closer → router.closerPersona,
     //    luciaClose → 'lucia' 고정, echoQuestion → 'echo' 고정.
