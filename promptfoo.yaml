@@ -1,0 +1,108 @@
+description: "PersonaX 88점 자동 품질 테스트"
+
+providers:
+  - id: https
+    config:
+      url: https://20260331-persona-x.vercel.app/api/chat
+      method: POST
+      headers:
+        Content-Type: application/json
+      body:
+        messages:
+          - role: user
+            content: "{{prompt}}"
+      transformResponse: |
+        const lines = String(text || '').split('\n');
+        let personas = null;
+        for (const line of lines) {
+          if (line.startsWith('data:')) {
+            try {
+              const j = JSON.parse(line.slice(5).trim());
+              if (j && j.type === 'done' && j.personas) personas = j.personas;
+            } catch (e) {}
+          }
+        }
+        return JSON.stringify(personas || {});
+
+tests:
+  - description: "invest — 삼성전자 지금 사도 될까요?"
+    vars:
+      prompt: "삼성전자 지금 사도 될까요?"
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: not-contains
+        value: "세 분 모두 일리"
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const all = (r.ray || '') + (r.jack || '') + (r.lucia || '') + (r.echo || '');
+          return all.includes('손절선') || all.includes('지지선');
+
+  - description: "emotional — 회사 다니기 너무 힘들어요"
+    vars:
+      prompt: "회사 다니기 너무 힘들어요"
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const echo = r.echo || '';
+          return !/(LUCIA|RAY|JACK)[^?!.]{0,30}궤변/.test(echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const echo = (r.echo || '').trim();
+          return echo.endsWith('?');
+
+  - description: "hee — 아들이 대학 합격했어요!"
+    vars:
+      prompt: "아들이 대학 합격했어요!"
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const all = (r.ray || '') + (r.jack || '') + (r.lucia || '') + (r.echo || '');
+          return !/리스크|손절/.test(all);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const all = (r.ray || '') + (r.jack || '') + (r.lucia || '') + (r.echo || '');
+          return all.includes('축하') || all.includes('기뻐');
+
+  - description: "action — 10년 다닌 회사 그만둘까요?"
+    vars:
+      prompt: "10년 다닌 회사 그만둘까요?"
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const echo = (r.echo || '').trim();
+          return echo.endsWith('?');
+
+  - description: "principle — 어떻게 사는 게 잘 사는 건가요?"
+    vars:
+      prompt: "어떻게 사는 게 잘 사는 건가요?"
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const echo = (r.echo || '').trim();
+          return echo.endsWith('?');
