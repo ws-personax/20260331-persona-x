@@ -598,6 +598,12 @@ const mapOrderedRound1 = (
   if (result.echoQuestion) {
     personaText.echo = result.echoQuestion;
   }
+  // 복합 카테고리(finance+emotional 등) — order에 echo가 없고 echoQuestion도 비어있을 때,
+  //   LUCIA_CLOSE가 실제 닫는 질문 역할이므로 personaText.echo에 동기화.
+  //   UI/테스트에서 echo 필드가 비지 않도록 보장.
+  if (!personaText.echo && result.luciaClose) {
+    personaText.echo = result.luciaClose;
+  }
   // ECHO 종결 "?" 보편 강제 — invest/action/principle은 message-router에서 echoQuestion에 적용됐고,
   //   emotional은 ECHO가 THIRD 슬롯이라 "."로 끝나는 경우가 많음. UI/테스트 기대치(ECHO=질문자) 부합.
   if (personaText.echo && !personaText.echo.trimEnd().endsWith('?')) {
