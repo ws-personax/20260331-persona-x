@@ -28,6 +28,7 @@ import { TEA_SYSTEM_LUCIA } from '@/app/api/chat/prompts/tea-lucia';
 import { TEA_SYSTEM_RAY } from '@/app/api/chat/prompts/tea-ray';
 import { TEA_SYSTEM_ECHO } from '@/app/api/chat/prompts/tea-echo';
 import OpenAI from 'openai';
+import { GoogleGenerativeAI, type GenerationConfig } from '@google/generative-ai';
 
 // 지연 초기화 — 모듈 로드 시점이 아닌 첫 호출 시점에 OpenAI 클라이언트 생성.
 // 빌드 단계에서 OPENAI_API_KEY가 없어도 throw하지 않도록 함.
@@ -41,6 +42,19 @@ function getOpenAIClient(): OpenAI {
     openaiClient = new OpenAI({ apiKey });
   }
   return openaiClient;
+}
+
+// Gemini 지연 초기화 — Stage 3 Gemini 분기(USE_GEMINI_STAGE3=true)에서만 사용.
+let geminiClient: GoogleGenerativeAI | null = null;
+function getGeminiClient(): GoogleGenerativeAI {
+  if (!geminiClient) {
+    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    if (!apiKey) {
+      throw new Error('GOOGLE_GENERATIVE_AI_API_KEY 환경변수가 없습니다');
+    }
+    geminiClient = new GoogleGenerativeAI(apiKey);
+  }
+  return geminiClient;
 }
 
 /**
@@ -61,6 +75,51 @@ async function callGPTMini(system: string, user: string): Promise<string> {
     ],
   });
   return res.choices[0]?.message?.content ?? '';
+}
+
+/**
+ * Stage 3 Gemini 분기 — USE_GEMINI_STAGE3=true일 때 callGPTMini 대체.
+ * 모델 ID는 GEMINI_STAGE3_MODEL env로 오버라이드 가능 (기본 gemini-3.5-flash).
+ * Stage 1의 callTeaPersona Gemini 경로와 동일한 SDK·systemInstruction·generationConfig 패턴 사용.
+ */
+async function callGeminiStage3(system: string, user: string): Promise<string> {
+  const modelName = process.env.GEMINI_STAGE3_MODEL || 'gemini-3.5-flash';
+  const client = getGeminiClient();
+  const model = client.getGenerativeModel({
+    model: modelName,
+    systemInstruction: system,
+  });
+  const result = await model.generateContent({
+    contents: [{ role: 'user', parts: [{ text: user }] }],
+    generationConfig: {
+      maxOutputTokens: 1200,
+      temperature: 0.95, // GPT 분기와 동일 — 갈등/다양성 유지
+      thinkingConfig: { thinkingBudget: 0 },
+    } as GenerationConfig,
+  });
+  const blockReason = result?.response?.promptFeedback?.blockReason;
+  if (blockReason) {
+    console.warn(`[stage3-gemini] ${modelName} 차단 — blockReason=${blockReason}`);
+    return '';
+  }
+  try {
+    return result?.response?.text?.() ?? '';
+  } catch (e) {
+    console.error(`[stage3-gemini] ${modelName} text() 추출 실패`, e);
+    return '';
+  }
+}
+
+/**
+ * Stage 3 디스패처 — USE_GEMINI_STAGE3 플래그로 Gemini/GPT 분기.
+ * true → callGeminiStage3 (gemini-3.5-flash 기본)
+ * false/미설정 → callGPTMini (기존 gpt-4.1-mini)
+ */
+async function callStage3(system: string, user: string): Promise<string> {
+  if (process.env.USE_GEMINI_STAGE3 === 'true') {
+    return callGeminiStage3(system, user);
+  }
+  return callGPTMini(system, user);
 }
 
 export const FEATURE_OPTION_D = true;
@@ -941,8 +1000,9 @@ ${
 기존 화면 표시 참고 순서: ${router.order.map((key, index) => `${index + 1}. ${key.toUpperCase()}`).join(' / ')}
 ⛔ [FIRST] 블록은 반드시 ${(router.firstPersona || 'lucia').toUpperCase()} 톤. 순서는 ${router.order.map((k) => k.toUpperCase()).join(' → ')}.
 ⛔ [CLOSER] 블록은 반드시 ${(router.closerPersona || 'jack').toUpperCase()} 톤. FIRST(${(router.firstPersona || 'lucia').toUpperCase()})는 CLOSER 불가.${closerJackRule}`;
-    // Stage 3 — GPT-4.1-mini 사용 (full 경로만). solo·Stage 1·Stage 2는 기존 callLLM 유지.
-    const scriptRaw = await callGPTMini(OPTION_D_SYSTEM, scriptPrompt);
+    // Stage 3 — 기본 GPT-4.1-mini, USE_GEMINI_STAGE3=true 시 Gemini Flash로 분기.
+    // solo·Stage 1·Stage 2는 기존 callLLM 유지.
+    const scriptRaw = await callStage3(OPTION_D_SYSTEM, scriptPrompt);
     // ✅ 후처리 필터 — 슬롯별 페르소나 키로 postProcessPersonaOutput 적용.
     //    first/second/third → router.order[0/1/2], closer → router.closerPersona,
     //    luciaClose → 'lucia' 고정, echoQuestion → 'echo' 고정.
@@ -978,7 +1038,7 @@ ${
 추상/철학 질문 금지. 양자택일 또는 숫자 질문.
 [ECHO_QUESTION] 태그로 감싸서 출력. 2줄 이내. ?로 끝낼 것.`;
       try {
-        const retryRaw = await callGPTMini(OPTION_D_SYSTEM, retryPrompt);
+        const retryRaw = await callStage3(OPTION_D_SYSTEM, retryPrompt);
         echoQuestionRaw = extractTag(retryRaw, 'ECHO_QUESTION') || '';
       } catch (e) {
         console.warn('[runRoutedRequest] ECHO_QUESTION 재요청 실패', e);
