@@ -367,3 +367,89 @@ tests:
           const r = JSON.parse(output);
           const all = (r.ray || '') + (r.jack || '') + (r.lucia || '') + (r.echo || '');
           return all.includes('손절선') || all.includes('지지선');
+
+  - description: "다중턴 22 — 카테고리 전환 (invest → emotional)"
+    vars:
+      prompt: "[2-turn] 삼성전자 → 손실 불안"
+    provider:
+      id: https
+      config:
+        url: https://20260331-persona-x.vercel.app/api/chat
+        method: POST
+        headers:
+          Content-Type: application/json
+        body:
+          messages:
+            - role: user
+              content: "삼성전자 지금 사도 될까요?"
+            - role: user
+              content: "근데 손실 나면 너무 불안할 것 같아요"
+        transformResponse: file://promptfoo-transform.js
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const all = (r.ray || '') + (r.jack || '') + (r.lucia || '') + (r.echo || '');
+          return /불안|마음/.test(all);
+      - type: not-contains
+        value: "매수하세요"
+
+  - description: "다중턴 23 — 페르소나 호명 (solo 경로)"
+    vars:
+      prompt: "[2-turn] 명퇴 → JACK 호명"
+    provider:
+      id: https
+      config:
+        url: https://20260331-persona-x.vercel.app/api/chat
+        method: POST
+        headers:
+          Content-Type: application/json
+        body:
+          messages:
+            - role: user
+              content: "명퇴 권유 받았어요"
+            - role: user
+              content: "JACK은 어떻게 생각해요?"
+        transformResponse: file://promptfoo-transform.js
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.jack && r.jack.length > 0);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const echo = (r.echo || '').trim();
+          return echo.endsWith('?');
+
+  - description: "다중턴 24 — 2라운드 연속 대화 (principle)"
+    vars:
+      prompt: "[2-turn] 잘 사는 건 → 하루하루 버티는"
+    provider:
+      id: https
+      config:
+        url: https://20260331-persona-x.vercel.app/api/chat
+        method: POST
+        headers:
+          Content-Type: application/json
+        body:
+          messages:
+            - role: user
+              content: "어떻게 사는 게 잘 사는 건가요?"
+            - role: user
+              content: "지금 하루하루 버티는 것 같아요"
+        transformResponse: file://promptfoo-transform.js
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const echo = (r.echo || '').trim();
+          return echo.endsWith('?');
