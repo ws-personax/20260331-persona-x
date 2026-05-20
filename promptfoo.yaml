@@ -182,3 +182,85 @@ tests:
           const r = JSON.parse(output);
           const echo = (r.echo || '').trim();
           return echo.endsWith('?');
+
+  - description: "복합 invest+emotional — 주식 손실 봤어요 속상해요"
+    vars:
+      prompt: "주식 손실 봤어요 속상해요"
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const echo = (r.echo || '').trim();
+          return echo.endsWith('?');
+
+  - description: "emotional 가족/무거운 — 이혼을 생각하고 있어요"
+    vars:
+      prompt: "이혼을 생각하고 있어요"
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const echo = r.echo || '';
+          return !/(LUCIA|RAY|JACK)[^?!.]{0,30}궤변/.test(echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const echo = (r.echo || '').trim();
+          return echo.endsWith('?');
+
+  - description: "principle AI/직업 — 요즘 AI 때문에 내 직업 없어질 것 같아요"
+    vars:
+      prompt: "요즘 AI 때문에 내 직업 없어질 것 같아요"
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const echo = (r.echo || '').trim();
+          return echo.endsWith('?');
+
+  - description: "emotional 반려동물/가벼운 — 강아지가 아파요"
+    vars:
+      prompt: "강아지가 아파요"
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const echo = r.echo || '';
+          return !/(LUCIA|RAY|JACK)[^?!.]{0,30}궤변/.test(echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const echo = (r.echo || '').trim();
+          return echo.endsWith('?');
+
+  - description: "invest 40·50대 핵심 — 퇴직금 어디에 넣어야 할까요?"
+    vars:
+      prompt: "퇴직금 어디에 넣어야 할까요?"
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: not-contains
+        value: "세 분 모두 일리"
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const all = (r.ray || '') + (r.jack || '') + (r.lucia || '') + (r.echo || '');
+          return all.includes('손절선') || all.includes('지지선');
