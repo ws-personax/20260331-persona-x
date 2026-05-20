@@ -3113,6 +3113,14 @@ ${DISCLAIMER}`;
       userId = null;
     }
 
+    // hee+invest 복합 분기 — '삼성전자로 처음 수익 났어요' 같이 HEE(축하/경사)와 invest(종목)가
+    //   동시에 매치되는 경우 legacy stock-detail 템플릿(시장 분석 위주)이 경사 모드를 인식 못함.
+    //   Option D path(buildFinanceMultiPersonaResponse)는 V3='emotional'(hee) 프롬프트로 진입하고
+    //   하위 안전망(_isHeeInvestComplex)이 손절선 vocab까지 부착 — 경사+투자 둘 다 충족.
+    if (detectEmotionalSubtypeHee(lastMsg)) {
+      return await buildFinanceMultiPersonaResponse(lastMsg);
+    }
+
     const [marketData, nasdaqData, rawNews] = await Promise.all([
       fetchMarketPrice(keyword),
       fetchMarketPrice('나스닥').catch(() => null),
