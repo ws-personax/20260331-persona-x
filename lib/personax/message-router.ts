@@ -912,10 +912,29 @@ ${
       const soloRaw = await callLLM(effectiveSoloPersona, soloSystem, [
         { role: 'user', content: soloPrompt },
       ], { enableSearch: soloEnableSearch });
-      let soloText = extractTag(soloRaw, 'FIRST');
+      const soloExtracted = extractTag(soloRaw, 'FIRST');
       // ✅ 후처리 필터 — 법적 표현 교체 / 자기 지칭 제거 / 호칭 치환 / few-shot 누수 차단
-      soloText = postProcessPersonaOutput(soloText, effectiveSoloPersona);
-      if (!soloText) soloText = `${display} 답변을 생성하지 못했습니다`;
+      let soloText = postProcessPersonaOutput(soloExtracted, effectiveSoloPersona);
+      if (!soloText) {
+        // 진단 로그 — 솔로 Stage 3 빈 응답 추적. 어느 단계에서 비었는지 식별:
+        //   · rawLen=0 → callLLM 자체 실패
+        //   · hasFirstTag=false → LLM이 [FIRST] 태그 안 붙임
+        //   · extractedLen > 0 && postProcessedLen=0 → postProcess 필터(few-shot 누수)에 걸림
+        console.warn('[solo-empty]', {
+          persona: effectiveSoloPersona,
+          categoryV3: router.categoryV3,
+          legacyCategory,
+          rawLen: (soloRaw || '').length,
+          rawHead: (soloRaw || '').slice(0, 200),
+          hasFirstTag: /\[FIRST\]/i.test(soloRaw || ''),
+          extractedLen: soloExtracted.length,
+          extractedHead: soloExtracted.slice(0, 100),
+          postProcessedLen: soloText.length,
+          lastMsgHead: lastMessage.slice(0, 80),
+          msgCount: messages.length,
+        });
+        soloText = `${display} 답변을 생성하지 못했습니다`;
+      }
       if (process.env.DEBUG_MODE === '1') {
         console.log('[runRoutedRequest] solo 완료 — first 20자:', soloText.slice(0, 20));
       }
