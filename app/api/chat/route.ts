@@ -581,6 +581,22 @@ type OptionDRound1Result = TaggedRound1Result & {
   };
 };
 
+// 솔로 path 전용 ECHO 폴백 — invoked가 echo가 아닐 때, echo 필드에 "현실+미래" 양자택일
+//   질문 1줄을 자동 부착해 ECHO 닫는 질문 일관성을 유지.
+//   UI/테스트는 personas.echo가 '?'로 끝나는 질문이라고 기대 — 솔로 모드에서도 동일 보장.
+const buildSoloEchoFollowup = (
+  invokedKey: 'ray' | 'jack' | 'lucia' | 'echo',
+): string => {
+  if (invokedKey === 'echo') return '';
+  const displayMap: Record<'ray' | 'jack' | 'lucia', string> = {
+    ray: 'RAY',
+    jack: 'JACK',
+    lucia: 'LUCIA',
+  };
+  const display = displayMap[invokedKey];
+  return `${display} 의견 들어보셨어요. 지금 이대로 가실 거예요, 5년 후에 다른 분 의견도 들어보실 거예요?`;
+};
+
 const mapOrderedRound1 = (
   result: OptionDRound1Result,
   order: TaggedPersonaKey[],
@@ -1614,6 +1630,7 @@ export async function POST(req: Request) {
               ? soloResult.soloContent || ''
               : '';
             await streamPersonaTagged(invoked, reply);
+            const echoFollowup = invoked === 'echo' ? reply : buildSoloEchoFollowup(invoked);
 
             send({
               type: 'done',
@@ -1622,7 +1639,7 @@ export async function POST(req: Request) {
                 ray: invoked === 'ray' ? reply : '',
                 jack: invoked === 'jack' ? reply : '',
                 lucia: invoked === 'lucia' ? reply : '',
-                echo: invoked === 'echo' ? reply : '',
+                echo: echoFollowup,
                 ray2: null, jack2: null, lucia2: null, echo2: null,
                 order: [invoked],
                 verdict: '관망',
@@ -2115,6 +2132,7 @@ export async function POST(req: Request) {
           }
           await new Promise((r) => setTimeout(r, 20));
         }
+        const echoFollowup = invoked === 'echo' ? reply : buildSoloEchoFollowup(invoked);
         send({
           type: 'done',
           reply,
@@ -2122,7 +2140,7 @@ export async function POST(req: Request) {
             ray:   invoked === 'ray'   ? reply : '',
             jack:  invoked === 'jack'  ? reply : '',
             lucia: invoked === 'lucia' ? reply : '',
-            echo:  invoked === 'echo'  ? reply : '',
+            echo:  echoFollowup,
             ray2: null, jack2: null, lucia2: null, echo2: null,
             order: [invoked],
             verdict: '관망',
