@@ -351,3 +351,19 @@ tests:
           const r = JSON.parse(output);
           const all = (r.ray || '') + (r.jack || '') + (r.lucia || '') + (r.echo || '');
           return /축하|기뻐|기쁨|기쁘|감격|벅차|벅참|뿌듯|경사|잘 됐|해냈/.test(all);
+
+  - description: "invest 부동산 — 부동산 지금 사도 될까요?"
+    vars:
+      prompt: "부동산 지금 사도 될까요?"
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: not-contains
+        value: "세 분 모두 일리"
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const all = (r.ray || '') + (r.jack || '') + (r.lucia || '') + (r.echo || '');
+          return all.includes('손절선') || all.includes('지지선');
