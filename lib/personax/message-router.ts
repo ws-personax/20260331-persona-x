@@ -1062,7 +1062,15 @@ ${
         echoQuestionRaw = '지금 손절선 정해놓으셨어요?';
       }
     }
-    const echoQuestion = postProcessPersonaOutput(echoQuestionRaw, 'echo');
+    const echoQuestionProcessed = postProcessPersonaOutput(echoQuestionRaw, 'echo');
+    // ECHO "?" 종결 강제 — invest/action/principle 카테고리는 반드시 질문으로 닫는다.
+    //   프롬프트 레벨 "반드시 ?로 끝" 규칙은 LLM이 가끔 무시 → 후처리로 100% 보정.
+    //   기존 ., !, , ; : 같은 종결부호는 제거 후 "?" 부착. 이미 ?로 끝나면 그대로.
+    const echoQuestion = expectsEchoQuestion && echoQuestionProcessed
+      ? (echoQuestionProcessed.trimEnd().endsWith('?')
+          ? echoQuestionProcessed
+          : echoQuestionProcessed.trimEnd().replace(/[.!,;:。！]+$/, '') + '?')
+      : echoQuestionProcessed;
 
     if (process.env.DEBUG_MODE === '1') {
       console.log('[runRoutedRequest] Stage 3 완료 — first:', first?.slice(0, 20));
