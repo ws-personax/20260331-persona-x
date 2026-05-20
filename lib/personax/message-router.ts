@@ -519,6 +519,16 @@ const SELF_NAME_LINE_PATTERNS: Record<AllPersonaKey, ReadonlyArray<RegExp>> = {
   echo:  [/^ECHO[,，]\s*/gim,  /^에코[,，]?\s*/gim],
 };
 
+// 자기 소개 — "JACK입니다." / "저는 JACK" / "잭입니다" 류 통째로 제거.
+// JACK 캐릭터(존댓말 금지)와 본문 톤(직설)에서 이런 자기 소개는 캐릭터 붕괴 신호.
+// 매칭 시 종결부호·트레일링 공백까지 같이 제거해 자연 문장 흐름 보존.
+const SELF_INTRO_PATTERNS: Partial<Record<AllPersonaKey, RegExp>> = {
+  jack: /(?<![가-힣a-zA-Z])(?:저는\s+)?(?:JACK|잭|짹|째앵|째액)(?:은|는|이|가)?\s*(?:입니다|이에요|이야|예요|이다)\s*[.!?]?\s*/gi,
+  lucia: /(?<![가-힣a-zA-Z])(?:저는\s+)?(?:LUCIA|루시아|루이사)(?:은|는|이|가)?\s*(?:입니다|이에요|이야|예요|이다)\s*[.!?]?\s*/gi,
+  ray: /(?<![가-힣a-zA-Z])(?:저는\s+)?(?:RAY|레이)(?:은|는|이|가)?\s*(?:입니다|이에요|이야|예요|이다)\s*[.!?]?\s*/gi,
+  echo: /(?<![가-힣a-zA-Z])(?:저는\s+)?(?:ECHO|에코)(?:은|는|이|가)?\s*(?:입니다|이에요|이야|예요|이다)\s*[.!?]?\s*/gi,
+};
+
 // 자기 호칭 — 모든 페르소나 공통. 형/오빠/누나/언니 → 제가 치환.
 // lookbehind로 "큰형/작은오빠" 같은 합성어 매치 차단.
 const SELF_TITLE_RE =
@@ -571,6 +581,14 @@ export const postProcessPersonaOutput = (
     for (const re of selfNameLineRes) {
       out = out.replace(re, '');
     }
+  }
+
+  // 3-2) 자기 소개 제거 — "JACK입니다." / "저는 JACK" / "잭이에요." 류 통째로 삭제.
+  //      JACK 캐릭터(존댓말 금지)·본문 톤(직설)과 충돌하는 자기 소개 패턴.
+  //      다른 페르소나도 LLM이 가끔 자기 소개 출력 → 4명 모두 적용.
+  const selfIntroRe = SELF_INTRO_PATTERNS[personaKey];
+  if (selfIntroRe) {
+    out = out.replace(selfIntroRe, '');
   }
 
   // 4) 자기 호칭 치환 — 형/오빠/누나/언니 + 이/가 + 동사 → 제가 + 동사
