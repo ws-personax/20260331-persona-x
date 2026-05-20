@@ -726,6 +726,8 @@ export async function runRoutedRequest(
 유저 메시지를 다음 3가지 중 하나로 분류한 뒤, 분류에 맞는 방식으로만 답하십시오.
 
 ### 1) 안부/상태 질문 — "${display} 너는 어때?" "${display} 요즘 어때?" "${display} 잘 지내?" "${display} 어떻게 지내?"
+⚠️ "어떻게 생각해" / "의견은" / "어떻게 봐" / "분석해줘" 같이 **주제에 대한 견해**를 묻는 표현은
+   여기 안부가 아니라 **2) 의견/주제 질문**으로 분류한다.
 이 경우 답변 구조는 정확히 다음 3단으로:
 
 **A. 이전 대화 주제를 1문장으로만 자연스럽게 언급** (직전 user/assistant 메시지에 주제가 있을 때만)
@@ -762,8 +764,12 @@ export async function runRoutedRequest(
 - "방금 그 ○○은 ~한 상황이에요" 식으로 주제로 끌어가기
 - 유저 상황 추측·진단·조언
 
-### 2) 의견/주제 질문 — "${display} ○○ 어떻게 봐?" "${display} ○○ 분석해줘"
+### 2) 의견/주제 질문 — "${display} ○○ 어떻게 봐?" "${display} ○○ 분석해줘" "${display}은/는 어떻게 생각해요?" "${display} 의견은?" "${display}이라면 어떻게?"
 → 해당 주제에 대한 ${display}의 관점·판단으로 답.
+→ 주제(○○)가 명시되지 않고 ${display}만 호명한 경우(예: "${display}은 어떻게 생각해요?")는
+   **직전 대화의 주제**(messages의 가장 최근 user 메시지)를 그 주제로 사용해 ${display} 관점으로 답한다.
+   ⛔ 이때 직전 주제를 다른 주제(예: 삼성전자/비트코인 등 본 예시 단어)로 절대 바꾸지 말 것.
+   직전 대화에 실제로 등장한 주제만 사용.
 → 시스템 프롬프트의 캐릭터 규칙(어조/구조/숫자 개수 등) 그대로 적용.
 
 ### 3) 감정 질문 — 유저가 자기 감정·상태·고민을 토로하며 ${display}을(를) 호명
@@ -916,29 +922,34 @@ ${
       // ✅ 후처리 필터 — 법적 표현 교체 / 자기 지칭 제거 / 호칭 치환 / few-shot 누수 차단
       let soloText = postProcessPersonaOutput(soloExtracted, effectiveSoloPersona);
       if (!soloText) {
-        // 진단 로그 — 솔로 Stage 3 빈 응답 추적. 어느 단계에서 비었는지 식별:
-        //   · rawLen=0 → callLLM 자체 실패
-        //   · hasFirstTag=false → LLM이 [FIRST] 태그 안 붙임
-        //   · extractedLen > 0 && postProcessedLen=0 → postProcess 필터(few-shot 누수)에 걸림
-        const diag = {
+        // 솔로 Stage 3 빈 응답 — LLM이 [FIRST] 태그 누락하거나 분류 혼동으로 빈 결과 반환 시 진단.
+        //   rawLen > 0 && hasFirstTag=false → LLM이 응답은 했으나 태그 누락 (분류 혼동 가능성)
+        //   extractedLen > 0 && postProcessedLen=0 → postProcess few-shot 누수 필터에 걸림
+        console.warn('[solo-empty]', {
           persona: effectiveSoloPersona,
           categoryV3: router.categoryV3,
           legacyCategory,
           rawLen: (soloRaw || '').length,
+          rawHead: (soloRaw || '').slice(0, 200),
           hasFirstTag: /\[FIRST\]/i.test(soloRaw || ''),
           extractedLen: soloExtracted.length,
-          postProcessedLen: soloText.length,
-          msgCount: messages.length,
-        };
-        console.warn('[solo-empty]', {
-          ...diag,
-          rawHead: (soloRaw || '').slice(0, 200),
           extractedHead: soloExtracted.slice(0, 100),
+          postProcessedLen: soloText.length,
           lastMsgHead: lastMessage.slice(0, 80),
+          msgCount: messages.length,
         });
-        // [TEMP DEBUG] curl/eval로 즉시 확인 가능하도록 진단 인라인.
-        //   소스 확인 후 이 라인 제거 예정.
-        soloText = `${display} 답변을 생성하지 못했습니다 [DEBUG ${JSON.stringify(diag)} | rawHead=${(soloRaw || '').slice(0, 120).replace(/\s+/g, ' ')}]`;
+        // [FIRST] 태그 누락 시 raw 응답을 폴백 콘텐츠로 사용 (postProcess 적용).
+        //   분류 혼동·태그 누락으로 인한 빈 응답을 살리되, 진짜 빈 응답(rawLen=0)은 안내 메시지로.
+        if (soloRaw && soloRaw.trim().length >= 10) {
+          const salvaged = postProcessPersonaOutput(soloRaw.trim(), effectiveSoloPersona);
+          if (salvaged) {
+            soloText = salvaged;
+          } else {
+            soloText = `${display} 답변을 생성하지 못했습니다`;
+          }
+        } else {
+          soloText = `${display} 답변을 생성하지 못했습니다`;
+        }
       }
       if (process.env.DEBUG_MODE === '1') {
         console.log('[runRoutedRequest] solo 완료 — first 20자:', soloText.slice(0, 20));
