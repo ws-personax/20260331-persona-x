@@ -920,20 +920,25 @@ ${
         //   · rawLen=0 → callLLM 자체 실패
         //   · hasFirstTag=false → LLM이 [FIRST] 태그 안 붙임
         //   · extractedLen > 0 && postProcessedLen=0 → postProcess 필터(few-shot 누수)에 걸림
-        console.warn('[solo-empty]', {
+        const diag = {
           persona: effectiveSoloPersona,
           categoryV3: router.categoryV3,
           legacyCategory,
           rawLen: (soloRaw || '').length,
-          rawHead: (soloRaw || '').slice(0, 200),
           hasFirstTag: /\[FIRST\]/i.test(soloRaw || ''),
           extractedLen: soloExtracted.length,
-          extractedHead: soloExtracted.slice(0, 100),
           postProcessedLen: soloText.length,
-          lastMsgHead: lastMessage.slice(0, 80),
           msgCount: messages.length,
+        };
+        console.warn('[solo-empty]', {
+          ...diag,
+          rawHead: (soloRaw || '').slice(0, 200),
+          extractedHead: soloExtracted.slice(0, 100),
+          lastMsgHead: lastMessage.slice(0, 80),
         });
-        soloText = `${display} 답변을 생성하지 못했습니다`;
+        // [TEMP DEBUG] curl/eval로 즉시 확인 가능하도록 진단 인라인.
+        //   소스 확인 후 이 라인 제거 예정.
+        soloText = `${display} 답변을 생성하지 못했습니다 [DEBUG ${JSON.stringify(diag)} | rawHead=${(soloRaw || '').slice(0, 120).replace(/\s+/g, ' ')}]`;
       }
       if (process.env.DEBUG_MODE === '1') {
         console.log('[runRoutedRequest] solo 완료 — first 20자:', soloText.slice(0, 20));
