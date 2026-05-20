@@ -696,6 +696,11 @@ export async function runRoutedRequest(
         echo: TEA_SYSTEM_ECHO,
       };
       const soloSystem = `${personaSystem[effectiveSoloPersona]}\n\n---\n\n${OPTION_D_SYSTEM}`;
+      // 의견/주제 질문 패턴 감지 — JACK 안부 섹션을 프롬프트에서 제외할지 결정.
+      //   "어떻게 생각해/의견은/어떻게 봐/분석" 등은 직전 주제에 대한 의견 질문이지
+      //   안부 질문 아님. LLM이 JACK 안부 섹션을 보면 verbatim 3-line 구조를 따라가는
+      //   경향이 있어 의견 질문엔 섹션 자체를 노출하지 않는 게 가장 안전.
+      const isOpinionStyleQuestion = /어떻게\s*생각|의견은|어떻게\s*봐|분석해|어떻게\s*판단|어떻게\s*보(?:세요|시는|냐)|네가\s*보기엔|당신이\s*보기엔/.test(lastMessage);
       if (process.env.DEBUG_MODE === '1') {
         console.log(
           '[runRoutedRequest] solo 단축 경로 — 1 LLM call only',
@@ -717,8 +722,14 @@ export async function runRoutedRequest(
 
 ## 🚨 단독 응답 모드 (최우선 — 다른 모든 규칙보다 우선)
 유저가 ${display}을(를) 직접 호명했습니다. 이번 답변은 ${display} 한 명만 답합니다.
-- [FIRST] 블록 하나에만 ${display}의 답을 작성하십시오.
-- [SECOND], [THIRD], [CLOSER], [LUCIA_CLOSE] 블록은 출력하지 마십시오.
+
+🚨🚨🚨 출력 형식 절대 규칙 (다른 모든 규칙보다 우선 — 위반 시 무효):
+\`\`\`
+[FIRST]
+{${display}의 응답 본문}
+\`\`\`
+- 응답은 반드시 "[FIRST]\\n"으로 시작해서 ${display} 본문을 작성. 태그 누락 절대 금지.
+- [SECOND], [THIRD], [CLOSER], [LUCIA_CLOSE], [ECHO_QUESTION] 블록은 출력하지 마십시오.
 - ${display}의 톤·관점·말투를 그대로 살려 자연스럽게 답합니다. (시스템 프롬프트의 ${display} 캐릭터 규칙 엄수)
 - 다른 페르소나(${(['LUCIA','JACK','RAY','ECHO'].filter((p) => p !== display)).join('/')})는 절대 언급·인용하지 않습니다.
 
@@ -783,7 +794,7 @@ export async function runRoutedRequest(
 - ❌ "형이 한 마디 할게" (JACK이 자기를 형으로 — 금지)
 - ❌ "누나가 말해줄게" (LUCIA가 자기를 누나로 — 금지)
 - ✅ "제가 보기엔..." / "저는 이렇게 봐요" / 호칭 없이 바로 본론${
-        display === 'JACK'
+        display === 'JACK' && !isOpinionStyleQuestion
           ? `
 
 ## 🥊 JACK 안부 응답 — 마동석 톤 강제 (위 1) 안부/상태 질문 A·B·C 가이드 덮어쓰기)
