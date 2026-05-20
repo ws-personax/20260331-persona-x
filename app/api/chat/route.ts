@@ -1659,6 +1659,18 @@ export async function POST(req: Request) {
               ? mapOrderedRound1(r1, order)
               : mapLegacyEchoRound1(r1, order);
 
+            // invest 카테고리 필수 어휘 안전망 — 4명 응답에 '손절선'/'지지선' 둘 다 없으면
+            //   ECHO 질문 끝에 손절선 가이드 1줄을 강제 부착. 프롬프트 규칙은 LLM이 무시할 수 있음.
+            if (_categoryV3 === 'invest') {
+              const allText = personaText.ray + personaText.jack + personaText.lucia + personaText.echo;
+              if (!allText.includes('손절선') && !allText.includes('지지선')) {
+                const fallback = '지금 손절선 정해놓으셨어요?';
+                personaText.echo = personaText.echo
+                  ? personaText.echo.trimEnd().replace(/[?。！!]$/, '') + ' ' + fallback
+                  : fallback;
+              }
+            }
+
             for (const key of order) {
               await streamPersonaTagged(key, personaText[key]);
             }
