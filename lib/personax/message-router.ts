@@ -891,9 +891,6 @@ ${
           ', 웹검색', isInvest ? 'ON' : 'OFF',
           '):', dataPack ? '성공' : '실패(빈 DATA_PACK)',
         );
-        // [TEMP DEBUG] dataPack 실내용 확인 — 웹검색 그라운딩 결과/현재가 포함 여부 추적용. 검증 후 제거.
-        console.warn('[stage1-datapack-raw]', (dataRaw || '').slice(0, 300));
-        console.warn('[stage1-datapack-extracted]', dataPack.slice(0, 500));
       }
 
       // Stage 2: 페르소나 관점 분해 (full 경로만)
@@ -920,6 +917,17 @@ ${
     const dataContext = dataPack
       ? `\n\n## 실시간 수집 데이터 (반박 시 이 숫자 사용 필수)\n${dataPack}\n\n⛔ 위 실시간 데이터의 숫자를 반박 시 반드시 인용할 것. 데이터에 없는 숫자를 만들어내지 말 것.\n\n`
       : '';
+    // CLOSER=JACK일 때 ~요 종결 위반이 stage3-guard에 반복 적발 → 재호출 비용 발생.
+    // OPTION_D_SYSTEM·buildScriptPrompt의 JACK 톤 규칙이 있음에도 GPT-4.1-mini가 어김 →
+    // 프롬프트 말미(recency bias 작용 지점)에 CLOSER 슬롯 한정 마동석 톤 Few-shot + ~요 금지 재명시.
+    const closerJackRule = router.closerPersona === 'jack'
+      ? `\n\n🚨 [CLOSER] JACK 말투 절대 규칙 (위반 시 답변 무효 — 다른 모든 규칙보다 우선):
+- [CLOSER] 블록은 JACK이 담당. JACK은 ~요 / ~습니다 / ~입니다로 끝나는 문장 절대 금지.
+- 반드시 ~다 / ~야 / ~거든 / ~잖아 / ~없어 / ~이다로 끝낼 것 (마동석 톤).
+- ✅ 좋은 예: "지금 들어가면 늦어." / "손절선 없으면 하지 마." / "그게 문제야." / "리스크가 너무 크다."
+- ❌ 나쁜 예: "지금 들어가면 늦어요." / "리스크가 너무 큽니다." / "조심하세요."
+- 2줄 이내, 짧고 직설적으로 끊어 칠 것.`
+      : '';
     const scriptPrompt = `${dataContext}${buildScriptPrompt(
       messages,
       personaViews,
@@ -932,12 +940,9 @@ ${
 
 기존 화면 표시 참고 순서: ${router.order.map((key, index) => `${index + 1}. ${key.toUpperCase()}`).join(' / ')}
 ⛔ [FIRST] 블록은 반드시 ${(router.firstPersona || 'lucia').toUpperCase()} 톤. 순서는 ${router.order.map((k) => k.toUpperCase()).join(' → ')}.
-⛔ [CLOSER] 블록은 반드시 ${(router.closerPersona || 'jack').toUpperCase()} 톤. FIRST(${(router.firstPersona || 'lucia').toUpperCase()})는 CLOSER 불가.`;
+⛔ [CLOSER] 블록은 반드시 ${(router.closerPersona || 'jack').toUpperCase()} 톤. FIRST(${(router.firstPersona || 'lucia').toUpperCase()})는 CLOSER 불가.${closerJackRule}`;
     // Stage 3 — GPT-4.1-mini 사용 (full 경로만). solo·Stage 1·Stage 2는 기존 callLLM 유지.
     const scriptRaw = await callGPTMini(OPTION_D_SYSTEM, scriptPrompt);
-    // [TEMP DEBUG] Stage 3 입력/출력 확인 — dataContext 주입 후 GPT가 실제 현재가 인용했는지 추적용. 검증 후 제거.
-    console.warn('[stage3-script-prompt-head]', scriptPrompt.slice(0, 400));
-    console.warn('[stage3-script-raw-head]', (scriptRaw || '').slice(0, 400));
     // ✅ 후처리 필터 — 슬롯별 페르소나 키로 postProcessPersonaOutput 적용.
     //    first/second/third → router.order[0/1/2], closer → router.closerPersona,
     //    luciaClose → 'lucia' 고정, echoQuestion → 'echo' 고정.
