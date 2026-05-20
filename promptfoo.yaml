@@ -477,3 +477,38 @@ tests:
           const r = JSON.parse(output);
           const echo = (r.echo || '').trim();
           return echo.endsWith('?');
+
+  - description: "다중턴 26 — invest → emotional 카테고리 전환 (ECHO ? 종결 강화)"
+    vars:
+      prompt: "[2-turn] 삼성전자 → 손실 불안 (ECHO ?)"
+    provider:
+      id: https
+      config:
+        url: https://20260331-persona-x.vercel.app/api/chat
+        method: POST
+        headers:
+          Content-Type: application/json
+        body:
+          messages:
+            - role: user
+              content: "삼성전자 지금 사도 될까요?"
+            - role: user
+              content: "근데 손실 나면 너무 불안할 것 같아요"
+        transformResponse: file://promptfoo-transform.js
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const all = (r.ray || '') + (r.jack || '') + (r.lucia || '') + (r.echo || '');
+          return /불안|마음/.test(all);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const echo = (r.echo || '').trim();
+          return echo.endsWith('?');
+      - type: not-contains
+        value: "매수하세요"
