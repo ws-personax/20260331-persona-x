@@ -1684,7 +1684,13 @@ export async function POST(req: Request) {
 
             // invest 카테고리 필수 어휘 안전망 — 4명 응답에 '손절선'/'지지선' 둘 다 없으면
             //   ECHO 질문 끝에 손절선 가이드 1줄을 강제 부착. 프롬프트 규칙은 LLM이 무시할 수 있음.
-            if (_categoryV3 === 'invest') {
+            // hee+invest 복합 케이스도 포함: HEE 모드(emotional)지만 메시지에 투자 키워드가
+            //   있으면 (예: "삼성전자로 처음 수익 났어요") 경사 + 투자 vocab 둘 다 필요.
+            const _isHeeInvestComplex =
+              _categoryV3 === 'emotional' &&
+              detectEmotionalSubtypeHee(lastMsg) &&
+              /삼성전자|SK하이닉스|테슬라|애플|엔비디아|코스피|코스닥|나스닥|비트코인|주식|종목|펀드|ETF|부동산|퇴직금|연금|코인|투자|수익/.test(lastMsg);
+            if (_categoryV3 === 'invest' || _isHeeInvestComplex) {
               const allText = personaText.ray + personaText.jack + personaText.lucia + personaText.echo;
               if (!allText.includes('손절선') && !allText.includes('지지선')) {
                 const fallback = '지금 손절선 정해놓으셨어요?';

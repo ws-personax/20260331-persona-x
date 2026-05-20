@@ -453,3 +453,27 @@ tests:
           const r = JSON.parse(output);
           const echo = (r.echo || '').trim();
           return echo.endsWith('?');
+
+  - description: "복합 hee+invest — 오늘 삼성전자로 처음 수익 났어요!"
+    vars:
+      prompt: "오늘 삼성전자로 처음 수익 났어요!"
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          return !!(r.ray && r.jack && r.lucia && r.echo);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const all = (r.ray || '') + (r.jack || '') + (r.lucia || '') + (r.echo || '');
+          return /축하|수익/.test(all);
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const all = (r.ray || '') + (r.jack || '') + (r.lucia || '') + (r.echo || '');
+          return all.includes('손절선') || all.includes('지지선');
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const echo = (r.echo || '').trim();
+          return echo.endsWith('?');
