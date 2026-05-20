@@ -27,29 +27,19 @@ import { TEA_SYSTEM_LUCIA } from './prompts/tea-lucia';
 import { TEA_SYSTEM_JACK } from './prompts/tea-jack';
 import { TEA_SYSTEM_ECHO } from './prompts/tea-echo';
 import { TEA_SYSTEM_RAY } from './prompts/tea-ray';
-import { SCREENPLAY_SYSTEM_PROMPT, buildScreenplayPrompt } from './prompts/orchestrator-screenplay';
 import {
   detectPersonaOrderHybrid,
-  buildTaggedRound1SystemPrompt,
   buildCategoryVocabBlockRule,
   detectCategoryV3,
-  getFirstPersona,
-  getCloserPersona,
   buildTaggedRound2SystemPrompt,
-  buildTaggedRound1UserPrompt,
   buildTaggedRound2UserPrompt,
-  parseTaggedRound1,
   parseTaggedRound2,
-  STAGE1_FALLBACK,
   detectEmotionalSubtypeHee,
   type TaggedPersonaKey as PromptTaggedPersonaKey,
   type TaggedRound1Result,
   type TaggedRound2Result,
-  type Stage1Data,
-  type Stage1PersonaAnalysis,
 } from './prompts/orchestrator-tagged';
 import {
-  FEATURE_OPTION_D,
   routeMessage,
   runRoutedRequest,
   enforceOrder,
@@ -66,11 +56,6 @@ const FEATURES = {
   echoOptional: false,
   luciaFraming: false,
 } as const;
-
-// ✅ 1차 페르소나 분석 (재료 수집) — D-1 신규
-import { buildLuciaAnalysisPrompt } from './prompts/analysis-lucia';
-import { buildJackAnalysisPrompt } from './prompts/analysis-jack';
-import { buildRayAnalysisPrompt } from './prompts/analysis-ray';
 
 // ✅ 재테크 탭 고급 질문 — 4명 페르소나 투자 철학 프롬프트
 import { ADVANCED_SYSTEM_RAY } from './prompts/advanced-ray';
@@ -431,130 +416,11 @@ const getAdminSupabase = () => {
 };
 
 // ─────────────────────────────────────────────
-// ✅ 극본 오케스트레이터 — 1번 LLM 호출로 RAY/JACK/LUCIA/ECHO 4명 1·2라운드 8개 대사 동시 생성
-//   기존 4번 호출 구조의 중복 발화·맥락 단절 문제 해소.
-//   실패 시 null 반환 → 호출부에서 기존 4-페르소나 LLM 폴백.
-// ─────────────────────────────────────────────
-type Screenplay = {
-  order: TaggedPersonaKey[];
-  ray: string;
-  jack: string;
-  lucia: string;
-  echo: string;
-  ray2: string;
-  jack2: string;
-  lucia2: string;
-  echo2: string;
-};
-
-async function callScreenplayOrchestrator(
-  userMessage: string,
-  category: string,
-  recentContext: string,
-  enableSearch: boolean,
-): Promise<Screenplay | null> {
-  try {
-    const userPrompt = buildScreenplayPrompt(userMessage, category, recentContext);
-    const llm = await callTeaPersona(
-      'echo',
-      SCREENPLAY_SYSTEM_PROMPT,
-      [{ role: 'user', content: userPrompt }],
-      { enableSearch },
-    );
-    if (!llm) return null;
-    const m = llm.match(/\{[\s\S]*\}/);
-    if (!m) return null;
-    const parsed = JSON.parse(m[0]) as Record<string, unknown>;
-    const stringKeys: (keyof Omit<Screenplay, 'order'>)[] = ['ray', 'jack', 'lucia', 'echo', 'ray2', 'jack2', 'lucia2', 'echo2'];
-    const result: Partial<Screenplay> = {};
-    for (const k of stringKeys) {
-      const v = parsed[k];
-      if (typeof v !== 'string' || !v.trim()) {
-        console.warn(`[screenplay] 키 누락/빈값: ${k}`);
-        return null;
-      }
-      result[k] = v.trim();
-    }
-    const validPersonas = ['ray', 'jack', 'lucia', 'echo'] as const;
-    const isValidPersona = (s: unknown): s is TaggedPersonaKey =>
-      typeof s === 'string' && (validPersonas as readonly string[]).includes(s);
-    result.order = Array.isArray(parsed.order) && parsed.order.length >= 3 && parsed.order.every(isValidPersona)
-      ? (parsed.order as TaggedPersonaKey[])
-      : ['ray', 'jack', 'lucia', 'echo'];
-    return result as Screenplay;
-  } catch (e) {
-    console.warn('[screenplay] 호출 실패', e);
-    return null;
-  }
-}
-
-// ─────────────────────────────────────────────
 // ✅ 단일 호출 태그 기반 오케스트레이터 (1라운드 / 2라운드 분리)
 //   1라운드: [FIRST] [SECOND] [THIRD] [ECHO_QUESTION]
 //   2라운드: [FIRST_2] [SECOND_2] [THIRD_2] [ECHO_FINAL]
 //   하이브리드 순서: 감정 키워드 감지 시 LUCIA 먼저, 아니면 카테고리 기반.
 // ─────────────────────────────────────────────
-// ─────────────────────────────────────────────
-// ✅ 1차 페르소나 분석 (D-1 신규) — 각 페르소나 독립 분석
-//   LUCIA/JACK/RAY 3명 병렬 호출 → JSON 파싱 → Stage1Data 반환
-//   실패 시 폴백 (빈 데이터)으로 진행 가능
-// ─────────────────────────────────────────────
-const parseStage1JSON = (raw: string | null): Stage1PersonaAnalysis => {
-  if (!raw) return STAGE1_FALLBACK;
-  try {
-    const m = raw.match(/\{[\s\S]*\}/);
-    if (!m) return STAGE1_FALLBACK;
-    const parsed = JSON.parse(m[0]) as Record<string, unknown>;
-    return {
-      insight: typeof parsed.insight === 'string' ? parsed.insight : '',
-      numbers: typeof parsed.numbers === 'string' ? parsed.numbers : '',
-      key_point: typeof parsed.key_point === 'string' ? parsed.key_point : '',
-    };
-  } catch (e) {
-    console.warn('[stage1] JSON 파싱 실패', e);
-    return STAGE1_FALLBACK;
-  }
-};
-
-const JSON_ONLY_SYSTEM = 'JSON 출력 머신. 다른 텍스트 금지. 코드펜스 금지. 반드시 { 로 시작 } 로 끝나는 JSON 한 덩어리만 출력.';
-
-async function runStage1Analysis(
-  userMessage: string,
-  recentContext: string,
-  plan: { lucia_angle: string; jack_angle: string; ray_angle: string },
-  options?: { isInvest?: boolean },
-): Promise<Stage1Data> {
-  const t0 = Date.now();
-  const luciaPrompt = buildLuciaAnalysisPrompt(userMessage, plan.lucia_angle, recentContext);
-  const jackPrompt  = buildJackAnalysisPrompt(userMessage,  plan.jack_angle,  recentContext);
-  const rayPrompt   = buildRayAnalysisPrompt(userMessage,   plan.ray_angle,   recentContext);
-
-  // ✅ invest 카테고리일 때 RAY만 웹 검색 ON — 실시간 가격/시세를 수집하고
-  //    JACK/LUCIA는 RAY가 수집한 데이터를 관점 가공만 함 (검색 OFF, 비용 통제).
-  const rayEnableSearch = options?.isInvest === true;
-
-  const [luciaRaw, jackRaw, rayRaw] = await Promise.all([
-    callTeaPersona('lucia', JSON_ONLY_SYSTEM, [{ role: 'user', content: luciaPrompt }]).catch((e) => {
-      console.warn('[stage1:lucia] 호출 실패', e); return null;
-    }),
-    callTeaPersona('jack',  JSON_ONLY_SYSTEM, [{ role: 'user', content: jackPrompt  }]).catch((e) => {
-      console.warn('[stage1:jack] 호출 실패',  e); return null;
-    }),
-    callTeaPersona('ray',   JSON_ONLY_SYSTEM, [{ role: 'user', content: rayPrompt   }], { enableSearch: rayEnableSearch }).catch((e) => {
-      console.warn('[stage1:ray] 호출 실패',   e); return null;
-    }),
-  ]);
-
-  const stage1: Stage1Data = {
-    lucia: parseStage1JSON(luciaRaw),
-    jack:  parseStage1JSON(jackRaw),
-    ray:   parseStage1JSON(rayRaw),
-  };
-
-  const elapsed = Date.now() - t0;
-  return stage1;
-}
-
 const toPromptOrder = (order: TaggedPersonaKey[]): PromptTaggedPersonaKey[] => {
   const nonEcho = order.filter((key): key is PromptTaggedPersonaKey => key !== 'echo');
   return nonEcho.length === 3 ? nonEcho : ['ray', 'jack', 'lucia'];
@@ -628,19 +494,6 @@ const mapOrderedRound1 = (
   return personaText;
 };
 
-const mapLegacyEchoRound1 = (
-  result: TaggedRound1Result,
-  order: TaggedPersonaKey[],
-): Record<TaggedPersonaKey, string> => {
-  const personaText = emptyPersonaText();
-  const promptOrder = toPromptOrder(order);
-  personaText[promptOrder[0]] = result.first;
-  personaText[promptOrder[1]] = result.second;
-  personaText[promptOrder[2]] = result.third;
-  personaText.echo = result.echoQuestion;
-  return personaText;
-};
-
 const mapLegacyEchoRound2 = (
   result: TaggedRound2Result,
   order: TaggedPersonaKey[],
@@ -653,39 +506,6 @@ const mapLegacyEchoRound2 = (
   personaText.echo = result.echoFinal;
   return personaText;
 };
-
-async function callTaggedRound1(
-  userMessage: string,
-  category: string,
-  recentContext: string,
-  order: TaggedPersonaKey[],
-  enableSearch: boolean,
-  stage1Data?: Stage1Data,
-  hasPriorConversation: boolean = false,
-  closerPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
-): Promise<OptionDRound1Result | null> {
-  try {
-    const nowKST = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
-    // ✅ FIRST 페르소나 결정 — CategoryV3 매트릭스 기반 (invest→RAY / action→JACK / emotional→LUCIA / principle→ECHO, 복합/모호→LUCIA)
-    const categoryV3 = detectCategoryV3(userMessage);
-    const firstPersona = getFirstPersona(categoryV3);
-    // CLOSER는 caller에서 결정(FIRST와 충돌 시 폴백) — 미전달 시 getCloserPersona로 폴백
-    const closer = closerPersona ?? getCloserPersona(categoryV3, firstPersona);
-    const systemPrompt = `현재 시각: ${nowKST} (KST)\n${buildTaggedRound1SystemPrompt(stage1Data, firstPersona, categoryV3, hasPriorConversation, closer)}`;
-    const userPrompt = buildTaggedRound1UserPrompt(userMessage, category, recentContext, toPromptOrder(order));
-    const llm = await callTeaPersona(
-      'echo',
-      systemPrompt,
-      [{ role: 'user', content: userPrompt }],
-      { enableSearch },
-    );
-    if (!llm) return null;
-    return parseTaggedRound1(llm);
-  } catch (e) {
-    console.warn('[tagged-r1] 호출 실패', e);
-    return null;
-  }
-}
 
 // callOptionD는 runRoutedRequest로 흡수됨.
 // route.ts는 LLM 호출자(callTeaPersona)를 주입하는 얇은 wrapper만 유지.
@@ -1652,35 +1472,18 @@ export async function POST(req: Request) {
             return;
           }
 
-          let r1: OptionDRound1Result | null = null;
-          let r1UsesOrderedSlots = false;
-          if (FEATURE_OPTION_D) {
-            // ✅ 카테고리 전환 시 이전 맥락 차단 — 마지막 메시지만 callOptionD에 전달
-            const optionDMessages = categoryChanged
-              ? (messages as Array<{ role?: string; content?: string }>).slice(-1)
-              : (messages as Array<{ role?: string; content?: string }>);
-            r1 = await callOptionDWithStage3Guard(optionDMessages, category, msg, order, categoryV3Local, firstPersonaLocal, _hasPriorConversation, _closerPersonaV3);
-            r1UsesOrderedSlots = true;
-            // ✅ callOptionD 빈 결과 시 폴백 완전 차단 — null/빈 객체여도 정상 done 경로로 강제 통과
-            if (!r1) {
-              console.warn('[optionD] null 반환 → 빈 결과 객체로 강제 통과 (폴백 차단)');
-              r1 = { first: '', second: '', third: '', echoQuestion: '' };
-            }
-          } else {
-            // ✅ D-1 1차 분석 단계 — 3명 페르소나 독립 분석 (병렬, JSON)
-            //   plan(오케스트레이터)에서 각 페르소나 angle을 받아 분석 프롬프트 구성
-            //   실패 시 빈 데이터로 폴백 — 2차 대본 생성은 계속 진행
-            const stage1Data = await runStage1Analysis(msg, recentContext, {
-              lucia_angle: plan.lucia_angle,
-              jack_angle:  plan.jack_angle,
-              ray_angle:   plan.ray_angle,
-            }, { isInvest: _routerDecision.categoryV3 === 'invest' });
-            r1 = await callTaggedRound1(msg, category, recentContext, order, enableSearchTagged, stage1Data, _hasPriorConversation, _closerPersonaV3);
+          // ✅ 카테고리 전환 시 이전 맥락 차단 — 마지막 메시지만 callOptionD에 전달
+          const optionDMessages = categoryChanged
+            ? (messages as Array<{ role?: string; content?: string }>).slice(-1)
+            : (messages as Array<{ role?: string; content?: string }>);
+          let r1: OptionDRound1Result | null = await callOptionDWithStage3Guard(optionDMessages, category, msg, order, categoryV3Local, firstPersonaLocal, _hasPriorConversation, _closerPersonaV3);
+          // ✅ callOptionD 빈 결과 시 폴백 완전 차단 — null/빈 객체여도 정상 done 경로로 강제 통과
+          if (!r1) {
+            console.warn('[optionD] null 반환 → 빈 결과 객체로 강제 통과 (폴백 차단)');
+            r1 = { first: '', second: '', third: '', echoQuestion: '' };
           }
           if (r1) {
-            const personaText = r1UsesOrderedSlots
-              ? mapOrderedRound1(r1, order)
-              : mapLegacyEchoRound1(r1, order);
+            const personaText = mapOrderedRound1(r1, order);
 
             // invest 카테고리 필수 어휘 안전망 — 4명 응답에 '손절선'/'지지선' 둘 다 없으면
             //   ECHO 질문 끝에 손절선 가이드 1줄을 강제 부착. 프롬프트 규칙은 LLM이 무시할 수 있음.
@@ -1849,249 +1652,6 @@ export async function POST(req: Request) {
           },
         });
         return;
-
-        // ─────────────────────────────────────────────
-        // ⚠️ DEPRECATED — 기존 screenplay JSON 단일 호출 + 4-페르소나 개별 호출 폴백.
-        //   단일 호출 태그 기반 오케스트레이터로 전환 (위 블록).
-        //   참조용으로 보존 — `if (false)` 로 비활성화 (주석 처리 효과).
-        // ─────────────────────────────────────────────
-        // eslint-disable-next-line no-constant-condition
-        if (false) {
-        // ✅ 극본 오케스트레이터 우선 시도 — 1번 LLM 호출로 8개 대사 동시 생성
-        // 성공 시 RAY → JACK → LUCIA → ECHO 순서로 15자 청크 / 20ms 딜레이 진행형 스트리밍.
-        // 실패(null) 시 아래 기존 4-페르소나 LLM 폴백 로직으로 진입.
-        const isFinanceCategory = ['finance', 'stock', 'crypto', 'economy'].includes(category);
-        const isScreenplayCategory = isFinanceCategory ||
-          ['life', 'emotion', 'news', 'general'].includes(category);
-        const screenplay = await callScreenplayOrchestrator(
-          msg,
-          category,
-          recentContext,
-          true,
-        );
-
-        if (screenplay && isScreenplayCategory) {
-          // 페르소나 round 1·2 진행형 스트리밍 — 누적 텍스트로 send (클라이언트는 replace 방식)
-          const streamPersona = async (key: TaggedPersonaKey, round: 1 | 2, full: string) => {
-            let acc = '';
-            for (const c of chunkText(full, 15)) {
-              acc += c;
-              if (key === 'echo') {
-                send({ type: 'echo', round, text: acc });
-              } else {
-                send({ type: 'persona', key, round, text: acc });
-              }
-              await new Promise(r => setTimeout(r, 20));
-            }
-          };
-
-          // 1라운드: order 기반 순서
-          const streamOrder = applyV3OrderOverride(screenplay.order);
-          for (const key of streamOrder) {
-            await streamPersona(key, 1, screenplay[key]);
-          }
-
-          // 2라운드: order 기반 순서
-          for (const key of streamOrder) {
-            const secondKey = key === 'echo' ? 'echo2' : `${key}2` as 'ray2' | 'jack2' | 'lucia2';
-            await streamPersona(key, 2, screenplay[secondKey]);
-          }
-
-          try {
-            const adminSupabase = getAdminSupabase();
-            if (adminSupabase) {
-              await adminSupabase.from('tea_logs').insert({
-                persona: 'ray',
-                turn_count: 1,
-                first_message: msg.slice(0, 100),
-                user_id: null,
-              });
-            }
-          } catch (e) {
-            console.warn('[tea:finance:screenplay] 로그 저장 실패 (무시)', e);
-          }
-
-          send({
-            type: 'done',
-            reply: [
-              screenplay.ray, screenplay.jack, screenplay.lucia, screenplay.echo,
-              screenplay.ray2, screenplay.jack2, screenplay.lucia2, screenplay.echo2,
-            ].filter(Boolean).join('\n\n'),
-            personas: {
-              jack: screenplay.jack, lucia: screenplay.lucia, ray: screenplay.ray, echo: screenplay.echo,
-              ray2:   screenplay.ray2   || null,
-              jack2:  screenplay.jack2  || null,
-              lucia2: screenplay.lucia2 || null,
-              echo2:  screenplay.echo2  || null,
-              order:  streamOrder,
-              verdict: '관망',
-              confidence: 0,
-              breakdown: '재테크 일반',
-              positionSizing: '0%',
-              jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
-            },
-          });
-          return;
-        }
-
-        console.error('[screenplay] 폴백 — 기존 4-페르소나 LLM 호출 사용');
-
-        // ─── 폴백: 기존 4-페르소나 병렬 LLM 호출 (절대 삭제 금지) ───
-        // 1단계 병렬 — 각자 완성하는 즉시 send로 클라이언트에 전달
-        const rayPromise = callTeaPersona('ray', TEA_SYSTEM_RAY, rayHistory, { enableSearch: true })
-          .then(r => {
-            const text = cleanText(r) || '지금 시장 데이터를 보면 — 좀 더 구체적인 상황을 말씀해주시면 수치로 정리해드릴게요.';
-            send({ type: 'persona', key: 'ray', round: 1, text });
-            return text;
-          });
-        const jackPromise = callTeaPersona('jack', TEA_SYSTEM_JACK, jackHistory)
-          .then(r => {
-            const text = cleanText(r) || '핵심 지표가 정리되면 다시 짚어드리겠습니다.';
-            send({ type: 'persona', key: 'jack', round: 1, text });
-            return text;
-          });
-        const luciaPromise = callTeaPersona('lucia', TEA_SYSTEM_LUCIA, luciaHistory)
-          .then(r => {
-            const text = cleanText(r) || '결정 전에 마음의 무게부터 같이 짚어볼까요?';
-            send({ type: 'persona', key: 'lucia', round: 1, text });
-            return text;
-          });
-        const [rayText, jackText, luciaText] = await Promise.all([rayPromise, jackPromise, luciaPromise]);
-
-        // 2단계: ECHO 취합 + 씨앗 질문 (마지막 줄은 반드시 페르소나에게 던지는 질문)
-        const echoTargetClause = (plan.echo_target && plan.echo_angle)
-          ? `이번엔 ${plan.echo_target.toUpperCase()}을 직접 지목해서 "${plan.echo_angle}" 이 부분을 찔러라.\n`
-          : '';
-        const echoConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n[RAY 응답]\n${rayText}\n\n[JACK 응답]\n${jackText}\n\n[LUCIA 응답]\n${luciaText}\n\n${echoTargetClause}당신은 ECHO입니다. 손석희+워렌버핏 스타일. 감정을 철저히 통제한다. 말이 적지만 한 마디가 무겁다. RAY/JACK/LUCIA 중 가장 허점 있는 한 명을 직접 지목해서 그 사람 주장의 가장 약한 부분을 찌르는 날카로운 질문 하나로 끝내라. 시작 방식은 매번 다르게. "......" 침묵 후 한 방도 가능. 부드러운 질문 금지. 불편하게 만들어야 2라운드가 산다. "결정은 당신이"·"선택은 당신 몫" 책임 회피 표현 절대 금지. 5줄 이내. 목록 금지. 마지막 줄은 반드시 물음표로 끝나는 질문.`;
-        const echoLLM = await callTeaPersona(
-          'echo',
-          TEA_SYSTEM_ECHO,
-          [{ role: 'user', content: echoConsolidationPrompt }],
-        );
-        const echoText = cleanText(echoLLM) || '원칙이 흔들릴 땐 한 박자 쉬어가는 것도 방법이에요.';
-        send({ type: 'echo', round: 1, text: echoText });
-
-        // 3단계: 2라운드 RAY/JACK/LUCIA 병렬 (ECHO 직접 질문에만 응답)
-        // ECHO가 지목한 페르소나는 핵심 답변자, 나머지는 1줄 보조 역할.
-        const targetedPersona = detectTargetedPersona(echoText);
-        const round2Context = `${financePrefix}사용자 질문: ${msg}\n\n1라운드 RAY: ${rayText}\n1라운드 JACK: ${jackText}\n1라운드 LUCIA: ${luciaText}\n1라운드 ECHO: ${echoText}\n\n`;
-
-        const buildRound2 = (persona: 'RAY' | 'JACK' | 'LUCIA'): string => {
-          // 지목 페르소나는 3줄 이내 정면 답변. 비지목 페르소나는 페르소나별 1줄 보조.
-          const targetedRole =
-            persona === 'RAY'
-              ? '반드시 숫자/데이터로 시작해 3줄 이내로 ECHO 질문에 정면 답하라.'
-              : persona === 'JACK'
-              ? '짧고 투박하게 "~요"로 끝내며 3줄 이내로 ECHO 질문에 정면 답하라.'
-              : '"~잖아요"·"~거든요" 톤으로 3줄 이내로 ECHO 질문에 정면 답하라. "아이고" 사용 금지. 마지막 문장을 질문으로 끝내지 마라. "~궁금해요"·"~어떤가요"·"~있으세요" 종결 금지. 반드시 마침표로 끝나는 문장으로 마무리.';
-
-          const supportRole =
-            persona === 'RAY'
-              ? '1줄. 숫자 한 가지만. 새 데이터 나열 금지.'
-              : persona === 'JACK'
-              ? '1줄. 한 마디만. 길게 늘어놓지 말 것.'
-              : '지금 토론 맥락에서 유저 감정을 1줄로 짚되, 유저가 아닌 토론 참여자로서 말할 것. 예: "그 불안이 결정을 흐리게 하는 거잖아요." "답답하시죠"·"불안하시죠" 같은 공감만으로 끝내지 마라. 반드시 심리 연구 또는 실제 투자자 사례를 근거로 들 것. 마지막 문장을 질문으로 끝내지 마라. "~궁금해요"·"~어떤가요"·"~있으세요" 종결 금지. 반드시 마침표로 끝나는 문장으로 마무리.';
-
-          const fallbackRole =
-            persona === 'RAY'
-              ? '반드시 숫자/데이터로 시작해 2줄 이내 답하라.'
-              : persona === 'JACK'
-              ? '짧고 투박하게 "~요"로 끝내라. 2줄 이내.'
-              : '"~잖아요"·"~거든요" 톤으로 2줄 이내. "아이고" 사용 금지.';
-
-          // 페르소나별 근거 출처 — 지목/비지목 무관하게 공통 적용
-          const evidenceSource =
-            persona === 'RAY'
-              ? '숫자/데이터 1개가 근거. 그 수치가 의미하는 것 한 줄이 주장.'
-              : persona === 'JACK'
-              ? '과거 사례 또는 시장 원리가 근거. 그 근거에서 나오는 결론 한 줄.'
-              : '심리 연구 또는 실제 투자자 사례가 근거. 그 근거에서 나오는 감정적 통찰 한 줄. "답답하시죠"·"불안하시죠" 공감만으로 끝내지 마라.';
-
-          const evidencePrinciple = `근거 원칙: 근거 없는 주장 절대 금지. 반드시 근거 한 줄 + 주장 한 줄 구조로 답하라. 근거는 숫자/사례/경험/데이터 중 하나. 근거 없이 감정이나 결론만 말하는 것은 답변이 아니다. ${evidenceSource}`;
-
-          let focus: string;
-          let role: string;
-          if (!targetedPersona) {
-            focus = 'ECHO가 방금 던진 질문에 답하라.';
-            role = fallbackRole;
-          } else if (targetedPersona === persona) {
-            focus = `ECHO가 지목한 페르소나: ${persona}. 너(${persona})가 ECHO 질문의 직접 대상이다. 핵심 답변자로 정면 응답.`;
-            role = targetedRole;
-          } else {
-            focus = `ECHO가 지목한 페르소나: ${targetedPersona}. 너는 보조 역할이다.`;
-            role = supportRole;
-          }
-
-          return `지시: ${focus} ${role}\n${evidencePrinciple}\n${investmentRule}\n출력 규칙: 대괄호 [...] 메타 태그를 출력에 포함하지 말 것. "RAY:" "JACK:" "LUCIA:" "ECHO:" 같은 페르소나 라벨로 줄을 시작하지 말 것. 호칭에 "님" 붙이지 말 것.`;
-        };
-
-        const ray2History:   TeaMsg[] = [{ role: 'user', content: `${round2Context}${buildRound2('RAY')}` }];
-        const jack2History:  TeaMsg[] = [{ role: 'user', content: `${round2Context}${buildRound2('JACK')}` }];
-        const lucia2History: TeaMsg[] = [{ role: 'user', content: `${round2Context}${buildRound2('LUCIA')}` }];
-
-        // 2라운드 병렬 — 각자 완성 시 즉시 send
-        const ray2Promise = callTeaPersona('ray', TEA_SYSTEM_RAY, ray2History, { enableSearch: true })
-          .then(r => {
-            const text = firstParagraph(cleanText(r));
-            send({ type: 'persona', key: 'ray', round: 2, text });
-            return text;
-          });
-        const jack2Promise = callTeaPersona('jack', TEA_SYSTEM_JACK, jack2History)
-          .then(r => {
-            const text = firstParagraph(cleanText(r));
-            send({ type: 'persona', key: 'jack', round: 2, text });
-            return text;
-          });
-        const lucia2Promise = callTeaPersona('lucia', TEA_SYSTEM_LUCIA, lucia2History)
-          .then(r => {
-            const text = firstParagraph(cleanText(r));
-            send({ type: 'persona', key: 'lucia', round: 2, text });
-            return text;
-          });
-        const [rayText2, jackText2, luciaText2] = await Promise.all([ray2Promise, jack2Promise, lucia2Promise]);
-
-        // 4단계: ECHO 최후 판결 — 씨앗 질문 금지, 명확한 판결 + 선언형 결론
-        const echo2ConsolidationPrompt = `${financePrefix}사용자 질문: ${msg}\n\n1라운드 RAY: ${rayText}\n1라운드 JACK: ${jackText}\n1라운드 LUCIA: ${luciaText}\n1라운드 ECHO: ${echoText}\n\n2라운드 RAY: ${rayText2}\n2라운드 JACK: ${jackText2}\n2라운드 LUCIA: ${luciaText2}\n\n최후 판결이다. 씨앗 질문 금지. RAY/JACK/LUCIA 중 누가 맞는지 명확히 판결하라. 마지막 문장은 반드시 아래 형식 중 하나로 마무리하고 마침표로 끝낼 것:\n(1) "단기(N년 이내)면 JACK, 장기면 LUCIA+RAY 말이 맞습니다."\n(2) "[조건]이라면 지금 구간은 [위험/기회]입니다."\n(3) "[핵심 변수]가 해결되지 않으면 [결론]입니다."\n조건만 말하고 판결 없이 끝내는 것 금지. "지금 이 싸움이 답을 보여줬습니다" 같은 결론 없는 문장으로 끝내지 마라. "~정하세요" "~하세요" 지시형 금지. 물음표 절대 금지. 요약·정리·나열 금지. 절대 3줄 초과 금지. "결정은 당신이 하십시오"·"선택은 당신 몫"·"판단은 본인이" 등 책임 회피 표현 절대 금지.`;
-        const echo2LLM = await callTeaPersona(
-          'echo',
-          TEA_SYSTEM_ECHO,
-          [{ role: 'user', content: echo2ConsolidationPrompt }],
-        );
-        const echoText2 = cleanText(echo2LLM);
-        send({ type: 'echo', round: 2, text: echoText2 });
-
-        try {
-          const adminSupabase = getAdminSupabase();
-          if (adminSupabase) {
-            await adminSupabase.from('tea_logs').insert({
-              persona: 'ray',
-              turn_count: 1,
-              first_message: msg.slice(0, 100),
-              user_id: null,
-            });
-          }
-        } catch (e) {
-          console.warn('[tea:finance] 로그 저장 실패 (무시)', e);
-        }
-
-        send({
-          type: 'done',
-          reply: [rayText, jackText, luciaText, echoText, rayText2, jackText2, luciaText2, echoText2].filter(Boolean).join('\n\n'),
-          personas: {
-            jack: jackText, lucia: luciaText, ray: rayText, echo: echoText,
-            ray2:   rayText2   || null,
-            jack2:  jackText2  || null,
-            lucia2: luciaText2 || null,
-            echo2:  echoText2  || null,
-            order:  applyV3OrderOverride(plan.order),
-            verdict: '관망',
-            confidence: 0,
-            breakdown: '재테크 일반',
-            positionSizing: '0%',
-            jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
-          },
-        });
-        } // ── DEPRECATED 블록 종료 (if (false)) ──
       });
     };
 
