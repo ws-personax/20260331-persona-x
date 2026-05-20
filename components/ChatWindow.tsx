@@ -2668,9 +2668,26 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                   const noticeDataSource = detailsParsed.dataSource || summaryParsed.dataSource;
                   const noticeMarketClosed = detailsParsed.marketClosedNote || summaryParsed.marketClosedNote;
                   const noticeHideDisclaimer = msg.personas.breakdown !== undefined;
+                  // ✅ 방향 B: order에 echo가 없어도 personas.echo가 있으면 EchoBubble 렌더.
+                  // invest/action/principle 카테고리는 order=[ray,jack,lucia]로 echo 미포함.
+                  // order.map(renderRound1)만으로는 EchoBubble이 호출 안 되므로 별도 렌더.
+                  // emotional은 order에 echo 포함 → renderRound1('echo')로 처리 (중복 방지).
+                  const echoInOrder = order.includes('echo' as PersonaKey);
+                  const echoText = msg.personas.echo;
+                  const hasEchoText = hasText(echoText);
+
                   return (
                     <>
                       {order.map(renderRound1)}
+                      {!echoInOrder && hasEchoText && (
+                        <EchoBubble
+                          key="echo1-standalone"
+                          summary={echoText!}
+                          details={msg.personas.echoDetails}
+                          timestamp={msg.timestamp}
+                          echoNews={msg.personas.echoNews}
+                        />
+                      )}
                       {hasLuciaClose && (
                         <PersonaBubble
                           key="lucia-close"
