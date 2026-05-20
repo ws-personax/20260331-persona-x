@@ -3950,10 +3950,19 @@ ${DISCLAIMER}`;
     const jackDetailsOut   = normalizeDetails(finalJackDetails);
     const luciaDetailsOut  = normalizeDetails(finalLuciaDetails);
 
+    // invest 카테고리 필수 어휘 안전망 (레거시 stock-detail path) —
+    //   4명 응답에 '손절선'·'지지선' 둘 다 없으면 ECHO 끝에 손절선 가이드 1줄 부착.
+    //   Option D path 안전망(line 1666)과 동일 정책을 레거시 경로에도 적용.
+    let finalEchoOut = finalEcho;
+    const _stockAllText = finalJackOut + finalLuciaOut + finalRayOut + finalEcho;
+    if (!_stockAllText.includes('손절선') && !_stockAllText.includes('지지선')) {
+      finalEchoOut = finalEcho.trimEnd().replace(/[?。！!]$/, '') + '\n손절선 정해놓으셨어요?';
+    }
+
     return respond({
       reply: finalReply,
       personas: {
-        jack: finalJackOut, lucia: finalLuciaOut, ray: finalRayOut, echo: finalEcho,
+        jack: finalJackOut, lucia: finalLuciaOut, ray: finalRayOut, echo: finalEchoOut,
         echoDetails: echoDetailsOut,
         rayDetails: rayDetailsOut,
         jackDetails: jackDetailsOut,
