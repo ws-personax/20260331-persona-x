@@ -2093,9 +2093,6 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
               return { ...m, personas: p };
             }
             if (event.type === 'done' && event.personas) {
-              // [TEMP DEBUG] 서버 done 이벤트의 echo 필드 도착 여부 검증용 — 추적 완료 후 제거 예정.
-              // eslint-disable-next-line no-console
-              console.warn('[client-done-echo]', event.personas?.echo?.slice(0, 80));
               if (event.personas.order && event.personas.order.length > 0) {
                 setPendingOrder(event.personas.order);
               }
