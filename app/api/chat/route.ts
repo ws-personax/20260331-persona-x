@@ -598,6 +598,11 @@ const mapOrderedRound1 = (
   if (result.echoQuestion) {
     personaText.echo = result.echoQuestion;
   }
+  // ECHO 종결 "?" 보편 강제 — invest/action/principle은 message-router에서 echoQuestion에 적용됐고,
+  //   emotional은 ECHO가 THIRD 슬롯이라 "."로 끝나는 경우가 많음. UI/테스트 기대치(ECHO=질문자) 부합.
+  if (personaText.echo && !personaText.echo.trimEnd().endsWith('?')) {
+    personaText.echo = personaText.echo.trimEnd().replace(/[.!,;:。！]+$/, '') + '?';
+  }
   return personaText;
 };
 
