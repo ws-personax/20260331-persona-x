@@ -12,9 +12,15 @@ interface HomeScreenProps {
 
 export default function HomeScreen({ onSubmit }: HomeScreenProps) {
   const examples = [
-    { emoji: '💼', text: '출근이 너무 힘들어요', bg: '#FFF7E0', accent: '#F59E0B' },
-    { emoji: '📈', text: '삼성전자 어떻게 할까요?', bg: '#E0F2FE', accent: '#0EA5E9' },
-    { emoji: '😴', text: '잠이 안 와요', bg: '#F3E8FF', accent: '#A855F7' },
+    { emoji: '💼', text: '창업 vs 재취업, 어떻게 해야 할까요?', bg: '#FFF7E0', accent: '#F59E0B' },
+    { emoji: '📈', text: '이 사람 계속 만나도 될까요?', bg: '#E0F2FE', accent: '#0EA5E9' },
+    { emoji: '😴', text: '삼성전자 지금 사야 할까요?', bg: '#F3E8FF', accent: '#A855F7' },
+  ];
+  const personas = [
+    { name: 'RAY', role: '분석형' },
+    { name: 'JACK', role: '직설형' },
+    { name: 'LUCIA', role: '공감형' },
+    { name: 'ECHO', role: '현실형' },
   ];
 
   return (
@@ -54,7 +60,7 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
 
         {/* 4명 페르소나 이미지 */}
         <div
-          className="flex justify-center flex-shrink-0"
+          className="flex flex-col items-center flex-shrink-0"
           style={{ padding: '0 20px 32px' }}
         >
           <div
@@ -67,6 +73,33 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
               alt="4명 페르소나"
               className="w-full h-full object-cover"
             />
+          </div>
+          <div className="grid grid-cols-4 w-full" style={{ maxWidth: '260px', marginTop: '10px' }}>
+            {personas.map((persona) => (
+              <div key={persona.name} className="text-center">
+                <div
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    color: '#1a1a2e',
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {persona.name}
+                </div>
+                <div
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: '#4a4a5a',
+                    lineHeight: 1.25,
+                    marginTop: '2px',
+                  }}
+                >
+                  {persona.role}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
