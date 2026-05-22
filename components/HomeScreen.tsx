@@ -17,10 +17,10 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
     { emoji: '😴', text: '삼성전자 지금 사야 할까요?', bg: '#F3E8FF', accent: '#A855F7' },
   ];
   const personas = [
-    { name: 'RAY', role: '분석형' },
-    { name: 'JACK', role: '직설형' },
-    { name: 'LUCIA', role: '공감형' },
-    { name: 'ECHO', role: '현실형' },
+    { name: 'RAY', role: '분석형', badgeClass: 'bg-blue-500' },
+    { name: 'JACK', role: '직설형', badgeClass: 'bg-red-500' },
+    { name: 'LUCIA', role: '공감형', badgeClass: 'bg-purple-500' },
+    { name: 'ECHO', role: '현실형', badgeClass: 'bg-gray-500' },
   ];
 
   return (
@@ -88,6 +88,7 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
                   {persona.name}
                 </div>
                 <div
+                  className="inline-flex items-center justify-center gap-1"
                   style={{
                     fontSize: '11px',
                     fontWeight: 600,
@@ -96,7 +97,11 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
                     marginTop: '2px',
                   }}
                 >
-                  {persona.role}
+                  <span
+                    aria-hidden="true"
+                    className={`inline-block w-2.5 h-2.5 rounded-sm ${persona.badgeClass}`}
+                  />
+                  <span>{persona.role}</span>
                 </div>
               </div>
             ))}
