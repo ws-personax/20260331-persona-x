@@ -594,6 +594,9 @@ export const postProcessPersonaOutput = (
   // 4) 자기 호칭 치환 — 형/오빠/누나/언니 + 이/가 + 동사 → 제가 + 동사
   out = out.replace(SELF_TITLE_RE, '제가 $1');
 
+  // 4-1) [/ECHO_QUESTION] 닫는 태그 누수 제거 — LLM이 가끔 닫는 태그를 본문에 노출.
+  out = out.replace(/\[\/ECHO_QUESTION\]\??/g, '');
+
   // 5) 마크다운 제거 — GPT-4.1-mini 등 마크다운 강조 성향 모델 대응.
   //    **볼드**, *이탤릭*, ## 헤더, ~~취소선~~, __밑줄__ 모두 일반 텍스트로.
   out = out.replace(/\*\*([^*]+)\*\*/g, '$1');                    // **볼드**
