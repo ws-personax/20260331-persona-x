@@ -26,3 +26,5 @@ build/
 
 # 5. 백업 폴더 (로컬 작업용 스냅샷)
 backups/
+response-*.txt
+results-*.json
