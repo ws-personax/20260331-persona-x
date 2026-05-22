@@ -541,9 +541,19 @@ const FEW_SHOT_LEAK_PATTERNS: ReadonlyArray<RegExp> = [
   /그\s*동안\s*생각해보신\s*게\s*있으신가요\?\s*아니면\s*지금\s*한\s*번\s*더/,
 ];
 
+// 희(喜) 모드에서 JACK·RAY가 자주 흘리는 찬물 어휘. 프롬프트로 막아도 GPT-4.1-mini가
+// 가끔 "리스크/책임/부담/갈등" 등으로 양면 프레이밍 → 축하 자리 분위기 깎임.
+// 매치 시 발화 전체를 사전 안전 fallback으로 교체(축하 톤 보장 우선).
+const HEE_FORBIDDEN_RE = /리스크|손절|손실|위험|책임|부담|균형|경고|조심|방심|함정|갈등/;
+const HEE_FALLBACKS: Partial<Record<AllPersonaKey, string>> = {
+  jack: '잘 됐습니다. 본인이 진짜 해낸 거예요.',
+  ray:  '이런 순간은 통계적으로 드뭅니다. 오래 기억될 만한 가치가 있어요.',
+};
+
 export const postProcessPersonaOutput = (
   text: string,
   personaKey: AllPersonaKey,
+  options: { heeMode?: boolean } = {},
 ): string => {
   if (!text) return text;
 
@@ -596,6 +606,26 @@ export const postProcessPersonaOutput = (
 
   // 4-1) [/ECHO_QUESTION] 닫는 태그 누수 제거 — LLM이 가끔 닫는 태그를 본문에 노출.
   out = out.replace(/\[\/ECHO_QUESTION\]\??/g, '');
+
+  // 4-2) JACK 3인칭 자기 호명 제거 — JACK이/JACK은/JACK의 → '' (jack 슬롯에서만 적용).
+  //      Hidden Objective(시간 낭비 극혐) 톤에서 3인칭 자기 호명은 캐릭터 붕괴 신호.
+  if (personaKey === 'jack') {
+    out = out.replace(/(?<![가-힣a-zA-Z])(?:JACK|잭)(?:이|은|의)\s*/g, '');
+  }
+
+  // 4-3) 희(喜) 모드 안전망 — JACK·RAY가 찬물 어휘 흘리면 발화 전체 fallback 교체.
+  //      프롬프트 가드에도 GPT-4.1-mini가 "리스크/책임/부담" 양면 프레이밍으로 새는 케이스 차단.
+  if (options.heeMode && HEE_FORBIDDEN_RE.test(out)) {
+    const fb = HEE_FALLBACKS[personaKey];
+    if (fb) {
+      console.warn(
+        '[postProcessPersonaOutput] hee 모드 금지 어휘 검출 → fallback 교체',
+        '| persona:', personaKey,
+        '| text 40자:', out.slice(0, 40),
+      );
+      return fb;
+    }
+  }
 
   // 5) 마크다운 제거 — GPT-4.1-mini 등 마크다운 강조 성향 모델 대응.
   //    **볼드**, *이탤릭*, ## 헤더, ~~취소선~~, __밑줄__ 모두 일반 텍스트로.
@@ -1076,11 +1106,14 @@ ${
     const secondKey = (router.order[1] || 'jack') as AllPersonaKey;
     const thirdKey = (router.order[2] || 'ray') as AllPersonaKey;
     const closerKeyForFilter = (router.closerPersona || 'jack') as AllPersonaKey;
-    const first = postProcessPersonaOutput(extractTag(scriptRaw, 'FIRST') || '', firstKey);
-    const second = postProcessPersonaOutput(extractTag(scriptRaw, 'SECOND') || '', secondKey);
-    const third = postProcessPersonaOutput(extractTag(scriptRaw, 'THIRD') || '', thirdKey);
-    const closer = postProcessPersonaOutput(extractTag(scriptRaw, 'CLOSER') || '', closerKeyForFilter);
-    const luciaClose = postProcessPersonaOutput(extractTag(scriptRaw, 'LUCIA_CLOSE') || '', 'lucia');
+    // 희(喜) 모드 판정 — JACK·RAY 슬롯에 찬물 어휘 안전망 적용용.
+    const heeMode = router.categoryV3 === 'emotional' && detectEmotionalSubtypeHee(lastMessage);
+    const ppOpts = { heeMode };
+    const first = postProcessPersonaOutput(extractTag(scriptRaw, 'FIRST') || '', firstKey, ppOpts);
+    const second = postProcessPersonaOutput(extractTag(scriptRaw, 'SECOND') || '', secondKey, ppOpts);
+    const third = postProcessPersonaOutput(extractTag(scriptRaw, 'THIRD') || '', thirdKey, ppOpts);
+    const closer = postProcessPersonaOutput(extractTag(scriptRaw, 'CLOSER') || '', closerKeyForFilter, ppOpts);
+    const luciaClose = postProcessPersonaOutput(extractTag(scriptRaw, 'LUCIA_CLOSE') || '', 'lucia', ppOpts);
 
     // ECHO_QUESTION 누락 감지 — invest/action/principle(=비-emotional) 카테고리에서만 보정.
     //   emotional은 [LUCIA_CLOSE] 액자 구조라 ECHO_QUESTION이 의도적으로 부재.
