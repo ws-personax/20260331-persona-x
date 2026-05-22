@@ -1455,6 +1455,15 @@ export const buildScriptPrompt = (
 [CLOSER]
 (결론 담당 페르소나 대사 1~2줄 + 선택적 질문)
 
+🚨 ECHO 순서 가드 (위반 시 답변 무효 — 모든 블록·모든 카테고리 공통)
+- ECHO는 **이미 발언한 페르소나만 호명할 수 있다**. 발언 순서는 [FIRST] → [SECOND] → [THIRD] → [CLOSER] 순서를 따른다.
+- ECHO가 [SECOND]일 때: [FIRST] 페르소나만 호명 가능. 아직 발언하지 않은 페르소나(예: JACK이 [THIRD]면 JACK) 이름 언급 금지.
+- ECHO가 [THIRD]일 때: [FIRST]·[SECOND] 페르소나만 호명 가능. [CLOSER]에 올 페르소나 이름 언급 금지.
+- ECHO가 [CLOSER]일 때: [FIRST]·[SECOND]·[THIRD] 모두 호명 가능 (3명 모두 이미 발언했으므로).
+- [ECHO_QUESTION] 블록은 항상 4명 발언 이후이므로 호명 자체가 금지(아래 [ECHO_QUESTION] 규칙 참조).
+- ⛔ 예: ECHO가 [THIRD]인데 [CLOSER]에 올 JACK을 "JACK 말처럼" 식으로 미리 호명 → 무효.
+- ⛔ 예: ECHO가 [SECOND]인데 아직 말 안 한 RAY를 "RAY가 본 것처럼" 식으로 미리 호명 → 무효.
+
 ${needsLuciaClose ? `감정/복합 카테고리이므로 [CLOSER] 다음에 반드시 [LUCIA_CLOSE]도 추가:
 [LUCIA_CLOSE]
 (LUCIA 박동훈 톤 — 2줄 이내, 토론 결론 짓지 말고 유저에게 작은 질문 1개로 끝)
