@@ -13,14 +13,8 @@ interface HomeScreenProps {
 export default function HomeScreen({ onSubmit }: HomeScreenProps) {
   const examples = [
     { emoji: '💼', text: '창업 vs 재취업, 어떻게 해야 할까요?', bg: '#FFF7E0', accent: '#F59E0B' },
-    { emoji: '📈', text: '이 사람 계속 만나도 될까요?', bg: '#E0F2FE', accent: '#0EA5E9' },
-    { emoji: '😴', text: '삼성전자 지금 사야 할까요?', bg: '#F3E8FF', accent: '#A855F7' },
-  ];
-  const personas = [
-    { name: 'RAY', role: '분석형', badgeClass: 'bg-blue-500' },
-    { name: 'JACK', role: '직설형', badgeClass: 'bg-red-500' },
-    { name: 'LUCIA', role: '공감형', badgeClass: 'bg-purple-500' },
-    { name: 'ECHO', role: '현실형', badgeClass: 'bg-gray-500' },
+    { emoji: '📈', text: '삼성전자 지금 사야 할까요?', bg: '#E0F2FE', accent: '#0EA5E9' },
+    { emoji: '❤️', text: '이 사람 계속 만나도 될까요?', bg: '#F3E8FF', accent: '#A855F7' },
   ];
 
   return (
@@ -69,42 +63,10 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/scenes/personas-4.webp"
+              src="/personas/persona-roles-v2.webp"
               alt="4명 페르소나"
               className="w-full h-full object-cover"
             />
-          </div>
-          <div className="grid grid-cols-4 w-full" style={{ maxWidth: '260px', marginTop: '10px' }}>
-            {personas.map((persona) => (
-              <div key={persona.name} className="text-center">
-                <div
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: 800,
-                    color: '#1a1a2e',
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {persona.name}
-                </div>
-                <div
-                  className="inline-flex items-center justify-center gap-1"
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    color: '#4a4a5a',
-                    lineHeight: 1.25,
-                    marginTop: '2px',
-                  }}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`inline-block w-2.5 h-2.5 rounded-sm ${persona.badgeClass}`}
-                  />
-                  <span>{persona.role}</span>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
 
@@ -192,7 +154,7 @@ function InputBar({ onSubmit }: { onSubmit: (text: string) => void }) {
         onKeyDown={(e) => {
           if (e.key === 'Enter') handleSubmit();
         }}
-        placeholder="오늘 어떠세요?"
+        placeholder="4명의 의견이 필요한 고민을 입력하세요"
         style={{
           flex: 1,
           background: 'transparent',

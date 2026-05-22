@@ -1464,6 +1464,8 @@ export const buildScriptPrompt = (
 - ⛔ 예: ECHO가 [THIRD]인데 [CLOSER]에 올 JACK을 "JACK 말처럼" 식으로 미리 호명 → 무효.
 - ⛔ 예: ECHO가 [SECOND]인데 아직 말 안 한 RAY를 "RAY가 본 것처럼" 식으로 미리 호명 → 무효.
 
+🚨 JACK 순서 가드 (위반 시 답변 무효): JACK 발언 블록 이전 어떤 블록에서도 "JACK" 이름 호명 금지 — JACK이 아직 발언하지 않았으므로 "JACK 말처럼"/"JACK이 본"/"JACK," 식 선호명 절대 금지.
+
 ${needsLuciaClose ? `감정/복합 카테고리이므로 [CLOSER] 다음에 반드시 [LUCIA_CLOSE]도 추가:
 [LUCIA_CLOSE]
 (LUCIA 박동훈 톤 — 2줄 이내, 토론 결론 짓지 말고 유저에게 작은 질문 1개로 끝)
