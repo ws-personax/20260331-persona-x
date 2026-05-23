@@ -9,6 +9,7 @@ node_modules
 out/
 build/
 .vercel
+tsconfig.tsbuildinfo
 
 # 3. 🔥 절대 보안 (지휘자님의 API Key가 들어있는 파일들)
 # 이 줄이 없으면 GitHub 등에 올릴 때 열쇠가 다 털립니다!
