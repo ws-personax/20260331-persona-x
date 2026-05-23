@@ -119,7 +119,7 @@ const PERSONAS: Record<
     initial: 'E',
     iconBg: '#d4a017',
     bubbleBg: '#F9FAFB',
-    bubbleBorder: '#d4a017',
+    bubbleBorder: '#fef08a',
     textColor: '#111827',
     echoTag: '',
   },
