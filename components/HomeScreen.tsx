@@ -154,7 +154,7 @@ function InputBar({ onSubmit }: { onSubmit: (text: string) => void }) {
         onKeyDown={(e) => {
           if (e.key === 'Enter') handleSubmit();
         }}
-        placeholder="4명의 의견이 필요한 고민을 입력하세요"
+        placeholder="지금 가장 고민되는 건?"
         style={{
           flex: 1,
           background: 'transparent',
