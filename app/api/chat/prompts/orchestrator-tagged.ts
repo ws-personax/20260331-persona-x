@@ -403,6 +403,18 @@ export const buildEmotionalHeeBlock = (): string => `
 
 // 이전 카테고리 어휘 차단 — 현재 카테고리에 어울리지 않는 어휘 사용 금지 강제.
 // 1차 분석 / 2차 관점 / 3차 대본 어디에 붙여도 안전한 공용 블록.
+const buildKnowledgeWebSearchRule = (categoryV3?: CategoryV3): string => {
+  if (categoryV3 !== 'knowledge') return '';
+  return `
+
+## 🔎 knowledge 카테고리 웹 검색 정책
+knowledge 카테고리에서는 최신 사실·수치·출처가 필요한 경우가 많으므로, 답변 작성 시 웹 검색을 **ON**으로 처리한다.
+- 최신 뉴스·정치·과학·역사·경제·사회·수능·AI 관련 사실은 검색 결과를 우선 근거로 삼는다.
+- 검색 결과가 없더라도, 정보의 시점을 명시하고 추정 대신 근거를 기반으로 답한다.
+- 질문이 사실 확인형이면 최신 정보 중심으로 설명하되, 행동 지시를 하지 않는다.
+`;
+};
+
 export const buildCategoryVocabBlockRule = (categoryV3?: CategoryV3): string => {
   if (!categoryV3) return '';
   const investBan = '삼성전자/SK하이닉스/테슬라/엔비디아/비트코인/PBR/PER/매수/매도/분할매수/종목/배당/환율/반도체/HBM/실적/주가/거래량';
@@ -438,7 +450,7 @@ export const buildTaggedRound1SystemPrompt = (
   closerPersona?: AllPersonaKey,
 ): string => `${SHARED_HOCHING_RULES}
 당신은 PersonaX의 단일 호출 오케스트레이터입니다.
-유저 질문 1개에 대해 RAY/JACK/LUCIA 3명 + ECHO 1명의 1라운드 대사를 한 번에 작성합니다.${buildStage1Section(stage1Data)}${buildFirstPersonaRuleSection(firstPersona, categoryV3, hasPriorConversation)}${buildCloserPersonaRuleSection(closerPersona, firstPersona, categoryV3)}${buildCategoryVocabBlockRule(categoryV3)}
+유저 질문 1개에 대해 RAY/JACK/LUCIA 3명 + ECHO 1명의 1라운드 대사를 한 번에 작성합니다.${buildStage1Section(stage1Data)}${buildFirstPersonaRuleSection(firstPersona, categoryV3, hasPriorConversation)}${buildCloserPersonaRuleSection(closerPersona, firstPersona, categoryV3)}${buildCategoryVocabBlockRule(categoryV3)}${buildKnowledgeWebSearchRule(categoryV3)}
 
 ## 🚨🚨 카테고리 분리 절대 규칙 (모든 규칙보다 우선)
 
@@ -1455,6 +1467,8 @@ export const buildScriptPrompt = (
 [CLOSER]
 (결론 담당 페르소나 대사 1~2줄 + 선택적 질문)
 
+${buildKnowledgeWebSearchRule(categoryV3 as CategoryV3 | undefined)}
+
 🚨 ECHO 순서 가드 (위반 시 답변 무효 — 모든 블록·모든 카테고리 공통)
 - ECHO는 **이미 발언한 페르소나만 호명할 수 있다**. 발언 순서는 [FIRST] → [SECOND] → [THIRD] → [CLOSER] 순서를 따른다.
 - ECHO가 [SECOND]일 때: [FIRST] 페르소나만 호명 가능. 아직 발언하지 않은 페르소나(예: JACK이 [THIRD]면 JACK) 이름 언급 금지.
@@ -1740,7 +1754,7 @@ export const parseTaggedRound2 = (raw: string): TaggedRound2Result | null => {
 // 마스터 명세: 카테고리 강화 / Router / 호명 / Feature Flag 단계로 사용
 // ──────────────────────────────────────────────────────────────────────────
 
-export type CategoryV3 = 'invest' | 'action' | 'emotional' | 'principle';
+export type CategoryV3 = 'invest' | 'action' | 'emotional' | 'principle' | 'knowledge';
 
 export type AllPersonaKey = 'lucia' | 'jack' | 'ray' | 'echo';
 
@@ -1750,6 +1764,7 @@ const CATEGORY_V3_KEYWORDS: Record<CategoryV3, RegExp> = {
   action: /퇴사|이직|결단|결정|도전|스포츠|야구|축구|농구|골프|경기|승부|선수|이길|우승|시작할|그만둘|바꿀|옮길|뛰어들|승부|뛸까|명퇴|명예퇴직|희망퇴직|권고사직|퇴직 권유/,
   emotional: /감정|관계|일상|걱정|가족|경사|좋은소식|기쁜|슬프|우울|불안|외로|힘들|지쳐|피곤|마음|위로|공감|가족|부모|자녀|남편|아내|친구|동료|선배|후배|시댁|처가|결혼|이혼|아이|손주|손자|손녀|기뻐|기쁘|설레|행복|축하|경사|반가|잠이|잠 못|잠을 못|못 자|수면|불면|속상|속상해|속상하|아파|아프|강아지|반려동물|반려견|반려묘|고양이|반려|쓰러|쓰러졌|쓰러지|사기 당|사기를 당|당했어요|피해|취업을 못|취업 못/,
   principle: /인생|원칙|철학|판단|방향|의미|가치|본질|삶|살아간|어떻게 살|어떻게 사|왜 사|왜 살|잘 사|잘 살아|사는 게|사는 거|사는 길|살아가|살아간|어떤 사람|어떤 길|선택의 기준|기준이 뭐|무엇이 옳|옳은가|맞는가|진리|진정|정답이 뭐|인생 정답|삶의 정답|AI 때문|직업 없어|직업이 없어|일자리 없어|일 없어질|일 사라질|직업 사라|일자리 사라/,
+  knowledge: /AI|수능|정치|뉴스|과학|역사|경제|사회/,
 };
 
 /** 키워드 매치 카운트 */
@@ -1759,6 +1774,7 @@ const countCategoryMatches = (text: string): Record<CategoryV3, number> => {
     action: 0,
     emotional: 0,
     principle: 0,
+    knowledge: 0,
   };
   (Object.keys(CATEGORY_V3_KEYWORDS) as CategoryV3[]).forEach((k) => {
     const re = CATEGORY_V3_KEYWORDS[k];
@@ -1872,6 +1888,7 @@ const FIRST_PERSONA_BY_CATEGORY: Record<CategoryV3, AllPersonaKey> = {
   action: 'jack',
   emotional: 'lucia',
   principle: 'echo',
+  knowledge: 'ray',
 };
 
 export const getFirstPersona = (category: CategoryV3): AllPersonaKey =>
@@ -1883,6 +1900,7 @@ export const getFirstPersona = (category: CategoryV3): AllPersonaKey =>
  *  - action    → ECHO (본질 짚기 마무리) → LUCIA → JACK
  *  - emotional → JACK 또는 ECHO (LLM 선택; 외부/시스템 문제면 JACK, 본질 짚기면 ECHO) → LUCIA
  *  - principle → JACK (결단 마무리) → LUCIA → ECHO
+ *  - knowledge → ECHO (최신 사실/핵심 정리) → JACK → LUCIA
  * FIRST 페르소나와 CLOSER 후보가 같으면 자동으로 다음 후보로 교체.
  */
 const CLOSER_FALLBACK_CHAIN: Record<CategoryV3, AllPersonaKey[]> = {
@@ -1890,6 +1908,7 @@ const CLOSER_FALLBACK_CHAIN: Record<CategoryV3, AllPersonaKey[]> = {
   action:    ['echo', 'lucia', 'jack'],
   emotional: ['jack', 'echo', 'lucia'],
   principle: ['jack', 'lucia', 'echo'],
+  knowledge: ['echo', 'jack', 'lucia'],
 };
 
 export const getCloserPersona = (
