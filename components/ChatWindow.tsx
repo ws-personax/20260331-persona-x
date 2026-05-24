@@ -2300,6 +2300,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
               border: '1px solid #d1d5db',
               whiteSpace: 'nowrap',
               cursor: 'pointer',
+              touchAction: 'manipulation',
             }}
           >
             History
@@ -2364,9 +2365,8 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
       )}
 
       {/* HomeScreen은 app/page.tsx 레벨에서 분리 호스팅 — ChatWindow는 채팅 진입 후만 책임 */}
-      {hasUserSent && (
       <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', padding: scrollPadding }}>
-        {teaPersona !== 'lucia' && (() => {
+        {hasUserSent && teaPersona !== 'lucia' && (() => {
           const p = TEA_PERSONAS_INFO.find(x => x.key === teaPersona)!;
           return (
             <div style={{ display: 'flex', justifyContent: 'center', padding: '0 12px 10px' }}>
@@ -2736,7 +2736,6 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
         } />}
         <div ref={bottomRef} />
       </div>
-      )}
 
       {showPosition && (
         <div style={{ position: 'fixed', left: 0, right: 0, bottom: 60, zIndex: 100 }}>
@@ -2842,10 +2841,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                           onClick={() => {
                             setInput(q.text);
                             setShowQuickQ(false);
-                            setTimeout(() => {
-                              handleSendWithPosition(q.text, null);
-                              setInput('');
-                            }, 50);
+                            handleSendWithPosition(q.text, null);
                           }}
                           disabled={isLoading}
                           style={{
@@ -2921,10 +2917,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                           onClick={() => {
                             setInput(q.text);
                             setShowQuickQ(false);
-                            setTimeout(() => {
-                              handleSendWithPosition(q.text, null, true);
-                              setInput('');
-                            }, 50);
+                            handleSendWithPosition(q.text, null, true);
                           }}
                           disabled={isLoading}
                           style={{
@@ -2987,10 +2980,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                     onClick={() => {
                       setInput(news.prompt);
                       setShowQuickQ(false);
-                      setTimeout(() => {
-                        handleSendWithPosition(news.prompt, null);
-                        setInput('');
-                      }, 50);
+                      handleSendWithPosition(news.prompt, null);
                     }}
                     disabled={isLoading}
                     style={{
@@ -3027,7 +3017,6 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
         </div>
       )}
 
-      {hasUserSent && (
       <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
           <textarea
@@ -3085,7 +3074,6 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
           />
         </div>
       </footer>
-      )}
     </div>
     {showHistory && (
       <HistoryModal

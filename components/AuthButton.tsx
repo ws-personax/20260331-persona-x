@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 type AuthUser = {
@@ -18,14 +18,21 @@ export default function AuthButton() {
   const supabase = useMemo(() => createClient(), []);
 
   const [loading, setLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [kakao, setKakao] = useState<KakaoUser | null>(null);
   const [error, setError] = useState('');
+  const loadingRef = useRef(false);
+
+  const setAuthLoading = (next: boolean) => {
+    loadingRef.current = next;
+    setLoading(next);
+  };
 
   useEffect(() => {
     let mounted = true;
 
-    const loadUser = async () => {
+    const loadAuth = async () => {
       // ✅ getUser 실패는 대개 "비로그인 상태" — 빨간색 에러로 노출하지 않음.
       const { data, error } = await supabase.auth.getUser();
       if (!mounted) return;
@@ -48,14 +55,13 @@ export default function AuthButton() {
       }
     };
 
-    loadUser();
-    loadKakao();
+    Promise.all([loadAuth(), loadKakao()]).finally(() => {
+      if (mounted) setCheckingAuth(false);
+    });
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      setTimeout(() => {
-        if (!mounted) return;
-        setUser(session?.user ? { email: session.user.email } : null);
-      }, 0);
+      if (!mounted) return;
+      setUser(session?.user ? { email: session.user.email } : null);
     });
 
     return () => {
@@ -65,8 +71,9 @@ export default function AuthButton() {
   }, [supabase]);
 
   const signInWithGoogle = async () => {
+    if (loadingRef.current) return;
     try {
-      setLoading(true);
+      setAuthLoading(true);
       setError('');
       const redirectTo = `${window.location.origin}/auth/callback`;
       const { error } = await supabase.auth.signInWithOAuth({
@@ -78,19 +85,21 @@ export default function AuthButton() {
         console.error('Google 로그인 실패:', error);
       }
     } finally {
-      setLoading(false);
+      setAuthLoading(false);
     }
   };
 
   const signInWithKakao = () => {
-    setLoading(true);
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setError('');
-    window.location.href = '/api/auth/kakao/start';
+    window.location.assign('/api/auth/kakao/start');
   };
 
   const signOut = async () => {
+    if (loadingRef.current) return;
     try {
-      setLoading(true);
+      setAuthLoading(true);
       setError('');
 
       if (kakao) {
@@ -112,17 +121,35 @@ export default function AuthButton() {
         }
       }
     } finally {
-      setLoading(false);
+      setAuthLoading(false);
     }
   };
 
   const displayLabel =
     kakao?.nickname || kakao?.email || user?.email || '로그인됨';
   const isLoggedIn = Boolean(user || kakao);
+  const isBusy = loading || checkingAuth;
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-      {isLoggedIn ? (
+      {checkingAuth ? (
+        <button
+          type="button"
+          disabled
+          style={{
+            padding: '8px 14px',
+            borderRadius: '10px',
+            border: '1px solid #d1d5db',
+            background: '#fff',
+            color: '#6b7280',
+            fontWeight: 700,
+            cursor: 'not-allowed',
+            touchAction: 'manipulation',
+          }}
+        >
+          처리 중...
+        </button>
+      ) : isLoggedIn ? (
         <>
           <span
             style={{
@@ -143,7 +170,7 @@ export default function AuthButton() {
           <button
             type="button"
             onClick={signOut}
-            disabled={loading}
+            disabled={isBusy}
             style={{
               padding: '8px 14px',
               borderRadius: '10px',
@@ -151,7 +178,8 @@ export default function AuthButton() {
               background: '#fff',
               color: '#111827',
               fontWeight: 700,
-              cursor: loading ? 'not-allowed' : 'pointer',
+              cursor: isBusy ? 'not-allowed' : 'pointer',
+              touchAction: 'manipulation',
             }}
           >
             {loading ? '처리 중...' : '로그아웃'}
@@ -162,7 +190,7 @@ export default function AuthButton() {
           <button
             type="button"
             onClick={signInWithGoogle}
-            disabled={loading}
+            disabled={isBusy}
             style={{
               padding: '8px 14px',
               borderRadius: '10px',
@@ -170,7 +198,8 @@ export default function AuthButton() {
               background: '#fff',
               color: '#111827',
               fontWeight: 700,
-              cursor: loading ? 'not-allowed' : 'pointer',
+              cursor: isBusy ? 'not-allowed' : 'pointer',
+              touchAction: 'manipulation',
             }}
           >
             {loading ? '로그인 중...' : 'Google 로그인'}
@@ -178,7 +207,7 @@ export default function AuthButton() {
           <button
             type="button"
             onClick={signInWithKakao}
-            disabled={loading}
+            disabled={isBusy}
             style={{
               padding: '8px 14px',
               borderRadius: '10px',
@@ -186,7 +215,8 @@ export default function AuthButton() {
               background: '#FEE500',
               color: '#191600',
               fontWeight: 700,
-              cursor: loading ? 'not-allowed' : 'pointer',
+              cursor: isBusy ? 'not-allowed' : 'pointer',
+              touchAction: 'manipulation',
             }}
           >
             {loading ? '로그인 중...' : '카카오 로그인'}
