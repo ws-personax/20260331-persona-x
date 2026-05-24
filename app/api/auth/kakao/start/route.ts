@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   authorize.searchParams.set('state', state);
   authorize.searchParams.set('scope', 'profile_nickname profile_image');
 
-  const res = NextResponse.redirect(authorize.toString());
+  const res = NextResponse.redirect(authorize.toString(), 302);
   const isProd = process.env.NODE_ENV === 'production';
   res.cookies.set(KAKAO_STATE_COOKIE, state, {
     httpOnly: true,
