@@ -20,4 +20,101 @@ jobs:
           node-version: "20"
 
       - name: Run promptfoo eval
-        run: npx --yes promptfoo@latest eval -c promptfoo.yaml
+        id: promptfoo
+        shell: bash
+        run: |
+          set +e
+          mkdir -p promptfoo-results
+          npx --yes promptfoo@latest eval -c promptfoo.yaml \
+            -o promptfoo-results/eval.json \
+            -o promptfoo-results/eval.junit.xml
+          status=$?
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Upload promptfoo results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: promptfoo-results
+          path: promptfoo-results/
+          if-no-files-found: warn
+
+      - name: Write promptfoo summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## promptfoo eval"
+            echo ""
+            echo "- Exit code: ${{ steps.promptfoo.outputs.exit_code || 'not available' }}"
+            echo "- Artifact: promptfoo-results"
+            echo "- JSON: promptfoo-results/eval.json"
+            echo "- JUnit: promptfoo-results/eval.junit.xml"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          node <<'NODE' >> "$GITHUB_STEP_SUMMARY"
+          const fs = require('fs');
+          const path = 'promptfoo-results/eval.json';
+
+          try {
+            if (!fs.existsSync(path)) {
+              console.log('Result JSON was not created.');
+              process.exit(0);
+            }
+
+            const data = JSON.parse(fs.readFileSync(path, 'utf8'));
+            const rows = data?.results?.results || data?.results || [];
+            const failed = Array.isArray(rows)
+              ? rows.filter((row) => row && row.success === false)
+              : [];
+
+            if (failed.length === 0) {
+              console.log('No failed assertions found in result JSON.');
+              process.exit(0);
+            }
+
+            console.log(`### Failed tests (${failed.length})`);
+            console.log('');
+
+            for (const [index, row] of failed.entries()) {
+              const description =
+                row?.testCase?.description ||
+                row?.description ||
+                row?.vars?.prompt ||
+                `Failed test ${index + 1}`;
+              const reason =
+                row?.failureReason ||
+                row?.gradingResult?.reason ||
+                row?.error ||
+                'No failure reason recorded.';
+              const output =
+                row?.response?.output ??
+                row?.output ??
+                row?.response ??
+                'No output recorded.';
+
+              console.log(`#### ${index + 1}. ${description}`);
+              console.log('');
+              console.log('**Failure reason**');
+              console.log('');
+              console.log('```text');
+              console.log(String(reason).slice(0, 4000));
+              console.log('```');
+              console.log('');
+              console.log('**Actual output**');
+              console.log('');
+              console.log('```text');
+              console.log(String(output).slice(0, 4000));
+              console.log('```');
+              console.log('');
+            }
+          } catch (error) {
+            console.log('Could not parse promptfoo result JSON for summary.');
+            console.log('');
+            console.log('```text');
+            console.log(String(error?.stack || error).slice(0, 4000));
+            console.log('```');
+          }
+          NODE
