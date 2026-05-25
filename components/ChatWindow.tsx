@@ -2252,6 +2252,8 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
         .px-app-root {
           height: 100vh;
           height: 100dvh;
+          min-height: 0;
+          overflow: hidden;
         }
         .px-onboarding-wrap {
           padding: 0 0 20px;
@@ -2268,6 +2270,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
         paddingTop: 'env(safe-area-inset-top, 0px)',
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         boxSizing: 'border-box',
+        overflow: 'hidden',
       }}
     >
       <header
@@ -2281,6 +2284,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
           position: 'sticky',
           top: 0,
           zIndex: 10,
+          flexShrink: 0,
         }}
       >
         <Logo size="sm" />
@@ -2366,7 +2370,17 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
       )}
 
       {/* HomeScreen은 app/page.tsx 레벨에서 분리 호스팅 — ChatWindow는 채팅 진입 후만 책임 */}
-      <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', padding: scrollPadding }}>
+      <div
+        ref={scrollContainerRef}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          overscrollBehavior: 'contain',
+          WebkitOverflowScrolling: 'touch',
+          padding: scrollPadding,
+        }}
+      >
         {hasUserSent && teaPersona !== 'lucia' && (() => {
           const p = TEA_PERSONAS_INFO.find(x => x.key === teaPersona)!;
           return (
@@ -3018,7 +3032,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
         </div>
       )}
 
-      <footer style={{ background: '#fff', padding: '12px', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
+      <footer style={{ background: '#fff', padding: '12px', paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
           <textarea
             ref={textareaRef}
