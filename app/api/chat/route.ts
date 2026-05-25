@@ -494,6 +494,44 @@ const mapOrderedRound1 = (
   return personaText;
 };
 
+const HEE_SAFE_FALLBACKS: Partial<Record<TaggedPersonaKey, string>> = {
+  ray: '정말 경사입니다. 가족에게 오래 남을 기쁜 장면이에요.',
+  jack: '잘 됐습니다. 진짜 축하받을 일입니다.',
+};
+
+const applyHeeSafeFallbacks = (
+  result: TaggedRound1Result,
+  order: TaggedPersonaKey[],
+): TaggedRound1Result => {
+  const next = { ...(result as OptionDRound1Result) };
+
+  if (next.soloKey) {
+    const fallback = HEE_SAFE_FALLBACKS[next.soloKey];
+    if (fallback) next.soloContent = fallback;
+    return next;
+  }
+
+  const setPersonaText = (key: TaggedPersonaKey, text: string) => {
+    if (next.closerKey === key && next.closerContent) {
+      next.closerContent = text;
+      return;
+    }
+
+    const slotIndex = order
+      .slice(0, 4)
+      .filter((orderedKey) => !(next.closerKey === orderedKey && next.closerContent))
+      .indexOf(key);
+
+    if (slotIndex === 0) next.first = text;
+    if (slotIndex === 1) next.second = text;
+    if (slotIndex === 2) next.third = text;
+  };
+
+  setPersonaText('ray', HEE_SAFE_FALLBACKS.ray || '');
+  setPersonaText('jack', HEE_SAFE_FALLBACKS.jack || '');
+  return next;
+};
+
 const mapLegacyEchoRound2 = (
   result: TaggedRound2Result,
   order: TaggedPersonaKey[],
@@ -560,7 +598,7 @@ async function callOptionD(
 // Stage 3 응답 품질 가드 — 다음 두 조건 감지 시 1회 callOptionD 재호출.
 //   1) JACK 발화에 ~요로 끝나는 문장 — JACK은 짧고 강한 ~다/~입니다만 허용
 //   2) ECHO 발화에 "ECHO는/가" / "에코는/가" 자기 3인칭 언급
-// 재생성도 위반이면 재생성 결과를 그대로 사용 (LLM 한 번 더 기회 부여 의미).
+// 재생성도 희(喜) 금지어휘를 포함하면 안전 fallback으로 축하 톤을 보장.
 // ──────────────────────────────────────────────────────────────────────────
 const hasJackYoEnding = (text: string): boolean => {
   if (!text) return false;
@@ -576,8 +614,8 @@ const hasEchoSelfReference = (text: string): boolean => {
 // 희(喜) 모드 전용 금지어휘 — RAY/JACK이 기쁨을 깎는 어휘로 빠지면 재생성 트리거.
 //   RAY: 준비/환경/부담/리스크/책임/결정 — "다음 스텝" 영역 침범으로 분위기 깎음
 //   JACK: 불안/리스크/부담/현실/걱정 — 마동석 짧은 인정 톤이 깨지고 무게로 빠짐
-const HEE_RAY_BAN_WORDS = /준비|환경|부담|리스크|책임|결정/;
-const HEE_JACK_BAN_WORDS = /불안|리스크|부담|현실|걱정/;
+const HEE_RAY_BAN_WORDS = /준비|환경|부담|리스크|손절|책임|결정/;
+const HEE_JACK_BAN_WORDS = /불안|리스크|손절|부담|현실|걱정/;
 
 const hasHeeRayBannedWord = (text: string): boolean =>
   !!text && HEE_RAY_BAN_WORDS.test(text);
@@ -659,7 +697,8 @@ async function callOptionDWithStage3Guard(
     }
     const retryReasons = detectStage3GuardViolations(retry, order, isHeeMode);
     if (retryReasons.length > 0) {
-      console.warn('[stage3-guard] 재생성도 위반:', retryReasons.join(', '), '— 재생성 결과 사용');
+      console.warn('[stage3-guard] 재생성도 위반:', retryReasons.join(', '), '— 희(喜) 안전 fallback 사용');
+      if (isHeeMode) return applyHeeSafeFallbacks(retry, order);
     }
     return retry;
   }
@@ -676,7 +715,8 @@ async function callOptionDWithStage3Guard(
   }
   const retryReasons = detectStage3GuardViolations(retry, order, isHeeMode);
   if (retryReasons.length > 0) {
-    console.warn('[stage3-guard] 재생성도 위반(solo):', retryReasons.join(', '), '— 재생성 결과 사용');
+    console.warn('[stage3-guard] 재생성도 위반(solo):', retryReasons.join(', '), '— 희(喜) 안전 fallback 사용');
+    if (isHeeMode) return applyHeeSafeFallbacks(retry, order);
   }
   return retry;
 }
