@@ -3,7 +3,7 @@ description: "PersonaX 88점 자동 품질 테스트"
 providers:
   - id: https
     config:
-      url: https://20260331-persona-x.vercel.app/api/chat
+      url: "{{ env.PROMPTFOO_TARGET_URL }}"
       method: POST
       headers:
         Content-Type: application/json
@@ -374,7 +374,7 @@ tests:
     provider:
       id: https
       config:
-        url: https://20260331-persona-x.vercel.app/api/chat
+        url: "{{ env.PROMPTFOO_TARGET_URL }}"
         method: POST
         headers:
           Content-Type: application/json
@@ -404,7 +404,7 @@ tests:
     provider:
       id: https
       config:
-        url: https://20260331-persona-x.vercel.app/api/chat
+        url: "{{ env.PROMPTFOO_TARGET_URL }}"
         method: POST
         headers:
           Content-Type: application/json
@@ -432,7 +432,7 @@ tests:
     provider:
       id: https
       config:
-        url: https://20260331-persona-x.vercel.app/api/chat
+        url: "{{ env.PROMPTFOO_TARGET_URL }}"
         method: POST
         headers:
           Content-Type: application/json
@@ -484,7 +484,7 @@ tests:
     provider:
       id: https
       config:
-        url: https://20260331-persona-x.vercel.app/api/chat
+        url: "{{ env.PROMPTFOO_TARGET_URL }}"
         method: POST
         headers:
           Content-Type: application/json
