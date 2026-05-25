@@ -9,6 +9,9 @@ jobs:
   eval:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # TODO: Switch this to the Vercel preview URL when preview lookup is reliable in CI.
+      PROMPTFOO_TARGET_URL: ${{ vars.PROMPTFOO_TARGET_URL || 'https://20260331-persona-x.vercel.app/api/chat' }}
 
     steps:
       - name: Checkout
@@ -51,6 +54,7 @@ jobs:
             echo "- Artifact: promptfoo-results"
             echo "- JSON: promptfoo-results/eval.json"
             echo "- JUnit: promptfoo-results/eval.junit.xml"
+            echo "- Target URL: $PROMPTFOO_TARGET_URL"
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
