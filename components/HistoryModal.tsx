@@ -120,6 +120,7 @@ export default function HistoryModal({ onClose, supabaseClient }: HistoryModalPr
         } catch (refreshError) {
           console.warn('[history-modal] refreshSession 예외:', refreshError);
         }
+        // 모바일 로그인 직후 Supabase 세션 동기화 지연을 짧게 흡수한다.
         await new Promise((resolve) => setTimeout(resolve, 250));
 
         const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
