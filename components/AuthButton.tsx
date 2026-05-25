@@ -131,7 +131,24 @@ export default function AuthButton() {
   const isBusy = loading || checkingAuth;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+    <>
+    <style>{`
+      @media (max-width: 640px) {
+        .px-auth-button {
+          gap: 6px !important;
+          flex-wrap: nowrap !important;
+        }
+        .px-auth-label {
+          display: none !important;
+        }
+        .px-auth-button button {
+          padding: 6px 10px !important;
+          font-size: 12px !important;
+          white-space: nowrap !important;
+        }
+      }
+    `}</style>
+    <div className="px-auth-button" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
       {checkingAuth ? (
         <button
           type="button"
@@ -152,6 +169,7 @@ export default function AuthButton() {
       ) : isLoggedIn ? (
         <>
           <span
+            className="px-auth-label"
             style={{
               fontSize: '12px',
               color: '#374151',
@@ -234,5 +252,6 @@ export default function AuthButton() {
         </span>
       ) : null}
     </div>
+    </>
   );
 }

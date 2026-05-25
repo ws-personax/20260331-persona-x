@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import AuthButton from './AuthButton';
+import HistoryModal from './HistoryModal';
 import Logo from './Logo';
 
 interface HomeScreenProps {
@@ -10,7 +12,8 @@ interface HomeScreenProps {
   onOpenMenu?: () => void;
 }
 
-export default function HomeScreen({ onSubmit }: HomeScreenProps) {
+export default function HomeScreen({ onSubmit, onOpenHistory }: HomeScreenProps) {
+  const [showHistory, setShowHistory] = useState(false);
   const examples = [
     { emoji: '💼', text: '창업 vs 재취업, 어떻게 해야 할까요?', bg: '#FFF7E0', accent: '#F59E0B' },
     { emoji: '📈', text: '삼성전자 지금 사야 할까요?', bg: '#E0F2FE', accent: '#0EA5E9' },
@@ -18,10 +21,39 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
   ];
 
   return (
+    <>
     <div className="h-[100dvh] bg-[#E8DCC0] flex flex-col overflow-hidden">
       {/* 헤더 */}
-      <header className="px-5 py-3.5 flex-shrink-0 flex items-center">
+      <header className="px-5 py-3.5 flex-shrink-0 flex items-center justify-between">
         <Logo size="sm" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <AuthButton />
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenHistory) {
+                onOpenHistory();
+                return;
+              }
+              setShowHistory(true);
+            }}
+            style={{
+              background: '#fff',
+              padding: '5px 12px',
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#374151',
+              border: '1px solid #d1d5db',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+            }}
+          >
+            History
+          </button>
+        </div>
       </header>
 
       {/* 메인 콘텐츠 - 상단 정렬 */}
@@ -121,6 +153,10 @@ export default function HomeScreen({ onSubmit }: HomeScreenProps) {
         <InputBar onSubmit={onSubmit} />
       </div>
     </div>
+    {showHistory && (
+      <HistoryModal onClose={() => setShowHistory(false)} />
+    )}
+    </>
   );
 }
 

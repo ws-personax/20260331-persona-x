@@ -2285,7 +2285,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
       >
         <Logo size="sm" />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: '60vw' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           <AuthButton />
           <button
             type="button"
@@ -2299,6 +2299,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
               color: '#374151',
               border: '1px solid #d1d5db',
               whiteSpace: 'nowrap',
+              flexShrink: 0,
               cursor: 'pointer',
               touchAction: 'manipulation',
             }}
