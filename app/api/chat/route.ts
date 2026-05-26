@@ -26,7 +26,7 @@ import {
   isKRMarketHoliday,
   isKRNonTradingDay,
 } from '@/lib/personax/calendar';
-import { detectStage3GuardViolations } from '@/lib/personax/guards';
+import { cleanJackEnding, detectStage3GuardViolations } from '@/lib/personax/guards';
 import { buildJackText, buildLuciaText, buildEchoText, RAY_TAIL, JACK_TAIL, LUCIA_TAIL, ECHO_TAIL } from '@/lib/personax/templates';
 import type { DiscussMode, IndicatorFlags, PrevContext } from '@/lib/personax/templates';
 
@@ -937,7 +937,7 @@ export async function POST(req: Request) {
           const next = prior[i + 1];
           if (next && next.role === 'assistant') {
             const rayText   = summarize(next.personas?.ray   || next.teaRay   || '', 100);
-            const jackText  = summarize(next.personas?.jack  || next.teaJack  || '', 80);
+            const jackText  = cleanJackEnding(summarize(next.personas?.jack  || next.teaJack  || '', 80));
             const luciaText = summarize(next.personas?.lucia || next.teaLucia || '', 80);
             const echoText  = summarize(next.personas?.echo  || '', 60);
 
@@ -1420,7 +1420,7 @@ export async function POST(req: Request) {
             .trim();
 
         const rayText   = cleanNews(rayLLM)   || '실시간 검색이 일시 지연되고 있어요. 잠시 후 다시 질문해주세요.';
-        const jackText  = cleanNews(jackLLM)  || '핵심 변수가 정리되면 다시 짚어드릴게요.';
+        const jackText  = cleanJackEnding(cleanNews(jackLLM)  || '핵심 변수가 정리되면 다시 짚어드릴게요.');
         const luciaText = cleanNews(luciaLLM) || '뉴스를 보고 마음이 흔들리시면 천천히 이야기 나눠봐요.';
 
         // ✅ ECHO 취합 판결 — 위 3명 응답을 컨텍스트로 받아 마지막에 호출
@@ -1735,7 +1735,7 @@ export async function POST(req: Request) {
       };
 
       const rayText = cleanAdvanced(rayLLM || '데이터 기반 분석이 필요합니다.\n지금 구간의 통계적 특성을 먼저 확인하시고 과거 유사 상황의 패턴을 비교해 보시는 걸 권합니다.');
-      const jackText = cleanAdvanced(jackLLM || '판단 기준을 먼저 정하세요.\n추세가 살아있는지, 꺾였는지 확인부터.\n손절선 없이는 진입도 없습니다.');
+      const jackText = cleanJackEnding(cleanAdvanced(jackLLM || '판단 기준을 먼저 정하세요.\n추세가 살아있는지, 꺾였는지 확인부터.\n손절선 없이는 진입도 없습니다.'));
       const luciaText = cleanAdvanced(luciaLLM || '이 질문에 답하기 전에 먼저 본인 심리 상태를 점검하세요.\n손실 회피 편향이 작동하는 구간입니다.\n최악의 시나리오를 가정하고 그때 어떻게 할지 먼저 정해두세요.');
       const echoText = cleanAdvanced(echoLLM || '한 가지만 짚겠습니다.\n원칙 없이 답하면 매번 다른 결론이 나옵니다.\n먼저 본인의 판단 기준을 종이에 적으세요.\n그게 출발점입니다.');
 

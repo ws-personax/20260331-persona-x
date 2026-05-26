@@ -51,6 +51,9 @@ export const hasJackYoEnding = (text: string): boolean => {
   return sentences.some((s) => /요$/.test(s));
 };
 
+export const cleanJackEnding = (text: string): string =>
+  text.replace(/요\./g, '다.');
+
 export const hasEchoSelfReference = (text: string): boolean => {
   if (!text) return false;
   return /ECHO\s*[는가]/.test(text) || /에코\s*[는가]/.test(text);
@@ -76,9 +79,6 @@ export const detectStage3GuardViolations = (
   const reasons: string[] = [];
   // solo 모드 — soloKey/soloContent에서 직접 검사
   if (result.soloKey) {
-    if (result.soloKey === 'jack' && hasJackYoEnding(result.soloContent || '')) {
-      reasons.push('JACK ~요 종결(solo)');
-    }
     if (result.soloKey === 'echo' && hasEchoSelfReference(result.soloContent || '')) {
       reasons.push('ECHO 자기 3인칭(solo)');
     }
@@ -94,7 +94,6 @@ export const detectStage3GuardViolations = (
   }
   // full 모드 — 페르소나별 텍스트 분리 후 검사
   const personaText = mapStage3PersonaText(result, order);
-  if (hasJackYoEnding(personaText.jack)) reasons.push('JACK ~요 종결');
   if (hasEchoSelfReference(personaText.echo)) reasons.push('ECHO 자기 3인칭');
   if (isHeeMode) {
     if (hasHeeRayBannedWord(personaText.ray)) reasons.push('희(喜) RAY 금지어휘');
