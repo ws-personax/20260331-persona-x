@@ -29,3 +29,7 @@ tsconfig.tsbuildinfo
 backups/
 response-*.txt
 results-*.json
+
+
+PROJECT_NOTES.md
+.claude/settings.local.json
