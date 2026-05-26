@@ -26,6 +26,7 @@ import {
   isKRMarketHoliday,
   isKRNonTradingDay,
 } from '@/lib/personax/calendar';
+import { detectStage3GuardViolations } from '@/lib/personax/guards';
 import { buildJackText, buildLuciaText, buildEchoText, RAY_TAIL, JACK_TAIL, LUCIA_TAIL, ECHO_TAIL } from '@/lib/personax/templates';
 import type { DiscussMode, IndicatorFlags, PrevContext } from '@/lib/personax/templates';
 
@@ -569,64 +570,6 @@ async function callOptionD(
 //   2) ECHO 발화에 "ECHO는/가" / "에코는/가" 자기 3인칭 언급
 // 재생성도 위반이면 재생성 결과를 그대로 사용 (LLM 한 번 더 기회 부여 의미).
 // ──────────────────────────────────────────────────────────────────────────
-const hasJackYoEnding = (text: string): boolean => {
-  if (!text) return false;
-  const sentences = text.split(/[.!?\n]+/).map((s) => s.trim()).filter(Boolean);
-  return sentences.some((s) => /요$/.test(s));
-};
-
-const hasEchoSelfReference = (text: string): boolean => {
-  if (!text) return false;
-  return /ECHO\s*[는가]/.test(text) || /에코\s*[는가]/.test(text);
-};
-
-// 희(喜) 모드 전용 금지어휘 — RAY/JACK이 기쁨을 깎는 어휘로 빠지면 재생성 트리거.
-//   RAY: 준비/환경/부담/리스크/책임/결정 — "다음 스텝" 영역 침범으로 분위기 깎음
-//   JACK: 불안/리스크/부담/현실/걱정 — 마동석 짧은 인정 톤이 깨지고 무게로 빠짐
-const HEE_RAY_BAN_WORDS = /준비|환경|부담|리스크|책임|결정/;
-const HEE_JACK_BAN_WORDS = /불안|리스크|부담|현실|걱정/;
-
-const hasHeeRayBannedWord = (text: string): boolean =>
-  !!text && HEE_RAY_BAN_WORDS.test(text);
-
-const hasHeeJackBannedWord = (text: string): boolean =>
-  !!text && HEE_JACK_BAN_WORDS.test(text);
-
-const detectStage3GuardViolations = (
-  result: TaggedRound1Result,
-  order: TaggedPersonaKey[],
-  isHeeMode: boolean = false,
-): string[] => {
-  const reasons: string[] = [];
-  // solo 모드 — soloKey/soloContent에서 직접 검사
-  if (result.soloKey) {
-    if (result.soloKey === 'jack' && hasJackYoEnding(result.soloContent || '')) {
-      reasons.push('JACK ~요 종결(solo)');
-    }
-    if (result.soloKey === 'echo' && hasEchoSelfReference(result.soloContent || '')) {
-      reasons.push('ECHO 자기 3인칭(solo)');
-    }
-    if (isHeeMode) {
-      if (result.soloKey === 'ray' && hasHeeRayBannedWord(result.soloContent || '')) {
-        reasons.push('희(喜) RAY 금지어휘(solo)');
-      }
-      if (result.soloKey === 'jack' && hasHeeJackBannedWord(result.soloContent || '')) {
-        reasons.push('희(喜) JACK 금지어휘(solo)');
-      }
-    }
-    return reasons;
-  }
-  // full 모드 — 기존 매핑 헬퍼로 페르소나별 텍스트 분리 후 검사
-  const personaText = mapOrderedRound1(result as OptionDRound1Result, order);
-  if (hasJackYoEnding(personaText.jack)) reasons.push('JACK ~요 종결');
-  if (hasEchoSelfReference(personaText.echo)) reasons.push('ECHO 자기 3인칭');
-  if (isHeeMode) {
-    if (hasHeeRayBannedWord(personaText.ray)) reasons.push('희(喜) RAY 금지어휘');
-    if (hasHeeJackBannedWord(personaText.jack)) reasons.push('희(喜) JACK 금지어휘');
-  }
-  return reasons;
-};
-
 async function callOptionDWithStage3Guard(
   messages: Array<{ role?: string; content?: string }>,
   category: string,
