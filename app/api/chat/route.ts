@@ -64,11 +64,11 @@ import {
 import {
   applyPersonaFallback,
   buildSoloEchoFollowup,
-  emptyPersonaText,
   HEE_FALLBACK,
   PERSONA_FALLBACK,
 } from '@/lib/personax/fallbacks';
 import { saveHistory, saveTeaConversation } from '@/lib/personax/history';
+import { mapLegacyEchoRound2, mapOrderedRound1 } from '@/lib/personax/streaming';
 
 // ✅ Feature Flag — Router/3단계 호출/ECHO 선택/LUCIA 프레이밍 단계별 활성화
 // router만 우선 활성화. 나머지는 다음 단계에서 켠다.
@@ -436,50 +436,6 @@ type OptionDRound1Result = TaggedRound1Result & {
     dataPack: string;
     personaViews: string;
   };
-};
-
-const mapOrderedRound1 = (
-  result: OptionDRound1Result,
-  order: TaggedPersonaKey[],
-): Record<TaggedPersonaKey, string> => {
-  const personaText = emptyPersonaText();
-  const nonEchoSlots = [result.first, result.second, result.third];
-  let nonEchoIdx = 0;
-  order.slice(0, 4).forEach((key) => {
-    if (result.closerKey === key && result.closerContent) {
-      personaText[key] = result.closerContent;
-    } else {
-      personaText[key] = nonEchoSlots[nonEchoIdx++] || '';
-    }
-  });
-  if (result.echoQuestion) {
-    personaText.echo = result.echoQuestion;
-  }
-  // 복합 카테고리(finance+emotional 등) — order에 echo가 없고 echoQuestion도 비어있을 때,
-  //   LUCIA_CLOSE가 실제 닫는 질문 역할이므로 personaText.echo에 동기화.
-  //   UI/테스트에서 echo 필드가 비지 않도록 보장.
-  if (!personaText.echo && result.luciaClose) {
-    personaText.echo = result.luciaClose;
-  }
-  // ECHO 종결 "?" 보편 강제 — invest/action/principle은 message-router에서 echoQuestion에 적용됐고,
-  //   emotional은 ECHO가 THIRD 슬롯이라 "."로 끝나는 경우가 많음. UI/테스트 기대치(ECHO=질문자) 부합.
-  if (personaText.echo && !personaText.echo.trimEnd().endsWith('?')) {
-    personaText.echo = personaText.echo.trimEnd().replace(/[.!,;:。！]+$/, '') + '?';
-  }
-  return personaText;
-};
-
-const mapLegacyEchoRound2 = (
-  result: TaggedRound2Result,
-  order: TaggedPersonaKey[],
-): Record<TaggedPersonaKey, string> => {
-  const personaText = emptyPersonaText();
-  const promptOrder = toPromptOrder(order);
-  personaText[promptOrder[0]] = result.first;
-  personaText[promptOrder[1]] = result.second;
-  personaText[promptOrder[2]] = result.third;
-  personaText.echo = result.echoFinal;
-  return personaText;
 };
 
 // callOptionD는 runRoutedRequest로 흡수됨.
