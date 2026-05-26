@@ -59,6 +59,13 @@ export const hasEchoSelfReference = (text: string): boolean => {
   return /ECHO\s*[는가]/.test(text) || /에코\s*[는가]/.test(text);
 };
 
+export const cleanEchoSelfReference = (text: string): string =>
+  text
+    .replace(/ECHO\s*는/g, '저는')
+    .replace(/에코\s*는/g, '저는')
+    .replace(/ECHO\s*가/g, '제가')
+    .replace(/에코\s*가/g, '제가');
+
 // 희(喜) 모드 전용 금지어휘 — RAY/JACK이 기쁨을 깎는 어휘로 빠지면 재생성 트리거.
 //   RAY: 준비/환경/부담/리스크/책임/결정 — "다음 스텝" 영역 침범으로 분위기 깎음
 //   JACK: 불안/리스크/부담/현실/걱정 — 마동석 짧은 인정 톤이 깨지고 무게로 빠짐
@@ -79,9 +86,6 @@ export const detectStage3GuardViolations = (
   const reasons: string[] = [];
   // solo 모드 — soloKey/soloContent에서 직접 검사
   if (result.soloKey) {
-    if (result.soloKey === 'echo' && hasEchoSelfReference(result.soloContent || '')) {
-      reasons.push('ECHO 자기 3인칭(solo)');
-    }
     if (isHeeMode) {
       if (result.soloKey === 'ray' && hasHeeRayBannedWord(result.soloContent || '')) {
         reasons.push('희(喜) RAY 금지어휘(solo)');
@@ -94,7 +98,6 @@ export const detectStage3GuardViolations = (
   }
   // full 모드 — 페르소나별 텍스트 분리 후 검사
   const personaText = mapStage3PersonaText(result, order);
-  if (hasEchoSelfReference(personaText.echo)) reasons.push('ECHO 자기 3인칭');
   if (isHeeMode) {
     if (hasHeeRayBannedWord(personaText.ray)) reasons.push('희(喜) RAY 금지어휘');
     if (hasHeeJackBannedWord(personaText.jack)) reasons.push('희(喜) JACK 금지어휘');
