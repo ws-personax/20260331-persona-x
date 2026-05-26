@@ -987,6 +987,49 @@ const normalizeDetails = (text: string | null | undefined): string | null => {
 };
 
 // ─────────────────────────────────────────────
+// ✅ Persona empty-value fallback — non-invest 경로 전용
+//   LLM/파싱 실패로 빈 문자열이 반환될 때 최소 안전 문장 보정.
+//   invest 카테고리는 기존 안전망(손절선 가드 등)이 담당하므로 제외.
+//   hee 모드(emotional + 기쁜 소식)는 축하 톤. 금지어 없음.
+// ─────────────────────────────────────────────
+const PERSONA_FALLBACK: Record<TaggedPersonaKey, string> = {
+  ray:   '지금 상황을 차분히 정리해보면, 먼저 기준을 세우는 것이 좋습니다.',
+  jack:  '핵심은 하나입니다. 지금 바로 결론보다 다음 행동 기준을 정해야 합니다.',
+  lucia: '지금 느끼는 마음을 무시하지 말고, 천천히 정리해도 괜찮아요.',
+  echo:  '지금 필요한 건 결론인가요, 아니면 한 번 더 확인할 기준인가요?',
+};
+
+const HEE_FALLBACK: Record<TaggedPersonaKey, string> = {
+  ray:   '정말 잘 되셨습니다. 오늘은 이 좋은 순간을 충분히 느껴도 됩니다.',
+  jack:  '이건 분명 좋은 일입니다. 마음껏 기뻐하셔도 됩니다.',
+  lucia: '정말 기쁘고 따뜻한 순간이네요. 함께 축하하고 싶어요.',
+  echo:  '이 기쁜 순간을 누구와 가장 먼저 나누고 싶으세요?',
+};
+
+/**
+ * personaText의 빈(공백 포함) 값만 fallback으로 채운다.
+ * 기존 정상 문장은 덮어쓰지 않음.
+ * isHee === true 시: 빈 값 보정 외에, "리스크" 또는 "손절" 포함 필드도
+ * HEE_FALLBACK으로 치환한다 (축하 톤 유지). echo는 항상 '?'로 종결.
+ */
+const applyPersonaFallback = (
+  personaText: Record<TaggedPersonaKey, string>,
+  isHee: boolean,
+): void => {
+  const fb = isHee ? HEE_FALLBACK : PERSONA_FALLBACK;
+  const keys: TaggedPersonaKey[] = ['ray', 'jack', 'lucia', 'echo'];
+  for (const k of keys) {
+    if (!personaText[k].trim()) {
+      // 빈 값 → fallback 채우기
+      personaText[k] = fb[k];
+    } else if (isHee && /리스크|손절/.test(personaText[k])) {
+      // hee 모드 금지어 포함 필드만 HEE_FALLBACK으로 치환
+      personaText[k] = HEE_FALLBACK[k];
+    }
+  }
+};
+
+// ─────────────────────────────────────────────
 // POST 핸들러
 // ─────────────────────────────────────────────
 export async function POST(req: Request) {
@@ -1161,7 +1204,16 @@ export async function POST(req: Request) {
             await build(send);
           } catch (e) {
             console.error('[stream] build 실패', e);
-            send({ type: 'done', personas: {}, reply: '' });
+            send({
+              type: 'done',
+              personas: {
+                ray:   PERSONA_FALLBACK.ray,
+                jack:  PERSONA_FALLBACK.jack,
+                lucia: PERSONA_FALLBACK.lucia,
+                echo:  PERSONA_FALLBACK.echo,
+              },
+              reply: PERSONA_FALLBACK.ray,
+            });
           } finally {
             try { controller.close(); } catch {}
           }
@@ -1446,9 +1498,14 @@ export async function POST(req: Request) {
               _closerPersonaV3,
               invoked,
             );
-            const reply = soloResult?.soloKey === invoked
+            let reply = soloResult?.soloKey === invoked
               ? soloResult.soloContent || ''
               : '';
+            // ✅ invoked persona 빈 응답 → non-invest 최소 fallback
+            if (!reply.trim() && _categoryV3 !== 'invest') {
+              const _isHeeSolo = _categoryV3 === 'emotional' && detectEmotionalSubtypeHee(msg);
+              reply = (_isHeeSolo ? HEE_FALLBACK : PERSONA_FALLBACK)[invoked as TaggedPersonaKey];
+            }
             await streamPersonaTagged(invoked, reply);
             const echoFollowup = invoked === 'echo' ? reply : buildSoloEchoFollowup(invoked);
 
@@ -1484,6 +1541,12 @@ export async function POST(req: Request) {
           }
           if (r1) {
             const personaText = mapOrderedRound1(r1, order);
+
+            // ✅ non-invest 빈 persona 보정 — LLM 파싱 실패로 빈 문자열 방어
+            if (_categoryV3 !== 'invest') {
+              const _isHee = _categoryV3 === 'emotional' && detectEmotionalSubtypeHee(msg);
+              applyPersonaFallback(personaText, _isHee);
+            }
 
             // invest 카테고리 필수 어휘 안전망 — 4명 응답에 '손절선'/'지지선' 둘 다 없으면
             //   ECHO 질문 끝에 손절선 가이드 1줄을 강제 부착. 프롬프트 규칙은 LLM이 무시할 수 있음.
@@ -1602,6 +1665,12 @@ export async function POST(req: Request) {
         if (r2) {
           const personaText2 = mapLegacyEchoRound2(r2, priorOrder);
 
+          // ✅ non-invest 빈 persona 보정 — r2 경로
+          if (_categoryV3 !== 'invest') {
+            const _isHee2 = _categoryV3 === 'emotional' && detectEmotionalSubtypeHee(msg);
+            applyPersonaFallback(personaText2, _isHee2);
+          }
+
           for (const key of priorOrder) {
             await streamPersonaTagged(key, personaText2[key]);
           }
@@ -1640,11 +1709,13 @@ export async function POST(req: Request) {
           return;
         }
         console.error('[tagged-r2] 파싱 실패 — done 응답');
+        const _r2Fb = (_categoryV3 === 'emotional' && detectEmotionalSubtypeHee(msg))
+          ? HEE_FALLBACK : PERSONA_FALLBACK;
         send({
           type: 'done',
-          reply: '',
+          reply: _r2Fb.ray,
           personas: {
-            ray: '', jack: '', lucia: '', echo: '',
+            ray: _r2Fb.ray, jack: _r2Fb.jack, lucia: _r2Fb.lucia, echo: _r2Fb.echo,
             ray2: null, jack2: null, lucia2: null, echo2: null,
             order: priorOrder,
             verdict: '관망', confidence: 0, breakdown: '재테크 일반', positionSizing: '0%',
@@ -1684,9 +1755,14 @@ export async function POST(req: Request) {
           _closerPersonaV3,
           invoked,
         );
-        const reply = soloResult?.soloKey === invoked
+        let reply = soloResult?.soloKey === invoked
           ? soloResult.soloContent || ''
           : '';
+        // ✅ invoked persona 빈 응답 → non-invest 최소 fallback
+        if (!reply.trim() && _categoryV3 !== 'invest') {
+          const _isHeeOuter = _categoryV3 === 'emotional' && detectEmotionalSubtypeHee(lastMsg);
+          reply = (_isHeeOuter ? HEE_FALLBACK : PERSONA_FALLBACK)[invoked as TaggedPersonaKey];
+        }
         // 스트리밍 — echo면 echo 이벤트, 그 외 페르소나는 persona 이벤트
         let acc = '';
         for (const c of chunkText(reply, 15)) {
