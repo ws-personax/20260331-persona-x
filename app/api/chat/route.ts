@@ -43,7 +43,6 @@ import {
   buildTaggedRound2UserPrompt,
   parseTaggedRound2,
   detectEmotionalSubtypeHee,
-  type TaggedPersonaKey as PromptTaggedPersonaKey,
   type TaggedRound1Result,
   type TaggedRound2Result,
 } from './prompts/orchestrator-tagged';
@@ -55,6 +54,13 @@ import {
   type LLMCaller,
   type TaggedPersonaKey,
 } from '@/lib/personax/message-router';
+import {
+  chunkText,
+  normalizeDetails,
+  removeDangsin,
+  sleep,
+  toPromptOrder,
+} from '@/lib/personax/utils';
 
 // ✅ Feature Flag — Router/3단계 호출/ECHO 선택/LUCIA 프레이밍 단계별 활성화
 // router만 우선 활성화. 나머지는 다음 단계에서 켠다.
@@ -136,7 +142,6 @@ const isRetriableModelError = (err: unknown): boolean => {
     msg.includes('timeout')
   );
 };
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const teaGenAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '');
 
 // ─────────────────────────────────────────────
@@ -281,24 +286,6 @@ const toGeminiContents = (history: TeaMsg[]) => {
 //   조사별 패턴을 먼저 제거하고, 단독 '당신'(앞뒤 공백 포함)도 정리.
 //   JSON 응답(오케스트레이터)에도 안전 — JSON 문법 문자(",{,} 등)와 충돌 없음.
 // ─────────────────────────────────────────────
-const removeDangsin = (text: string): string => {
-  return text
-    .replace(/당신은\s+/g, '')
-    .replace(/당신이\s+/g, '')
-    .replace(/당신의\s+/g, '')
-    .replace(/당신을\s+/g, '')
-    .replace(/당신에게\s+/g, '')
-    .replace(/당신과\s+/g, '')
-    .replace(/당신만\s+/g, '')
-    .replace(/당신도\s+/g, '')
-    .replace(/당신께\s+/g, '')
-    .replace(/당신\s+/g, '')
-    .replace(/\s+당신/g, '')
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/^[ \t]+/gm, '')
-    .trim();
-};
-
 const callTeaPersona = async (
   persona: TeaPersonaKey,
   system: string,
@@ -429,11 +416,6 @@ const getAdminSupabase = () => {
 //   2라운드: [FIRST_2] [SECOND_2] [THIRD_2] [ECHO_FINAL]
 //   하이브리드 순서: 감정 키워드 감지 시 LUCIA 먼저, 아니면 카테고리 기반.
 // ─────────────────────────────────────────────
-const toPromptOrder = (order: TaggedPersonaKey[]): PromptTaggedPersonaKey[] => {
-  const nonEcho = order.filter((key): key is PromptTaggedPersonaKey => key !== 'echo');
-  return nonEcho.length === 3 ? nonEcho : ['ray', 'jack', 'lucia'];
-};
-
 const emptyPersonaText = (): Record<TaggedPersonaKey, string> => ({
   ray: '',
   jack: '',
@@ -657,16 +639,6 @@ async function callTaggedRound2(
   }
 }
 
-// 텍스트를 size 글자 단위로 분할 — 진행형 스트리밍 청크용
-function chunkText(text: string, size: number): string[] {
-  if (!text) return [];
-  const out: string[] = [];
-  for (let i = 0; i < text.length; i += size) {
-    out.push(text.slice(i, i + size));
-  }
-  return out;
-}
-
 // ─────────────────────────────────────────────
 // ✅ parseChainedPersonas 제거 — Gemini 완전 제거로 불필요
 
@@ -803,84 +775,6 @@ const MARKET_INDEX_SET = new Set([
   '다우', '다우존스', '코스피', '코스닥', '한국 증시', '한국증시',
   '^IXIC', '^GSPC', '^DJI', '^KS11', '^KQ11',
 ]);
-
-// ─────────────────────────────────────────────
-// 자세히 보기 전용 후처리 — 지시형 표현 완화 + 이모지 허용 셋만 유지
-//   허용 이모지: ✅ ⚠️ 🔹 📊 📈 💡 🔴 🟡 🟢 (📍 렌더링 이슈로 🔹으로 대체)
-//   주의: 이 함수는 "자세히 보기(details)" 문자열에만 적용해야 함.
-//   ECHO 상단 summary / RAY·JACK·LUCIA 메인 버블에는 적용하지 않음 (지휘관 톤 유지).
-// ─────────────────────────────────────────────
-const normalizeDetails = (text: string | null | undefined): string | null => {
-  if (!text) return text ?? null;
-  return text
-    // 이모지 교체 (긴 것 먼저)
-    .replace(/🛡️/g, '⚠️')
-    .replace(/📌/g, '🔹')
-    .replace(/📍/g, '🔹')
-    .replace(/🎯/g, '✅')
-    .replace(/📉/g, '📊')
-    .replace(/💭/g, '💡')
-    .replace(/📐/g, '📊')
-    // 허용 셋에 없는 이모지 제거 (선행 공백 흡수)
-    .replace(/⚔️\s?/g, '')
-    .replace(/🔗\s?/g, '')
-    // 금지 표현 — 긴 패턴부터
-    .replace(/손절\s*기준\s*사수/g, '리스크 기준선 관리')
-    .replace(/손절\s*기준\s*엄수/g, '리스크 기준선 이탈 여부 확인 권장')
-    .replace(/손절\s*규칙은\s*지키되/g, '리스크 기준선을 참고하되')
-    .replace(/손절\s*규칙/g, '리스크 관리 규칙')
-    .replace(/손절\s*라인\s*확인\s*권고/g, '리스크 기준선 확인 권고')
-    .replace(/손절\s*설정/g, '리스크 기준선 설정')
-    .replace(/손절\s*라인/g, '리스크 기준선')
-    .replace(/손절가/g, '리스크 기준선')
-    .replace(/손절선/g, '리스크 기준선')
-    .replace(/권장\s*손절\s*-?\s*(\d+)\s*%/g, '권장 리스크 기준선 -$1%')
-    .replace(/손절/g, '리스크 기준선')
-    .replace(/현금화/g, '리스크 관리 고려')
-    .replace(/섣부른\s*매수\s*금지/g, '충분한 확인 후 판단 권장')
-    .replace(/매수\s*금지/g, '신중한 접근 권장')
-    .replace(/추격\s*매수는\s*금지/g, '추격 매수는 자제 권장')
-    .replace(/섣부른\s*역발상은\s*금지/g, '섣부른 역발상은 자제 권장')
-    .replace(/성급한\s*진입은\s*금지/g, '성급한 진입은 자제 권장')
-    .replace(/섣부른\s*저점\s*매수는\s*금지/g, '섣부른 저점 매수는 자제 권장')
-    .replace(/신규\s*진입을\s*금지/g, '신규 진입 자제 권장')
-    .replace(/진입은\s*금지가\s*원칙/g, '진입은 자제가 원칙')
-    .replace(/금지합니다/g, '자제 권장')
-    .replace(/금지가\s*원칙/g, '자제가 원칙')
-    .replace(/즉각\s*재진입하십시오/g, '재진입 시나리오 검토 가능')
-    .replace(/즉각\s*/g, '')
-    .replace(/사수/g, '')
-    .replace(/엄수/g, '준수 권장')
-    // "하십시오" 계열 → 권장/검토 형태로 (긴 것 먼저)
-    .replace(/서두르지\s*마십시오/g, '서두름 자제 권장')
-    .replace(/추격은\s*피하십시오/g, '추격 자제 권장')
-    .replace(/피하십시오/g, '자제 권장')
-    // "지금 즉시 50% 정리하십시오" 같은 지시형 — 통째로 완화 (개별 '정리하십시오'보다 먼저 매칭)
-    .replace(/지금\s*(?:즉시\s*)?\d+\s*%\s*정리하십시오/g, '분할 축소 고려 가능')
-    .replace(/\d+\s*%\s*정리하십시오/g, '분할 축소 고려 가능')
-    .replace(/정리하십시오/g, '정리 권장')
-    .replace(/진입하십시오/g, '진입 권장')
-    .replace(/확인하십시오/g, '확인 권장')
-    .replace(/기다리십시오/g, '대기 권장')
-    .replace(/준비하십시오/g, '준비 권장')
-    .replace(/검토하십시오/g, '검토 권장')
-    .replace(/고려하십시오/g, '고려 권장')
-    .replace(/유지하십시오/g, '유지 권장')
-    .replace(/대기하십시오/g, '대기 권장')
-    .replace(/판단하십시오/g, '판단 권장')
-    .replace(/대응하십시오/g, '대응 권장')
-    .replace(/결정하십시오/g, '결정 권장')
-    .replace(/접근하십시오/g, '접근 권장')
-    .replace(/보류하십시오/g, '보류 권장')
-    .replace(/재진입하십시오/g, '재진입 검토')
-    .replace(/추종하십시오/g, '추종 검토')
-    .replace(/시도하십시오/g, '시도 검토')
-    .replace(/설정하십시오/g, '설정 권장')
-    // 공백 정리
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-};
 
 // ─────────────────────────────────────────────
 // ✅ Persona empty-value fallback — non-invest 경로 전용
