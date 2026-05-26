@@ -734,14 +734,6 @@ export async function runRoutedRequest(
       //   안부 질문 아님. LLM이 JACK 안부 섹션을 보면 verbatim 3-line 구조를 따라가는
       //   경향이 있어 의견 질문엔 섹션 자체를 노출하지 않는 게 가장 안전.
       const isOpinionStyleQuestion = /어떻게\s*생각|의견은|어떻게\s*봐|분석해|어떻게\s*판단|어떻게\s*보(?:세요|시는|냐)|네가\s*보기엔|당신이\s*보기엔/.test(lastMessage);
-      if (process.env.DEBUG_MODE === '1') {
-        console.log(
-          '[runRoutedRequest] solo 단축 경로 — 1 LLM call only',
-          '| persona:', display,
-          '| order:', router.order,
-          '| categoryV3:', router.categoryV3,
-        );
-      }
       // Stage 3만 실행 — personaViews는 빈 문자열로 buildScriptPrompt 통과 (style/vocab 가드 유지).
       const soloPrompt = `${buildScriptPrompt(
         messages,
@@ -980,9 +972,6 @@ ${
         //   상위 솔로 ECHO fallback이 닫는 질문으로 보완하므로 사용자 경험상 자연스럽게 닫힘.
         soloText = `${display} 답변을 생성하지 못했습니다`;
       }
-      if (process.env.DEBUG_MODE === '1') {
-        console.log('[runRoutedRequest] solo 완료 — first 20자:', soloText.slice(0, 20));
-      }
       return {
         first: '',
         second: '',
@@ -993,16 +982,6 @@ ${
       };
     }
 
-    if (process.env.DEBUG_MODE === '1') {
-      console.log(
-        '[runRoutedRequest] full 경로 — personaCall:', router.personaCall,
-        'categoryV3:', router.categoryV3,
-        'first:', router.firstPersona,
-        'closer:', router.closerPersona,
-        'order:', router.order,
-      );
-    }
-
     // Stage 1+2 — precomputedStages 제공 시 LLM 호출 스킵하고 그대로 사용.
     //   품질 가드 위반 후 Stage 3만 재호출하는 경로에서 사용. solo 경로는 이 블록 자체에 도달하지 않음.
     let dataPack: string;
@@ -1010,9 +989,6 @@ ${
     if (params.precomputedStages) {
       dataPack = params.precomputedStages.dataPack;
       personaViews = params.precomputedStages.personaViews;
-      if (process.env.DEBUG_MODE === '1') {
-        console.log('[runRoutedRequest] Stage 1+2 스킵 — precomputedStages 사용 (재생성 경로)');
-      }
     } else {
       // Stage 1: 데이터 수집 — emotional만 스킵, 나머지(invest/action/principle)는 실행.
       //   · invest: 웹 검색 ON으로 실시간 가격/시세/PBR/순매수 수집 → Stage 2/3 반박 근거.
@@ -1022,9 +998,6 @@ ${
       const skipStage1 = router.categoryV3 === 'emotional';
       if (skipStage1) {
         dataPack = '';
-        if (process.env.DEBUG_MODE === '1') {
-          console.log('[runRoutedRequest] Stage 1 스킵 — categoryV3=emotional (실시간 데이터 불필요)');
-        }
       } else {
         const dataPrompt = buildDataCollectionPrompt(
           messages,
@@ -1036,14 +1009,6 @@ ${
           { role: 'user', content: dataPrompt },
         ], { enableSearch: isInvest });
         dataPack = extractTag(dataRaw, 'DATA_PACK');
-        if (process.env.DEBUG_MODE === '1') {
-          console.log(
-            '[runRoutedRequest] Stage 1(',
-            router.categoryV3,
-            ', 웹검색', isInvest ? 'ON' : 'OFF',
-            '):', dataPack ? '성공' : '실패(빈 DATA_PACK)',
-          );
-        }
       }
 
       // Stage 2: 페르소나 관점 분해 (full 경로만)
@@ -1061,9 +1026,6 @@ ${
       const rayView = extractTag(analysisRaw, 'RAY_VIEW');
       const echoView = extractTag(analysisRaw, 'ECHO_VIEW');
       personaViews = `[LUCIA_VIEW]\n${luciaView}\n\n[JACK_VIEW]\n${jackView}\n\n[RAY_VIEW]\n${rayView}\n\n[ECHO_VIEW]\n${echoView}`;
-      if (process.env.DEBUG_MODE === '1') {
-        console.log('[runRoutedRequest] Stage 2:', personaViews ? '성공' : '실패');
-      }
     }
 
     // Stage 3 — 일반 (4명 대본)
@@ -1156,10 +1118,6 @@ ${
           ? echoQuestionProcessed
           : echoQuestionProcessed.trimEnd().replace(/[.!,;:。！]+$/, '') + '?')
       : echoQuestionProcessed;
-
-    if (process.env.DEBUG_MODE === '1') {
-      console.log('[runRoutedRequest] Stage 3 완료 — first:', first?.slice(0, 20));
-    }
 
     return {
       first,
