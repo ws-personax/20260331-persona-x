@@ -69,6 +69,13 @@ import {
 } from '@/lib/personax/fallbacks';
 import { saveHistory, saveTeaConversation } from '@/lib/personax/history';
 import { mapLegacyEchoRound2, mapOrderedRound1 } from '@/lib/personax/streaming';
+import {
+  createFallbackDebatePlan,
+  parseDebatePlanJson,
+  type DebatePersona,
+  type DebatePlan,
+  type DebatePlanPriorContext,
+} from '@/lib/personax/debate-plan';
 
 // ✅ Feature Flag — Router/3단계 호출/ECHO 선택/LUCIA 프레이밍 단계별 활성화
 // router만 우선 활성화. 나머지는 다음 단계에서 켠다.
@@ -800,40 +807,13 @@ export async function POST(req: Request) {
     // ✅ 오케스트레이터 — multi-persona 분기 진입 전 토론 디렉터 LLM이 흐름을 결정
     //    질문 유형에 따라 페르소나 발언 순서/각도/충돌 쟁점/ECHO 지목 대상을 미리 지시한다.
     //    JSON 파싱 실패·LLM 실패 시 안전 기본값으로 폴백하므로 실패가 응답을 망가뜨리지 않는다.
-    type DiscussionPersona = 'ray' | 'jack' | 'lucia';
-    type OrchestratorPlan = {
-      order: DiscussionPersona[];
-      ray_angle: string;
-      jack_angle: string;
-      lucia_angle: string;
-      echo_target: DiscussionPersona;
-      echo_angle: string;
-      conflict_point: string;
-      ray_limit: string;
-      lucia_limit: string;
-      is_followup: boolean;
-      avoid_repeat: string;
-    };
-
     const runOrchestrator = async (
       msg: string,
-      fallbackOrder: DiscussionPersona[] = ['ray', 'jack', 'lucia'],
-      priorContext: { recentSummary?: string; priorRayResponse?: string } = {},
-    ): Promise<OrchestratorPlan> => {
+      fallbackOrder: DebatePersona[] = ['ray', 'jack', 'lucia'],
+      priorContext: DebatePlanPriorContext = {},
+    ): Promise<DebatePlan> => {
       const hasPrior = !!(priorContext.recentSummary || priorContext.priorRayResponse);
-      const fallback: OrchestratorPlan = {
-        order: fallbackOrder,
-        ray_angle: '',
-        jack_angle: '',
-        lucia_angle: '',
-        echo_target: 'jack',
-        echo_angle: '',
-        conflict_point: '',
-        ray_limit: '숫자 2개만. 핵심 지표명 명시.',
-        lucia_limit: '3줄 이내. 마침표 종결.',
-        is_followup: hasPrior,
-        avoid_repeat: priorContext.priorRayResponse ? priorContext.priorRayResponse.slice(0, 120) : '',
-      };
+      const fallback = createFallbackDebatePlan(fallbackOrder, priorContext);
 
       const priorBlock = hasPrior
         ? `\n[이전 대화 요약] ${priorContext.recentSummary || ''}\n[이전 RAY 응답] ${(priorContext.priorRayResponse || '').slice(0, 200)}\n`
@@ -848,26 +828,7 @@ export async function POST(req: Request) {
           [{ role: 'user', content: orchestratorPrompt }],
         );
         if (!llm) return fallback;
-        const m = llm.match(/\{[\s\S]*\}/);
-        if (!m) return fallback;
-        const parsed = JSON.parse(m[0]) as Record<string, unknown>;
-        const valid = ['ray', 'jack', 'lucia'] as const;
-        const isPersona = (s: unknown): s is DiscussionPersona =>
-          typeof s === 'string' && (valid as readonly string[]).includes(s);
-        const orderArr = Array.isArray(parsed.order) ? (parsed.order as unknown[]).filter(isPersona) : [];
-        return {
-          order: orderArr.length === 3 ? (orderArr as DiscussionPersona[]) : fallback.order,
-          ray_angle: typeof parsed.ray_angle === 'string' ? parsed.ray_angle : '',
-          jack_angle: typeof parsed.jack_angle === 'string' ? parsed.jack_angle : '',
-          lucia_angle: typeof parsed.lucia_angle === 'string' ? parsed.lucia_angle : '',
-          echo_target: isPersona(parsed.echo_target) ? parsed.echo_target : fallback.echo_target,
-          echo_angle: typeof parsed.echo_angle === 'string' ? parsed.echo_angle : '',
-          conflict_point: typeof parsed.conflict_point === 'string' ? parsed.conflict_point : '',
-          ray_limit: typeof parsed.ray_limit === 'string' && parsed.ray_limit.trim() ? parsed.ray_limit : fallback.ray_limit,
-          lucia_limit: typeof parsed.lucia_limit === 'string' && parsed.lucia_limit.trim() ? parsed.lucia_limit : fallback.lucia_limit,
-          is_followup: typeof parsed.is_followup === 'boolean' ? parsed.is_followup : fallback.is_followup,
-          avoid_repeat: typeof parsed.avoid_repeat === 'string' ? parsed.avoid_repeat : fallback.avoid_repeat,
-        };
+        return parseDebatePlanJson(llm, fallback);
       } catch (e) {
         console.warn('[orchestrator] 파싱 실패, 폴백 사용', e);
         return fallback;
