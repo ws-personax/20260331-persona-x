@@ -1,6 +1,7 @@
 ﻿import { fetchInvestmentNews } from '@/lib/news';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
+import type { NextRequest } from 'next/server';
 import { GoogleGenerativeAI, type GenerationConfig, type Tool } from '@google/generative-ai';
 import Anthropic from '@anthropic-ai/sdk';
 
@@ -74,6 +75,7 @@ import {
   PERSONA_FALLBACK,
 } from '@/lib/personax/fallbacks';
 import { saveHistory, saveTeaConversation } from '@/lib/personax/history';
+import { readKakaoSessionFromRequest } from '@/lib/auth/kakao';
 import { mapLegacyEchoRound2, mapOrderedRound1 } from '@/lib/personax/streaming';
 import {
   createFallbackDebatePlan,
@@ -614,7 +616,7 @@ const MARKET_INDEX_SET = new Set([
 // ─────────────────────────────────────────────
 // POST 핸들러
 // ─────────────────────────────────────────────
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   // ✅ Gemini 제거됨 — API 키 불필요
 
   // ✅ Rate Limit 체크 — IP당 1분 5회 초과 시 429 반환
@@ -2219,6 +2221,7 @@ ${DISCLAIMER}`;
     const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
 
     let userId: string | null = null;
+    const kakaoSession = readKakaoSessionFromRequest(req);
     try {
       const supabaseServer = await createServerSupabase();
       const { data: { user }, error: getUserErr } = await supabaseServer.auth.getUser();
@@ -2230,6 +2233,9 @@ ${DISCLAIMER}`;
         });
       }
       userId = user?.id ?? null;
+      if (!userId && kakaoSession?.id) {
+        userId = `kakao_${kakaoSession.id}`;
+      }
       if (!userId) {
         console.warn('[saveHistory:getUser] userId null — 히스토리 저장 스킵 예정 (서버 쿠키 미동기화 가능)');
       }
