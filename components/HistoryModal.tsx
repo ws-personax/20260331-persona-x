@@ -113,18 +113,27 @@ export default function HistoryModal({ onClose, supabaseClient }: HistoryModalPr
         // ✅ 모달 진입 시점엔 이미 ChatWindow에서 같은 supabase 인스턴스로 세션이 살아있음
         //    페이지 이동이 없으므로 쿠키 동기화 지연 이슈 자체가 발생하지 않음
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        const authUser = session?.user;
-        if (sessionError || !authUser) {
-          console.error('[history-modal] getUser 실패:', sessionError);
+        const authUser = session?.user ?? null;
+
+        let resolvedUserId: string | null = authUser?.id ?? null;
+        if (!resolvedUserId) {
+          const kakaoMatch = document.cookie.match(/px_kakao_session=([^;]+)/);
+          if (kakaoMatch) {
+            resolvedUserId = `kakao_${decodeURIComponent(kakaoMatch[1])}`;
+          }
+        }
+
+        if (!resolvedUserId) {
           setError('NO_SESSION');
           return;
         }
-        setUser({ email: authUser.email });
+
+        setUser({ email: authUser?.email ?? resolvedUserId });
 
         const { data, error: dbError } = await supabase
           .from('user_analysis_history')
           .select('id, created_at, keyword, verdict, confidence, entry_price_num, target_price_num, stop_loss_num, currency, result_status, asset_type, question')
-          .eq('user_id', authUser.id)
+          .eq('user_id', resolvedUserId)
           .order('created_at', { ascending: false })
           .limit(50);
         if (dbError) {
