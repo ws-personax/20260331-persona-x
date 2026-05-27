@@ -117,9 +117,12 @@ export default function HistoryModal({ onClose, supabaseClient }: HistoryModalPr
 
         let resolvedUserId: string | null = authUser?.id ?? null;
         if (!resolvedUserId) {
-          const kakaoMatch = document.cookie.match(/px_kakao_session=([^;]+)/);
-          if (kakaoMatch) {
-            resolvedUserId = `kakao_${decodeURIComponent(kakaoMatch[1])}`;
+          const kakaoRes = await fetch('/api/auth/kakao/me', { credentials: 'include' });
+          if (kakaoRes.ok) {
+            const kakaoData = await kakaoRes.json();
+            if (kakaoData?.user?.id) {
+              resolvedUserId = `kakao_${kakaoData.user.id}`;
+            }
           }
         }
 
