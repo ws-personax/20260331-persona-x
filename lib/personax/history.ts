@@ -69,6 +69,7 @@ export const saveHistory = async (params: {
       evaluated_at:     null,
       ip_address:       params.ipAddress ?? null,
       user_id:          params.userId ?? null,
+      provider_user_id: params.userId ?? null,
     });
 
     if (insertError) {
