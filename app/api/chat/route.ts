@@ -66,6 +66,7 @@ import {
   summarize,
   toPromptOrder,
 } from '@/lib/personax/utils';
+import { cleanAdvanced, cleanNews, splitForBubble } from '@/lib/personax/text-format';
 import {
   applyPersonaFallback,
   buildSoloEchoFollowup,
@@ -1353,19 +1354,6 @@ export async function POST(req: Request) {
           callTeaPersona('lucia', TEA_SYSTEM_LUCIA, luciaHistory, { enableSearch: true }),
         ]);
 
-        const cleanNews = (text: string | null | undefined): string =>
-          (text || '')
-            .replace(/\*\*(.*?)\*\*/g, '$1')
-            .replace(/\[(?:1라운드|2라운드|3라운드)[^\]]*\]/g, '')
-            .replace(/\[ECHO[^\]]*\]/g, '')
-            .replace(/\[역할[^\]]*\]/g, '')
-            .replace(/\[지시[^\]]*\]/g, '')
-            .replace(/\[현재 시점[^\]]*\]/g, '')
-            .replace(/^\s*(?:RAY|JACK|LUCIA|ECHO)\s*[:：]\s*/gm, '')
-            .replace(/^\s*지시\s*[:：]\s*/gm, '')
-            .replace(/\n{2,}/g, '\n')
-            .trim();
-
         const rayText   = cleanNews(rayLLM)   || '실시간 검색이 일시 지연되고 있어요. 잠시 후 다시 질문해주세요.';
         const jackText  = cleanJackEnding(cleanNews(jackLLM)  || '핵심 변수가 정리되면 다시 짚어드릴게요.');
         const luciaText = cleanNews(luciaLLM) || '뉴스를 보고 마음이 흔들리시면 천천히 이야기 나눠봐요.';
@@ -1665,21 +1653,6 @@ export async function POST(req: Request) {
         callTeaPersona('lucia', ADVANCED_SYSTEM_LUCIA, advancedHistory),
         callTeaPersona('echo', ADVANCED_SYSTEM_ECHO, advancedHistory),
       ]);
-
-      // ✅ 빈 줄 완전 제거 + 볼드 마크다운 제거 (연속 \n{2,} → \n)
-      const cleanAdvanced = (text: string): string =>
-        text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\n{2,}/g, '\n').trim();
-
-      // ✅ summary(첫 2줄) / details(나머지) 분리 — "자세히 보기" 버튼용
-      const splitForBubble = (text: string): { summary: string; details: string } => {
-        const clean = cleanAdvanced(text);
-        const lines = clean.split('\n').filter(l => l.trim());
-        if (lines.length <= 2) return { summary: clean, details: '' };
-        return {
-          summary: lines.slice(0, 2).join('\n'),
-          details: lines.slice(2).join('\n'),
-        };
-      };
 
       const rayText = cleanAdvanced(rayLLM || '데이터 기반 분석이 필요합니다.\n지금 구간의 통계적 특성을 먼저 확인하시고 과거 유사 상황의 패턴을 비교해 보시는 걸 권합니다.');
       const jackText = cleanJackEnding(cleanAdvanced(jackLLM || '판단 기준을 먼저 정하세요.\n추세가 살아있는지, 꺾였는지 확인부터.\n손절선 없이는 진입도 없습니다.'));
