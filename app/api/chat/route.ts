@@ -38,14 +38,17 @@ import { TEA_SYSTEM_RAY } from './prompts/tea-ray';
 import {
   detectPersonaOrderHybrid,
   buildCategoryVocabBlockRule,
-  detectCategoryV3,
   buildTaggedRound2SystemPrompt,
   buildTaggedRound2UserPrompt,
   parseTaggedRound2,
-  detectEmotionalSubtypeHee,
   type TaggedRound1Result,
   type TaggedRound2Result,
 } from './prompts/orchestrator-tagged';
+import {
+  detectCategoryV3,
+  detectEmotionalSubtypeHee,
+  type CategoryV3,
+} from '@/lib/personax/classifier';
 import {
   routeMessage,
   runRoutedRequest,
@@ -452,7 +455,7 @@ async function callOptionD(
   category: string,
   lastMessage: string,
   order: TaggedPersonaKey[],
-  categoryV3?: import('./prompts/orchestrator-tagged').CategoryV3,
+  categoryV3?: CategoryV3,
   firstPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
   hasPriorConversation: boolean = false,
   closerPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
@@ -505,7 +508,7 @@ async function callOptionDWithStage3Guard(
   category: string,
   lastMessage: string,
   order: TaggedPersonaKey[],
-  categoryV3?: import('./prompts/orchestrator-tagged').CategoryV3,
+  categoryV3?: CategoryV3,
   firstPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
   hasPriorConversation: boolean = false,
   closerPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,

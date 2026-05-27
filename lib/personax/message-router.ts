@@ -11,18 +11,20 @@
  */
 
 import {
-  detectCategoryV3,
-  detectEmotionalSubtypeHee,
   decideCallStrategy as _decideCallStrategy,
   getFirstPersona,
   getCloserPersona,
   buildDataCollectionPrompt,
   buildPersonaAnalysisPrompt,
   buildScriptPrompt,
-  type CategoryV3,
   type AllPersonaKey,
   type CallStrategy,
 } from '@/app/api/chat/prompts/orchestrator-tagged';
+import {
+  detectCategoryV3,
+  detectEmotionalSubtypeHee,
+  type CategoryV3,
+} from './classifier';
 import { TEA_SYSTEM_JACK } from '@/app/api/chat/prompts/tea-jack';
 import { TEA_SYSTEM_LUCIA } from '@/app/api/chat/prompts/tea-lucia';
 import { TEA_SYSTEM_RAY } from '@/app/api/chat/prompts/tea-ray';
