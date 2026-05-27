@@ -59,9 +59,11 @@ import {
 } from '@/lib/personax/message-router';
 import {
   chunkText,
+  cleanText,
   normalizeDetails,
   removeDangsin,
   sleep,
+  summarize,
   toPromptOrder,
 } from '@/lib/personax/utils';
 import {
@@ -848,22 +850,6 @@ export async function POST(req: Request) {
       const monthNow = kstNow.getUTCMonth() + 1;
       const financePrefix = `[현재 시점: ${yearNow}년 ${monthNow}월 — 최신(${yearNow}년) 데이터·보도 기준으로 답변. 과거 인물·정책을 현재형으로 단정하지 말 것.]\n`;
 
-      // LLM이 프롬프트의 대괄호 메타 태그(예: [1라운드 RAY], [ECHO가 방금 질문...], [역할: ...])를
-      // 출력에 그대로 echo하는 케이스 방어. 또한 페르소나가 다른 페르소나의 라벨로 줄을
-      // 시작하는 흉내 패턴도 제거.
-      const cleanText = (t: string | null | undefined): string =>
-        (t || '')
-          .replace(/\*\*(.*?)\*\*/g, '$1')
-          .replace(/\[(?:1라운드|2라운드|3라운드)[^\]]*\]/g, '')
-          .replace(/\[ECHO[^\]]*\]/g, '')
-          .replace(/\[역할[^\]]*\]/g, '')
-          .replace(/\[지시[^\]]*\]/g, '')
-          .replace(/\[현재 시점[^\]]*\]/g, '')
-          .replace(/^\s*(?:RAY|JACK|LUCIA|ECHO)\s*[:：]\s*/gm, '')
-          .replace(/^\s*지시\s*[:：]\s*/gm, '')
-          .replace(/\n{2,}/g, '\n')
-          .trim();
-
       // ECHO 응답에서 마지막 질문이 향하는 페르소나 추출
       // 마지막 물음표 직전 ~200자 윈도우에서 페르소나명을 찾는다.
       const detectTargetedPersona = (echoResp: string): 'RAY' | 'JACK' | 'LUCIA' | null => {
@@ -888,9 +874,6 @@ export async function POST(req: Request) {
           personas?: { ray?: string; jack?: string; lucia?: string; echo?: string };
         }>;
         if (prior.length === 0) return '';
-
-        const summarize = (s: string, n: number): string =>
-          (s || '').replace(/\s+/g, ' ').trim().slice(0, n);
 
         const turns: string[] = [];
         for (let i = 0; i < prior.length; i++) {

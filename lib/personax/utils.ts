@@ -4,6 +4,22 @@ type PromptOrderKey = Exclude<TaggedPersonaKey, 'echo'>;
 
 export const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+export const cleanText = (text: string | null | undefined): string =>
+  (text || '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\[(?:1라운드|2라운드|3라운드)[^\]]*\]/g, '')
+    .replace(/\[ECHO[^\]]*\]/g, '')
+    .replace(/\[역할[^\]]*\]/g, '')
+    .replace(/\[지시[^\]]*\]/g, '')
+    .replace(/\[현재 시점[^\]]*\]/g, '')
+    .replace(/^\s*(?:RAY|JACK|LUCIA|ECHO)\s*[:：]\s*/gm, '')
+    .replace(/^\s*지시\s*[:：]\s*/gm, '')
+    .replace(/\n{2,}/g, '\n')
+    .trim();
+
+export const summarize = (text: string, size: number): string =>
+  (text || '').replace(/\s+/g, ' ').trim().slice(0, size);
+
 export const removeDangsin = (text: string): string => {
   return text
     .replace(/당신은\s+/g, '')
