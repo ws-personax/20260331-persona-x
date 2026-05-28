@@ -22,11 +22,13 @@ export async function saveConversation(
   },
 ) {
   try {
+    if (!params.providerUserId) return;
+
     const { data: conv, error: convErr } = await supabase
       .from('conversations')
       .insert({
         provider_user_id: params.providerUserId,
-        user_id: params.userId,
+        user_id: params.userId ?? null,
         category: params.category,
         title: params.title.slice(0, 50),
       })

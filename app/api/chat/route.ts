@@ -1008,30 +1008,24 @@ export async function POST(req: NextRequest) {
         };
 
         const saveUnifiedConversation = async (personaText: Record<TaggedPersonaKey, string>) => {
-          let conversationUserId: string | null = null;
-          let supabaseServer: Awaited<ReturnType<typeof createServerSupabase>> | null = null;
           const kakaoSessionForConversation = readKakaoSessionFromRequest(req);
+          const providerUserId = kakaoSessionForConversation?.id
+            ? `kakao_${kakaoSessionForConversation.id}`
+            : null;
+          if (!providerUserId) return;
+
+          let supabaseServer: Awaited<ReturnType<typeof createServerSupabase>> | null = null;
           try {
             supabaseServer = await createServerSupabase();
-            const { data: { user }, error: getUserErr } = await supabaseServer.auth.getUser();
-            if (getUserErr) {
-              console.warn('[saveConversation:getUser] error:', getUserErr.message);
-            }
-            conversationUserId = user?.id ?? null;
-            if (!conversationUserId && kakaoSessionForConversation?.id) {
-              conversationUserId = `kakao_${kakaoSessionForConversation.id}`;
-            }
           } catch (e) {
-            console.warn('[saveConversation:getUser] exception:', e);
-            conversationUserId = null;
+            console.warn('[saveConversation] supabase client init failed:', e);
           }
 
-          if (!conversationUserId) return;
           if (!supabaseServer) return;
 
           await saveConversation(supabaseServer, {
-            providerUserId: conversationUserId,
-            userId: conversationUserId && !conversationUserId.startsWith('kakao_') ? conversationUserId : null,
+            providerUserId,
+            userId: null,
             category: _categoryV3 ?? 'general',
             title: msg.slice(0, 50),
             messages: [
