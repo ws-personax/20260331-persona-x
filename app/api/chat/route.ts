@@ -1000,9 +1000,10 @@ export async function POST(req: NextRequest) {
 
         const saveUnifiedConversation = async (personaText: Record<TaggedPersonaKey, string>) => {
           let conversationUserId: string | null = null;
+          let supabaseServer: Awaited<ReturnType<typeof createServerSupabase>> | null = null;
           const kakaoSessionForConversation = readKakaoSessionFromRequest(req);
           try {
-            const supabaseServer = await createServerSupabase();
+            supabaseServer = await createServerSupabase();
             const { data: { user }, error: getUserErr } = await supabaseServer.auth.getUser();
             if (getUserErr) {
               console.warn('[saveConversation:getUser] error:', getUserErr.message);
@@ -1017,8 +1018,9 @@ export async function POST(req: NextRequest) {
           }
 
           if (!conversationUserId) return;
+          if (!supabaseServer) return;
 
-          await saveConversation({
+          await saveConversation(supabaseServer, {
             providerUserId: conversationUserId,
             userId: conversationUserId && !conversationUserId.startsWith('kakao_') ? conversationUserId : null,
             category: _categoryV3 ?? 'general',
