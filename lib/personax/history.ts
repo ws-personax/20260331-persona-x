@@ -11,6 +11,48 @@ const getSupabase = () => {
   return createClient(url, key);
 };
 
+export async function saveConversation(params: {
+  providerUserId: string;
+  userId: string | null;
+  category: string;
+  title: string;
+  messages: Array<{ role: string; persona?: string | null; content: string }>;
+}) {
+  const supabase = await createServerSupabase();
+
+  const { data: conv, error: convErr } = await supabase
+    .from('conversations')
+    .insert({
+      provider_user_id: params.providerUserId,
+      user_id: params.userId,
+      category: params.category,
+      title: params.title.slice(0, 50),
+    })
+    .select('id')
+    .single();
+
+  if (convErr || !conv) {
+    console.warn('[saveConversation] conversation insert failed:', convErr);
+    return;
+  }
+
+  const rows = params.messages
+    .filter((m) => m.content?.trim())
+    .map((m) => ({
+      conversation_id: conv.id,
+      role: m.role,
+      persona: m.persona ?? null,
+      content: m.content,
+    }));
+
+  if (rows.length === 0) return;
+
+  const { error: msgErr } = await supabase.from('messages').insert(rows);
+  if (msgErr) {
+    console.warn('[saveConversation] messages insert failed:', msgErr);
+  }
+}
+
 export const saveHistory = async (params: {
   keyword: string; question: string; verdict: Verdict;
   totalScore: number; assetType: string; entryCondition: string;

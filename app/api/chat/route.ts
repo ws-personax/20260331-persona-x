@@ -74,7 +74,7 @@ import {
   HEE_FALLBACK,
   PERSONA_FALLBACK,
 } from '@/lib/personax/fallbacks';
-import { saveHistory, saveTeaConversation } from '@/lib/personax/history';
+import { saveHistory, saveTeaConversation, saveConversation } from '@/lib/personax/history';
 import { readKakaoSessionFromRequest } from '@/lib/auth/kakao';
 import { mapLegacyEchoRound2, mapOrderedRound1 } from '@/lib/personax/streaming';
 import {
@@ -998,6 +998,41 @@ export async function POST(req: NextRequest) {
           }
         };
 
+        const saveUnifiedConversation = async (personaText: Record<TaggedPersonaKey, string>) => {
+          let conversationUserId: string | null = null;
+          const kakaoSessionForConversation = readKakaoSessionFromRequest(req);
+          try {
+            const supabaseServer = await createServerSupabase();
+            const { data: { user }, error: getUserErr } = await supabaseServer.auth.getUser();
+            if (getUserErr) {
+              console.warn('[saveConversation:getUser] error:', getUserErr.message);
+            }
+            conversationUserId = user?.id ?? null;
+            if (!conversationUserId && kakaoSessionForConversation?.id) {
+              conversationUserId = `kakao_${kakaoSessionForConversation.id}`;
+            }
+          } catch (e) {
+            console.warn('[saveConversation:getUser] exception:', e);
+            conversationUserId = null;
+          }
+
+          if (!conversationUserId) return;
+
+          await saveConversation({
+            providerUserId: conversationUserId,
+            userId: conversationUserId && !conversationUserId.startsWith('kakao_') ? conversationUserId : null,
+            category: _categoryV3 ?? 'general',
+            title: msg.slice(0, 50),
+            messages: [
+              { role: 'user', content: msg },
+              { role: 'assistant', persona: 'lucia', content: personaText.lucia },
+              { role: 'assistant', persona: 'jack', content: personaText.jack },
+              { role: 'assistant', persona: 'ray', content: personaText.ray },
+              { role: 'assistant', persona: 'echo', content: personaText.echo },
+            ].filter((m) => m.content?.trim()),
+          });
+        };
+
         if (isRound1) {
           if (_routerDecision.strategy === 'solo' && _routerDecision.invokedPersona) {
             const optionDMessages = categoryChanged
@@ -1101,6 +1136,8 @@ export async function POST(req: NextRequest) {
               console.warn('[tea:tagged-r1] 로그 저장 실패 (무시)', e);
             }
 
+            await saveUnifiedConversation(personaText);
+
             send({
               type: 'done',
               reply: order.map((key) => personaText[key]).filter(Boolean).join('\n\n'),
@@ -1203,6 +1240,8 @@ export async function POST(req: NextRequest) {
           } catch (e) {
             console.warn('[tea:tagged-r2] 로그 저장 실패 (무시)', e);
           }
+
+          await saveUnifiedConversation(personaText2);
 
           send({
             type: 'done',
