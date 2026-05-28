@@ -618,6 +618,15 @@ const MARKET_INDEX_SET = new Set([
 // ─────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   // ✅ Gemini 제거됨 — API 키 불필요
+  console.log('[chat request host]', {
+    url: req.url,
+    origin: req.nextUrl.origin,
+    host: req.headers.get('host'),
+    forwardedHost: req.headers.get('x-forwarded-host'),
+    forwardedProto: req.headers.get('x-forwarded-proto'),
+    hasCookieHeader: Boolean(req.headers.get('cookie')),
+    hasKakaoCookie: Boolean(req.cookies.get('px_kakao_session')?.value),
+  });
 
   // ✅ Rate Limit 체크 — IP당 1분 5회 초과 시 429 반환
   const clientIp = getClientIp(req);

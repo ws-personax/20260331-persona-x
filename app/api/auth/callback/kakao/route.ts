@@ -98,6 +98,13 @@ export async function GET(req: NextRequest) {
     path: '/',
     maxAge: KAKAO_SESSION_MAX_AGE,
   });
+  console.log('[kakao callback host]', {
+    url: req.url,
+    origin: req.nextUrl.origin,
+    host: req.headers.get('host'),
+    forwardedHost: req.headers.get('x-forwarded-host'),
+    forwardedProto: req.headers.get('x-forwarded-proto'),
+  });
   res.cookies.set(KAKAO_STATE_COOKIE, '', { path: '/', maxAge: 0 });
   res.cookies.set(KAKAO_NEXT_COOKIE, '', { path: '/', maxAge: 0 });
   return res;
