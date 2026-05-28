@@ -89,7 +89,11 @@ export async function GET(req: NextRequest) {
   };
   const signed = signSession(session);
 
-  const res = NextResponse.redirect(`${origin}${next}`);
+  const redirectUrl = new URL('/', req.url);
+  if (session.id) {
+    redirectUrl.searchParams.set('kakao_uid', `kakao_${session.id}`);
+  }
+  const res = NextResponse.redirect(redirectUrl);
   const isProd = process.env.NODE_ENV === 'production';
   res.cookies.set(KAKAO_SESSION_COOKIE, signed, {
     httpOnly: true,

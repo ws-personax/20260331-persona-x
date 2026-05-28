@@ -1586,6 +1586,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
   const [teaPersona, setTeaPersona] = useState<'lucia' | 'jack' | 'echo'>('lucia');
   const [luciaGreeting, setLuciaGreeting] = useState<string | null>(null);
   const [kakaoUser, setKakaoUser] = useState<KakaoUser | null>(null);
+  const [providerUserId, setProviderUserId] = useState<string | null>(null);
   // ✅ 히스토리 모달 — 페이지 이동 없이 같은 supabase 인스턴스로 데이터 조회 (모바일 세션 단절 방지)
   const [showHistory, setShowHistory] = useState(false);
   const supabaseRef = useMemo(() => createSupabaseBrowser(), []);
@@ -1596,6 +1597,26 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
 
   useEffect(() => {
     setLuciaGreeting(pickLuciaGreeting());
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const kakaoUid = params.get('kakao_uid');
+    const storedProviderUid = localStorage.getItem('px_provider_uid');
+
+    if (kakaoUid) {
+      localStorage.setItem('px_provider_uid', kakaoUid);
+      setProviderUserId(kakaoUid);
+      params.delete('kakao_uid');
+      const nextUrl =
+        window.location.pathname +
+        (params.toString() ? `?${params.toString()}` : '') +
+        window.location.hash;
+      window.history.replaceState({}, '', nextUrl);
+      return;
+    }
+
+    setProviderUserId(storedProviderUid ?? null);
   }, []);
 
   useEffect(() => {
@@ -2058,7 +2079,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
       teaRound,
       teaPersona: isTeaSend ? teaPersona : undefined,
       isAdvancedQuestion: isAdvanced,
-      providerUserId: kakaoUser?.id ? `kakao_${kakaoUser.id}` : null,
+      providerUserId,
     };
 
     try {
