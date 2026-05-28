@@ -136,7 +136,7 @@ export default function HistoryModal({ onClose, supabaseClient }: HistoryModalPr
         const { data, error: dbError } = await supabase
           .from('user_analysis_history')
           .select('id, created_at, keyword, verdict, confidence, entry_price_num, target_price_num, stop_loss_num, currency, result_status, asset_type, question')
-          .eq('user_id', resolvedUserId)
+          .eq('provider_user_id', resolvedUserId)
           .order('created_at', { ascending: false })
           .limit(50);
         if (dbError) {
