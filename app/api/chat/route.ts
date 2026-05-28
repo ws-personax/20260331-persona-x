@@ -638,7 +638,11 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { messages, positionContext, teaMode, teaRound, teaPersona, isAdvancedQuestion } = await req.json();
+    const { messages, positionContext, teaMode, teaRound, teaPersona, isAdvancedQuestion, providerUserId: requestProviderUserId } = await req.json();
+    const bodyProviderUserId =
+      typeof requestProviderUserId === 'string'
+        ? requestProviderUserId
+        : null;
     const lastMsg = messages.at(-1)?.content || "";
 
     // ✅ LUCIA 허브 — 카테고리 감지 및 페르소나 라우팅
@@ -1009,9 +1013,18 @@ export async function POST(req: NextRequest) {
 
         const saveUnifiedConversation = async (personaText: Record<TaggedPersonaKey, string>) => {
           const kakaoSessionForConversation = readKakaoSessionFromRequest(req);
-          const providerUserId = kakaoSessionForConversation?.id
+          const cookieProviderUserId = kakaoSessionForConversation?.id
             ? `kakao_${kakaoSessionForConversation.id}`
             : null;
+          const providerUserId =
+            bodyProviderUserId ??
+            cookieProviderUserId ??
+            null;
+          console.log('[providerUserId source]', {
+            bodyProviderUserId,
+            cookieProviderUserId,
+            finalProviderUserId: providerUserId,
+          });
           if (!providerUserId) return;
 
           let supabaseServer: Awaited<ReturnType<typeof createServerSupabase>> | null = null;
@@ -1023,18 +1036,30 @@ export async function POST(req: NextRequest) {
 
           if (!supabaseServer) return;
 
+          const userId = null;
+          const categoryForConversation = _categoryV3 ?? 'general';
+          const conversationMessages = [
+            { role: 'user', content: msg },
+            { role: 'assistant', persona: 'lucia', content: personaText.lucia },
+            { role: 'assistant', persona: 'jack', content: personaText.jack },
+            { role: 'assistant', persona: 'ray', content: personaText.ray },
+            { role: 'assistant', persona: 'echo', content: personaText.echo },
+          ].filter((m) => m.content?.trim());
+
+          console.log('[route:saveConversation params]', {
+            providerUserId,
+            userId,
+            category: categoryForConversation,
+            hasMessages: Array.isArray(conversationMessages),
+            messageCount: conversationMessages?.length,
+          });
+
           await saveConversation(supabaseServer, {
             providerUserId,
-            userId: null,
-            category: _categoryV3 ?? 'general',
+            userId,
+            category: categoryForConversation,
             title: msg.slice(0, 50),
-            messages: [
-              { role: 'user', content: msg },
-              { role: 'assistant', persona: 'lucia', content: personaText.lucia },
-              { role: 'assistant', persona: 'jack', content: personaText.jack },
-              { role: 'assistant', persona: 'ray', content: personaText.ray },
-              { role: 'assistant', persona: 'echo', content: personaText.echo },
-            ].filter((m) => m.content?.trim()),
+            messages: conversationMessages,
           });
         };
 

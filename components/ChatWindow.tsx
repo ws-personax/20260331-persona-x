@@ -71,6 +71,10 @@ interface Message {
   luciaIntro?: string;
 }
 
+type KakaoUser = {
+  id: number;
+};
+
 type PersonaKey = 'jack' | 'lucia' | 'ray' | 'echo';
 
 const PERSONAS: Record<
@@ -1581,6 +1585,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
   const [showQuickQ, setShowQuickQ] = useState(false);
   const [teaPersona, setTeaPersona] = useState<'lucia' | 'jack' | 'echo'>('lucia');
   const [luciaGreeting, setLuciaGreeting] = useState<string | null>(null);
+  const [kakaoUser, setKakaoUser] = useState<KakaoUser | null>(null);
   // ✅ 히스토리 모달 — 페이지 이동 없이 같은 supabase 인스턴스로 데이터 조회 (모바일 세션 단절 방지)
   const [showHistory, setShowHistory] = useState(false);
   const supabaseRef = useMemo(() => createSupabaseBrowser(), []);
@@ -1591,6 +1596,24 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
 
   useEffect(() => {
     setLuciaGreeting(pickLuciaGreeting());
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadKakaoUser = async () => {
+      try {
+        const res = await fetch('/api/auth/kakao/me', { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = (await res.json()) as { user: KakaoUser | null };
+        if (mounted) setKakaoUser(json.user);
+      } catch {
+        if (mounted) setKakaoUser(null);
+      }
+    };
+    void loadKakaoUser();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const [activeTab, setActiveTab] = useState<'추천'|'고급'|'뉴스'>('추천');
@@ -2035,6 +2058,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
       teaRound,
       teaPersona: isTeaSend ? teaPersona : undefined,
       isAdvancedQuestion: isAdvanced,
+      providerUserId: kakaoUser?.id ? `kakao_${kakaoUser.id}` : null,
     };
 
     try {
