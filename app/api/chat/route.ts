@@ -1061,11 +1061,9 @@ export async function POST(req: NextRequest) {
           if (r1) {
             const personaText = mapOrderedRound1(r1, order);
 
-            // ✅ non-invest 빈 persona 보정 — LLM 파싱 실패로 빈 문자열 방어
-            if (_categoryV3 !== 'invest') {
-              const _isHee = _categoryV3 === 'emotional' && detectEmotionalSubtypeHee(msg);
-              applyPersonaFallback(personaText, _isHee);
-            }
+            // ✅ 빈 persona 보정 — LLM 파싱 실패로 빈 문자열 방어
+            const _isHee = _categoryV3 === 'emotional' && detectEmotionalSubtypeHee(msg);
+            applyPersonaFallback(personaText, _isHee);
 
             // invest 카테고리 필수 어휘 안전망 — 4명 응답에 '손절선'/'지지선' 둘 다 없으면
             //   ECHO 질문 끝에 손절선 가이드 1줄을 강제 부착. 프롬프트 규칙은 LLM이 무시할 수 있음.
@@ -1184,11 +1182,9 @@ export async function POST(req: NextRequest) {
         if (r2) {
           const personaText2 = mapLegacyEchoRound2(r2, priorOrder);
 
-          // ✅ non-invest 빈 persona 보정 — r2 경로
-          if (_categoryV3 !== 'invest') {
-            const _isHee2 = _categoryV3 === 'emotional' && detectEmotionalSubtypeHee(msg);
-            applyPersonaFallback(personaText2, _isHee2);
-          }
+          // ✅ 빈 persona 보정 — r2 경로
+          const _isHee2 = _categoryV3 === 'emotional' && detectEmotionalSubtypeHee(msg);
+          applyPersonaFallback(personaText2, _isHee2);
 
           for (const key of priorOrder) {
             await streamPersonaTagged(key, personaText2[key]);
