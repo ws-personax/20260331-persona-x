@@ -35,6 +35,7 @@ import {
   buildDecisionFrame,
   buildDecisionSummary,
 } from '@/lib/personax/decision-frame';
+import { buildMarketDataPromptContext } from '@/lib/personax/market-data';
 
 // 지연 초기화 — 모듈 로드 시점이 아닌 첫 호출 시점에 OpenAI 클라이언트 생성.
 // 빌드 단계에서 OPENAI_API_KEY가 없어도 throw하지 않도록 함.
@@ -703,6 +704,7 @@ export async function runRoutedRequest(
       params.router ||
       routeMessage(messages, lastMessage, '');
     const legacyCategory = router.legacyCategory || '';
+    const marketDataPromptContext = await buildMarketDataPromptContext(lastMessage);
 
     // ──────────────────────────────────────────────────────────────
     // SOLO 우선순위 결정 — Stage 1·2 진입 전에 평가.
@@ -731,7 +733,7 @@ export async function runRoutedRequest(
       const personaSystem: Record<AllPersonaKey, string> = {
         jack: TEA_SYSTEM_JACK,
         lucia: TEA_SYSTEM_LUCIA,
-        ray: TEA_SYSTEM_RAY,
+        ray: marketDataPromptContext ? `${TEA_SYSTEM_RAY}\n\n${marketDataPromptContext}` : TEA_SYSTEM_RAY,
         echo: TEA_SYSTEM_ECHO,
       };
       const soloSystem = `${personaSystem[effectiveSoloPersona]}\n\n---\n\n${OPTION_D_SYSTEM}`;
@@ -1046,6 +1048,9 @@ ${
     // CLOSER=JACK일 때 ~요 종결 위반이 stage3-guard에 반복 적발 → 재호출 비용 발생.
     // OPTION_D_SYSTEM·buildScriptPrompt의 JACK 톤 규칙이 있음에도 GPT-4.1-mini가 어김 →
     // 프롬프트 말미(recency bias 작용 지점)에 CLOSER 슬롯 한정 마동석 톤 Few-shot + ~요 금지 재명시.
+    const marketDataContext = marketDataPromptContext
+      ? `\n\n${marketDataPromptContext}\n\n`
+      : '';
     const closerJackRule = router.closerPersona === 'jack'
       ? `\n\n🚨 [CLOSER] JACK 말투 절대 규칙 (위반 시 답변 무효 — 다른 모든 규칙보다 우선):
 - [CLOSER] 블록은 JACK이 담당. JACK은 ~요 / ~습니다 / ~입니다로 끝나는 문장 절대 금지.
@@ -1054,7 +1059,7 @@ ${
 - ❌ 나쁜 예: "지금 들어가면 늦어요." / "리스크가 너무 큽니다." / "조심하세요."
 - 2줄 이내, 짧고 직설적으로 끊어 칠 것.`
       : '';
-    const scriptPrompt = `${dataContext}${buildScriptPrompt(
+    const scriptPrompt = `${marketDataContext}${dataContext}${buildScriptPrompt(
       messages,
       personaViews,
       legacyCategory,
