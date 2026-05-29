@@ -76,6 +76,7 @@ import {
 } from '@/lib/personax/fallbacks';
 import { saveHistory, saveTeaConversation, saveConversation } from '@/lib/personax/history';
 import { readKakaoSessionFromRequest } from '@/lib/auth/kakao';
+import { resolvePersonaXSession } from '@/lib/personax/session';
 import { mapLegacyEchoRound2, mapOrderedRound1 } from '@/lib/personax/streaming';
 import {
   createFallbackDebatePlan,
@@ -2285,29 +2286,28 @@ ${DISCLAIMER}`;
     const currency = inferCurrency(keyword);
     const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
 
-    let userId: string | null = null;
-    const kakaoSession = readKakaoSessionFromRequest(req);
-    try {
-      const supabaseServer = await createServerSupabase();
-      const { data: { user }, error: getUserErr } = await supabaseServer.auth.getUser();
-      if (getUserErr) {
-        console.warn('[saveHistory:getUser] error:', {
-          message: getUserErr.message,
-          name: getUserErr.name,
-          status: (getUserErr as { status?: number }).status,
-        });
-      }
-      userId = user?.id ?? null;
-      if (!userId && kakaoSession?.id) {
-        userId = `kakao_${kakaoSession.id}`;
-      }
-      if (!userId) {
-        console.warn('[saveHistory:getUser] userId null — 히스토리 저장 스킵 예정 (서버 쿠키 미동기화 가능)');
-      }
-    } catch (e) {
-      console.warn('[saveHistory:getUser] 예외 — userId null로 처리:', e);
-      userId = null;
-    }
+    const session = await resolvePersonaXSession({
+      bodyProviderUserId,
+      cookieProviderUserId: (() => {
+        const k = readKakaoSessionFromRequest(req);
+        return k?.id ? `kakao_${k.id}` : null;
+      })(),
+      supabaseUserId: await (async () => {
+        try {
+          const sb = await createServerSupabase();
+          const {
+            data: { user },
+          } = await sb.auth.getUser();
+
+          return user?.id ?? null;
+        } catch {
+          return null;
+        }
+      })(),
+    });
+
+    const providerUserId = session.providerUserId;
+    const userId = session.userId;
 
     // hee+invest 복합 분기 — '삼성전자로 처음 수익 났어요' 같이 HEE(축하/경사)와 invest(종목)가
     //   동시에 매치되는 경우 legacy stock-detail 템플릿(시장 분석 위주)이 경사 모드를 인식 못함.
