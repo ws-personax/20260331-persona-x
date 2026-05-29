@@ -77,6 +77,11 @@ import {
 import { saveHistory, saveTeaConversation, saveConversation } from '@/lib/personax/history';
 import { readKakaoSessionFromRequest } from '@/lib/auth/kakao';
 import { resolvePersonaXSession } from '@/lib/personax/session';
+import {
+  detectQuestionType,
+  hasDirectAnswer,
+  buildDirectAnswerFallback,
+} from '@/lib/personax/response-guard';
 import { mapLegacyEchoRound2, mapOrderedRound1 } from '@/lib/personax/streaming';
 import {
   createFallbackDebatePlan,
@@ -778,6 +783,24 @@ export async function POST(req: NextRequest) {
 
     // 2라운드 페르소나 응답에서 다른 페르소나 발화 누출 방어 — 첫 빈 줄 이전 문단만 사용
     const firstParagraph = (t: string): string => (t || '').split(/\n\s*\n/)[0].trim();
+    const applyResponseGuard = (
+      personaText: Record<'lucia' | 'jack' | 'ray' | 'echo', string>,
+      userMessage: string,
+    ) => {
+      const questionType = detectQuestionType(userMessage);
+
+      for (const key of ['lucia', 'jack', 'ray', 'echo'] as const) {
+        if (
+          personaText[key]?.trim() &&
+          !hasDirectAnswer(personaText[key], questionType)
+        ) {
+          const fallback = buildDirectAnswerFallback(questionType);
+          if (fallback) {
+            personaText[key] = `${fallback}\n\n${personaText[key]}`;
+          }
+        }
+      }
+    };
 
     // ✅ 페르소나별 순차 스트리밍 — 각 LLM 호출 완성 시점에 NDJSON 청크 1개씩 클라이언트로 전송
     type StreamEvent =
@@ -1148,6 +1171,7 @@ export async function POST(req: NextRequest) {
                   : fallback;
               }
             }
+            applyResponseGuard(personaText, msg);
 
             for (const key of order) {
               await streamPersonaTagged(key, personaText[key]);
@@ -1253,6 +1277,7 @@ export async function POST(req: NextRequest) {
           // ✅ 빈 persona 보정 — r2 경로
           const _isHee2 = _categoryV3 === 'emotional' && detectEmotionalSubtypeHee(msg);
           applyPersonaFallback(personaText2, _isHee2);
+          applyResponseGuard(personaText2, priorUserQuestion);
 
           for (const key of priorOrder) {
             await streamPersonaTagged(key, personaText2[key]);
