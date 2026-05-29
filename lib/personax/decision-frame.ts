@@ -6,11 +6,14 @@ import {
 export type DecisionFrame = {
   userQuestion: string;
   questionType: QuestionType;
+  conflictLevel: ConflictLevel;
   directAnswerRequired: boolean;
   criteria: string[];
   redFlags: string[];
   nextAction: string;
 };
+
+export type ConflictLevel = 'low' | 'medium' | 'high';
 
 const DECISION_FRAME_DEFAULTS: Record<
   QuestionType,
@@ -81,6 +84,44 @@ const DECISION_FRAME_DEFAULTS: Record<
   },
 };
 
+const CONFLICT_LEVEL_BY_TYPE: Record<QuestionType, ConflictLevel> = {
+  continue_or_stop: 'low',
+  buy_or_wait: 'high',
+  compare: 'medium',
+  list: 'low',
+  general: 'low',
+};
+
+const REQUIRED_BY_TYPE: Record<QuestionType, string[]> = {
+  continue_or_stop: [
+    '계속 / 중단 / 조건부 중 하나를 명확히 제시',
+    '계속 만날 조건과 멈춰야 할 신호를 구분',
+    '오늘 할 일 1개',
+  ],
+  buy_or_wait: [
+    '매수 / 보류 / 관망 / 분할 접근 중 하나를 명확히 제시',
+    '손절선 또는 리스크 기준 포함',
+    '오늘 할 일 1개',
+  ],
+  compare: [
+    'A/B 중 하나 또는 우선순위를 명확히 제시',
+    '선택 근거 2개',
+    '오늘 할 일 1개',
+  ],
+  list: [
+    '번호 목록으로 핵심 항목 제시',
+    '가능하면 3개 항목으로 정리',
+    '각 항목에 짧은 설명 포함',
+  ],
+  general: [
+    '질문 의도를 한 문장으로 정리',
+    '불필요하게 장황하지 않게 답변',
+  ],
+};
+
+const buildList = (items: string[]): string =>
+  items.map((item) => `* ${item}`).join('\n');
+
 export function buildDecisionFrame(question: string): DecisionFrame {
   const questionType = detectQuestionType(question);
   const defaults = DECISION_FRAME_DEFAULTS[questionType];
@@ -88,9 +129,32 @@ export function buildDecisionFrame(question: string): DecisionFrame {
   return {
     userQuestion: question,
     questionType,
+    conflictLevel: CONFLICT_LEVEL_BY_TYPE[questionType],
     directAnswerRequired: questionType !== 'general',
     criteria: defaults.criteria,
     redFlags: defaults.redFlags,
     nextAction: defaults.nextAction,
   };
+}
+
+export function buildDecisionSummary(frame: DecisionFrame): string {
+  return `[Decision Frame]
+질문 유형: ${frame.questionType}
+충돌 강도: ${frame.conflictLevel}
+
+반드시 포함할 것:
+
+${buildList(REQUIRED_BY_TYPE[frame.questionType])}
+
+판단 기준:
+
+${buildList(frame.criteria)}
+
+위험 신호:
+
+${buildList(frame.redFlags)}
+
+오늘 할 일:
+
+* ${frame.nextAction}`;
 }

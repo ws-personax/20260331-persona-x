@@ -31,6 +31,10 @@ import { TEA_SYSTEM_RAY } from '@/app/api/chat/prompts/tea-ray';
 import { TEA_SYSTEM_ECHO } from '@/app/api/chat/prompts/tea-echo';
 import OpenAI from 'openai';
 import { GoogleGenerativeAI, type GenerationConfig } from '@google/generative-ai';
+import {
+  buildDecisionFrame,
+  buildDecisionSummary,
+} from '@/lib/personax/decision-frame';
 
 // 지연 초기화 — 모듈 로드 시점이 아닌 첫 호출 시점에 OpenAI 클라이언트 생성.
 // 빌드 단계에서 OPENAI_API_KEY가 없어도 throw하지 않도록 함.
@@ -1014,12 +1018,15 @@ ${
       }
 
       // Stage 2: 페르소나 관점 분해 (full 경로만)
-      const analysisPrompt = buildPersonaAnalysisPrompt(
+      const frame = buildDecisionFrame(lastMessage);
+      const decisionSummary = buildDecisionSummary(frame);
+      const rawAnalysisPrompt = buildPersonaAnalysisPrompt(
         messages,
         dataPack,
         legacyCategory,
         router.categoryV3,
       );
+      const analysisPrompt = `${decisionSummary}\n\n${rawAnalysisPrompt}`;
       const analysisRaw = await callLLM('echo', OPTION_D_SYSTEM_DATA, [
         { role: 'user', content: analysisPrompt },
       ]);
