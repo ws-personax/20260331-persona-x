@@ -1013,20 +1013,22 @@ export async function POST(req: NextRequest) {
         };
 
         const saveUnifiedConversation = async (personaText: Record<TaggedPersonaKey, string>) => {
-          const kakaoSessionForConversation = readKakaoSessionFromRequest(req);
-          const cookieProviderUserId = kakaoSessionForConversation?.id
-            ? `kakao_${kakaoSessionForConversation.id}`
-            : null;
-          const providerUserId =
-            bodyProviderUserId ??
-            cookieProviderUserId ??
-            null;
+          const cookieProviderUserId = (() => {
+            const k = readKakaoSessionFromRequest(req);
+            return k?.id ? `kakao_${k.id}` : null;
+          })();
+          const session = await resolvePersonaXSession({
+            bodyProviderUserId,
+            cookieProviderUserId,
+            supabaseUserId: null,
+          });
+
           console.log('[providerUserId source]', {
             bodyProviderUserId,
             cookieProviderUserId,
-            finalProviderUserId: providerUserId,
+            finalProviderUserId: session.providerUserId,
+            source: session.source,
           });
-          if (!providerUserId) return;
 
           let supabaseServer: Awaited<ReturnType<typeof createServerSupabase>> | null = null;
           try {
@@ -1037,7 +1039,6 @@ export async function POST(req: NextRequest) {
 
           if (!supabaseServer) return;
 
-          const userId = null;
           const categoryForConversation = _categoryV3 ?? 'general';
           const conversationMessages = [
             { role: 'user', content: msg },
@@ -1048,16 +1049,15 @@ export async function POST(req: NextRequest) {
           ].filter((m) => m.content?.trim());
 
           console.log('[route:saveConversation params]', {
-            providerUserId,
-            userId,
+            providerUserId: session.providerUserId,
+            userId: session.userId,
             category: categoryForConversation,
             hasMessages: Array.isArray(conversationMessages),
             messageCount: conversationMessages?.length,
           });
 
           await saveConversation(supabaseServer, {
-            providerUserId,
-            userId,
+            session,
             category: categoryForConversation,
             title: msg.slice(0, 50),
             messages: conversationMessages,

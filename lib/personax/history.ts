@@ -3,6 +3,7 @@ import { createClient as createServerSupabase } from '@/lib/supabase/server';
 import type { MarketData, Verdict } from './types';
 import { inferCurrency } from './market';
 import { extractConditionPrices, parsePriceToNumber } from './scoring';
+import { type PersonaXSession } from '@/lib/personax/session';
 
 const getSupabase = () => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -14,21 +15,25 @@ const getSupabase = () => {
 export async function saveConversation(
   supabase: Awaited<ReturnType<typeof createServerSupabase>>,
   params: {
-    providerUserId: string;
-    userId: string | null;
+    session: PersonaXSession;
     category: string;
     title: string;
     messages: Array<{ role: string; persona?: string | null; content: string }>;
   },
 ) {
   try {
-    if (!params.providerUserId) return;
+    if (!params.session.providerUserId) {
+      console.warn('[saveConversation] skip — providerUserId missing', {
+        source: params.session.source,
+      });
+      return;
+    }
 
     const { data: conv, error: convErr } = await supabase
       .from('conversations')
       .insert({
-        provider_user_id: params.providerUserId,
-        user_id: params.userId ?? null,
+        provider_user_id: params.session.providerUserId,
+        user_id: params.session.userId ?? null,
         category: params.category,
         title: params.title.slice(0, 50),
       })
