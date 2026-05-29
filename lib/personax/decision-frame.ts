@@ -94,7 +94,7 @@ const CONFLICT_LEVEL_BY_TYPE: Record<QuestionType, ConflictLevel> = {
 
 const REQUIRED_BY_TYPE: Record<QuestionType, string[]> = {
   continue_or_stop: [
-    '계속 / 중단 / 조건부 중 하나를 명확히 제시',
+    '계속 / 중단 / 조건부 계속 중 하나를 명확히 제시',
     '계속 만날 조건과 멈춰야 할 신호를 구분',
     '오늘 할 일 1개',
   ],
@@ -116,6 +116,33 @@ const REQUIRED_BY_TYPE: Record<QuestionType, string[]> = {
   general: [
     '질문 의도를 한 문장으로 정리',
     '불필요하게 장황하지 않게 답변',
+  ],
+};
+
+const OUTPUT_RULES_BY_TYPE: Record<QuestionType, string[]> = {
+  continue_or_stop: [
+    '첫 문장은 반드시 "계속", "중단", "조건부 계속" 중 하나로 시작한다.',
+    '"계속할 조건"과 "멈춰야 할 신호"를 분리해서 말한다.',
+    '선택 없이 감정 해석이나 기준 나열로 시작하지 않는다.',
+  ],
+  buy_or_wait: [
+    '첫 문장은 반드시 "매수", "보류", "관망", "분할 접근" 중 하나로 시작한다.',
+    '투자 조언은 단정하지 말고 판단 기준과 리스크를 함께 제시한다.',
+    '손절선 또는 리스크 기준 없이 방향만 말하지 않는다.',
+  ],
+  compare: [
+    '첫 문장에 반드시 A 또는 B 중 하나를 선택한다.',
+    '정보가 부족하면 "조건부로 A/B"라고 명시한다.',
+    '선택 없이 기준만 나열하지 않는다.',
+  ],
+  list: [
+    '첫 응답에 반드시 "1.", "2.", "3." 번호 목록을 포함한다.',
+    '산문형 감정 해석으로 시작하지 않는다.',
+    '질문이 "3가지"면 정확히 3개를 제시한다.',
+  ],
+  general: [
+    '첫 문장에서 질문 의도를 정리한다.',
+    '불필요한 배경 설명으로 길게 시작하지 않는다.',
   ],
 };
 
@@ -145,6 +172,10 @@ export function buildDecisionSummary(frame: DecisionFrame): string {
 반드시 포함할 것:
 
 ${buildList(REQUIRED_BY_TYPE[frame.questionType])}
+
+출력 규칙:
+
+${buildList(OUTPUT_RULES_BY_TYPE[frame.questionType])}
 
 판단 기준:
 
