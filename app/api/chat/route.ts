@@ -794,7 +794,7 @@ export async function POST(req: NextRequest) {
           personaText[key]?.trim() &&
           !hasDirectAnswer(personaText[key], questionType)
         ) {
-          const fallback = buildDirectAnswerFallback(questionType);
+          const fallback = buildDirectAnswerFallback(questionType, key);
           if (fallback) {
             personaText[key] = `${fallback}\n\n${personaText[key]}`;
           }
