@@ -7,24 +7,45 @@ export type QuestionType =
 
 export type DirectAnswerPersonaKey = 'lucia' | 'jack' | 'ray' | 'echo';
 
+const SAFE_INVESTMENT_FALLBACK =
+  '현재가는 별도 확인이 필요합니다. 확인된 시장 데이터 없이 구체적 가격, 지지선, 손절선, 진입 구간을 단정할 수 없습니다. 판단 기준은 실적, 업황, 투자 기간, 감당 가능한 손실 범위입니다.';
+
+const INVESTMENT_QUESTION_PATTERN =
+  /사야|매수|팔아야|매도|보유|관망|투자해도|진입|손절|물타|비중|주식|코인|비트코인|삼성전자|종목|현재가|지지선|저항선|수익률|PER|PBR/i;
+
+const UNSAFE_INVESTMENT_ANSWER_PATTERN =
+  /(?:\d+(?:[.,]\d+)?\s*(?:원|만원|억원|조원|달러|%|퍼센트|배))|지지선|저항선|손절선|진입|매수|매도|관망입니다|보류입니다|분할 접근입니다|쳐다보지도 마라|지금 들어가라|지금 들어가지 마라/i;
+
 export function detectQuestionType(question: string): QuestionType {
-  if (/계속\s*만나|헤어져|만나도\s*될|끊어야|그만해야/.test(question)) {
+  if (/계속\s*만나|계속할|헤어|그만해야|그만\s*만나|끊어야|손절해야|이혼/.test(question)) {
     return 'continue_or_stop';
   }
 
-  if (/사야|매수|팔아야|보유|관망|투자해도/.test(question)) {
+  if (INVESTMENT_QUESTION_PATTERN.test(question)) {
     return 'buy_or_wait';
   }
 
-  if (/vs|VS|비교|둘\s*중|[A-Za-z0-9가-힣]+\s*와\s*[A-Za-z0-9가-힣]+|[A-Za-z0-9가-힣]+\s*랑\s*[A-Za-z0-9가-힣]+|어느\s*쪽/.test(question)) {
+  if (/vs|VS|비교|중\s*뭐|둘\s*중|어느\s*쪽|A\s*\/\s*B|A와\s*B/.test(question)) {
     return 'compare';
   }
 
-  if (/3가지|세\s*가지|목록|리스트|추천|정리|핵심/.test(question)) {
+  if (/3가지|\d+\s*가지|목록|리스트|추천|정리|답변/.test(question)) {
     return 'list';
   }
 
   return 'general';
+}
+
+export function sanitizeInvestmentAnswer(answer: string, question: string): string {
+  if (!INVESTMENT_QUESTION_PATTERN.test(question)) {
+    return answer;
+  }
+
+  if (!UNSAFE_INVESTMENT_ANSWER_PATTERN.test(answer)) {
+    return answer;
+  }
+
+  return SAFE_INVESTMENT_FALLBACK;
 }
 
 export function hasDirectAnswer(
@@ -33,13 +54,16 @@ export function hasDirectAnswer(
 ): boolean {
   switch (questionType) {
     case 'continue_or_stop':
-      return /계속|중단|그만|헤어|조건부|만나도|멈춰/.test(answer);
+      return /마음의 안전감|반복 패턴|계속할 조건|멈춰야 할 신호|반복 행동|관계를 재평가|상황을 재평가/.test(answer);
     case 'buy_or_wait':
-      return /매수|보류|관망|사세요|기다리세요|분할|진입|매도/.test(answer);
+      return (
+        /현재가는 별도 확인이 필요합니다|확인된 시장 데이터 없이는 구체적 가격 판단을 할 수 없습니다|판단 기준은 실적, 업황, 투자 기간, 감당 가능한 손실 범위입니다/.test(answer) &&
+        !UNSAFE_INVESTMENT_ANSWER_PATTERN.test(answer)
+      );
     case 'compare':
-      return /창업|재취업|A|B|더\s*낫|우선|선택/.test(answer);
+      return /비교|우선|선택|기준|조건/.test(answer);
     case 'list':
-      return /(?:^|\n)\s*(?:\d+\.|①|②|③|- )|첫째|둘째|셋째/.test(answer);
+      return /(?:^|\n)\s*(?:\d+\.|- )|첫째|둘째|셋째/.test(answer);
     case 'general':
       return true;
   }
@@ -50,21 +74,21 @@ const DIRECT_ANSWER_FALLBACKS: Record<
   Record<DirectAnswerPersonaKey, string>
 > = {
   continue_or_stop: {
-    lucia: '조건부 계속입니다. 마음이 편해지는지, 반복해서 상처받는지만 먼저 나눠 봐야 합니다.',
-    jack: '중단 신호부터 보세요. 말만 바뀌고 행동이 그대로면 더 끌고 가면 안 됩니다.',
-    ray: '조건부 계속입니다. 약속 이행, 연락 빈도, 갈등 후 회복 여부를 2주 기준으로 봐야 합니다.',
-    echo: '조건부 계속입니다. 계속할 조건과 멈춰야 할 신호를 분리해야 합니다.',
+    lucia: '지금은 마음의 안전감을 먼저 확인해야 합니다. 이 관계가 편안함을 주는지, 반복해서 작아지게 만드는지부터 봐야 합니다.',
+    jack: '말보다 반복 행동을 기준으로 보셔야 합니다. 상대의 상황보다 대응 태도를 봐야 합니다.',
+    ray: '관계 지속 여부는 반복 패턴으로 봐야 합니다. 약속 이행, 갈등 후 회복, 존중의 일관성이 판단 기준입니다.',
+    echo: '계속할 조건과 멈춰야 할 신호를 분리해야 합니다. 감정이 아니라 반복되는 구조를 봐야 합니다.',
   },
   buy_or_wait: {
-    lucia: '관망입니다. 불안해서 들어가는 돈인지, 감당 가능한 돈인지 먼저 봐야 합니다.',
-    jack: '보류입니다. 기준 없는 진입이면 매수가 아니라 충동입니다.',
-    ray: '분할 접근입니다. 확인된 가격과 리스크 기준이 있을 때만 판단할 수 있습니다.',
-    echo: '관망입니다. 손절선이나 리스크 기준 없이 방향만 정하면 안 됩니다.',
+    lucia: SAFE_INVESTMENT_FALLBACK,
+    jack: SAFE_INVESTMENT_FALLBACK,
+    ray: SAFE_INVESTMENT_FALLBACK,
+    echo: SAFE_INVESTMENT_FALLBACK,
   },
   compare: {
-    lucia: '조건부로 더 마음이 오래 버틸 수 있는 쪽을 우선해야 합니다.',
-    jack: '먼저 하나를 고르세요. 지금 당장 실행 가능한 쪽이 우선입니다.',
-    ray: '조건부로 기대값이 높은 쪽을 우선해야 합니다. 비용, 기간, 실패 확률을 비교해야 합니다.',
+    lucia: '조건부 비교입니다. 마음이 오래 버틸 수 있는 선택지와 현실 비용이 작은 선택지를 나눠 봐야 합니다.',
+    jack: '먼저 기준을 하나로 잡아야 합니다. 지금 당장 실행 가능한 쪽과 리스크가 작은 쪽을 분리해서 보셔야 합니다.',
+    ray: '조건부 비교입니다. 비용, 기간, 실패 확률, 회복 가능성을 같은 기준으로 놓고 봐야 합니다.',
     echo: '조건부 선택입니다. 기준만 나열하지 말고 우선순위를 정해야 합니다.',
   },
   list: {
