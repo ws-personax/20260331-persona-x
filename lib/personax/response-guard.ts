@@ -1,3 +1,9 @@
+import {
+  removeFuturePersonaReferences,
+  sanitizeMarketDataFactLock,
+  type PersonaKey,
+} from '@/lib/personax/persona-dna';
+
 export type QuestionType =
   | 'continue_or_stop'
   | 'buy_or_wait'
@@ -20,6 +26,23 @@ const DIRECT_TRADE_INSTRUCTION_PATTERN =
   /사세요|파세요|매수하세요|매도하세요|지금\s*들어가세요|전량\s*매수하세요|전량\s*매도하세요/g;
 
 const INVESTMENT_RISK_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/52주\s*(?:최고가|최저가|고가|저가)[^,.。\n]*/g, '추가 가격 범위 데이터는 별도 확인이 필요합니다'],
+  [/PER[^,.。\n]*/gi, '추가 밸류에이션 데이터는 별도 확인이 필요합니다'],
+  [/PBR[^,.。\n]*/gi, '추가 밸류에이션 데이터는 별도 확인이 필요합니다'],
+  [/영업이익[^,.。\n]*/g, '추가 실적 데이터는 별도 확인이 필요합니다'],
+  [/시가총액[^,.。\n]*/g, '추가 규모 데이터는 별도 확인이 필요합니다'],
+  [/(?:최근\s*)?(?:24시간\s*)?거래량[^,.。\n]*/g, '추가 수급 데이터는 별도 확인이 필요합니다'],
+  [/외국인\s*순매수[^,.。\n]*/g, '추가 수급 데이터는 별도 확인이 필요합니다'],
+  [/기관\s*순매수[^,.。\n]*/g, '추가 수급 데이터는 별도 확인이 필요합니다'],
+  [/(?:역대\s*)?최고가[^,.。\n]*/g, '추가 가격 범위 데이터는 별도 확인이 필요합니다'],
+  [/[\d,.]+\s*(?:달러|USD)[^,.。\n]*/gi, '추가 달러 기준 데이터는 별도 확인이 필요합니다'],
+  [/(?:달러|USD)[^,.。\n]*/gi, '추가 달러 기준 데이터는 별도 확인이 필요합니다'],
+  [/(?:지난\s*)?7일[^,.。\n]*/g, '추가 기간별 수익률 데이터는 별도 확인이 필요합니다'],
+  [/(?:지난\s*)?(?:1개월|한\s*달|달)[^,.。\n]*/g, '추가 기간별 수익률 데이터는 별도 확인이 필요합니다'],
+  [/(?:지난\s*)?1년[^,.。\n]*/g, '추가 기간별 수익률 데이터는 별도 확인이 필요합니다'],
+  [/9개월\s*변동성[^,.。\n]*/g, '추가 변동성 데이터는 별도 확인이 필요합니다'],
+  [/연중\s*최저[^,.。\n]*/g, '추가 변동성 데이터는 별도 확인이 필요합니다'],
+  [/HBM4E?|7세대|완판/g, '추가 제품 데이터는 별도 확인이 필요합니다'],
   [/손절선/g, '리스크 기준'],
   [/지지선|저항선/g, '가격 변동 기준'],
   [/진입/g, '판단'],
@@ -34,11 +57,16 @@ const INVESTMENT_RISK_REPLACEMENTS: Array<[RegExp, string]> = [
   [/차트\s*보지\s*마라/g, '단기 움직임만 보고 판단하지 않는 편이 안전합니다'],
   [/쳐다보지도\s*마(?:라)?/g, '기준 없이 판단하지 않는 편이 안전합니다'],
   [/분할\s*매수/g, '분할 접근 여부'],
+  [/추격\s*매수/g, '추격 판단'],
   [/관망\s*유지해라/g, '추가 확인이 필요합니다'],
   [/손절해라/g, '리스크 기준을 먼저 정해야 합니다'],
   [/물타라/g, '추가 자금 투입은 신중히 검토해야 합니다'],
   [/비중\s*늘려라|비중\s*줄여라/g, '비중 조정 여부는 투자 기간과 리스크 감내 범위에 따라 달라집니다'],
   [/던질|던진다는|던진다|던져야|던져라|던지(?:는|면|고|자|지|라|세요|십시오|겠다는)?/g, '정리할'],
+  [/도망칠\s*각오/g, '정리할 기준'],
+  [/판단하지\s*마라/g, '판단하지 않는 편이 안전합니다'],
+  [/들어가는/g, '판단하는'],
+  [/물린/g, '손실을 본'],
   [/버티실\s*겁니까/g, '유지할 기준이 있으신가요'],
   [/지키실\s*겁니까/g, '유지할 기준이 있으신가요'],
   [/확인해라/g, '확인하는 편이 안전합니다'],
@@ -179,8 +207,14 @@ export function applyResponseGuard(
       continue;
     }
 
+    personaText[key] = removeFuturePersonaReferences(
+      key as PersonaKey,
+      answer,
+    );
+
     if (hasMarketData === true && questionType === 'buy_or_wait') {
-      personaText[key] = removeDirectTradeInstructions(answer);
+      const factLockedAnswer = sanitizeMarketDataFactLock(personaText[key], true);
+      personaText[key] = removeDirectTradeInstructions(factLockedAnswer);
       continue;
     }
 
