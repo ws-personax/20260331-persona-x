@@ -4,6 +4,7 @@ import { useState } from 'react';
 import AuthButton from './AuthButton';
 import HistoryModal from './HistoryModal';
 import Logo from './Logo';
+import ReviewCard from './ReviewCard';
 
 interface HomeScreenProps {
   userName?: string;
@@ -14,6 +15,13 @@ interface HomeScreenProps {
 
 export default function HomeScreen({ onSubmit, onOpenHistory }: HomeScreenProps) {
   const [showHistory, setShowHistory] = useState(false);
+  const openHistory = () => {
+    if (onOpenHistory) {
+      onOpenHistory();
+      return;
+    }
+    setShowHistory(true);
+  };
   const examples = [
     { emoji: '💼', text: '창업 vs 재취업, 어떻게 해야 할까요?', bg: '#FFF7E0', accent: '#F59E0B' },
     { emoji: '📈', text: '삼성전자 지금 사야 할까요?', bg: '#E0F2FE', accent: '#0EA5E9' },
@@ -30,13 +38,7 @@ export default function HomeScreen({ onSubmit, onOpenHistory }: HomeScreenProps)
           <AuthButton />
           <button
             type="button"
-            onClick={() => {
-              if (onOpenHistory) {
-                onOpenHistory();
-                return;
-              }
-              setShowHistory(true);
-            }}
+            onClick={openHistory}
             style={{
               background: '#fff',
               padding: '5px 12px',
@@ -55,6 +57,7 @@ export default function HomeScreen({ onSubmit, onOpenHistory }: HomeScreenProps)
           </button>
         </div>
       </header>
+      <ReviewCard onOpenHistory={openHistory} />
 
       {/* 메인 콘텐츠 - 상단 정렬 */}
       <div className="flex-1 flex flex-col overflow-hidden" style={{ minHeight: 0 }}>
