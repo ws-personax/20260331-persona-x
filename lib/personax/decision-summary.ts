@@ -92,25 +92,40 @@ export function buildDecisionSummary(params: {
 }
 
 export function formatDecisionSummary(summary: DecisionSummary): string {
-  const counterView = summary.counterView.trim().length >= 8
-    ? summary.counterView
+  const separator = '━━━━━━━━━━';
+  const cleanLine = (value: string): string =>
+    value.trim().replace(/^━━━━━━━━━━\?+$/, separator).replace(/(━━━━━━━━━━)\?+$/g, '$1');
+  const cleanLines = (value: string): string[] =>
+    value
+      .split('\n')
+      .map(cleanLine)
+      .filter(Boolean);
+  const reasons = summary.reasons
+    .flatMap(cleanLines)
+    .filter((reason) => reason !== separator);
+  const counterView = cleanLine(summary.counterView).length >= 8
+    ? cleanLine(summary.counterView)
     : counterFallbackByType('generic');
+  const verdict = cleanLine(summary.verdict);
+  const nextAction = cleanLine(summary.nextAction);
 
-  return [
-    '━━━━━━━━━━',
+  const lines = [
+    separator,
     '',
     'PersonaX 결론',
-    summary.verdict,
+    verdict,
     '',
     '핵심 이유:',
-    ...summary.reasons.map((reason) => `- ${reason}`),
+    ...(reasons.length ? reasons : cleanLines(counterFallbackByType('generic'))).map((reason) => `- ${reason}`),
     '',
     '반대 의견:',
     counterView,
     '',
     '다음 행동:',
-    summary.nextAction,
+    nextAction,
     '',
-    '━━━━━━━━━━',
-  ].join('\n');
+    separator,
+  ];
+
+  return lines.join('\n').replace(/(━━━━━━━━━━)\?+$/g, '$1');
 }

@@ -1159,7 +1159,18 @@ ${
           ? echoQuestionProcessed
           : echoQuestionProcessed.trimEnd().replace(/[.!,;:。！]+$/, '') + '?')
       : echoQuestionProcessed;
-    const decisionSummaryText = formatDecisionSummary(buildPersonaXDecisionSummary({
+    const hasDecisionSummary = (...values: string[]): boolean =>
+      values.some((value) => value.includes('PersonaX 결론'));
+    const decisionSummaryText = hasDecisionSummary(
+      first,
+      second,
+      third,
+      closer,
+      luciaClose,
+      echoQuestion,
+    )
+      ? ''
+      : formatDecisionSummary(buildPersonaXDecisionSummary({
       question: lastMessage,
       questionType: inferDecisionSummaryType(lastMessage, router),
       [firstKey]: first,
@@ -1167,21 +1178,36 @@ ${
       [thirdKey]: third,
       echo: echoQuestion || closer,
     }));
-    const echoQuestionWithSummary = echoQuestion
-      ? `${echoQuestion}\n\n${decisionSummaryText}`
-      : decisionSummaryText;
-    const luciaCloseWithSummary = !echoQuestion && luciaClose
-      ? `${luciaClose}\n\n${decisionSummaryText}`
-      : luciaClose;
+    const appendSummary = (value: string): string =>
+      value ? `${value}\n\n${decisionSummaryText}` : decisionSummaryText;
+    let firstWithSummary = first;
+    let secondWithSummary = second;
+    let thirdWithSummary = third;
+    let closerWithSummary = closer;
+    let echoQuestionWithSummary = echoQuestion;
+    if (decisionSummaryText) {
+      const lastOutputKey = router.order[router.order.length - 1] || 'echo';
+      if (lastOutputKey === router.closerPersona && closer) {
+        closerWithSummary = appendSummary(closer);
+      } else if (lastOutputKey === firstKey) {
+        firstWithSummary = appendSummary(first);
+      } else if (lastOutputKey === secondKey) {
+        secondWithSummary = appendSummary(second);
+      } else if (lastOutputKey === thirdKey) {
+        thirdWithSummary = appendSummary(third);
+      } else {
+        echoQuestionWithSummary = appendSummary(echoQuestion);
+      }
+    }
 
     return {
-      first,
-      second,
-      third,
+      first: firstWithSummary,
+      second: secondWithSummary,
+      third: thirdWithSummary,
       echoQuestion: echoQuestionWithSummary,
-      closerContent: closer,
+      closerContent: closerWithSummary,
       closerKey: router.closerPersona as TaggedPersonaKey,
-      luciaClose: luciaCloseWithSummary,
+      luciaClose,
       // 품질 가드 위반 시 Stage 3만 재호출하도록 Stage 1+2 결과 노출.
       _stage12Cache: { dataPack, personaViews },
     };
