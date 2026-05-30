@@ -695,6 +695,7 @@ export async function runRoutedRequest(
       dataPack: string;
       personaViews: string;
     };
+    marketDataPromptContext?: string;
   },
 ): Promise<RoutedRequestResult | null> {
   try {
@@ -704,7 +705,9 @@ export async function runRoutedRequest(
       params.router ||
       routeMessage(messages, lastMessage, '');
     const legacyCategory = router.legacyCategory || '';
-    const marketDataPromptContext = await buildMarketDataPromptContext(lastMessage);
+    const marketDataPromptContext =
+      params.marketDataPromptContext ??
+      await buildMarketDataPromptContext(lastMessage);
 
     // ──────────────────────────────────────────────────────────────
     // SOLO 우선순위 결정 — Stage 1·2 진입 전에 평가.

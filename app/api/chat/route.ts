@@ -79,9 +79,9 @@ import { readKakaoSessionFromRequest } from '@/lib/auth/kakao';
 import { resolvePersonaXSession } from '@/lib/personax/session';
 import {
   detectQuestionType,
-  hasDirectAnswer,
-  buildDirectAnswerFallback,
+  applyResponseGuard,
 } from '@/lib/personax/response-guard';
+import { buildMarketDataPromptContext } from '@/lib/personax/market-data';
 import { mapLegacyEchoRound2, mapOrderedRound1 } from '@/lib/personax/streaming';
 import {
   createFallbackDebatePlan,
@@ -472,6 +472,7 @@ async function callOptionD(
   closerPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
   soloPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
   precomputedStages?: { dataPack: string; personaViews: string },
+  marketDataPromptContext?: string,
 ): Promise<TaggedRound1Result | null> {
   const normalizedMessages = (messages || []).map((m) => ({
     role: m.role || '',
@@ -505,6 +506,7 @@ async function callOptionD(
     router,
     soloPersona,
     precomputedStages,
+    marketDataPromptContext,
   });
 }
 
@@ -524,6 +526,7 @@ async function callOptionDWithStage3Guard(
   hasPriorConversation: boolean = false,
   closerPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
   soloPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
+  marketDataPromptContext?: string,
 ): Promise<TaggedRound1Result | null> {
   // 희(喜) 모드 감지 — emotional + 좋은 소식 키워드. RAY/JACK 금지어휘 가드 활성화 조건.
   const isHeeMode =
@@ -531,7 +534,7 @@ async function callOptionDWithStage3Guard(
 
   const first = await callOptionD(
     messages, category, lastMessage, order, categoryV3, firstPersona,
-    hasPriorConversation, closerPersona, soloPersona,
+    hasPriorConversation, closerPersona, soloPersona, undefined, marketDataPromptContext,
   );
   if (!first) return first;
 
@@ -545,7 +548,7 @@ async function callOptionDWithStage3Guard(
     console.warn('[stage3-guard] 위반 감지 → Stage 3만 재호출 (Stage 1+2 캐시 재사용):', reasons.join(', '));
     const retry = await callOptionD(
       messages, category, lastMessage, order, categoryV3, firstPersona,
-      hasPriorConversation, closerPersona, soloPersona, cache,
+      hasPriorConversation, closerPersona, soloPersona, cache, marketDataPromptContext,
     );
     if (!retry) {
       console.warn('[stage3-guard] 재생성 결과 null → 1차 결과 사용');
@@ -562,7 +565,7 @@ async function callOptionDWithStage3Guard(
   console.warn('[stage3-guard] 위반 감지(solo) → 전체 재호출:', reasons.join(', '));
   const retry = await callOptionD(
     messages, category, lastMessage, order, categoryV3, firstPersona,
-    hasPriorConversation, closerPersona, soloPersona,
+    hasPriorConversation, closerPersona, soloPersona, undefined, marketDataPromptContext,
   );
   if (!retry) {
     console.warn('[stage3-guard] 재생성 결과 null → 1차 결과 사용');
@@ -783,23 +786,62 @@ export async function POST(req: NextRequest) {
 
     // 2라운드 페르소나 응답에서 다른 페르소나 발화 누출 방어 — 첫 빈 줄 이전 문단만 사용
     const firstParagraph = (t: string): string => (t || '').split(/\n\s*\n/)[0].trim();
-    const applyResponseGuard = (
-      personaText: Record<'lucia' | 'jack' | 'ray' | 'echo', string>,
-      userMessage: string,
-    ) => {
-      const questionType = detectQuestionType(userMessage);
-
-      for (const key of ['lucia', 'jack', 'ray', 'echo'] as const) {
-        if (
-          personaText[key]?.trim() &&
-          !hasDirectAnswer(personaText[key], questionType)
-        ) {
-          const fallback = buildDirectAnswerFallback(questionType, key);
-          if (fallback) {
-            personaText[key] = `${fallback}\n\n${personaText[key]}`;
-          }
-        }
+    const marketDataContextCache = new Map<string, Promise<string>>();
+    const getOrBuildMarketDataContext = async (userMessage: string): Promise<string> => {
+      if (!marketDataContextCache.has(userMessage)) {
+        marketDataContextCache.set(
+          userMessage,
+          buildMarketDataPromptContext(userMessage),
+        );
       }
+
+      return await marketDataContextCache.get(userMessage) ?? '';
+    };
+
+    const hasMarketDataForGuard = async (
+      userMessage: string,
+      questionType: ReturnType<typeof detectQuestionType>,
+    ): Promise<boolean> => {
+      if (questionType !== 'buy_or_wait') {
+        return false;
+      }
+
+      const marketDataPromptContext = await getOrBuildMarketDataContext(userMessage);
+      return marketDataPromptContext?.includes('"price"') ?? false;
+    };
+
+    const getMarketDataSourceLabelForGuard = async (
+      userMessage: string,
+      questionType: ReturnType<typeof detectQuestionType>,
+    ): Promise<string> => {
+      if (questionType !== 'buy_or_wait') {
+        return '';
+      }
+
+      const marketDataPromptContext = await getOrBuildMarketDataContext(userMessage);
+      if (!marketDataPromptContext?.includes('"price"')) {
+        return '';
+      }
+
+      const source =
+        marketDataPromptContext.match(/"source":\s*"([^"]+)"/)?.[1] ?? '';
+      return source ? `데이터 출처: ${source}` : '';
+    };
+
+    const appendMarketDataSourceLabel = (
+      personaText: Record<string, string>,
+      sourceLabel: string,
+    ): void => {
+      if (!sourceLabel || Object.values(personaText).some((text) => text?.includes('데이터 출처:'))) {
+        return;
+      }
+
+      const targetKey = personaText.echo ? 'echo' : Object.keys(personaText).find((key) => personaText[key]);
+      if (!targetKey) {
+        return;
+      }
+
+      personaText[targetKey] = `${personaText[targetKey].trimEnd()}\n\n${sourceLabel}`;
     };
 
     // ✅ 페르소나별 순차 스트리밍 — 각 LLM 호출 완성 시점에 NDJSON 청크 1개씩 클라이언트로 전송
@@ -1093,6 +1135,7 @@ export async function POST(req: NextRequest) {
               ? (messages as Array<{ role?: string; content?: string }>).slice(-1)
               : (messages as Array<{ role?: string; content?: string }>);
             const invoked = _routerDecision.invokedPersona;
+            const marketDataPromptContext = await getOrBuildMarketDataContext(msg);
             // ✅ invokedPersona를 callOptionD에 명시 전달 — runRoutedRequest 내부의
             //   strict 검출(personaCall) 미스매치를 무시하고 solo 모드 강제.
             const soloResult = await callOptionDWithStage3Guard(
@@ -1105,6 +1148,7 @@ export async function POST(req: NextRequest) {
               _hasPriorConversation,
               _closerPersonaV3,
               invoked,
+              marketDataPromptContext,
             );
             let reply = soloResult?.soloKey === invoked
               ? soloResult.soloContent || ''
@@ -1141,7 +1185,19 @@ export async function POST(req: NextRequest) {
           const optionDMessages = categoryChanged
             ? (messages as Array<{ role?: string; content?: string }>).slice(-1)
             : (messages as Array<{ role?: string; content?: string }>);
-          let r1: OptionDRound1Result | null = await callOptionDWithStage3Guard(optionDMessages, category, msg, order, categoryV3Local, firstPersonaLocal, _hasPriorConversation, _closerPersonaV3);
+          const marketDataPromptContext = await getOrBuildMarketDataContext(msg);
+          let r1: OptionDRound1Result | null = await callOptionDWithStage3Guard(
+            optionDMessages,
+            category,
+            msg,
+            order,
+            categoryV3Local,
+            firstPersonaLocal,
+            _hasPriorConversation,
+            _closerPersonaV3,
+            undefined,
+            marketDataPromptContext,
+          );
           // ✅ callOptionD 빈 결과 시 폴백 완전 차단 — null/빈 객체여도 정상 done 경로로 강제 통과
           if (!r1) {
             console.warn('[optionD] null 반환 → 빈 결과 객체로 강제 통과 (폴백 차단)');
@@ -1171,7 +1227,15 @@ export async function POST(req: NextRequest) {
                   : fallback;
               }
             }
-            applyResponseGuard(personaText, msg);
+            const questionType = detectQuestionType(msg);
+            const hasMarketData = await hasMarketDataForGuard(msg, questionType);
+            applyResponseGuard(personaText, questionType, hasMarketData);
+            if (hasMarketData) {
+              appendMarketDataSourceLabel(
+                personaText,
+                await getMarketDataSourceLabelForGuard(msg, questionType),
+              );
+            }
 
             for (const key of order) {
               await streamPersonaTagged(key, personaText[key]);
@@ -1277,7 +1341,18 @@ export async function POST(req: NextRequest) {
           // ✅ 빈 persona 보정 — r2 경로
           const _isHee2 = _categoryV3 === 'emotional' && detectEmotionalSubtypeHee(msg);
           applyPersonaFallback(personaText2, _isHee2);
-          applyResponseGuard(personaText2, priorUserQuestion);
+          const questionType = detectQuestionType(priorUserQuestion);
+          const hasMarketData = await hasMarketDataForGuard(
+            priorUserQuestion,
+            questionType,
+          );
+          applyResponseGuard(personaText2, questionType, hasMarketData);
+          if (hasMarketData) {
+            appendMarketDataSourceLabel(
+              personaText2,
+              await getMarketDataSourceLabelForGuard(priorUserQuestion, questionType),
+            );
+          }
 
           for (const key of priorOrder) {
             await streamPersonaTagged(key, personaText2[key]);
@@ -1354,6 +1429,7 @@ export async function POST(req: NextRequest) {
       const dummyOrder: TaggedPersonaKey[] =
         invoked === 'echo' ? ['lucia', 'jack', 'ray'] : [invoked, 'jack', 'lucia'].filter((k, i, a) => a.indexOf(k) === i) as TaggedPersonaKey[];
       return streamRespond(async (send) => {
+        const marketDataPromptContext = await getOrBuildMarketDataContext(lastMsg);
         const soloResult = await callOptionDWithStage3Guard(
           soloMessages,
           category,
@@ -1364,6 +1440,7 @@ export async function POST(req: NextRequest) {
           _hasPriorConversation,
           _closerPersonaV3,
           invoked,
+          marketDataPromptContext,
         );
         let reply = soloResult?.soloKey === invoked
           ? soloResult.soloContent || ''

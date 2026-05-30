@@ -16,6 +16,49 @@ const INVESTMENT_QUESTION_PATTERN =
 const UNSAFE_INVESTMENT_ANSWER_PATTERN =
   /(?:\d+(?:[.,]\d+)?\s*(?:원|만원|억원|조원|달러|%|퍼센트|배))|지지선|저항선|손절선|진입|매수|매도|관망입니다|보류입니다|분할 접근입니다|쳐다보지도 마라|지금 들어가라|지금 들어가지 마라/i;
 
+const DIRECT_TRADE_INSTRUCTION_PATTERN =
+  /사세요|파세요|매수하세요|매도하세요|지금\s*들어가세요|전량\s*매수하세요|전량\s*매도하세요/g;
+
+const INVESTMENT_RISK_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/손절선/g, '리스크 기준'],
+  [/지지선|저항선/g, '가격 변동 기준'],
+  [/진입/g, '판단'],
+  [/들어가면\s*바로\s*물린다/g, '섣부른 판단은 위험할 수 있습니다'],
+  [/들어가면\s*물린다/g, '섣부른 판단은 위험할 수 있습니다'],
+  [/들어가지\s*않는\s*게\s*맞다/g, '기준 없이 판단하지 않는 편이 안전합니다'],
+  [/기준\s*없이\s*들어가지\s*마(?:라)?/g, '기준 없이 판단하지 않는 편이 안전합니다'],
+  [/들어가지\s*마(?:라)?/g, '기준 없이 판단하지 않는 편이 안전합니다'],
+  [/들어가면\s*된다/g, '판단 기준으로 삼을 수 있습니다'],
+  [/들어올\s*자격(?:은|이)?\s*없다/g, '기준 없이 판단하지 않는 편이 안전합니다'],
+  [/시작도\s*하지\s*마라/g, '기준 없이 판단하지 않는 편이 안전합니다'],
+  [/차트\s*보지\s*마라/g, '단기 움직임만 보고 판단하지 않는 편이 안전합니다'],
+  [/쳐다보지도\s*마(?:라)?/g, '기준 없이 판단하지 않는 편이 안전합니다'],
+  [/분할\s*매수/g, '분할 접근 여부'],
+  [/관망\s*유지해라/g, '추가 확인이 필요합니다'],
+  [/손절해라/g, '리스크 기준을 먼저 정해야 합니다'],
+  [/물타라/g, '추가 자금 투입은 신중히 검토해야 합니다'],
+  [/비중\s*늘려라|비중\s*줄여라/g, '비중 조정 여부는 투자 기간과 리스크 감내 범위에 따라 달라집니다'],
+  [/던질|던진다는|던진다|던져야|던져라|던지(?:는|면|고|자|지|라|세요|십시오|겠다는)?/g, '정리할'],
+  [/버티실\s*겁니까/g, '유지할 기준이 있으신가요'],
+  [/지키실\s*겁니까/g, '유지할 기준이 있으신가요'],
+  [/확인해라/g, '확인하는 편이 안전합니다'],
+  [/확인하세요/g, '확인하는 편이 안전합니다'],
+];
+
+function removeDirectTradeInstructions(answer: string): string {
+  const cleaned = INVESTMENT_RISK_REPLACEMENTS.reduce(
+    (text, [pattern, replacement]) => text.replace(pattern, replacement),
+    answer.replace(DIRECT_TRADE_INSTRUCTION_PATTERN, ''),
+  );
+
+  return cleaned
+    .replace(/[ \t]{2,}/g, ' ')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => !/^[.。!！?？,，;；:\-\s]*$/.test(line))
+    .join('\n');
+}
+
 export function detectQuestionType(question: string): QuestionType {
   if (/계속\s*만나|계속할|헤어|그만해야|그만\s*만나|끊어야|손절해야|이혼/.test(question)) {
     return 'continue_or_stop';
@@ -38,6 +81,21 @@ export function detectQuestionType(question: string): QuestionType {
 
 export function sanitizeInvestmentAnswer(answer: string, question: string): string {
   if (!INVESTMENT_QUESTION_PATTERN.test(question)) {
+    return answer;
+  }
+
+  if (!UNSAFE_INVESTMENT_ANSWER_PATTERN.test(answer)) {
+    return answer;
+  }
+
+  return SAFE_INVESTMENT_FALLBACK;
+}
+
+function sanitizeInvestmentAnswerByType(
+  answer: string,
+  questionType: QuestionType,
+): string {
+  if (questionType !== 'buy_or_wait') {
     return answer;
   }
 
@@ -108,4 +166,38 @@ export function buildDirectAnswerFallback(
   }
 
   return DIRECT_ANSWER_FALLBACKS[questionType][persona] ?? '';
+}
+
+export function applyResponseGuard(
+  personaText: Record<string, string>,
+  questionType: QuestionType,
+  hasMarketData?: boolean,
+): void {
+  for (const key of Object.keys(personaText)) {
+    const answer = personaText[key];
+    if (!answer?.trim()) {
+      continue;
+    }
+
+    if (hasMarketData === true && questionType === 'buy_or_wait') {
+      personaText[key] = removeDirectTradeInstructions(answer);
+      continue;
+    }
+
+    const sanitizedAnswer = sanitizeInvestmentAnswerByType(answer, questionType);
+    if (sanitizedAnswer !== answer) {
+      personaText[key] = sanitizedAnswer;
+      continue;
+    }
+
+    if (!hasDirectAnswer(personaText[key], questionType)) {
+      const fallback = buildDirectAnswerFallback(
+        questionType,
+        key as DirectAnswerPersonaKey,
+      );
+      if (fallback) {
+        personaText[key] = `${fallback}\n\n${personaText[key]}`;
+      }
+    }
+  }
 }
