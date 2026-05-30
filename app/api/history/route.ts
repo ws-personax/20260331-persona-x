@@ -4,6 +4,8 @@ import { createClient as createServerSupabase } from '@/lib/supabase/server';
 import { readKakaoSessionFromRequest } from '@/lib/auth/kakao';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 type HistoryItem = {
   id: string;
