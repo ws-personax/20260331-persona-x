@@ -4,12 +4,60 @@ import type { MarketData, Verdict } from './types';
 import { inferCurrency } from './market';
 import { extractConditionPrices, parsePriceToNumber } from './scoring';
 import { type PersonaXSession } from '@/lib/personax/session';
+import { type DecisionSummary } from '@/lib/personax/decision-summary';
 
 const getSupabase = () => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return null;
   return createClient(url, key);
+};
+
+const addDaysIsoDate = (days: number): string => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+};
+
+const normalizeDecisionType = (category: string, decisionType?: string): string => {
+  if (decisionType?.trim()) return decisionType.trim();
+  if (category === 'emotional') return 'pure_emotional_support';
+  if (category === 'invest') return 'invest';
+  return category || 'generic';
+};
+
+const isUuid = (value: string | null): value is string =>
+  !!value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+
+const buildDecisionMemoryFields = (
+  category: string,
+  decisionSummary?: DecisionSummary,
+  decisionType?: string,
+) => {
+  if (!decisionSummary) return {};
+
+  const normalizedType = normalizeDecisionType(category, decisionType);
+  const reviewDays =
+    normalizedType === 'pure_emotional_support'
+      ? null
+      : normalizedType === 'invest' || normalizedType === 'buy_or_wait'
+        ? 7
+        : 14;
+  const reviewDate = reviewDays === null ? null : addDaysIsoDate(reviewDays);
+
+  return {
+    verdict: decisionSummary.verdict,
+    verdict_strength: 2,
+    reasons: decisionSummary.reasons,
+    counter_views: decisionSummary.counterView ? [decisionSummary.counterView] : null,
+    next_action: decisionSummary.nextAction,
+    decision_type: normalizedType,
+    review_date: reviewDate,
+    review_status: reviewDate ? 'pending' : null,
+    result: null,
+    executed: false,
+    decision_importance: 3,
+  };
 };
 
 export async function saveConversation(
@@ -19,6 +67,8 @@ export async function saveConversation(
     category: string;
     title: string;
     messages: Array<{ role: string; persona?: string | null; content: string }>;
+    decisionSummary?: DecisionSummary;
+    decisionType?: string;
   },
 ) {
   try {
@@ -29,13 +79,16 @@ export async function saveConversation(
       return;
     }
 
-    const { data: conv, error: convErr } = await supabase
+    const db = getSupabase() ?? supabase;
+
+    const { data: conv, error: convErr } = await db
       .from('conversations')
       .insert({
         provider_user_id: params.session.providerUserId,
-        user_id: params.session.userId ?? null,
+        user_id: isUuid(params.session.userId) ? params.session.userId : null,
         category: params.category,
         title: params.title.slice(0, 50),
+        ...buildDecisionMemoryFields(params.category, params.decisionSummary, params.decisionType),
       })
       .select('id')
       .single();
@@ -56,7 +109,7 @@ export async function saveConversation(
 
     if (rows.length === 0) return;
 
-    const { error: msgErr } = await supabase.from('messages').insert(rows);
+    const { error: msgErr } = await db.from('messages').insert(rows);
     if (msgErr) {
       console.warn('[saveConversation] messages insert failed:', msgErr);
     }

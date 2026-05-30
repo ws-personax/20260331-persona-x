@@ -38,6 +38,7 @@ import {
 import {
   buildDecisionSummary as buildPersonaXDecisionSummary,
   formatDecisionSummary,
+  type DecisionSummary,
 } from '@/lib/personax/decision-summary';
 import { buildMarketDataPromptContext } from '@/lib/personax/market-data';
 
@@ -428,6 +429,8 @@ export type RoutedRequestResult = {
   soloContent?: string;
   /** solo 호출 시 단일 응답 페르소나 */
   soloKey?: TaggedPersonaKey;
+  decisionSummary?: DecisionSummary;
+  decisionType?: string;
   /**
    * Stage 1(데이터 수집)+Stage 2(페르소나 관점) 결과 캐시 — full 경로만 채워짐.
    * 호출자가 Stage 3 결과가 품질 가드(JACK ~요 종결 / ECHO 자기 3인칭 등) 위반을 감지하면
@@ -1161,7 +1164,8 @@ ${
       : echoQuestionProcessed;
     const hasDecisionSummary = (...values: string[]): boolean =>
       values.some((value) => value.includes('PersonaX 결론'));
-    const decisionSummaryText = hasDecisionSummary(
+    const decisionType = inferDecisionSummaryType(lastMessage, router);
+    const decisionSummary = hasDecisionSummary(
       first,
       second,
       third,
@@ -1169,15 +1173,18 @@ ${
       luciaClose,
       echoQuestion,
     )
-      ? ''
-      : formatDecisionSummary(buildPersonaXDecisionSummary({
-      question: lastMessage,
-      questionType: inferDecisionSummaryType(lastMessage, router),
-      [firstKey]: first,
-      [secondKey]: second,
-      [thirdKey]: third,
-      echo: echoQuestion || closer,
-    }));
+      ? undefined
+      : buildPersonaXDecisionSummary({
+        question: lastMessage,
+        questionType: decisionType,
+        [firstKey]: first,
+        [secondKey]: second,
+        [thirdKey]: third,
+        echo: echoQuestion || closer,
+      });
+    const decisionSummaryText = decisionSummary
+      ? formatDecisionSummary(decisionSummary)
+      : '';
     const appendSummary = (value: string): string =>
       value ? `${value}\n\n${decisionSummaryText}` : decisionSummaryText;
     let firstWithSummary = first;
@@ -1209,6 +1216,8 @@ ${
       closerKey: router.closerPersona as TaggedPersonaKey,
       luciaClose,
       // 품질 가드 위반 시 Stage 3만 재호출하도록 Stage 1+2 결과 노출.
+      decisionSummary,
+      decisionType,
       _stage12Cache: { dataPack, personaViews },
     };
   } catch (e) {

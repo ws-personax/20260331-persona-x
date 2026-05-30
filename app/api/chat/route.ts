@@ -82,6 +82,7 @@ import {
   applyResponseGuard,
 } from '@/lib/personax/response-guard';
 import { buildMarketDataPromptContext } from '@/lib/personax/market-data';
+import type { DecisionSummary } from '@/lib/personax/decision-summary';
 import { mapLegacyEchoRound2, mapOrderedRound1 } from '@/lib/personax/streaming';
 import {
   createFallbackDebatePlan,
@@ -450,6 +451,8 @@ type OptionDRound1Result = TaggedRound1Result & {
   closerKey?: TaggedPersonaKey;
   soloContent?: string;
   soloKey?: TaggedPersonaKey;
+  decisionSummary?: DecisionSummary;
+  decisionType?: string;
   /** [LUCIA_CLOSE] 액자 구조 — 감정/복합 카테고리 전용 별도 LUCIA 버블 */
   luciaClose?: string;
   /** Stage 1+2 캐시 — 품질 가드 위반 시 Stage 3만 재호출하는 데 사용 (full 경로만 존재) */
@@ -473,7 +476,7 @@ async function callOptionD(
   soloPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
   precomputedStages?: { dataPack: string; personaViews: string },
   marketDataPromptContext?: string,
-): Promise<TaggedRound1Result | null> {
+): Promise<OptionDRound1Result | null> {
   const normalizedMessages = (messages || []).map((m) => ({
     role: m.role || '',
     content: m.content || '',
@@ -527,7 +530,7 @@ async function callOptionDWithStage3Guard(
   closerPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
   soloPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
   marketDataPromptContext?: string,
-): Promise<TaggedRound1Result | null> {
+): Promise<OptionDRound1Result | null> {
   // 희(喜) 모드 감지 — emotional + 좋은 소식 키워드. RAY/JACK 금지어휘 가드 활성화 조건.
   const isHeeMode =
     categoryV3 === 'emotional' && detectEmotionalSubtypeHee(lastMessage);
@@ -1077,7 +1080,11 @@ export async function POST(req: NextRequest) {
           }
         };
 
-        const saveUnifiedConversation = async (personaText: Record<TaggedPersonaKey, string>) => {
+        const saveUnifiedConversation = async (
+          personaText: Record<TaggedPersonaKey, string>,
+          decisionSummary?: DecisionSummary,
+          decisionType?: string,
+        ) => {
           const cookieProviderUserId = (() => {
             const k = readKakaoSessionFromRequest(req);
             return k?.id ? `kakao_${k.id}` : null;
@@ -1126,6 +1133,8 @@ export async function POST(req: NextRequest) {
             category: categoryForConversation,
             title: msg.slice(0, 50),
             messages: conversationMessages,
+            decisionSummary,
+            decisionType,
           });
         };
 
@@ -1255,7 +1264,7 @@ export async function POST(req: NextRequest) {
               console.warn('[tea:tagged-r1] 로그 저장 실패 (무시)', e);
             }
 
-            await saveUnifiedConversation(personaText);
+            await saveUnifiedConversation(personaText, r1.decisionSummary, r1.decisionType);
 
             send({
               type: 'done',
