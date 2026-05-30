@@ -1,0 +1,116 @@
+export type DecisionSummary = {
+  verdict: string;
+  reasons: string[];
+  counterView: string;
+  nextAction: string;
+};
+
+const normalizeQuestion = (question: string): string => question.replace(/\s+/g, ' ').trim();
+
+const inferQuestionType = (question: string, questionType: string): string => {
+  const q = normalizeQuestion(question);
+
+  if (questionType) return questionType;
+  if (/사야|매수|팔아야|매도|비트코인|삼성전자|주식|코인|투자/.test(q)) return 'buy_or_wait';
+  if (/창업.*재취업|재취업.*창업|창업\s*vs\s*재취업/i.test(q)) return 'startup_vs_job';
+  if (/계속\s*만나|헤어|이 사람|관계|연애|이혼/.test(q)) return 'relationship';
+  if (/이직|커리어|진로|퇴사|회사|직장/.test(q)) return 'career';
+  return 'generic';
+};
+
+const firstNonEmpty = (...values: Array<string | undefined>): string => (
+  values.find((value) => value?.trim())?.trim() ?? ''
+);
+
+const counterFallbackByType = (type: string): string => {
+  if (type === 'buy_or_wait') {
+    return '단기 가격만 보고 판단하면 리스크를 놓칠 수 있습니다.';
+  }
+  if (type === 'startup_vs_job') {
+    return '반대 선택지도 조건이 맞으면 충분히 검토할 가치가 있습니다.';
+  }
+  if (type === 'relationship') {
+    return '감정만으로 결론내리면 반복되는 행동 신호를 놓칠 수 있습니다.';
+  }
+
+  return '다른 선택지도 조건이 맞으면 검토할 가치가 있습니다.';
+};
+
+export function buildDecisionSummary(params: {
+  question: string;
+  questionType: string;
+  ray?: string;
+  jack?: string;
+  lucia?: string;
+  echo?: string;
+}): DecisionSummary {
+  const type = inferQuestionType(params.question, params.questionType);
+  const anchor = firstNonEmpty(params.echo, params.jack, params.ray, params.lucia);
+
+  if (type === 'buy_or_wait') {
+    return {
+      verdict: '지금은 조건부 판단입니다',
+      reasons: ['현재 가격과 등락률을 먼저 확인해야 합니다', '리스크 기준 없이 행동하면 손실 폭이 커질 수 있습니다'],
+      counterView: counterFallbackByType(type),
+      nextAction: '오늘은 투자 기간, 손실 한도, 추가 확인할 가격 기준을 각각 1줄로 적어보세요',
+    };
+  }
+
+  if (type === 'startup_vs_job') {
+    return {
+      verdict: '현재 조건에서는 재취업 우선입니다',
+      reasons: ['현금흐름 확보가 먼저입니다', '창업 리스크를 줄일 준비 시간이 필요합니다'],
+      counterView: '다만 창업 준비는 사이드 프로젝트로 병행할 수 있습니다',
+      nextAction: '30일 내 지원 기업 10곳과 창업 검증 과제 1개를 함께 정리하세요',
+    };
+  }
+
+  if (type === 'relationship') {
+    return {
+      verdict: '계속 여부는 반복 행동을 보고 조건부로 판단해야 합니다',
+      reasons: ['감정보다 반복되는 행동 패턴이 더 중요합니다', '관계가 나를 계속 작아지게 만드는지 확인해야 합니다'],
+      counterView: '다만 일회성 실수라면 대화 후 변화 여부를 볼 여지는 있습니다',
+      nextAction: '2주 동안 불편했던 행동 3개와 실제로 바뀐 행동 3개를 기록하세요',
+    };
+  }
+
+  if (type === 'career') {
+    return {
+      verdict: '지금은 선택지를 좁히기보다 조건을 정리할 때입니다',
+      reasons: ['커리어 결정은 감정, 돈, 시간 조건이 함께 맞아야 합니다', '바로 움직이기 전 손실 가능한 범위를 알아야 합니다'],
+      counterView: '다만 이미 회복 불가능한 환경이라면 빠른 전환도 선택지입니다',
+      nextAction: '이번 주 안에 돈, 시간, 성장 기준을 각각 3줄로 정리하세요',
+    };
+  }
+
+  return {
+    verdict: anchor ? '결정 기준을 먼저 세워야 합니다' : '추가 정보 확인 후 결정해야 합니다',
+    reasons: ['지금 질문은 기준이 없으면 답이 흔들립니다', '다음 행동을 작게 정해야 재점검할 수 있습니다'],
+    counterView: '다만 상황이 급하면 가장 회복 가능한 선택을 우선할 수 있습니다',
+    nextAction: '오늘 안에 선택 기준 3개와 바로 할 행동 1개를 적으세요',
+  };
+}
+
+export function formatDecisionSummary(summary: DecisionSummary): string {
+  const counterView = summary.counterView.trim().length >= 8
+    ? summary.counterView
+    : counterFallbackByType('generic');
+
+  return [
+    '━━━━━━━━━━',
+    '',
+    'PersonaX 결론',
+    summary.verdict,
+    '',
+    '핵심 이유:',
+    ...summary.reasons.map((reason) => `- ${reason}`),
+    '',
+    '반대 의견:',
+    counterView,
+    '',
+    '다음 행동:',
+    summary.nextAction,
+    '',
+    '━━━━━━━━━━',
+  ].join('\n');
+}

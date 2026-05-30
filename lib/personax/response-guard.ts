@@ -27,8 +27,8 @@ const DIRECT_TRADE_INSTRUCTION_PATTERN =
 
 const INVESTMENT_RISK_REPLACEMENTS: Array<[RegExp, string]> = [
   [/52주\s*(?:최고가|최저가|고가|저가)[^,.。\n]*/g, '추가 가격 범위 데이터는 별도 확인이 필요합니다'],
-  [/PER[^,.。\n]*/gi, '추가 밸류에이션 데이터는 별도 확인이 필요합니다'],
-  [/PBR[^,.。\n]*/gi, '추가 밸류에이션 데이터는 별도 확인이 필요합니다'],
+  [/\bPER\b[^,.。\n]*/gi, '추가 밸류에이션 데이터는 별도 확인이 필요합니다'],
+  [/\bPBR\b[^,.。\n]*/gi, '추가 밸류에이션 데이터는 별도 확인이 필요합니다'],
   [/영업이익[^,.。\n]*/g, '추가 실적 데이터는 별도 확인이 필요합니다'],
   [/시가총액[^,.。\n]*/g, '추가 규모 데이터는 별도 확인이 필요합니다'],
   [/(?:최근\s*)?(?:24시간\s*)?거래량[^,.。\n]*/g, '추가 수급 데이터는 별도 확인이 필요합니다'],
@@ -80,10 +80,25 @@ function removeDirectTradeInstructions(answer: string): string {
   );
 
   return cleaned
+    .replace(
+      /추가\s+[^,.。!?\n]*데이터는 별도 확인이 필요합니다[^,.。!?\n]*/g,
+      '',
+    )
+    .replace(/필요합니다[,.。]?\s*\d+(?:\.\d+)?[A-Za-z가-힣%]*/g, '필요합니다')
+    .replace(/필요합니다[,.。]?\s*\d{1,3}(?:,\d{3})*원/g, '필요합니다')
+    .replace(/필요합니다[,.。]\d+원/g, '필요합니다')
+    .replace(/(?:^|[\s,.。])[,。.]?\d{1,3}(?:,\d{3})+원(?=$|[\s,.。])/g, ' ')
+    .replace(/(?:^|[\s,.。])[,。.]?\d+원(?=$|[\s,.。])/g, ' ')
+    .replace(/추가\s+추가/g, '추가')
+    .replace(/필요합니다[,.。]\s*필요합니다/g, '필요합니다')
+    .replace(/\s+([,.。])/g, '$1')
+    .replace(/([,.。]){2,}/g, '$1')
+    .replace(/,\s*(?=\n|$)/g, '')
     .replace(/[ \t]{2,}/g, ' ')
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => !/^[.。!！?？,，;；:\-\s]*$/.test(line))
+    .filter((line) => !/^(?:원|KRW|USD|달러|,?\d+(?:,\d+)?원?)$/.test(line))
     .join('\n');
 }
 
