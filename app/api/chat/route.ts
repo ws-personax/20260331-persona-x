@@ -61,12 +61,14 @@ import {
 import {
   chunkText,
   cleanText,
+  firstParagraph,
   normalizeDetails,
   removeDangsin,
   sleep,
   summarize,
   toPromptOrder,
 } from '@/lib/personax/utils';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { cleanAdvanced, cleanNews, splitForBubble } from '@/lib/personax/text-format';
 import {
   applyPersonaFallback,
@@ -107,36 +109,6 @@ import { ADVANCED_SYSTEM_LUCIA } from './prompts/advanced-lucia';
 import { ADVANCED_SYSTEM_ECHO } from './prompts/advanced-echo';
 
 export const maxDuration = 60;
-
-// ─────────────────────────────────────────────
-// ✅ Rate Limiting — IP당 1분 5회 제한 (API 비용 폭탄 방지)
-// ─────────────────────────────────────────────
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const limit = rateLimitMap.get(ip);
-
-  if (!limit || now > limit.resetTime) {
-    rateLimitMap.set(ip, { count: 1, resetTime: now + 60000 });
-    return true;
-  }
-
-  if (limit.count >= 5) {
-    return false;
-  }
-
-  limit.count++;
-  return true;
-}
-
-function getClientIp(req: Request): string {
-  return (
-    req.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
-    req.headers.get('x-real-ip') ||
-    'unknown'
-  );
-}
 
 // ─────────────────────────────────────────────
 // ✅ 차 한잔(teaMode) 전용 — Gemini Flash LLM 호출
@@ -786,8 +758,6 @@ export async function POST(req: NextRequest) {
       return Response.json(body as Parameters<typeof Response.json>[0], init);
     };
 
-    // 2라운드 페르소나 응답에서 다른 페르소나 발화 누출 방어 — 첫 빈 줄 이전 문단만 사용
-    const firstParagraph = (t: string): string => (t || '').split(/\n\s*\n/)[0].trim();
     const marketDataContextCache = new Map<string, Promise<string>>();
     const getOrBuildMarketDataContext = async (userMessage: string): Promise<string> => {
       if (!marketDataContextCache.has(userMessage)) {

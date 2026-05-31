@@ -20,6 +20,10 @@ export const cleanText = (text: string | null | undefined): string =>
 export const summarize = (text: string, size: number): string =>
   (text || '').replace(/\s+/g, ' ').trim().slice(0, size);
 
+export function firstParagraph(t: string): string {
+  return (t || '').split(/\n\s*\n/)[0].trim();
+}
+
 export const removeDangsin = (text: string): string => {
   return text
     .replace(/당신은\s+/g, '')
