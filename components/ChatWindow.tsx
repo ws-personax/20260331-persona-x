@@ -747,7 +747,10 @@ const VoiceControlsColumn = memo(function VoiceControlsColumn({
       {sttSupported && (
         <button
           type="button"
-          onClick={onToggleRecording}
+          onClick={() => {
+            console.log('[stt] button clicked');
+            onToggleRecording();
+          }}
           disabled={isLoading}
           title={inCountdown ? `${micLabel} (${autoSendCountdown}초)` : micLabel}
           aria-label={micLabel}
@@ -1258,7 +1261,16 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
   }, []);
 
   const toggleRecording = useCallback(() => {
-    if (!sttSupported) return;
+    console.log('[stt] toggleRecording start');
+    const canUseSTT = isSTTSupported();
+    console.log('[stt] canUseSTT', canUseSTT);
+    if (!canUseSTT) {
+      setSttSupported(false);
+      return;
+    }
+    if (!sttSupported) {
+      setSttSupported(true);
+    }
     if (autoSendCountdown !== null) {
       cancelAutoSend();
       return;
@@ -1277,7 +1289,10 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
     }
     const w = window as unknown as { SpeechRecognition?: new () => unknown; webkitSpeechRecognition?: new () => unknown };
     const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!SR) return;
+    if (!SR) {
+      setSttSupported(false);
+      return;
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rec: any = new SR();
     rec.lang = 'ko-KR';
@@ -1299,12 +1314,18 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
       }
     };
     rec.onend = () => setIsRecording(false);
-    rec.onerror = () => setIsRecording(false);
+    rec.onerror = (event: unknown) => {
+      console.error('[stt] recognition error', event);
+      setIsRecording(false);
+    };
     recognitionRef.current = rec;
     try {
+      console.log('[stt] before rec.start');
       rec.start();
+      console.log('[stt] rec.start success');
       setIsRecording(true);
-    } catch {
+    } catch (error) {
+      console.error('[stt] rec.start error', error);
       setIsRecording(false);
     }
   }, [sttSupported, isRecording, autoSendCountdown, autoRead, cancelAutoSend, startAutoSendCountdown]);

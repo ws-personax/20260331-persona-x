@@ -6,11 +6,11 @@ export const isTTSSupported = (): boolean =>
   typeof window !== 'undefined' && typeof Audio !== 'undefined';
 
 export const isSTTSupported = (): boolean => {
-  if (typeof window !== 'undefined') {
-    const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
-    return !!(w.SpeechRecognition || w.webkitSpeechRecognition);
+  if (typeof window === 'undefined') {
+    return false;
   }
-  return false;
+  const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
+  return !!(w.SpeechRecognition || w.webkitSpeechRecognition);
 };
 
 type PersonaVoice = 'ray' | 'jack' | 'lucia' | 'echo';
