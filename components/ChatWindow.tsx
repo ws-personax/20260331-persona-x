@@ -1383,7 +1383,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
       ];
       for (const o of order) {
         if (queued.has(o.key) || !o.text) continue;
-        const suffix = o.key !== 'echo' ? ' 자세한 내용은 화면을 확인하세요.' : '';
+        const suffix = (o.key !== 'echo' && /자세히\s*보기/.test(o.text ?? '')) ? ' 자세한 내용은 화면을 확인하세요.' : '';
         newItems.push({
           text: sanitizeForTTS(o.text, o.key) + suffix,
           personaKey: o.key,

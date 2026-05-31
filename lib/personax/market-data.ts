@@ -247,6 +247,31 @@ RAY must not create or infer any price, PER, PBR, volume, market cap, 52-week hi
 RAY must say: "확인 가능한 데이터가 필요합니다. 확인된 marketData 없이는 숫자 분석을 하지 않겠습니다. 판단 기준은 실적, 업황, 투자 기간, 감당 가능한 손실 범위입니다."`;
   }
 
+  const promptMarketData: Record<string, string | number> = {
+    price: marketData.data.price,
+    currency: marketData.data.currency,
+    source: marketData.data.source,
+    change: marketData.data.change,
+    name: marketData.data.name,
+    symbol: marketData.data.symbol,
+    fetchedAt: marketData.data.fetchedAt,
+  };
+
+  const addIfPresent = (key: string, value: string | number | null | undefined): void => {
+    if (value !== undefined && value !== null) {
+      promptMarketData[key] = value;
+    }
+  };
+
+  addIfPresent('high', marketData.data.high);
+  addIfPresent('low', marketData.data.low);
+  addIfPresent('rawPrice', marketData.data.rawPrice);
+  addIfPresent('rawHigh', marketData.data.rawHigh);
+  addIfPresent('rawLow', marketData.data.rawLow);
+  addIfPresent('rawVolume', marketData.data.rawVolume);
+  addIfPresent('avgVolume', marketData.data.avgVolume);
+  addIfPresent('volume', marketData.data.volume);
+
   return `## Market Data
 assetType: ${asset.assetType}
 detectedAsset: ${asset.name}
@@ -255,15 +280,7 @@ lookupKey: ${asset.lookupKey}
 symbol: ${asset.symbol ?? 'unknown'}
 isEtf: ${asset.isEtf ? 'true' : 'false'}
 marketData:
-${JSON.stringify({
-  price: marketData.data.price,
-  currency: marketData.data.currency,
-  source: marketData.data.source,
-  change: marketData.data.change,
-  name: marketData.data.name,
-  symbol: marketData.data.symbol,
-  fetchedAt: marketData.data.fetchedAt,
-}, null, 2)}
+${JSON.stringify(promptMarketData, null, 2)}
 
 RAY may use only numeric values present in this Market Data block. LLM memory, estimates, or old numbers are forbidden.`;
 }
