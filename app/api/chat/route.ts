@@ -1198,7 +1198,24 @@ export async function POST(req: NextRequest) {
             }
             const questionType = detectQuestionType(msg);
             const hasMarketData = await hasMarketDataForGuard(msg, questionType);
+            const guardDebugBeforeText = Object.values(personaText).join('\n\n');
+            console.log('[guard-debug] route before applyResponseGuard', {
+              questionType,
+              hasMarketData,
+              length: guardDebugBeforeText.length,
+              hasPriceLikeNumber: /\d{1,3}(,\d{3})+/.test(guardDebugBeforeText),
+              sample: guardDebugBeforeText.slice(0, 300),
+            });
             applyResponseGuard(personaText, questionType, hasMarketData);
+            const guardDebugAfterText = Object.values(personaText).join('\n\n');
+            console.log('[guard-debug] route after applyResponseGuard', {
+              questionType,
+              hasMarketData,
+              length: guardDebugAfterText.length,
+              lengthDelta: guardDebugAfterText.length - guardDebugBeforeText.length,
+              hasPriceLikeNumber: /\d{1,3}(,\d{3})+/.test(guardDebugAfterText),
+              sample: guardDebugAfterText.slice(0, 300),
+            });
             if (hasMarketData) {
               appendMarketDataSourceLabel(
                 personaText,
@@ -1315,7 +1332,24 @@ export async function POST(req: NextRequest) {
             priorUserQuestion,
             questionType,
           );
+          const guardDebugBeforeText2 = Object.values(personaText2).join('\n\n');
+          console.log('[guard-debug] route r2 before applyResponseGuard', {
+            questionType,
+            hasMarketData,
+            length: guardDebugBeforeText2.length,
+            hasPriceLikeNumber: /\d{1,3}(,\d{3})+/.test(guardDebugBeforeText2),
+            sample: guardDebugBeforeText2.slice(0, 300),
+          });
           applyResponseGuard(personaText2, questionType, hasMarketData);
+          const guardDebugAfterText2 = Object.values(personaText2).join('\n\n');
+          console.log('[guard-debug] route r2 after applyResponseGuard', {
+            questionType,
+            hasMarketData,
+            length: guardDebugAfterText2.length,
+            lengthDelta: guardDebugAfterText2.length - guardDebugBeforeText2.length,
+            hasPriceLikeNumber: /\d{1,3}(,\d{3})+/.test(guardDebugAfterText2),
+            sample: guardDebugAfterText2.slice(0, 300),
+          });
           if (hasMarketData) {
             appendMarketDataSourceLabel(
               personaText2,

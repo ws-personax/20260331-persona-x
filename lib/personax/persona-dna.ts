@@ -130,12 +130,44 @@ export function sanitizeMarketDataFactLock(
     .filter(Boolean);
 
   if (safeSentences.length === sentences.length) {
+    console.log('[guard-debug] sanitizeMarketDataFactLock unchanged', {
+      regex: FACT_LOCK_SENTENCE_PATTERN.source,
+      beforeLength: text.length,
+      afterLength: text.length,
+      lengthDelta: 0,
+      beforeHasPriceLikeNumber: /\d{1,3}(,\d{3})+/.test(text),
+      afterHasPriceLikeNumber: /\d{1,3}(,\d{3})+/.test(text),
+      beforeSample: text.slice(0, 300),
+      afterSample: text.slice(0, 300),
+    });
     return text;
   }
 
   if (safeSentences.length === 0) {
-    return '추가 실적·수급 데이터는 별도 확인이 필요합니다.';
+    const fallback = '추가 실적·수급 데이터는 별도 확인이 필요합니다.';
+    console.log('[guard-debug] sanitizeMarketDataFactLock removed all', {
+      regex: FACT_LOCK_SENTENCE_PATTERN.source,
+      beforeLength: text.length,
+      afterLength: fallback.length,
+      lengthDelta: fallback.length - text.length,
+      beforeHasPriceLikeNumber: /\d{1,3}(,\d{3})+/.test(text),
+      afterHasPriceLikeNumber: /\d{1,3}(,\d{3})+/.test(fallback),
+      beforeSample: text.slice(0, 300),
+      afterSample: fallback.slice(0, 300),
+    });
+    return fallback;
   }
 
-  return safeSentences.join('\n');
+  const result = safeSentences.join('\n');
+  console.log('[guard-debug] sanitizeMarketDataFactLock changed', {
+    regex: FACT_LOCK_SENTENCE_PATTERN.source,
+    beforeLength: text.length,
+    afterLength: result.length,
+    lengthDelta: result.length - text.length,
+    beforeHasPriceLikeNumber: /\d{1,3}(,\d{3})+/.test(text),
+    afterHasPriceLikeNumber: /\d{1,3}(,\d{3})+/.test(result),
+    beforeSample: text.slice(0, 300),
+    afterSample: result.slice(0, 300),
+  });
+  return result;
 }

@@ -79,7 +79,7 @@ function removeDirectTradeInstructions(answer: string): string {
     answer.replace(DIRECT_TRADE_INSTRUCTION_PATTERN, ''),
   );
 
-  return cleaned
+  const result = cleaned
     .replace(
       /추가\s+[^,.。!?\n]*데이터는 별도 확인이 필요합니다[^,.。!?\n]*/g,
       '',
@@ -100,6 +100,17 @@ function removeDirectTradeInstructions(answer: string): string {
     .filter((line) => !/^[.。!！?？,，;；:\-\s]*$/.test(line))
     .filter((line) => !/^(?:원|KRW|USD|달러|,?\d+(?:,\d+)?원?)$/.test(line))
     .join('\n');
+  console.log('[guard-debug] removeDirectTradeInstructions', {
+    beforeLength: answer.length,
+    cleanedLength: cleaned.length,
+    afterLength: result.length,
+    lengthDelta: result.length - answer.length,
+    beforeHasPriceLikeNumber: /\d{1,3}(,\d{3})+/.test(answer),
+    afterHasPriceLikeNumber: /\d{1,3}(,\d{3})+/.test(result),
+    beforeSample: answer.slice(0, 300),
+    afterSample: result.slice(0, 300),
+  });
+  return result;
 }
 
 export function detectQuestionType(question: string): QuestionType {
