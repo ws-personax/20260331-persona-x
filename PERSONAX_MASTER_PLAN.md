@@ -1,6 +1,6 @@
 # PERSONAX_MASTER_PLAN.md
 
-# PersonaX North Star Document (2026-05-30)
+# PersonaX North Star Document (2026-05-31)
 
 이 문서는 현재 구현 완료 목록이 아니라 PersonaX의 North Star / 장기 설계도이다.
 
@@ -16,6 +16,22 @@
 
 YES → 개발  
 NO → 보류
+
+## IMPORTANT (2026-05-31)
+
+PersonaX는 AI 토론 앱이 아니다.
+
+PersonaX는 사용자의 결정을 기억하고 성장시키는 Decision OS이다.
+
+현재 최우선 과제:
+
+1. auth.ts 분리 (resolveUserId: Kakao/Supabase 통합, Account Linking·Personal Memory 기초 공사)
+2. ChatWindow.tsx 분리
+3. route.ts 오케스트레이터화
+4. Account Linking 설계
+5. Personal Memory 구현
+
+모든 신규 기능보다 아키텍처 안정화를 우선한다.
 
 ---
 
@@ -270,44 +286,98 @@ route.ts 전체 재작성, Finance 분기 대규모 이동, 응답 흐름 변경
 
 ---
 
-## 14. 현재 상태 (2026-05-30)
+## 14. 현재 상태 (2026-05-31)
 
-### 구현 상태
+### 완료
 
-- Decision Frame: MVP 연결 완료, 안정화 진행 중
-- Session: 기초 연결 완료, History V2/Auth Session 안정화 필요
-- History: 기초 연결 완료, conversations/messages 중심으로 추가 안정화 필요
-- Response Guard: 1차 적용 완료, Legal Guard 중앙화 필요
-- Market Data: MVP 연결 완료, 실제 답변 반영 안정화 진행 중
-- Persona DNA: 예정
-- Decision Memory: DB 스키마 설계 단계
-- Personal Memory: 7월 이후
+- Decision Frame
+- Decision Summary
+- History API
+- Decision Memory 저장
+- conversations 테이블 확장
+- Review Card MVP
+- Market Data Fact Lock
+- /api/history dynamic route 수정
+- 모바일 History 임시 조치 완료, 표시 정상 동작
+  - Kakao ↔ Supabase 세션 구조는 근본 미해결
+  - auth.ts 정리 이후 재점검 필요
+
+### 진행 중
+
+- auth.ts 분리 (resolveUserId: Kakao/Supabase 통합)
+- ChatWindow.tsx 분리
+- route.ts 오케스트레이터화
+
+### 예정
+
+- Account Linking
+- Personal Memory
 
 ---
 
 ## 15. 로드맵
 
-### 실행 우선순위
+### June 2026
 
-1. Market Data 안정화
-2. History V2 / Auth Session 안정화
-3. Legal / Response Guard 중앙화
-4. conversations 확장 및 Decision Memory 저장
-5. Persona DNA Layer
-6. Korean Context Layer
-7. Decision Summary
-8. Personal Memory
+### Week 1
 
-### 장기 Phase
+- auth.ts 분리 (resolveUserId 함수: Kakao / Supabase 통합 추출)
 
-- Phase 1: Decision Frame 안정화
-- Phase 2: Market Data Layer 안정화
-- Phase 3: History V2 / Auth Session 안정화
-- Phase 4: Legal / Response Guard 중앙화
-- Phase 5: Decision Memory
-- Phase 6: Persona DNA / Korean Context Layer
-- Phase 7: Decision Summary
-- Phase 8: Personal Memory
+목적:
+
+- 사용자 식별 로직 중앙화
+- Personal Memory 준비
+- Account Linking 준비
+
+범위:
+
+- resolveUserId 추출
+- Kakao 식별 로직 통합
+- Supabase 식별 로직 통합
+- route.ts 중복 제거
+
+금지:
+
+- 저장 정책 변경
+- Account Linking 구현
+- Personal Memory 구현
+- saveConversation guard 변경
+- saveTeaConversation 수정
+
+- conversations.user_id nullable 추가
+- lib/personax/utils.ts 추출 (chunkText, normalizeDetails, firstParagraph)
+
+### Week 2
+
+- ChatWindow.tsx 분리 시작
+- UI 단위로 1개씩 분리
+- 기능 변경 금지
+- 계정 통합 로직 구현 금지
+
+### Week 3
+
+- route.ts 분리
+- classifier.ts 분리
+- error handling 통일
+- console.log 제거
+
+### Week 4
+
+- users 테이블 설계
+- user_identities 테이블 설계
+- Account Linking 설계
+
+원칙:
+
+6월 = 길만 깔기
+
+### July 2026
+
+- Personal Memory 구현
+
+원칙:
+
+7월 = 차를 달리게 하기
 
 ---
 
@@ -444,4 +514,143 @@ Decision OS처럼 결정과 재점검으로 닫는다.
 
 - PROJECT_NOTES.md = 개발 로그 / 시행착오 기록
 - PERSONAX_MASTER_PLAN.md = 공식 North Star / 장기 설계도
+- Codex/Claude가 가장 먼저 읽는 문서
 - 실제 작업 우선순위는 항상 현재 코드 상태와 테스트 결과를 기준으로 조정한다.
+
+---
+
+## 19. History Architecture
+
+History는 채팅 기록이 아니다.
+
+History는 Decision Session Archive 이다.
+
+목표:
+
+사용자가 과거 결정을 다시 확인할 수 있게 한다.
+
+원칙:
+
+- 질문 제목 우선
+- 날짜보다 의사결정 맥락 우선
+- 한 화면에 최대한 많은 질문 표시
+
+예시:
+
+창업 vs 재취업 어떻게 해야 할까요?
+
+삼성전자 지금 사야 할까요?
+
+이 사람 계속 만나도 될까요?
+
+향후:
+
+클릭 시
+
+- 전체 대화 복원
+- Decision Summary
+- Review 상태
+
+주의:
+
+전체 대화 복원 기능은 6월 리팩토링 범위가 아니다.
+Personal Memory 이후 단계적으로 진행한다.
+
+---
+
+## 20. Decision Loop
+
+PersonaX의 핵심은 개별 기능이 아니다.
+
+History
+→ Review Card
+→ Personal Memory
+
+는 하나의 루프이다.
+
+질문
+↓
+Decision Summary
+↓
+History
+↓
+Review Card
+↓
+Personal Memory
+↓
+다음 질문
+
+6월 리팩토링 목표는
+새 기능 추가가 아니라
+이 루프가 끊기지 않게 구조를 정리하는 것이다.
+
+---
+
+## 21. Account Linking Strategy
+
+목표:
+
+Google / Kakao 계정 통합
+
+구조:
+
+users
+
+user_identities
+
+conversations.user_id
+
+설계 원칙:
+
+provider + providerUserId → PersonaX appSession → user_id
+
+예:
+- Kakao  → provider: kakao,  providerUserId: kakao_123
+- Google → provider: google, providerUserId: google_abc
+
+route.ts는 provider 종류를 알 필요 없음
+session.ts가 appSession → user_id 변환 담당
+
+Personal Memory 준비 조건:
+conversations.user_id 안정화 + auth.ts 분리 필수
+
+사전 준비:
+
+Week 1 auth.ts 분리를 통해
+사용자 식별 로직을 중앙화한다.
+
+Week 2 conversations.user_id nullable 추가로
+DB 준비를 완료한다.
+
+Week 4 설계 이후
+7월 Personal Memory 구현 전에
+Account Linking을 연결한다.
+
+원칙:
+
+- 6월 설계
+- 7월 구현
+
+주의:
+
+계정 통합 로직은
+Personal Memory 이전에는 구현하지 않는다.
+
+---
+
+## 22. June 2026 Refactoring Rules
+
+반드시 수행:
+
+- conversations.user_id nullable 추가
+- classifier.ts 분리
+- console.log 제거
+- error handling 통일
+- ECHO 후처리 제거
+
+금지:
+
+- route.ts 대규모 재작성
+- Personal Memory 선구현
+- Account Linking 선구현
+- History 전체 대화 복원 구현

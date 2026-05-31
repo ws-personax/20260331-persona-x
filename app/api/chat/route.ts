@@ -75,8 +75,7 @@ import {
   PERSONA_FALLBACK,
 } from '@/lib/personax/fallbacks';
 import { saveHistory, saveTeaConversation, saveConversation } from '@/lib/personax/history';
-import { readKakaoSessionFromRequest } from '@/lib/auth/kakao';
-import { resolvePersonaXSession } from '@/lib/personax/session';
+import { resolveUserId } from '@/lib/personax/auth';
 import {
   detectQuestionType,
   applyResponseGuard,
@@ -1085,19 +1084,10 @@ export async function POST(req: NextRequest) {
           decisionSummary?: DecisionSummary,
           decisionType?: string,
         ) => {
-          const cookieProviderUserId = (() => {
-            const k = readKakaoSessionFromRequest(req);
-            return k?.id ? `kakao_${k.id}` : null;
-          })();
-          const session = await resolvePersonaXSession({
-            bodyProviderUserId,
-            cookieProviderUserId,
-            supabaseUserId: null,
-          });
+          const session = await resolveUserId(req, bodyProviderUserId);
 
           console.log('[providerUserId source]', {
             bodyProviderUserId,
-            cookieProviderUserId,
             finalProviderUserId: session.providerUserId,
             source: session.source,
           });
@@ -2397,25 +2387,7 @@ ${DISCLAIMER}`;
     const currency = inferCurrency(keyword);
     const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
 
-    const session = await resolvePersonaXSession({
-      bodyProviderUserId,
-      cookieProviderUserId: (() => {
-        const k = readKakaoSessionFromRequest(req);
-        return k?.id ? `kakao_${k.id}` : null;
-      })(),
-      supabaseUserId: await (async () => {
-        try {
-          const sb = await createServerSupabase();
-          const {
-            data: { user },
-          } = await sb.auth.getUser();
-
-          return user?.id ?? null;
-        } catch {
-          return null;
-        }
-      })(),
-    });
+    const session = await resolveUserId(req, bodyProviderUserId, true);
 
     const providerUserId = session.providerUserId;
     const userId = session.userId;
