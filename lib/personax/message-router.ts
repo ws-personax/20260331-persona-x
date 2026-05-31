@@ -1058,7 +1058,13 @@ ${
         legacyCategory,
         router.categoryV3,
       );
-      const analysisPrompt = `${decisionSummary}\n\n${rawAnalysisPrompt}`;
+      // marketDataContext가 있을 때 Stage 2 프롬프트 앞에 시장 데이터 블록 주입.
+      // Stage 2가 이 데이터를 보지 못하면 RAY_VIEW/JACK_VIEW가 원론적으로 생성되고,
+      // Stage 3에서 marketDataContext를 받아도 personaViews가 이미 희석된 상태로 시작됨.
+      const stage2MarketBlock = marketDataPromptContext
+        ? `## 시장 데이터 (RAY/JACK 필수 활용)\n${marketDataPromptContext}\n- RAY는 high/low/rawHigh/rawLow 숫자를 반드시 언급해야 한다.\n- JACK은 price와 low를 기준으로 매수/보류 판단 근거를 제시해야 한다.\n- 위 숫자 외 임의 숫자 생성 금지.\n\n`
+        : '';
+      const analysisPrompt = `${stage2MarketBlock}${decisionSummary}\n\n${rawAnalysisPrompt}`;
       const analysisRaw = await callLLM('echo', OPTION_D_SYSTEM_DATA, [
         { role: 'user', content: analysisPrompt },
       ]);
