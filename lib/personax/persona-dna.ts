@@ -74,6 +74,27 @@ const splitFactClauses = (sentence: string): string[] => (
     .filter(Boolean)
 );
 
+const PRICE_NUMBER_PATTERN =
+  /\d{1,3}(?:,\d{3})+원|\d+(?:\.\d+)?\s*(?:원|만원|억원|조원)/;
+
+const PERCENT_PATTERN = /\d+(?:\.\d+)?\s*%/;
+
+const PRICE_JUDGMENT_CONTEXT_PATTERN =
+  /현재가|고점|저점|가격|주가|시세|(?:가격|주가|시세|진입|손절|지지|저항|매수|매도|판단)\s*(?:기준|선|이하|이상|부근)|(?:기준|선|이하|이상|부근)\s*(?:에서|으로|은|는|을|를|까지|부터)?\s*(?:판단|접근|확인|보는|봐야)/;
+
+const ORPHAN_FACT_LOCK_PATTERN =
+  /(?:은|는|인|의)\s+(?:기준|대비)|현재가는\s+대비|당장\s+선에서|기준\s+기준|리스크\s+기준\s+기준/;
+
+const shouldPreserveFactLockSentence = (sentence: string): boolean => (
+  PRICE_NUMBER_PATTERN.test(sentence) ||
+  PERCENT_PATTERN.test(sentence) ||
+  PRICE_JUDGMENT_CONTEXT_PATTERN.test(sentence)
+);
+
+const isBrokenFactLockResult = (text: string): boolean => (
+  ORPHAN_FACT_LOCK_PATTERN.test(text)
+);
+
 export function getAllowedReferencedPersonas(persona: PersonaKey): PersonaKey[] {
   const index = PERSONA_TIMELINE.indexOf(persona);
   return index <= 0 ? [] : [...PERSONA_TIMELINE.slice(0, index)];
@@ -121,11 +142,16 @@ export function sanitizeMarketDataFactLock(
         return sentence;
       }
 
+      if (shouldPreserveFactLockSentence(sentence)) {
+        return sentence;
+      }
+
       const safeClauses = splitFactClauses(sentence).filter((clause) => (
         !FACT_LOCK_SENTENCE_PATTERN.test(clause)
       ));
 
-      return safeClauses.join('. ');
+      const result = safeClauses.join('. ');
+      return isBrokenFactLockResult(result) ? sentence : result;
     })
     .filter(Boolean);
 
