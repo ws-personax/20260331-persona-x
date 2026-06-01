@@ -23,7 +23,9 @@ const UNSAFE_INVESTMENT_ANSWER_PATTERN =
   /(?:\d+(?:[.,]\d+)?\s*(?:원|만원|억원|조원|달러|%|퍼센트|배))|지지선|저항선|손절선|진입|매수|매도|관망입니다|보류입니다|분할 접근입니다|쳐다보지도 마라|지금 들어가라|지금 들어가지 마라/i;
 
 const DIRECT_TRADE_INSTRUCTION_PATTERN =
-  /사세요|파세요|매수하세요|매도하세요|지금\s*들어가세요|전량\s*매수하세요|전량\s*매도하세요/g;
+  /(?:무조건|지금\s*(?:당장)?|즉시|전량)?\s*(?:사세요|사라|매수하세요|매수해라|매수하라|파세요|팔아라|매도하세요|매도해라|매도하라|들어가세요|들어가라)|몰빵|수익\s*보장|손실\s*없음|확실한\s*수익/g;
+
+const PRICE_WITH_WON_BEFORE_PATTERN = /(?:^|[\s,.。])\d{1,3}(?:,\d{3})*원\s*$/;
 
 const INVESTMENT_RISK_REPLACEMENTS: Array<[RegExp, string]> = [
   [/52주\s*(?:최고가|최저가|고가|저가)[^,.。\n]*/g, '추가 가격 범위 데이터는 별도 확인이 필요합니다'],
@@ -43,8 +45,6 @@ const INVESTMENT_RISK_REPLACEMENTS: Array<[RegExp, string]> = [
   [/9개월\s*변동성[^,.。\n]*/g, '추가 변동성 데이터는 별도 확인이 필요합니다'],
   [/연중\s*최저[^,.。\n]*/g, '추가 변동성 데이터는 별도 확인이 필요합니다'],
   [/HBM4E?|7세대|완판/g, '추가 제품 데이터는 별도 확인이 필요합니다'],
-  [/손절선/g, '리스크 기준'],
-  [/지지선|저항선/g, '가격 변동 기준'],
   [/진입/g, '판단'],
   [/들어가면\s*바로\s*물린다/g, '섣부른 판단은 위험할 수 있습니다'],
   [/들어가면\s*물린다/g, '섣부른 판단은 위험할 수 있습니다'],
@@ -73,11 +73,21 @@ const INVESTMENT_RISK_REPLACEMENTS: Array<[RegExp, string]> = [
   [/확인하세요/g, '확인하는 편이 안전합니다'],
 ];
 
+function replaceUnpricedRiskTerms(text: string): string {
+  return text
+    .replace(/손절선/g, (match, offset, source) => (
+      PRICE_WITH_WON_BEFORE_PATTERN.test(source.slice(0, offset)) ? match : '리스크 기준'
+    ))
+    .replace(/지지선|저항선/g, (match, offset, source) => (
+      PRICE_WITH_WON_BEFORE_PATTERN.test(source.slice(0, offset)) ? match : '가격 기준'
+    ));
+}
+
 function removeDirectTradeInstructions(answer: string): string {
-  const cleaned = INVESTMENT_RISK_REPLACEMENTS.reduce(
+  const cleaned = replaceUnpricedRiskTerms(INVESTMENT_RISK_REPLACEMENTS.reduce(
     (text, [pattern, replacement]) => text.replace(pattern, replacement),
     answer.replace(DIRECT_TRADE_INSTRUCTION_PATTERN, ''),
-  );
+  ));
 
   const result = cleaned
     .replace(
@@ -87,10 +97,10 @@ function removeDirectTradeInstructions(answer: string): string {
     .replace(/필요합니다[,.。]?\s*\d+(?:\.\d+)?[A-Za-z가-힣%]*/g, '필요합니다')
     .replace(/필요합니다[,.。]?\s*\d{1,3}(?:,\d{3})*원/g, '필요합니다')
     .replace(/필요합니다[,.。]\d+원/g, '필요합니다')
-    .replace(/(?:^|[\s,.。])[,。.]?\d{1,3}(?:,\d{3})+원(?=$|[\s,.。])/g, ' ')
-    .replace(/(?:^|[\s,.。])[,。.]?\d+원(?=$|[\s,.。])/g, ' ')
     .replace(/추가\s+추가/g, '추가')
     .replace(/필요합니다[,.。]\s*필요합니다/g, '필요합니다')
+    .replace(/(?:리스크 기준|가격 기준|가격 변동 기준)\s+기준/g, '$1')
+    .replace(/기준\s+기준/g, '기준')
     .replace(/\s+([,.。])/g, '$1')
     .replace(/([,.。]){2,}/g, '$1')
     .replace(/,\s*(?=\n|$)/g, '')
@@ -98,7 +108,7 @@ function removeDirectTradeInstructions(answer: string): string {
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => !/^[.。!！?？,，;；:\-\s]*$/.test(line))
-    .filter((line) => !/^(?:원|KRW|USD|달러|,?\d+(?:,\d+)?원?)$/.test(line))
+    .filter((line) => !/^(?:원|KRW|USD|달러)$/.test(line))
     .join('\n');
   console.log('[guard-debug] removeDirectTradeInstructions', {
     beforeLength: answer.length,
