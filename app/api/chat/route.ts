@@ -48,6 +48,7 @@ import {
 import {
   detectCategoryV3,
   detectEmotionalSubtypeHee,
+  detectLegacyCategory,
   type CategoryV3,
 } from '@/lib/personax/classifier';
 import {
@@ -629,33 +630,6 @@ export async function POST(req: NextRequest) {
     const lastMsg = messages.at(-1)?.content || "";
 
     // ✅ LUCIA 허브 — 카테고리 감지 및 페르소나 라우팅
-    const CATEGORY_MAP = {
-      finance:  /주식|펀드|ETF|종목|코스피|코스닥|나스닥|NASDAQ|S&P500|SP500|S&P|다우존스|다우|항셍|닛케이|원달러|달러|금|채권|포트폴리오|수익|손절|매수|매도|배당|금리|환율|가상화폐|비트코인|저축|예금|적금|퇴직금|연금|삼성전자|SK하이닉스|카카오뱅크|카카오게임즈|카카오|네이버|현대차|기아차|기아|LG전자|LG|엘지전자|엘지|삼성바이오|셀트리온|포스코|크래프톤|넥슨|넷마블|하이브|두산|롯데|한화|SK|KT|CJ|GS|KB금융|신한지주|하나금융|테슬라|애플|엔비디아|구글|아마존|마이크로소프트|돈이|돈은|돈을|살까|팔까|투자할까|넣을까|빼야|수익|손실|올랐|떨어졌|물렸|상승|하락/,
-      sports:   /야구|축구|농구|배구|골프|올림픽|경기|이길|승부|우승|선수|리그|기아|삼성라이온즈|두산|LG트윈스|롯데|한화|KT|SSG|NC|키움/,
-      news:     /정세|뉴스|전쟁|분쟁|중동|러시아|우크라이나|미중|외교|정치|대통령|선거|경제뉴스|시황|금융뉴스|증시|환경|기후|재난|사건|사고|테러|유가|원유|석유|에너지|OPEC|산유국|천연가스|인플레이션|금리정책|연준|Fed|미연준|기준금리|호르무즈|이란|이스라엘|하마스|헤즈볼라|가자|레바논|트럼프|바이든|시진핑|푸틴|북한|미사일|핵|제재|관세|무역전쟁|환율전쟁|HMM|화물선|해운|공급망|반도체규제|AI규제|빅테크|실리콘밸리|연방|의회|상원|하원|탄핵|대선|총선|보궐|여당|야당|국회|법안|정책/,
-      life:     /명퇴|명예퇴직|희망퇴직|퇴직 권유|권고사직|은퇴|조기퇴직|퇴직 후|제2인생|요양원|치매|부모님 건강|어머니 건강|아버지 건강|무릎|허리|혈압|당뇨|갱년기|근감소|건강검진|병원|아이 대학|자녀 취업|자녀 결혼|아들 걱정|딸 걱정|황혼이혼|부부 갈등|노후|노후준비|노후자금|은퇴자금|막막|가장으로서|생계|카드론|노후파산|노후빈곤|황혼육아|손자|손녀|며느리|사위|시댁|처가|이혼숙려|졸혼|별거|회사 다니|직장 다니|회사 그만|직장 그만|일이 힘들|일 너무 힘들|업무가 힘들|업무 너무|아들 합격|딸 합격|자녀 합격|손주 합격|손녀 합격|손자 합격|아들 졸업|딸 졸업|자녀 졸업|아들 취업|딸 취업|아들 결혼|딸 결혼|아들이 대학|딸이 대학|어떻게 사|어떻게 살|잘 사는|잘 살아|사는 게|사는 거|사는 길|살아가|인생의 의미|삶의 의미|인생 정답|삶의 정답|뭐가 정답/,
-      legal:    /세금|법률|계약|소송|이혼|상속|증여|부동산등기|임대차|보증금|노동|퇴직|해고|세무|신고|명퇴|권고사직|퇴직금|실업급여|노동부|노무사/,
-      tech:     /자동차|전기차|배터리|반도체|AI|인공지능|스마트폰|앱|소프트웨어|하드웨어|IT|클라우드/,
-      emotion:  /힘들|외로|슬프|우울|화나|기쁘|설레|불안|걱정|스트레스|피곤|지쳐|고민|마음|감정|위로|공감|재테크고민|투자고민|노후걱정/,
-    };
-    // 건강/의료 키워드 — finance보다 먼저 체크해야 "돈이 들어가는 시술/병원" 류 질문이 재테크로 오분류되지 않는다.
-    // 별도 health 카테고리가 없으므로 life로 라우팅 (4명 페르소나 + ECHO 판결 구조).
-    const HEALTH_KEYWORDS = /피부과|병원|시술|성형|약|치료|수술|검사|진료|의사|한의원|치과|안과|이비인후과|내과|외과|정신과|MRI|CT|항암|투약|처방|입원|외래/;
-    const detectCategory = (text: string): 'finance' | 'sports' | 'news' | 'legal' | 'tech' | 'life' | 'emotion' | 'general' => {
-      if (HEALTH_KEYWORDS.test(text))      return 'life';
-      // life를 emotion보다 먼저 체크: 구체적 라이프 이벤트(회사 다니기/아들 합격/어떻게 사는)는
-      // 일반 감정 키워드("힘들") 매치보다 우선해야 4-페르소나 라우팅(life 핸들러)으로 들어간다.
-      // emotion 카테고리는 line 2119 조건에 없어 keyword_not_recognized 폴백으로 떨어지기 때문.
-      if (CATEGORY_MAP.life.test(text))    return 'life';
-      if (CATEGORY_MAP.emotion.test(text)) return 'emotion';
-      if (CATEGORY_MAP.finance.test(text)) return 'finance';
-      if (CATEGORY_MAP.news.test(text))    return 'news';
-      if (CATEGORY_MAP.sports.test(text))  return 'sports';
-      // legal로 가면 ECHO 단일 핸들러로 빠져 4명 충돌 구조가 형성되지 않는다.
-      if (CATEGORY_MAP.legal.test(text))   return 'legal';
-      if (CATEGORY_MAP.tech.test(text))    return 'tech';
-      return 'general';
-    };
 
     // ✅ V2 결함 #10 — 명시 연결어 정밀 패턴 (옵션 A++)
     //   유저가 이전 맥락을 명시적으로 이어가려는 신호 감지.
@@ -703,8 +677,8 @@ export async function POST(req: NextRequest) {
       .slice(0, -1)
       .reverse()
       .find((m) => m?.role === 'user')?.content || '';
-    const prevCategory = _prevUserMsg ? detectCategory(_prevUserMsg) : null;
-    const category = detectCategory(lastMsg);
+    const prevCategory = _prevUserMsg ? detectLegacyCategory(_prevUserMsg) : null;
+    const category = detectLegacyCategory(lastMsg);
     const categoryChanged = !!(prevCategory && prevCategory !== category);
     const _hasConnector = hasExplicitConnector(lastMsg);
     // 맥락 약화 조건: 카테고리 변경 AND 연결어 없음 (진짜 신호는 명시 연결어, 짧음은 신뢰성 X)
