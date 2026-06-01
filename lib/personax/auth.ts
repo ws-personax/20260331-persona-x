@@ -1,36 +1,49 @@
 import type { NextRequest } from 'next/server';
 
-import { readKakaoSessionFromRequest } from '@/lib/auth/kakao';
+import {
+  readKakaoSessionFromRequest,
+  type KakaoSession,
+} from '@/lib/auth/kakao';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
 import {
+  normalizeProviderUserId,
   resolvePersonaXSession,
+  type AuthProvider,
   type PersonaXSession,
 } from '@/lib/personax/session';
+
+export function getKakaoSession(req: NextRequest): KakaoSession | null {
+  return readKakaoSessionFromRequest(req);
+}
+
+export function buildProviderUserId(
+  provider: AuthProvider,
+  rawId: string | number | null | undefined,
+): string | null {
+  return normalizeProviderUserId({ provider, rawId });
+}
+
+export async function getCurrentUser(): Promise<string | null> {
+  try {
+    const supabase = await createServerSupabase();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    return user?.id ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export async function resolveUserId(
   req: NextRequest,
   bodyProviderUserId?: unknown,
   includeSupabase = false,
 ): Promise<PersonaXSession> {
-  const cookieProviderUserId = (() => {
-    const k = readKakaoSessionFromRequest(req);
-    return k?.id ? `kakao_${k.id}` : null;
-  })();
-
-  const supabaseUserId = includeSupabase
-    ? await (async () => {
-        try {
-          const sb = await createServerSupabase();
-          const {
-            data: { user },
-          } = await sb.auth.getUser();
-
-          return user?.id ?? null;
-        } catch {
-          return null;
-        }
-      })()
-    : null;
+  const kakaoSession = getKakaoSession(req);
+  const cookieProviderUserId = buildProviderUserId('kakao', kakaoSession?.id);
+  const supabaseUserId = includeSupabase ? await getCurrentUser() : null;
 
   return resolvePersonaXSession({
     bodyProviderUserId,
