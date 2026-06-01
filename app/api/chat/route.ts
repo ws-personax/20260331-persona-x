@@ -78,7 +78,7 @@ import {
   PERSONA_FALLBACK,
 } from '@/lib/personax/fallbacks';
 import { saveHistory, saveTeaConversation, saveConversation } from '@/lib/personax/history';
-import { resolveUserId } from '@/lib/personax/auth';
+import { resolveChatSession } from '@/lib/personax/auth';
 import {
   detectQuestionType,
   applyResponseGuard,
@@ -623,10 +623,6 @@ export async function POST(req: NextRequest) {
 
   try {
     const { messages, positionContext, teaMode, teaRound, teaPersona, isAdvancedQuestion, providerUserId: requestProviderUserId } = await req.json();
-    const bodyProviderUserId =
-      typeof requestProviderUserId === 'string'
-        ? requestProviderUserId
-        : null;
     const lastMsg = messages.at(-1)?.content || "";
 
     // ✅ LUCIA 허브 — 카테고리 감지 및 페르소나 라우팅
@@ -1028,7 +1024,7 @@ export async function POST(req: NextRequest) {
           decisionSummary?: DecisionSummary,
           decisionType?: string,
         ) => {
-          const session = await resolveUserId(req, bodyProviderUserId);
+          const { bodyProviderUserId, session } = await resolveChatSession(req, requestProviderUserId);
 
           console.log('[providerUserId source]', {
             bodyProviderUserId,
@@ -2365,7 +2361,7 @@ ${DISCLAIMER}`;
     const currency = inferCurrency(keyword);
     const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
 
-    const session = await resolveUserId(req, bodyProviderUserId, true);
+    const { session } = await resolveChatSession(req, requestProviderUserId, true);
 
     const providerUserId = session.providerUserId;
     const userId = session.userId;

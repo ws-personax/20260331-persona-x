@@ -51,3 +51,19 @@ export async function resolveUserId(
     supabaseUserId,
   });
 }
+
+export async function resolveChatSession(
+  req: NextRequest,
+  requestProviderUserId?: unknown,
+  includeSupabase = false,
+): Promise<{ bodyProviderUserId: string | null; session: PersonaXSession }> {
+  const bodyProviderUserId =
+    typeof requestProviderUserId === 'string'
+      ? requestProviderUserId
+      : null;
+
+  return {
+    bodyProviderUserId,
+    session: await resolveUserId(req, bodyProviderUserId, includeSupabase),
+  };
+}
