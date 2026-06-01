@@ -42,6 +42,68 @@ PersonaX는 AI 토론 앱이 아니다.
 
 PersonaX는 사용자의 결정을 기억하고 성장시키는 Decision OS이다.
 
+## 최종 종착역 (2026-06-02)
+
+PersonaX의 최종 목표는 질문에 답하는 AI가 아니다.
+
+PersonaX는 사용자의 삶을 기억하고,
+결정을 기록하고,
+결과를 함께 돌아보며,
+사용자가 어떤 사람으로 성장하고 있는지 이해하는
+4명의 전문가 친구 네트워크다.
+
+외부 표현:
+
+**나를 기억하는 4명의 전문가 친구**
+
+내부 설계:
+
+**Personal Operating System**
+
+## Trust & Memory Core
+
+Personal Memory 구현 전에 Trust & Memory Core를 먼저 설계한다.
+
+Trust는 모든 레이어의 기반이다.
+
+핵심 원칙:
+
+- 고민 데이터 광고 활용 금지
+- 개인 기억과 익명 집계 데이터 분리
+- 사용자가 기억 삭제 가능
+- 익명 통계는 동의 기반
+- 사용자의 편에 서는 서비스
+- Trust는 약속이 아니라 사용자가 검증할 수 있는 구조여야 한다
+
+### Memory 3분류
+
+#### Private Memory
+개인 기억. 통계/광고/외부 활용 금지.
+
+#### Decision Outcome Data
+결정, 실행 여부, 만족도, 결과. 익명 집계 가능.
+
+#### Temporary Context
+현재 대화용 맥락. 저장하지 않을 수 있음.
+
+### 장기 구조
+
+Decision Memory
+↓
+Personal Memory
+↓
+Life Graph
+↓
+Identity Graph
+↓
+Agent Layer
+
+### 현재 리팩토링 의미
+
+현재 route.ts 오케스트레이터화, classifier 분리, response-builder, response-guard 안정화는
+최종적으로 Trust & Memory Core, Life Graph, Agent Layer를 붙이기 위한
+Layer 3 Decision Engine 기반 공사다.
+
 현재 최우선 과제:
 
 1. auth.ts 분리 (resolveUserId: Kakao/Supabase 통합, Account Linking·Personal Memory 기초 공사)
