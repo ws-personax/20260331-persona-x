@@ -107,6 +107,7 @@ function removeDirectTradeInstructions(answer: string): string {
     .replace(/가격 범위 데이터\s+(?:대비|부근)/g, '가격 범위 데이터 기준')
     .replace(/수급 데이터(?:에서|대비|부근)?/g, '수급 데이터')
     .replace(/거래량은\s*(?:으로|로)\s*/g, '거래량은 ')
+    .replace(/평균\s*거래량인\s*대비/g, '평균 거래량 대비')
     .replace(/\s+([,.。])/g, '$1')
     .replace(/([,.。]){2,}/g, '$1')
     .replace(/,\s*(?=\n|$)/g, '')
