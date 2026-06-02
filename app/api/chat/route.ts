@@ -1070,9 +1070,7 @@ export async function POST(req: NextRequest) {
 
         if (isRound1) {
           if (_routerDecision.strategy === 'solo' && _routerDecision.invokedPersona) {
-            const optionDMessages = categoryChanged
-              ? (messages as Array<{ role?: string; content?: string }>).slice(-1)
-              : (messages as Array<{ role?: string; content?: string }>);
+            const optionDMessages = (messages as Array<{ role?: string; content?: string }>).slice(-1);
             const invoked = _routerDecision.invokedPersona;
             const marketDataPromptContext = await getOrBuildMarketDataContext(msg);
             // ✅ invokedPersona를 callOptionD에 명시 전달 — runRoutedRequest 내부의
@@ -1391,10 +1389,8 @@ export async function POST(req: NextRequest) {
     // ──────────────────────────────────────────────────────────────
     if (_routerDecision.strategy === 'solo' && _routerDecision.invokedPersona) {
       const invoked = _routerDecision.invokedPersona;
-      // ✅ solo는 categoryChanged 슬라이싱 적용 안 함 — 이전 대화 맥락이 안부 질문의
-      //   자연스러운 전환 문장("○○ 얘기하시다가 저한테 물어보시네요")에 필요.
-      //   주제 분석으로 끌어가는 건 프롬프트 측 "질문 의도 분류"가 막음.
-      const soloMessages = messages as Array<{ role?: string; content?: string }>;
+      // ✅ solo도 이전 질문 키워드 오염 차단 — Stage2/Stage3에는 현재 질문만 전달
+      const soloMessages = (messages as Array<{ role?: string; content?: string }>).slice(-1);
       // order 인자는 callOptionD 내부 routeMessage 재구성에 쓰임 — invoked가 echo면
       // TaggedPersonaKey(3-key) 범위 밖이라 더미 'lucia'로 채움.
       const dummyOrder: TaggedPersonaKey[] =
