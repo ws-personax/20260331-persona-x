@@ -1228,7 +1228,7 @@ export async function POST(req: NextRequest) {
                 breakdown: '재테크 일반',
                 positionSizing: '0%',
                 jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
-                lucia_close: r1.luciaClose || null,
+                lucia_close: r1.decisionSummary ? null : (r1.luciaClose || null),
               },
             });
             return;
