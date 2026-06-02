@@ -1120,10 +1120,8 @@ export async function POST(req: NextRequest) {
             return;
           }
 
-          // ✅ 카테고리 전환 시 이전 맥락 차단 — 마지막 메시지만 callOptionD에 전달
-          const optionDMessages = categoryChanged
-            ? (messages as Array<{ role?: string; content?: string }>).slice(-1)
-            : (messages as Array<{ role?: string; content?: string }>);
+          // ✅ 이전 맥락 오염 완화 — Stage2/Stage3에는 최근 3개 메시지만 전달
+          const optionDMessages = (messages as Array<{ role?: string; content?: string }>).slice(-3);
           const marketDataPromptContext = await getOrBuildMarketDataContext(msg);
           let r1: OptionDRound1Result | null = await callOptionDWithStage3Guard(
             optionDMessages,
