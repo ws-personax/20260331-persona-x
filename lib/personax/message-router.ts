@@ -681,7 +681,7 @@ const inferDecisionSummaryType = (
   if (/창업.*재취업|재취업.*창업|창업\s*vs\s*재취업/i.test(question)) {
     return 'startup_vs_job';
   }
-  if (/계속\s*만나|헤어|이 사람|관계|연애|이혼/.test(question)) {
+  if (/계속\s*만나|헤어|이 사람|관계|연애|이혼|시기|질투|무시|비난|뒷담|견제|상처|거리두기|경계|대인관계|친구|동료|직장동료|상사|부하|갈등|트러블|미워|싫어|눈치|왕따|따돌림|험담/.test(question)) {
     return 'relationship';
   }
   if (/이직|커리어|진로|퇴사|회사|직장/.test(question)) {
