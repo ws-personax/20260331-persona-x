@@ -33,6 +33,23 @@ function canUseSafeInvestmentFallback(
   );
 }
 
+function shouldSanitizeEchoInvestmentTerms(questionType: QuestionType): boolean {
+  return (
+    questionType !== 'buy_or_wait' &&
+    (questionType as string) !== 'sell_or_hold'
+  );
+}
+
+function sanitizeEchoInvestmentTerms(answer: string): string {
+  return answer
+    .replace(/손절선\s*정해놓으셨어요\?/g, '중단 기준 정해놓으셨어요?')
+    .replace(/지지선\s*기준/g, '판단 기준')
+    .replace(/현재가\s*기준/g, '현재 상황 기준')
+    .replace(/손절선/g, '중단 기준')
+    .replace(/지지선/g, '판단 기준')
+    .replace(/현재가/g, '현재 상황');
+}
+
 const DIRECT_TRADE_INSTRUCTION_PATTERN =
   /(?:무조건|지금\s*(?:당장)?|즉시|전량)?\s*(?:사세요|사라|매수하세요|매수해라|매수하라|파세요|팔아라|매도하세요|매도해라|매도하라|들어가세요|들어가라)|몰빵|수익\s*보장|손실\s*없음|확실한\s*수익/g;
 
@@ -266,6 +283,10 @@ export function applyResponseGuard(
       key as PersonaKey,
       answer,
     );
+
+    if (key === 'echo' && shouldSanitizeEchoInvestmentTerms(questionType)) {
+      personaText[key] = sanitizeEchoInvestmentTerms(personaText[key]);
+    }
 
     if (hasMarketData === true && questionType === 'buy_or_wait') {
       const factLockedAnswer = sanitizeMarketDataFactLock(personaText[key], true);
