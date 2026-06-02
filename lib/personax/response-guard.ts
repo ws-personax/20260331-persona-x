@@ -50,6 +50,20 @@ function sanitizeEchoInvestmentTerms(answer: string): string {
     .replace(/현재가/g, '현재 상황');
 }
 
+function sanitizeRayAggressiveTerms(answer: string): string {
+  return answer
+    .replace(/자살행위/g, '리스크가 매우 큽니다')
+    .replace(/말도 안 된다/g, '근거가 약합니다')
+    .replace(/미쳤다/g, '현실성이 낮습니다')
+    .replace(/바보같은/g, '비효율적인');
+}
+
+function sanitizeJackAggressiveTerms(answer: string): string {
+  return answer
+    .replace(/다 망한다/g, '위험합니다')
+    .replace(/멍청한/g, '준비가 부족한');
+}
+
 const DIRECT_TRADE_INSTRUCTION_PATTERN =
   /(?:무조건|지금\s*(?:당장)?|즉시|전량)?\s*(?:사세요|사라|매수하세요|매수해라|매수하라|파세요|팔아라|매도하세요|매도해라|매도하라|들어가세요|들어가라)|몰빵|수익\s*보장|손실\s*없음|확실한\s*수익/g;
 
@@ -286,6 +300,14 @@ export function applyResponseGuard(
 
     if (key === 'echo' && shouldSanitizeEchoInvestmentTerms(questionType)) {
       personaText[key] = sanitizeEchoInvestmentTerms(personaText[key]);
+    }
+
+    if (key === 'ray') {
+      personaText[key] = sanitizeRayAggressiveTerms(personaText[key]);
+    }
+
+    if (key === 'jack' && shouldSanitizeEchoInvestmentTerms(questionType)) {
+      personaText[key] = sanitizeJackAggressiveTerms(personaText[key]);
     }
 
     if (hasMarketData === true && questionType === 'buy_or_wait') {
