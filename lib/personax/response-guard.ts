@@ -17,7 +17,10 @@ const SAFE_INVESTMENT_FALLBACK =
   '현재가는 별도 확인이 필요합니다. 확인된 시장 데이터 없이 구체적 가격, 지지선, 손절선, 진입 구간을 단정할 수 없습니다. 판단 기준은 실적, 업황, 투자 기간, 감당 가능한 손실 범위입니다.';
 
 const INVESTMENT_QUESTION_PATTERN =
-  /사야|매수|팔아야|매도|보유|관망|투자해도|진입|손절|물타|비중|주식|코인|비트코인|삼성전자|종목|현재가|지지선|저항선|수익률|PER|PBR/i;
+  /사야|살까|살까요|매수|팔아야|매도|보유|관망|투자해도|진입|손절|물타|비중|주식|코인|비트코인|삼성전자|LG전자|엘지전자|종목|현재가|지지선|저항선|수익률|PER|PBR/i;
+
+const LUMP_SUM_ALLOCATION_PATTERN =
+  /퇴직금|자산\s*배분|자산배분|노후\s*자금|노후자금|목돈|상속금/;
 
 const UNSAFE_INVESTMENT_ANSWER_PATTERN =
   /(?:\d+(?:[.,]\d+)?\s*(?:원|만원|억원|조원|달러|%|퍼센트|배))|지지선|저항선|손절선|진입|매수|매도|관망입니다|보류입니다|분할 접근입니다|쳐다보지도 마라|지금 들어가라|지금 들어가지 마라/i;
@@ -179,6 +182,10 @@ function removeDirectTradeInstructions(answer: string): string {
 export function detectQuestionType(question: string): QuestionType {
   if (/계속\s*만나|계속할|헤어|그만해야|그만\s*만나|끊어야|손절해야|이혼/.test(question)) {
     return 'continue_or_stop';
+  }
+
+  if (LUMP_SUM_ALLOCATION_PATTERN.test(question)) {
+    return 'general';
   }
 
   if (INVESTMENT_QUESTION_PATTERN.test(question)) {
