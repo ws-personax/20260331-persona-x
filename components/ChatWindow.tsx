@@ -1272,9 +1272,9 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
     // eslint-disable-next-line no-console
     // eslint-disable-next-line no-console
 
-    const teaRound = isTeaSend
-      ? messagesRef.current.filter(m => m.role === 'user' && m.teaMode).length + 1
-      : 0;
+    const pendingEchoQuestion = false;
+    const isEchoAnswer = Boolean(pendingEchoQuestion);
+    const teaRound = isTeaSend ? (isEchoAnswer ? 2 : 1) : 0;
 
     const userMsg: Message = {
       id: generateId(),
