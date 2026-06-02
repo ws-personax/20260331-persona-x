@@ -64,6 +64,10 @@ function sanitizeJackAggressiveTerms(answer: string): string {
     .replace(/멍청한/g, '준비가 부족한');
 }
 
+function sanitizeJackAlwaysAggressiveTerms(answer: string): string {
+  return answer.replace(/자살행위/g, '리스크가 매우 큽니다');
+}
+
 const DIRECT_TRADE_INSTRUCTION_PATTERN =
   /(?:무조건|지금\s*(?:당장)?|즉시|전량)?\s*(?:사세요|사라|매수하세요|매수해라|매수하라|파세요|팔아라|매도하세요|매도해라|매도하라|들어가세요|들어가라)|몰빵|수익\s*보장|손실\s*없음|확실한\s*수익/g;
 
@@ -304,6 +308,10 @@ export function applyResponseGuard(
 
     if (key === 'ray') {
       personaText[key] = sanitizeRayAggressiveTerms(personaText[key]);
+    }
+
+    if (key === 'jack') {
+      personaText[key] = sanitizeJackAlwaysAggressiveTerms(personaText[key]);
     }
 
     if (key === 'jack' && shouldSanitizeEchoInvestmentTerms(questionType)) {
