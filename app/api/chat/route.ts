@@ -1120,8 +1120,8 @@ export async function POST(req: NextRequest) {
             return;
           }
 
-          // ✅ 이전 맥락 오염 완화 — Stage2/Stage3에는 최근 3개 메시지만 전달
-          const optionDMessages = (messages as Array<{ role?: string; content?: string }>).slice(-3);
+          // ✅ 이전 질문 키워드 오염 차단 — Stage2/Stage3에는 현재 질문만 전달
+          const optionDMessages = (messages as Array<{ role?: string; content?: string }>).slice(-1);
           const marketDataPromptContext = await getOrBuildMarketDataContext(msg);
           let r1: OptionDRound1Result | null = await callOptionDWithStage3Guard(
             optionDMessages,
