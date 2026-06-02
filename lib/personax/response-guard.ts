@@ -22,6 +22,17 @@ const INVESTMENT_QUESTION_PATTERN =
 const UNSAFE_INVESTMENT_ANSWER_PATTERN =
   /(?:\d+(?:[.,]\d+)?\s*(?:원|만원|억원|조원|달러|%|퍼센트|배))|지지선|저항선|손절선|진입|매수|매도|관망입니다|보류입니다|분할 접근입니다|쳐다보지도 마라|지금 들어가라|지금 들어가지 마라/i;
 
+function canUseSafeInvestmentFallback(
+  questionType: QuestionType,
+  hasMarketData?: boolean,
+): boolean {
+  return (
+    hasMarketData === false &&
+    (questionType === 'buy_or_wait' ||
+      (questionType as string) === 'sell_or_hold')
+  );
+}
+
 const DIRECT_TRADE_INSTRUCTION_PATTERN =
   /(?:무조건|지금\s*(?:당장)?|즉시|전량)?\s*(?:사세요|사라|매수하세요|매수해라|매수하라|파세요|팔아라|매도하세요|매도해라|매도하라|들어가세요|들어가라)|몰빵|수익\s*보장|손실\s*없음|확실한\s*수익/g;
 
@@ -165,8 +176,9 @@ export function sanitizeInvestmentAnswer(answer: string, question: string): stri
 function sanitizeInvestmentAnswerByType(
   answer: string,
   questionType: QuestionType,
+  hasMarketData?: boolean,
 ): string {
-  if (questionType !== 'buy_or_wait') {
+  if (!canUseSafeInvestmentFallback(questionType, hasMarketData)) {
     return answer;
   }
 
@@ -261,13 +273,24 @@ export function applyResponseGuard(
       continue;
     }
 
-    const sanitizedAnswer = sanitizeInvestmentAnswerByType(answer, questionType);
+    const sanitizedAnswer = sanitizeInvestmentAnswerByType(
+      answer,
+      questionType,
+      hasMarketData,
+    );
     if (sanitizedAnswer !== answer) {
       personaText[key] = sanitizedAnswer;
       continue;
     }
 
     if (!hasDirectAnswer(personaText[key], questionType)) {
+      if (
+        questionType === 'buy_or_wait' &&
+        !canUseSafeInvestmentFallback(questionType, hasMarketData)
+      ) {
+        continue;
+      }
+
       const fallback = buildDirectAnswerFallback(
         questionType,
         key as DirectAnswerPersonaKey,
