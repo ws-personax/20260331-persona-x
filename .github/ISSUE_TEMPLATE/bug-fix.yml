@@ -1,88 +1,78 @@
 name: PersonaX Bug Fix
-description: 버그 수정 및 회귀 방지
+description: 버그 수정 작업
 title: "[Bug] "
 labels:
-
-* bug
+  - bug
 
 body:
+  - type: dropdown
+    id: phase
+    attributes:
+      label: 작업 단계
+      options:
+        - Analysis Only
+        - Fix Approved
+        - Commit Approved
+    validations:
+      required: true
 
-* type: dropdown
-  id: phase
-  attributes:
-  label: 작업 단계
-  options:
-  - Analysis Only
-  - Fix Approved
-  - Commit Approved
-  validations:
-  required: true
+  - type: textarea
+    id: symptom
+    attributes:
+      label: 버그 현상
+      description: 실제 발생한 현상을 작성하세요.
+    validations:
+      required: true
 
-* type: textarea
-  id: bug
-  attributes:
-  label: 버그 현상
-  validations:
-  required: true
+  - type: textarea
+    id: cause
+    attributes:
+      label: 예상 원인
+      description: 추정 원인을 작성하세요.
+    validations:
+      required: true
 
-* type: textarea
-  id: reproduce
-  attributes:
-  label: 재현 방법
-  placeholder: |
-  1. 질문 입력
-  2. 응답 확인
-  3. 문제 문장 확인
-  validations:
-  required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: 수정 후보 파일
+    validations:
+      required: true
 
-* type: textarea
-  id: expected
-  attributes:
-  label: 기대 동작
-  validations:
-  required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: 제약 조건
+      value: |
+        API 호출 금지
+        promptfoo 실행 금지
+        실제 LLM 테스트 금지
+        지정 파일 외 수정 금지
+        commit/push 금지 (별도 승인 전까지)
+    validations:
+      required: true
 
-* type: textarea
-  id: files
-  attributes:
-  label: 의심 파일
-  validations:
-  required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: 검증 방법
+      value: |
+        npx tsc --noEmit
+        git diff
+        정적 확인
+    validations:
+      required: true
 
-* type: textarea
-  id: forbidden
-  attributes:
-  label: 금지 사항
-  value: |
-  API 호출 금지
-  promptfoo 금지
-  실제 LLM 테스트 금지
-  관련 없는 파일 수정 금지
-  commit/push 금지, 별도 승인 전까지
-  validations:
-  required: true
-
-* type: textarea
-  id: verification
-  attributes:
-  label: 검증 방법
-  value: |
-  npx tsc --noEmit
-  git diff
-  로컬 문자열 테스트 가능하면 수행
-  validations:
-  required: true
-
-* type: textarea
-  id: report
-  attributes:
-  label: 보고 형식
-  value: |
-  1. 원인
-  2. 수정 파일
-  3. 변경 내용
-  4. 검증 결과
-  5. 남은 위험
-  validations:
-  required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: 보고 형식
+      value: |
+        1. 원인 1~3순위
+        2. 수정 위치
+        3. 변경 전 문제
+        4. 변경 후 내용
+        5. tsc 결과
+        6. git diff 요약
+    validations:
+      required: true

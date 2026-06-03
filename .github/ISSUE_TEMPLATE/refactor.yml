@@ -1,65 +1,65 @@
 name: PersonaX Refactor
-description: 구조 개선 및 파일 분리
+description: 구조 개선 및 리팩토링 작업
 title: "[Refactor] "
 labels:
-
-* refactor
+  - refactor
 
 body:
+  - type: dropdown
+    id: phase
+    attributes:
+      label: 작업 단계
+      options:
+        - Analysis Only
+        - Refactor Approved
+        - Commit Approved
+    validations:
+      required: true
 
-* type: dropdown
-  id: phase
-  attributes:
-  label: 작업 단계
-  options:
-  - Analysis Only
-  - Refactor Approved
-  - Commit Approved
-  validations:
-  required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: 목표
+      description: 리팩토링 목표를 작성하세요.
+    validations:
+      required: true
 
-* type: textarea
-  id: goal
-  attributes:
-  label: 목표
-  validations:
-  required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 수정 범위
+      description: 수정 허용 파일 및 범위
+    validations:
+      required: true
 
-* type: textarea
-  id: scope
-  attributes:
-  label: 수정 범위
-  validations:
-  required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: 제약 조건
+      value: |
+        기능 변경 금지
+        API 호출 금지
+        promptfoo 실행 금지
+        실제 LLM 테스트 금지
+        작은 단위 리팩토링 유지
+    validations:
+      required: true
 
-* type: textarea
-  id: forbidden
-  attributes:
-  label: 수정 금지
-  value: |
-  route.ts 전체 수정 금지
-  ChatWindow 전체 수정 금지
-  DB 스키마 변경 금지
-  API 호출 금지
-  promptfoo 금지
-  실제 LLM 테스트 금지
-  commit/push 금지, 별도 승인 전까지
-  validations:
-  required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: 검증 방법
+      value: |
+        npx tsc --noEmit
+        git diff
+        정적 검토
+    validations:
+      required: true
 
-* type: textarea
-  id: verification
-  attributes:
-  label: 검증
-  value: |
-  npx tsc --noEmit
-  git diff
-  validations:
-  required: true
-
-* type: textarea
-  id: done
-  attributes:
-  label: 완료 조건
-  validations:
-  required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: 완료 조건
+      description: 무엇이 완료되면 종료인지 작성
+    validations:
+      required: true
