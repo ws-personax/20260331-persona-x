@@ -674,6 +674,10 @@ const extractTag = (text: string | null, tag: string): string => {
   return stripPersonaLabelLines((m?.[1] || '').trim());
 };
 
+const suppressUnsupportedMarketDataContext = (context: string): string => (
+  /assetType:\s*real_estate\b/.test(context) ? '' : context
+);
+
 const inferDecisionSummaryType = (
   question: string,
   router: RouterDecision,
@@ -736,9 +740,10 @@ export async function runRoutedRequest(
       params.router ||
       routeMessage(messages, lastMessage, '');
     const legacyCategory = router.legacyCategory || '';
-    const marketDataPromptContext =
+    const rawMarketDataPromptContext =
       params.marketDataPromptContext ??
       await buildMarketDataPromptContext(lastMessage);
+    const marketDataPromptContext = suppressUnsupportedMarketDataContext(rawMarketDataPromptContext);
 
     // ──────────────────────────────────────────────────────────────
     // SOLO 우선순위 결정 — Stage 1·2 진입 전에 평가.
