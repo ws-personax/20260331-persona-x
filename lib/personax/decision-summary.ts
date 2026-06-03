@@ -44,6 +44,10 @@ const inferQuestionType = (question: string, questionType: string): string => {
   const q = normalizeQuestion(question);
 
   if (questionType) return questionType;
+  if (
+    /아파트|부동산|단지|입지|학군|교통|직주근접|실거주|전세|청약|재건축|재개발/.test(q) &&
+    /추천|지역|어디|괜찮|좋을까|10억|9억|8억|7억|6억/.test(q)
+  ) return 'real_estate_recommendation';
   if (/사야|매수|팔아야|매도|비트코인|삼성전자|주식|코인|투자/.test(q)) return 'buy_or_wait';
   if (LUMP_SUM_PURPOSE_PATTERN.test(q) && LUMP_SUM_INVESTMENT_EXECUTION_PATTERN.test(q)) return 'buy_or_wait';
   if (/창업.*재취업|재취업.*창업|창업\s*vs\s*재취업/i.test(q)) return 'startup_vs_job';
@@ -80,6 +84,18 @@ export function buildDecisionSummary(params: {
 }): DecisionSummary {
   const type = inferQuestionType(params.question, params.questionType);
   const anchor = firstNonEmpty(params.echo, params.jack, params.ray, params.lucia);
+
+  if (type === 'real_estate_recommendation') {
+    return {
+      verdict: '지역 추천보다 먼저 실거주 기준과 예산 안전선을 정해야 합니다',
+      reasons: [
+        '10억 이하 아파트는 입지, 직주근접, 교통, 학군, 공급 물량에 따라 판단이 달라집니다',
+        '실거주 목적과 투자 목적이 다르면 추천 지역도 달라집니다',
+      ],
+      counterView: '다만 이미 직장 위치와 예산이 확정되어 있다면 후보 지역을 바로 좁혀도 됩니다',
+      nextAction: '출퇴근 지역, 보유 현금, 대출 가능 금액, 실거주/투자 목적을 먼저 정리하세요',
+    };
+  }
 
   if (type === 'buy_or_wait') {
     return {

@@ -682,6 +682,10 @@ const inferDecisionSummaryType = (
   question: string,
   router: RouterDecision,
 ): string => {
+  const hasRealEstateRecommendationIntent =
+    /아파트|부동산|단지|입지|학군|교통|직주근접|실거주|전세|청약|재건축|재개발/.test(question) &&
+    /추천|지역|어디|괜찮|좋을까|10억|9억|8억|7억|6억/.test(question);
+
   if (/창업.*재취업|재취업.*창업|창업\s*vs\s*재취업/i.test(question)) {
     return 'startup_vs_job';
   }
@@ -690,6 +694,9 @@ const inferDecisionSummaryType = (
   }
   if (/이직|커리어|진로|퇴사|회사|직장/.test(question)) {
     return 'career';
+  }
+  if (hasRealEstateRecommendationIntent) {
+    return 'real_estate_recommendation';
   }
   if (router.categoryV3 === 'invest' || /사야|매수|팔아야|매도|비트코인|삼성전자|주식|코인|투자/.test(question)) {
     return 'buy_or_wait';
