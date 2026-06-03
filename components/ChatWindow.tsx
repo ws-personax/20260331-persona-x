@@ -213,6 +213,19 @@ const isEchoQuestionText = (text?: string | null): boolean => {
   return t.includes('?') || t.includes('습니까') || t.includes('나요') || t.includes('까요');
 };
 
+const looksLikeNewQuestion = (text: string): boolean => {
+  const t = text.trim();
+  if (!t) return false;
+  return (
+    t.endsWith('?') ||
+    t.endsWith('까요') ||
+    t.endsWith('할까요') ||
+    t.endsWith('좋을까') ||
+    t.endsWith('어떻게 해야 할까요') ||
+    /어떻게|해야|할까|할까요|되나요|될까요|말려야|사야|만나도|시기|퇴직금|상속금|목돈|남편|사업/.test(t)
+  );
+};
+
 const EchoBubble = memo(function EchoBubble({
   summary,
   details,
@@ -1279,7 +1292,8 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
     // eslint-disable-next-line no-console
     // eslint-disable-next-line no-console
 
-    const isEchoAnswer = Boolean(pendingEchoQuestion);
+    const isNewQuestion = looksLikeNewQuestion(text);
+    const isEchoAnswer = Boolean(pendingEchoQuestion) && !isNewQuestion;
     const teaRound = isTeaSend ? (isEchoAnswer ? 2 : 1) : 0;
 
     const userMsg: Message = {
@@ -1336,7 +1350,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
       providerUserId,
     };
 
-    if (isEchoAnswer) {
+    if (pendingEchoQuestion && (isEchoAnswer || isNewQuestion)) {
       setPendingEchoQuestion(null);
     }
 
