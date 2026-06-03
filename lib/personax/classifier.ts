@@ -45,6 +45,12 @@ const CATEGORY_V3_KEYWORDS: Record<CategoryV3, RegExp> = {
   knowledge: /AI|수능|정치|뉴스|과학|역사|경제|사회/,
 };
 
+const LUMP_SUM_UNDECIDED_PATTERN =
+  /퇴직금|목돈|상속금|노후\s*자금|노후자금|은퇴\s*자금|은퇴자금/;
+
+const INVESTMENT_EXECUTION_PATTERN =
+  /투자|주식|ETF|채권|펀드|매수|사야|살까|비중|자산\s*배분|자산배분|포트폴리오|IRP|연금저축|예금|적금/;
+
 /** 키워드 매치 카운트 */
 const countCategoryMatches = (text: string): Record<CategoryV3, number> => {
   const counts: Record<CategoryV3, number> = {
@@ -90,6 +96,12 @@ export const detectCategoryV3 = (msg: string): CategoryV3 => {
   // 희(喜) 우선 단락 — 수익/성과 + 성취 표현("났/벌었/받았")은 invest 키워드보다 우선해 emotional로.
   // 이유: hee 서브타입은 emotional 하위에서만 활성화되므로 invest로 빠지면 축하 모드가 꺼진다.
   if (detectEmotionalSubtypeHee(text)) return 'emotional';
+  if (
+    LUMP_SUM_UNDECIDED_PATTERN.test(text) &&
+    !INVESTMENT_EXECUTION_PATTERN.test(text)
+  ) {
+    return 'emotional';
+  }
   const counts = countCategoryMatches(text);
   const matched = (Object.keys(counts) as CategoryV3[]).filter((k) => counts[k] > 0);
   if (matched.length === 0) return 'emotional';
