@@ -7,6 +7,17 @@ export type DecisionSummary = {
 
 const normalizeQuestion = (question: string): string => question.replace(/\s+/g, ' ').trim();
 
+const LUMP_SUM_PURPOSE_PATTERN =
+  /퇴직금|목돈|상속금|노후\s*자금|노후자금|은퇴\s*자금|은퇴자금/;
+
+const LUMP_SUM_INVESTMENT_EXECUTION_PATTERN =
+  /투자|주식|ETF|채권|펀드|매수|사야|살까|비중|자산\s*배분|자산배분|포트폴리오|IRP|연금저축|예금|적금/;
+
+const isLumpSumPurposeQuestion = (question: string): boolean => {
+  const q = normalizeQuestion(question);
+  return LUMP_SUM_PURPOSE_PATTERN.test(q) && !LUMP_SUM_INVESTMENT_EXECUTION_PATTERN.test(q);
+};
+
 type RelationshipSummarySubtype =
   | 'decision'
   | 'conflict'
@@ -34,6 +45,7 @@ const inferQuestionType = (question: string, questionType: string): string => {
 
   if (questionType) return questionType;
   if (/사야|매수|팔아야|매도|비트코인|삼성전자|주식|코인|투자/.test(q)) return 'buy_or_wait';
+  if (LUMP_SUM_PURPOSE_PATTERN.test(q) && LUMP_SUM_INVESTMENT_EXECUTION_PATTERN.test(q)) return 'buy_or_wait';
   if (/창업.*재취업|재취업.*창업|창업\s*vs\s*재취업/i.test(q)) return 'startup_vs_job';
   if (/계속\s*만나|헤어|이 사람|관계|연애|이혼|시기|질투|무시|비난|뒷담|견제|상처|거리두기|경계|대인관계|친구|동료|직장동료|상사|부하|갈등|트러블|미워|싫어|눈치|왕따|따돌림|험담/.test(q)) return 'relationship';
   if (/이직|커리어|진로|퇴사|회사|직장/.test(q)) return 'career';
@@ -122,6 +134,15 @@ export function buildDecisionSummary(params: {
       reasons: ['커리어 결정은 감정, 돈, 시간 조건이 함께 맞아야 합니다', '바로 움직이기 전 손실 가능한 범위를 알아야 합니다'],
       counterView: '다만 이미 회복 불가능한 환경이라면 빠른 전환도 선택지입니다',
       nextAction: '이번 주 안에 돈, 시간, 성장 기준을 각각 3줄로 정리하세요',
+    };
+  }
+
+  if (isLumpSumPurposeQuestion(params.question)) {
+    return {
+      verdict: '먼저 이 돈의 목적을 정해야 합니다',
+      reasons: ['퇴직금이나 목돈은 투자 대상보다 사용 목적이 먼저 정해져야 합니다', '노후자금, 생활비, 부채상환, 창업자금, 가족지원은 서로 다른 기준이 필요합니다'],
+      counterView: '다만 이미 투자 목적이 명확하다면 상품 비교로 넘어가도 됩니다',
+      nextAction: '이 돈을 노후자금, 생활비, 부채상환, 창업자금, 가족지원 중 어디에 쓸지 1순위와 2순위로 나누어 적으세요',
     };
   }
 
