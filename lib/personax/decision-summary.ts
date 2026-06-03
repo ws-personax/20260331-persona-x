@@ -7,6 +7,28 @@ export type DecisionSummary = {
 
 const normalizeQuestion = (question: string): string => question.replace(/\s+/g, ' ').trim();
 
+type RelationshipSummarySubtype =
+  | 'decision'
+  | 'conflict'
+  | 'boundary'
+  | 'default';
+
+const inferRelationshipSummarySubtype = (question: string): RelationshipSummarySubtype => {
+  const q = normalizeQuestion(question);
+
+  if (/계속\s*만나|헤어|그만\s*만나|관계\s*유지|재회|이혼|손절해야|이 사람/.test(q)) {
+    return 'decision';
+  }
+  if (/시기|질투|무시|비난|견제|뒷담|험담|왕따|따돌림|갈등|트러블|눈치/.test(q)) {
+    return 'conflict';
+  }
+  if (/거리두기|경계|선\s*긋기|상처|미워|싫어|대인관계/.test(q)) {
+    return 'boundary';
+  }
+
+  return 'default';
+};
+
 const inferQuestionType = (question: string, questionType: string): string => {
   const q = normalizeQuestion(question);
 
@@ -66,6 +88,26 @@ export function buildDecisionSummary(params: {
   }
 
   if (type === 'relationship') {
+    const subtype = inferRelationshipSummarySubtype(params.question);
+
+    if (subtype === 'conflict') {
+      return {
+        verdict: '상대 감정에 반응하기보다 패턴을 보고 선을 정해야 합니다',
+        reasons: ['시기와 견제는 설득보다 반복 패턴 확인이 중요합니다', '감정적으로 맞서면 관계의 주도권을 상대에게 넘길 수 있습니다'],
+        counterView: '다만 실제 피해나 공개적인 공격이 있다면 조용한 거리두기만으로는 부족할 수 있습니다',
+        nextAction: '2주 동안 상대의 말과 행동 중 반복되는 침범 패턴 3가지를 기록하고, 노출할 정보와 거리를 줄이세요',
+      };
+    }
+
+    if (subtype === 'boundary') {
+      return {
+        verdict: '관계를 끊을지보다 어디까지 허용할지 먼저 정해야 합니다',
+        reasons: ['불편함이 반복된다면 감정보다 경계선 설정이 먼저입니다', '모든 관계를 끝내기보다 접촉 범위를 줄이는 선택지도 있습니다'],
+        counterView: '다만 상대가 반복적으로 선을 넘는다면 관계 유지보다 보호가 우선입니다',
+        nextAction: '상대에게 허용할 말, 시간, 거리의 기준을 각각 하나씩 정하고 그 기준을 넘으면 대응을 줄이세요',
+      };
+    }
+
     return {
       verdict: '계속 여부는 반복 행동을 보고 조건부로 판단해야 합니다',
       reasons: ['감정보다 반복되는 행동 패턴이 더 중요합니다', '관계가 나를 계속 작아지게 만드는지 확인해야 합니다'],
