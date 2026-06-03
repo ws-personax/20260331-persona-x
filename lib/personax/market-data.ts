@@ -228,6 +228,7 @@ export async function fetchPersonaXMarketData(
 export async function buildMarketDataPromptContext(question: string): Promise<string> {
   const asset = detectMarketAsset(question);
   if (!asset) return '';
+  if (asset.assetType === 'real_estate') return '';
 
   const marketData = await fetchPersonaXMarketData(asset);
 
