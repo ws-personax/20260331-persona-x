@@ -1,0 +1,48 @@
+name: PersonaX Output Quality
+description: 답변 품질 수정
+title: "[Output] "
+labels:
+  - output-quality
+
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 문제 현상
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대 동작
+    validations:
+      required: true
+
+  - type: textarea
+    id: files
+    attributes:
+      label: 수정 후보 파일
+    validations:
+      required: true
+
+  - type: textarea
+    id: forbidden
+    attributes:
+      label: 금지 사항
+      value: |
+        API 호출 금지
+        promptfoo 금지
+        실제 LLM 테스트 금지
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: 검증 방법
+      value: |
+        npx tsc --noEmit
+        git diff
+    validations:
+      required: true
