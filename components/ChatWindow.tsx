@@ -207,6 +207,12 @@ const cleanJackText = (text: string): string =>
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/\n{2,}/g, '\n');
 
+const isEchoQuestionText = (text?: string | null): boolean => {
+  const t = (text || '').trim();
+  if (t.length < 8) return false;
+  return t.includes('?') || t.includes('습니까') || t.includes('나요') || t.includes('까요');
+};
+
 const EchoBubble = memo(function EchoBubble({
   summary,
   details,
@@ -1211,6 +1217,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
   const [pendingKeyword, setPendingKeyword] = useState('');
   const [pendingInitialPosition, setPendingInitialPosition] = useState<Partial<Position> | null>(null);
   const [pendingOrder, setPendingOrder] = useState<PersonaKey[] | null>(null);
+  const [pendingEchoQuestion, setPendingEchoQuestion] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1272,7 +1279,6 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
     // eslint-disable-next-line no-console
     // eslint-disable-next-line no-console
 
-    const pendingEchoQuestion = false;
     const isEchoAnswer = Boolean(pendingEchoQuestion);
     const teaRound = isTeaSend ? (isEchoAnswer ? 2 : 1) : 0;
 
@@ -1329,6 +1335,10 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
       isAdvancedQuestion: isAdvanced,
       providerUserId,
     };
+
+    if (isEchoAnswer) {
+      setPendingEchoQuestion(null);
+    }
 
     try {
       const response = await fetch('/api/chat', {
@@ -1389,6 +1399,13 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
               if (event.personas.order && event.personas.order.length > 0) {
                 setPendingOrder(event.personas.order);
               }
+              const echoText = event.personas.echo || '';
+              const isSolo = !event.personas.order || event.personas.order.length < 3;
+              if (!isEchoAnswer && !isSolo && isEchoQuestionText(echoText)) {
+                setPendingEchoQuestion(echoText.trim());
+              } else if (!isEchoAnswer) {
+                setPendingEchoQuestion(null);
+              }
               return { ...m, content: event.reply || '', personas: event.personas };
             }
             return m;
@@ -1445,6 +1462,13 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
       const updated = [...nextMessages, assistantMsg];
       messagesRef.current = updated;
       setMessages(updated);
+      const echoText = assistantMsg.personas?.echo || '';
+      const isSolo = !assistantMsg.personas?.order || assistantMsg.personas.order.length < 3;
+      if (!isEchoAnswer && assistantMsg.personas && !isSolo && isEchoQuestionText(echoText)) {
+        setPendingEchoQuestion(echoText.trim());
+      } else if (!isEchoAnswer) {
+        setPendingEchoQuestion(null);
+      }
     } catch {
       const errMsg: Message = {
         id: generateId(),
@@ -1463,7 +1487,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
       setPendingOrder(null);
       setIsAdvancedLoading(false);
     }
-  }, [teaPersona]);
+  }, [teaPersona, pendingEchoQuestion]);
 
   const handleSend = useCallback((override?: string) => {
     const content = (override ?? input).trim();
