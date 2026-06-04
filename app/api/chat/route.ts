@@ -26,13 +26,7 @@ import {
   TREND_PICKS, RECOMMEND_PATTERNS, detectAssetClass,
   extractTwoKeywords, getSector,
 } from '@/lib/personax/market';
-import {
-  findPrevKRTradingDay,
-  findPrevWeekday,
-  formatKRDateLabel,
-  isKRMarketHoliday,
-  isKRNonTradingDay,
-} from '@/lib/personax/calendar';
+import { buildMarketSessionLabels } from '@/lib/personax/market-session-label';
 import { cleanEchoSelfReference, cleanJackEnding, detectStage3GuardViolations } from '@/lib/personax/guards';
 import { buildJackText, buildLuciaText, buildEchoText, RAY_TAIL, JACK_TAIL, LUCIA_TAIL, ECHO_TAIL } from '@/lib/personax/templates';
 import type { DiscussMode, IndicatorFlags, PrevContext } from '@/lib/personax/templates';
@@ -2146,46 +2140,19 @@ ${DISCLAIMER}`;
     const isCrypto  = !!(CRYPTO_MAP[keyword] || CRYPTO_MAP[keyword.toUpperCase()]);
     const assetType = isCrypto ? 'CRYPTO' : currency === 'KRW' ? 'KOREAN_STOCK' : 'US_STOCK';
 
-    // ✅ 장 미개장 감지 — 한국시간 기준
-    const nowKST = new Date(Date.now() + 9 * 60 * 60 * 1000);
-    const dayKST = nowKST.getUTCDay(); // 0=일, 6=토
-    const hourKST = nowKST.getUTCHours();
-    const minuteKST = nowKST.getUTCMinutes();
-    const timeKST = hourKST * 100 + minuteKST; // 예: 0815 = 오전 8시 15분
-
-    // 한국장: 평일 09:00~15:30 (KST), 주말/공휴일 휴장
-    // ✅ 마감 시간 명시: 1530 = 15시 30분. 15:29:59까지 장중, 15:30:00부터 마감
-    const KR_OPEN  = 900;
-    const KR_CLOSE = 1530;
-    const isWeekend = (assetType !== 'CRYPTO') && (dayKST === 0 || dayKST === 6);
-    const isKRHolidayToday = assetType !== 'CRYPTO' && isKRMarketHoliday(nowKST);
-    const isKRNonTradingToday = isWeekend || isKRHolidayToday;
-    const isKRBeforeOpen = assetType === 'KOREAN_STOCK' && !isKRNonTradingToday && timeKST < KR_OPEN;
-    const isKRAfterClose = assetType === 'KOREAN_STOCK' && !isKRNonTradingToday && timeKST >= KR_CLOSE;
-    const isKRClosed = isKRNonTradingToday || isKRBeforeOpen || isKRAfterClose;
-
-    // ✅ 마지막 거래일 라벨 ("M월 D일") — 주말/공휴일/개장 전 분기에서 사용
-    //    - 비거래일(주말/공휴일): 오늘 직전 거래일
-    //    - 평일 개장 전: 어제 직전 거래일 (월요일 개장 전이면 지난 금요일)
-    const lastKRTradingDate = (() => {
-      if (isKRNonTradingToday) return findPrevKRTradingDay(nowKST);
-      const prev = new Date(nowKST.getTime());
-      prev.setUTCDate(prev.getUTCDate() - 1);
-      return findPrevKRTradingDay(prev);
-    })();
-    const lastKRTradingLabel = formatKRDateLabel(lastKRTradingDate);
-
-    // 미국장: 평일 23:30~06:00 KST (서머타임 기준)
-    const isUSClosed = assetType === 'US_STOCK' && !isCrypto &&
-      (isWeekend || (timeKST >= 600 && timeKST < 2330));
-
-    const marketClosedNote = isKRClosed && assetType === 'KOREAN_STOCK'
-      ? isKRNonTradingToday
-        ? `\n⚠️ ${isWeekend ? '주말 휴장' : '공휴일 휴장'} 중 — ${lastKRTradingLabel} 종가 기준 분석입니다.`
-        : isKRBeforeOpen
-          ? `\n⚠️ 장 개장 전(09:00 개장) — ${lastKRTradingLabel} 종가 기준 분석입니다.`
-          : `\n⚠️ 장 마감 후 — 오늘 종가 기준 분석입니다.`
-      : '';
+    const {
+      nowKST,
+      timeKST,
+      isWeekend,
+      isKRNonTradingToday,
+      isKRBeforeOpen,
+      isKRAfterClose,
+      isKRClosed,
+      isUSClosed,
+      lastKRTradingLabel,
+      marketClosedNote,
+      rayTimeNote,
+    } = buildMarketSessionLabels({ assetType, isCrypto });
 
     const vol   = getVolumeInfo(marketData?.rawVolume || 0, marketData?.avgVolume || 0, assetType as 'CRYPTO' | 'KOREAN_STOCK' | 'US_STOCK');
     const vix   = getVolatility(marketData?.rawPrice || 0, marketData?.rawHigh || 0, marketData?.rawLow || 0, assetType as 'CRYPTO' | 'KOREAN_STOCK' | 'US_STOCK');
@@ -2453,18 +2420,6 @@ ${DISCLAIMER}`;
     // ✅ 히스토리 — 이전 종목 맥락 연결용으로만 사용
 
     // ─── ✅ 레이: 완전 템플릿화 (Gemini 배제) ───
-    // ✅ 장 미개장 시 레이도 기준 날짜 표시 — 주말/공휴일 동적 계산 (KR은 KR 휴장일 반영, US는 주말만)
-    const rayTimeNote = (() => {
-      if (isKRClosed && assetType === 'KOREAN_STOCK') {
-        return ` (${isKRNonTradingToday || isKRBeforeOpen ? `${lastKRTradingLabel} 종가` : '오늘 종가'} 기준)`;
-      }
-      if (isUSClosed && assetType === 'US_STOCK') {
-        const lastUSLabel = formatKRDateLabel(findPrevWeekday(nowKST));
-        return ` (${isWeekend ? `${lastUSLabel} 종가` : '오늘 종가'} 기준)`;
-      }
-      return '';
-    })();
-
     // ✅ USD 가격 간소화 표기 — "380.56" → "약 $381"
     // ✅ 지수(코스피/나스닥/S&P500/다우 등)는 통화 단위 대신 "pt" 표기
     const isMarketIndexKeyword = MARKET_INDEX_SET.has(keyword);
