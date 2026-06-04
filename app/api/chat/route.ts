@@ -86,7 +86,7 @@ import {
 } from '@/lib/personax/fallbacks';
 import { saveHistory, saveTeaConversation, saveConversation } from '@/lib/personax/history';
 import { buildConversationMessages } from '@/lib/personax/conversation-messages';
-import { detectTargetedPersona } from '@/lib/personax/finance-context';
+import { buildPriorRayResponse, buildRecentFinanceContext, detectTargetedPersona } from '@/lib/personax/finance-context';
 import { buildTeaHistory, type TeaMsg, type TeaPersonaKey } from '@/lib/personax/tea-history';
 import { resolveChatSession } from '@/lib/personax/auth';
 import {
@@ -750,74 +750,14 @@ export async function POST(req: NextRequest) {
       const monthNow = kstNow.getUTCMonth() + 1;
       const financePrefix = `[현재 시점: ${yearNow}년 ${monthNow}월 — 최신(${yearNow}년) 데이터·보도 기준으로 답변. 과거 인물·정책을 현재형으로 단정하지 말 것.]\n`;
 
-      // 직전 user→assistant 페어 — 4명 페르소나 발화 모두 보존해서 충돌 맥락 유지
-      const recentContext = (() => {
-        if (!Array.isArray(messages) || messages.length < 2) return '';
-        const prior = messages.slice(0, -1).slice(-8) as Array<{
-          role?: string;
-          content?: string;
-          teaRay?: string;
-          teaJack?: string;
-          teaLucia?: string;
-          personas?: { ray?: string; jack?: string; lucia?: string; echo?: string };
-        }>;
-        if (prior.length === 0) return '';
-
-        const turns: string[] = [];
-        for (let i = 0; i < prior.length; i++) {
-          const m = prior[i];
-          if (m?.role !== 'user') continue;
-          const q = summarize(m.content || '', 100);
-          if (!q) continue;
-          const next = prior[i + 1];
-          if (next && next.role === 'assistant') {
-            const rayText   = summarize(next.personas?.ray   || next.teaRay   || '', 100);
-            const jackText  = cleanJackEnding(summarize(next.personas?.jack  || next.teaJack  || '', 80));
-            const luciaText = summarize(next.personas?.lucia || next.teaLucia || '', 80);
-            const echoText  = cleanEchoSelfReference(summarize(next.personas?.echo  || '', 60));
-
-            const ctxParts: string[] = [`[유저: ${q}]`];
-            if (rayText)   ctxParts.push(`[RAY: ${rayText}]`);
-            if (jackText)  ctxParts.push(`[JACK: ${jackText}]`);
-            if (luciaText) ctxParts.push(`[LUCIA: ${luciaText}]`);
-            if (echoText)  ctxParts.push(`[ECHO: ${echoText}]`);
-            turns.push(ctxParts.join(' → '));
-            i++; // 다음 assistant는 소비됐으므로 건너뜀
-          } else {
-            turns.push(`[유저: ${q}]`);
-          }
-        }
-        if (shouldWeakenContext) {
-          // ✅ V2 결함 #10 보정 — 완전 차단 (라이브 검증으로 200자 요약 불충분 확인)
-          //   카테고리 변경 + 명시 연결어 없음 = 새 주제로 전환
-          //   이전 맥락 정보를 LLM에게 노출하지 않음 (끌어올 정보 자체를 차단)
-          //   마스터 통찰 보호: shouldWeakenContext 로직이 이미 "새 주제"만 감지하므로
-          //   명시 연결어/같은 카테고리는 영향 없음 (유지됨)
-          return '[새 주제로 전환 — 이전 맥락 무관, 마지막 메시지에만 집중]';
-        }
-        return turns.join(' → ');
-      })();
+      const recentContext = buildRecentFinanceContext(messages, shouldWeakenContext);
       const ctxSuffix = recentContext
         ? `\n[직전 대화 주제: ${recentContext}]\n현재 질문: ${msg}`
         : `\n${msg}`;
 
       // 0단계: 오케스트레이터 — 토론 디렉터가 발언 순서/각도/충돌 쟁점/ECHO 지목 결정
       // 후속 질문 감지를 위해 직전 RAY 응답 한 줄 추출해 priorContext로 전달
-      const priorRayResponse = (() => {
-        if (!Array.isArray(messages) || messages.length === 0) return '';
-        const prior = messages.slice(-8) as Array<{
-          role?: string;
-          personas?: { ray?: string };
-          teaRay?: string;
-        }>;
-        for (let i = prior.length - 1; i >= 0; i--) {
-          const m = prior[i];
-          if (m?.role !== 'assistant') continue;
-          const ray = m.personas?.ray || m.teaRay || '';
-          if (ray) return ray.replace(/\s+/g, ' ').trim().slice(0, 200);
-        }
-        return '';
-      })();
+      const priorRayResponse = buildPriorRayResponse(messages);
       const plan = await runOrchestrator(msg, ['ray', 'jack', 'lucia'], {
         recentSummary: recentContext,
         priorRayResponse,
