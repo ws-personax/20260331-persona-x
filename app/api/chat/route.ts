@@ -85,6 +85,7 @@ import {
   PERSONA_FALLBACK,
 } from '@/lib/personax/fallbacks';
 import { saveHistory, saveTeaConversation, saveConversation } from '@/lib/personax/history';
+import { buildConversationMessages } from '@/lib/personax/conversation-messages';
 import { buildTeaHistory, type TeaMsg, type TeaPersonaKey } from '@/lib/personax/tea-history';
 import { resolveChatSession } from '@/lib/personax/auth';
 import {
@@ -916,13 +917,7 @@ export async function POST(req: NextRequest) {
           if (!supabaseServer) return;
 
           const categoryForConversation = _categoryV3 ?? 'general';
-          const conversationMessages = [
-            { role: 'user', content: msg },
-            { role: 'assistant', persona: 'lucia', content: personaText.lucia },
-            { role: 'assistant', persona: 'jack', content: personaText.jack },
-            { role: 'assistant', persona: 'ray', content: personaText.ray },
-            { role: 'assistant', persona: 'echo', content: personaText.echo },
-          ].filter((m) => m.content?.trim());
+          const conversationMessages = buildConversationMessages(msg, '', personaText);
 
           console.log('[route:saveConversation params]', {
             providerUserId: session.providerUserId,
