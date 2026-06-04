@@ -1,9 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
-import AuthButton from '@/components/AuthButton';
 import HistoryModal from '@/components/HistoryModal';
-import Logo from '@/components/Logo';
 import { createClient as createSupabaseBrowser } from '@/lib/supabase/client';
 import { PositionInput, buildPositionContext } from './PositionInput';
 import type { Position } from './PositionInput';
@@ -17,6 +15,7 @@ import {
 } from '@/components/chat/PersonaBubble';
 import { SpeakerButton } from '@/components/chat/SpeakerButton';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
+import { ChatHeader } from '@/components/chat/ChatHeader';
 import { VoiceControlsColumn } from '@/components/chat/VoiceControlsColumn';
 import {
   enqueueSpeak,
@@ -1491,45 +1490,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
         overflow: 'hidden',
       }}
     >
-      <header
-        style={{
-          background: '#E8DCC0',
-          padding: '12px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid #f1f1f4',
-          position: 'sticky',
-          top: 0,
-          zIndex: 10,
-          flexShrink: 0,
-        }}
-      >
-        <Logo size="sm" />
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <AuthButton />
-          <button
-            type="button"
-            onClick={() => setShowHistory(true)}
-            style={{
-              background: '#fff',
-              padding: '5px 12px',
-              borderRadius: 8,
-              fontSize: 12,
-              fontWeight: 700,
-              color: '#374151',
-              border: '1px solid #d1d5db',
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-              cursor: 'pointer',
-              touchAction: 'manipulation',
-            }}
-          >
-            History
-          </button>
-        </div>
-      </header>
+      <ChatHeader onOpenHistory={() => setShowHistory(true)} />
 
       {/* pointerEvents: none — 배너 자체는 클릭 가로채지 않도록 (아래 콘텐츠가 그대로 클릭됨). */}
       {isSpeakingGlobal && (
