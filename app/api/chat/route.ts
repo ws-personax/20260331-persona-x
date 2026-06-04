@@ -86,6 +86,7 @@ import {
 import { buildMarketDataPromptContext } from '@/lib/personax/market-data';
 import type { DecisionSummary } from '@/lib/personax/decision-summary';
 import { mapLegacyEchoRound2, mapOrderedRound1 } from '@/lib/personax/streaming';
+import { streamRespond, type StreamEvent } from '@/lib/personax/stream-response';
 import {
   createFallbackDebatePlan,
   parseDebatePlanJson,
@@ -787,50 +788,15 @@ export async function POST(req: NextRequest) {
     };
 
     // ✅ 페르소나별 순차 스트리밍 — 각 LLM 호출 완성 시점에 NDJSON 청크 1개씩 클라이언트로 전송
-    type StreamEvent =
-      | { type: 'persona'; key: 'ray' | 'jack' | 'lucia'; round: 1 | 2; text: string }
-      | { type: 'echo'; round: 1 | 2; text: string }
-      | { type: 'done'; personas: Record<string, unknown>; reply: string };
-
-    const streamRespond = (
-      build: (send: (event: StreamEvent) => void) => Promise<void>,
-    ): Response => {
-      const encoder = new TextEncoder();
-      const stream = new ReadableStream<Uint8Array>({
-        async start(controller) {
-          const send = (event: StreamEvent) => {
-            try {
-              controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'));
-            } catch (e) {
-              console.warn('[stream] enqueue 실패', e);
-            }
-          };
-          try {
-            await build(send);
-          } catch (e) {
-            console.error('[stream] build 실패', e);
-            send({
-              type: 'done',
-              personas: {
-                ray:   PERSONA_FALLBACK.ray,
-                jack:  PERSONA_FALLBACK.jack,
-                lucia: PERSONA_FALLBACK.lucia,
-                echo:  PERSONA_FALLBACK.echo,
-              },
-              reply: PERSONA_FALLBACK.ray,
-            });
-          } finally {
-            try { controller.close(); } catch {}
-          }
-        },
-      });
-      return new Response(stream, {
-        headers: {
-          'Content-Type': 'application/x-ndjson; charset=utf-8',
-          'Cache-Control': 'no-cache, no-transform',
-          'X-Accel-Buffering': 'no',
-        },
-      });
+    const streamFallbackEvent: StreamEvent = {
+      type: 'done',
+      personas: {
+        ray:   PERSONA_FALLBACK.ray,
+        jack:  PERSONA_FALLBACK.jack,
+        lucia: PERSONA_FALLBACK.lucia,
+        echo:  PERSONA_FALLBACK.echo,
+      },
+      reply: PERSONA_FALLBACK.ray,
     };
 
     // ✅ 오케스트레이터 — multi-persona 분기 진입 전 토론 디렉터 LLM이 흐름을 결정
@@ -1377,7 +1343,7 @@ export async function POST(req: NextRequest) {
           },
         });
         return;
-      });
+      }, streamFallbackEvent);
     };
 
     // ──────────────────────────────────────────────────────────────
@@ -1446,7 +1412,7 @@ export async function POST(req: NextRequest) {
             jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
           },
         });
-      });
+      }, streamFallbackEvent);
     }
 
     // ✅ 차 한잔 모드 — LLM 기반 3 페르소나 응답 (Gemini 2.0 Flash, 병렬 호출)
