@@ -26,6 +26,21 @@ type HistoryResponse = {
   error?: string;
 };
 
+type HistoryMessage = {
+  id: string;
+  conversation_id: string;
+  role: string;
+  persona: string | null;
+  content: string;
+  created_at: string;
+};
+
+type HistoryDetailResponse = {
+  conversation?: HistoryItem | null;
+  messages?: HistoryMessage[];
+  error?: string;
+};
+
 interface HistoryModalProps {
   onClose: () => void;
   supabaseClient?: SupabaseClient;
@@ -55,10 +70,22 @@ const statusLabel = (status: string | null) => {
   return status || '-';
 };
 
+const personaLabel = (persona: string | null) => {
+  if (persona === 'lucia') return 'LUCIA';
+  if (persona === 'jack') return 'JACK';
+  if (persona === 'ray') return 'RAY';
+  if (persona === 'echo') return 'ECHO';
+  return persona || 'Assistant';
+};
+
 export default function HistoryModal({ onClose }: HistoryModalProps) {
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [selectedDetail, setSelectedDetail] = useState<HistoryDetailResponse | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
 
   useEffect(() => {
     const loadData = async () => {
@@ -123,6 +150,43 @@ export default function HistoryModal({ onClose }: HistoryModalProps) {
       executed: filteredItems.filter((item) => item.executed).length,
     };
   }, [filteredItems]);
+
+  const resetDetail = () => {
+    setSelectedConversationId(null);
+    setSelectedDetail(null);
+    setDetailError('');
+  };
+
+  const loadDetail = async (conversationId: string) => {
+    try {
+      setSelectedConversationId(conversationId);
+      setSelectedDetail(null);
+      setDetailError('');
+      setDetailLoading(true);
+
+      const res = await fetch(`/api/history/${encodeURIComponent(conversationId)}`, {
+        credentials: 'include',
+        cache: 'no-store',
+      });
+      const data = (await res.json()) as HistoryDetailResponse;
+
+      if (!res.ok) {
+        console.warn('[history-modal] detail non-200:', res.status, data.error);
+        setDetailError(data.error || '대화 내용을 불러오지 못했습니다.');
+      }
+
+      if (data.error) {
+        console.warn('[history-modal] detail warning:', data.error);
+      }
+
+      setSelectedDetail(data);
+    } catch (e) {
+      console.error('[history-modal] loadDetail failed:', e);
+      setDetailError('대화 내용을 불러오지 못했습니다.');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   const overlayStyle: React.CSSProperties = {
     position: 'fixed',
@@ -198,6 +262,74 @@ export default function HistoryModal({ onClose }: HistoryModalProps) {
 
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         <div style={{ maxWidth: 720, margin: '0 auto', padding: '20px 16px', paddingBottom: 'max(40px, env(safe-area-inset-bottom))' }}>
+          {selectedConversationId ? (
+            <div>
+              <button
+                type="button"
+                onClick={resetDetail}
+                style={{
+                  background: '#fff',
+                  border: '1px solid #d1d5db',
+                  borderRadius: 8,
+                  color: '#374151',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 800,
+                  marginBottom: 12,
+                  padding: '8px 12px',
+                }}
+              >
+                ← History
+              </button>
+
+              <div style={{ background: '#fff', borderRadius: 14, padding: '16px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
+                <p style={{ fontSize: 16, fontWeight: 800, color: '#111827', margin: '0 0 4px' }}>
+                  {selectedDetail?.conversation?.title || 'Untitled decision'}
+                </p>
+                {selectedDetail?.conversation?.created_at && (
+                  <p style={{ fontSize: 11, color: '#9ca3af', margin: '0 0 14px' }}>
+                    {formatDate(selectedDetail.conversation.created_at)} 쨌 {selectedDetail.conversation.decision_type || selectedDetail.conversation.category || 'decision'}
+                  </p>
+                )}
+
+                {detailLoading ? (
+                  <p style={{ color: '#374151', fontWeight: 700, margin: 0 }}>대화 내용을 불러오는 중...</p>
+                ) : detailError ? (
+                  <p style={{ color: '#dc2626', fontWeight: 700, margin: 0 }}>{detailError}</p>
+                ) : (selectedDetail?.messages?.length ?? 0) === 0 ? (
+                  <p style={{ color: '#6b7280', fontWeight: 700, margin: 0 }}>저장된 대화 내용이 없습니다.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {selectedDetail?.messages?.map((message) => {
+                      const isUser = message.role === 'user';
+                      return (
+                        <div
+                          key={message.id}
+                          style={{
+                            alignSelf: isUser ? 'flex-end' : 'stretch',
+                            background: isUser ? '#FAE100' : '#f9fafb',
+                            border: isUser ? 'none' : '1px solid #e5e7eb',
+                            borderRadius: isUser ? '15px 0 15px 15px' : '0 14px 14px 14px',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                            maxWidth: isUser ? '78%' : '100%',
+                            padding: '10px 14px',
+                          }}
+                        >
+                          <p style={{ color: '#6b7280', fontSize: 11, fontWeight: 800, margin: '0 0 6px' }}>
+                            {isUser ? '사용자 질문' : personaLabel(message.persona)}
+                          </p>
+                          <p style={{ color: '#111827', fontSize: 14, lineHeight: 1.65, margin: 0, whiteSpace: 'pre-wrap' }}>
+                            {message.content}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             {([0, 7, 30] as const).map((days) => (
               <button
@@ -248,7 +380,19 @@ export default function HistoryModal({ onClose }: HistoryModalProps) {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {filteredItems.map((item) => (
-                <div key={item.id} style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
+                <div
+                  key={item.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => void loadDetail(item.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      void loadDetail(item.id);
+                    }
+                  }}
+                  style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', cursor: 'pointer' }}
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
                     <div style={{ minWidth: 0 }}>
                       <p style={{ fontSize: 16, fontWeight: 800, color: '#111827', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -284,6 +428,8 @@ export default function HistoryModal({ onClose }: HistoryModalProps) {
                 </div>
               ))}
             </div>
+          )}
+            </>
           )}
         </div>
       </div>
