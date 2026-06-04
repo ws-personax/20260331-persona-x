@@ -44,6 +44,7 @@ type HistoryDetailResponse = {
 interface HistoryModalProps {
   onClose: () => void;
   supabaseClient?: SupabaseClient;
+  initialConversationId?: string;
 }
 
 const formatDate = (iso: string) => {
@@ -78,7 +79,7 @@ const personaLabel = (persona: string | null) => {
   return persona || 'Assistant';
 };
 
-export default function HistoryModal({ onClose }: HistoryModalProps) {
+export default function HistoryModal({ onClose, initialConversationId }: HistoryModalProps) {
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -187,6 +188,11 @@ export default function HistoryModal({ onClose }: HistoryModalProps) {
       setDetailLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!initialConversationId) return;
+    void loadDetail(initialConversationId);
+  }, [initialConversationId]);
 
   const overlayStyle: React.CSSProperties = {
     position: 'fixed',

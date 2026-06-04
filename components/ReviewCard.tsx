@@ -13,9 +13,10 @@ type ReviewItem = {
 
 type ReviewCardProps = {
   onOpenHistory: () => void;
+  onOpenConversation?: (conversationId: string) => void;
 };
 
-export default function ReviewCard({ onOpenHistory }: ReviewCardProps) {
+export default function ReviewCard({ onOpenHistory, onOpenConversation }: ReviewCardProps) {
   const [items, setItems] = useState<ReviewItem[]>([]);
   const [hidden, setHidden] = useState(false);
 
@@ -80,6 +81,35 @@ export default function ReviewCard({ onOpenHistory }: ReviewCardProps) {
             리뷰 예정: {item.review_date}
           </span>
         )}
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenConversation?.(item.id);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              e.stopPropagation();
+              onOpenConversation?.(item.id);
+            }
+          }}
+          style={{
+            display: 'inline-flex',
+            marginTop: 10,
+            borderRadius: 8,
+            border: '1px solid #d1d5db',
+            background: '#f9fafb',
+            color: '#374151',
+            padding: '6px 10px',
+            fontSize: 12,
+            fontWeight: 800,
+            cursor: 'pointer',
+          }}
+        >
+          당시 대화 보기
+        </span>
         <span
           role="button"
           tabIndex={0}
