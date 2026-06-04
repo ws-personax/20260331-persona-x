@@ -293,6 +293,100 @@ PersonaX는 **Decision OS** 이다.
 
 ## 6. 미래 아키텍처
 
+## HRM (Hierarchical Reasoning Model) 적용 원칙
+
+### 핵심 원칙
+
+- HRM은 모델 교체 대상이 아니다.
+- HRM은 PersonaX 아키텍처 설계 참고용이다.
+- PersonaX는 HRM의 "상위 판단 → 하위 판단" 구조를 채택한다.
+
+### PersonaX 구조
+
+L0 Question
+사용자 질문
+
+↓
+
+L1 Decision Context
+질문의 domain, decisionType, forbiddenTerms 판정
+
+↓
+
+L2 Decision Frame
+questionType, conflictLevel, criteria 정의
+
+↓
+
+L3 Persona Debate
+RAY / JACK / LUCIA / ECHO 관점 충돌
+
+↓
+
+L4 Decision Summary
+최종 결론 생성
+
+↓
+
+L5 Review Card
+결정 재검토
+
+↓
+
+L6 Personal Memory
+장기 기억 및 의사결정 추적
+
+### 현재 우선순위
+
+2026년 6월:
+
+- Decision Context Layer
+- ChatWindow 분리
+- route.ts 오케스트레이터화
+
+2026년 7월:
+
+- Personal Memory 구현
+
+### 제품 방향
+
+PersonaX는 답변 품질 경쟁보다
+의사결정 기억 경쟁을 목표로 한다.
+
+핵심 원칙:
+
+"80점 답변 + 100점 기억"이
+"95점 답변 + 기억 없음"을 이긴다.
+
+### 개발 우선순위 기준
+
+1순위:
+
+- 사용자가 떠나는 버그
+- 저장 실패
+- 로그인 문제
+- History 문제
+- 비용 폭주
+
+2순위:
+
+- Decision Context
+- Review Card
+- Decision Memory
+- Personal Memory
+
+3순위:
+
+- 답변 문체 개선
+- 페르소나 표현 개선
+- 출력 미세 품질 개선
+
+주의:
+HRM 관련 구현은 대규모 구조 변경으로 진행하지 않는다.
+Decision Context → Decision Frame → Memory 순으로 작은 PR 단위로 진행한다.
+
+---
+
 질문
 ↓
 Decision Frame

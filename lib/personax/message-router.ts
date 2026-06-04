@@ -40,6 +40,10 @@ import {
   formatDecisionSummary,
   type DecisionSummary,
 } from '@/lib/personax/decision-summary';
+import {
+  buildDecisionContext,
+  type DecisionContext,
+} from '@/lib/personax/context/decision-context';
 import { buildMarketDataPromptContext } from '@/lib/personax/market-data';
 
 // 지연 초기화 — 모듈 로드 시점이 아닌 첫 호출 시점에 OpenAI 클라이언트 생성.
@@ -281,6 +285,7 @@ export type RouterDecision = {
   order: TaggedPersonaKey[];
   /** route.ts 레거시 카테고리 (finance/sports/news 등) — 프롬프트 빌더 호환용 */
   legacyCategory: string;
+  decisionContext: DecisionContext;
 };
 
 /** 하이브리드 기본 순서 — 감정 키워드 우선, 그 다음 레거시 카테고리 */
@@ -391,6 +396,7 @@ export const routeMessage = (
   const order: TaggedPersonaKey[] = isHeeMode
     ? ['lucia', 'jack', 'ray', 'echo']
     : enforceOrder(baseOrder, firstPersona, closerPersona, orderCategory);
+  const decisionContext = buildDecisionContext(text);
   return {
     personaCall,
     invokedPersona: strategyResult.invokedPersona,
@@ -402,6 +408,7 @@ export const routeMessage = (
     hasPriorConversation,
     order,
     legacyCategory,
+    decisionContext,
   };
 };
 
