@@ -89,6 +89,8 @@ import {
   applyResponseGuard,
 } from '@/lib/personax/response-guard';
 import { buildMarketDataPromptContext } from '@/lib/personax/market-data';
+import { buildMemoryContext } from '@/lib/personax/memory-context';
+import { fetchMemoryContextItems } from '@/lib/personax/memory-store';
 import type { DecisionSummary } from '@/lib/personax/decision-summary';
 import { mapLegacyEchoRound2, mapOrderedRound1 } from '@/lib/personax/streaming';
 import { streamRespond, type StreamEvent } from '@/lib/personax/stream-response';
@@ -427,6 +429,7 @@ async function callOptionD(
   soloPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
   precomputedStages?: { dataPack: string; personaViews: string },
   marketDataPromptContext?: string,
+  memoryContext?: string,
 ): Promise<OptionDRound1Result | null> {
   const normalizedMessages = (messages || []).map((m) => ({
     role: m.role || '',
@@ -461,6 +464,7 @@ async function callOptionD(
     soloPersona,
     precomputedStages,
     marketDataPromptContext,
+    memoryContext,
   });
 }
 
@@ -481,6 +485,7 @@ async function callOptionDWithStage3Guard(
   closerPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
   soloPersona?: import('./prompts/orchestrator-tagged').AllPersonaKey,
   marketDataPromptContext?: string,
+  memoryContext?: string,
 ): Promise<OptionDRound1Result | null> {
   // 희(喜) 모드 감지 — emotional + 좋은 소식 키워드. RAY/JACK 금지어휘 가드 활성화 조건.
   const isHeeMode =
@@ -488,7 +493,7 @@ async function callOptionDWithStage3Guard(
 
   const first = await callOptionD(
     messages, category, lastMessage, order, categoryV3, firstPersona,
-    hasPriorConversation, closerPersona, soloPersona, undefined, marketDataPromptContext,
+    hasPriorConversation, closerPersona, soloPersona, undefined, marketDataPromptContext, memoryContext,
   );
   if (!first) return first;
 
@@ -502,7 +507,7 @@ async function callOptionDWithStage3Guard(
     console.warn('[stage3-guard] 위반 감지 → Stage 3만 재호출 (Stage 1+2 캐시 재사용):', reasons.join(', '));
     const retry = await callOptionD(
       messages, category, lastMessage, order, categoryV3, firstPersona,
-      hasPriorConversation, closerPersona, soloPersona, cache, marketDataPromptContext,
+      hasPriorConversation, closerPersona, soloPersona, cache, marketDataPromptContext, memoryContext,
     );
     if (!retry) {
       console.warn('[stage3-guard] 재생성 결과 null → 1차 결과 사용');
@@ -519,7 +524,7 @@ async function callOptionDWithStage3Guard(
   console.warn('[stage3-guard] 위반 감지(solo) → 전체 재호출:', reasons.join(', '));
   const retry = await callOptionD(
     messages, category, lastMessage, order, categoryV3, firstPersona,
-    hasPriorConversation, closerPersona, soloPersona, undefined, marketDataPromptContext,
+    hasPriorConversation, closerPersona, soloPersona, undefined, marketDataPromptContext, memoryContext,
   );
   if (!retry) {
     console.warn('[stage3-guard] 재생성 결과 null → 1차 결과 사용');
@@ -692,6 +697,36 @@ export async function POST(req: NextRequest) {
       return await marketDataContextCache.get(userMessage) ?? '';
     };
 
+    let chatSessionPromise: ReturnType<typeof resolveChatSession> | null = null;
+    const getChatSession = () => {
+      if (!chatSessionPromise) {
+        chatSessionPromise = resolveChatSession(req, requestProviderUserId);
+      }
+      return chatSessionPromise;
+    };
+
+    const buildOptionDMemoryContext = async (): Promise<string> => {
+      try {
+        const { session } = await getChatSession();
+        if (!session.providerUserId) return '';
+
+        const supabaseServer = await createServerSupabase();
+        const memoryItems = await fetchMemoryContextItems({
+          supabase: supabaseServer,
+          providerUserId: session.providerUserId,
+          userId: session.userId,
+        });
+
+        return buildMemoryContext({
+          items: memoryItems,
+          providerUserId: session.providerUserId,
+          userId: session.userId,
+        });
+      } catch {
+        return '';
+      }
+    };
+
     // ✅ 페르소나별 순차 스트리밍 — 각 LLM 호출 완성 시점에 NDJSON 청크 1개씩 클라이언트로 전송
     const streamFallbackEvent: StreamEvent = {
       type: 'done',
@@ -823,7 +858,7 @@ export async function POST(req: NextRequest) {
           decisionSummary?: DecisionSummary,
           decisionType?: string,
         ) => {
-          const { bodyProviderUserId, session } = await resolveChatSession(req, requestProviderUserId);
+          const { bodyProviderUserId, session } = await getChatSession();
 
           console.log('[providerUserId source]', {
             bodyProviderUserId,
@@ -914,6 +949,7 @@ export async function POST(req: NextRequest) {
           // ✅ 이전 질문 키워드 오염 차단 — Stage2/Stage3에는 현재 질문만 전달
           const optionDMessages = (messages as Array<{ role?: string; content?: string }>).slice(-1);
           const marketDataPromptContext = await getOrBuildMarketDataContext(msg);
+          const memoryContext = await buildOptionDMemoryContext();
           let r1: OptionDRound1Result | null = await callOptionDWithStage3Guard(
             optionDMessages,
             category,
@@ -925,6 +961,7 @@ export async function POST(req: NextRequest) {
             _closerPersonaV3,
             undefined,
             marketDataPromptContext,
+            memoryContext,
           );
           // ✅ callOptionD 빈 결과 시 폴백 완전 차단 — null/빈 객체여도 정상 done 경로로 강제 통과
           if (!r1) {
