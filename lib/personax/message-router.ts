@@ -745,6 +745,7 @@ export async function runRoutedRequest(
       personaViews: string;
     };
     marketDataPromptContext?: string;
+    memoryContext?: string;
   },
 ): Promise<RoutedRequestResult | null> {
   try {
@@ -758,6 +759,7 @@ export async function runRoutedRequest(
       params.marketDataPromptContext ??
       await buildMarketDataPromptContext(lastMessage);
     const marketDataPromptContext = suppressUnsupportedMarketDataContext(rawMarketDataPromptContext);
+    const memoryContext = params.memoryContext?.trim() || '';
 
     // ──────────────────────────────────────────────────────────────
     // SOLO 우선순위 결정 — Stage 1·2 진입 전에 평가.
@@ -1087,7 +1089,10 @@ ${
       const stage2MarketBlock = marketDataPromptContext
         ? `## 시장 데이터 (RAY/JACK 필수 활용)\n${marketDataPromptContext}\n- RAY는 high/low/rawHigh/rawLow 숫자를 반드시 언급해야 한다.\n- JACK은 price와 low를 기준으로 매수/보류 판단 근거를 제시해야 한다.\n- 위 숫자 외 임의 숫자 생성 금지.\n\n`
         : '';
-      const analysisPrompt = `${stage2MarketBlock}${decisionSummary}\n\n${rawAnalysisPrompt}`;
+      const stage2MemoryBlock = memoryContext
+        ? `## 이전 결정 참고 (보조 맥락)\n${memoryContext}\n- 위 내용은 사용자의 과거 결정 맥락입니다. 현재 질문을 가장 우선하고, 과거 결정은 반복 패턴과 성향을 파악하는 참고로만 사용하십시오.\n- 과거 기록에 없는 사실을 만들거나 현재 질문의 답을 과거 결정으로 대체하지 마십시오.\n\n`
+        : '';
+      const analysisPrompt = `${stage2MarketBlock}${stage2MemoryBlock}${decisionSummary}\n\n${rawAnalysisPrompt}`;
       const analysisRaw = await callLLM('echo', OPTION_D_SYSTEM_DATA, [
         { role: 'user', content: analysisPrompt },
       ]);
