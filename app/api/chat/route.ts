@@ -86,6 +86,7 @@ import {
 } from '@/lib/personax/fallbacks';
 import { saveHistory, saveTeaConversation, saveConversation } from '@/lib/personax/history';
 import { buildConversationMessages } from '@/lib/personax/conversation-messages';
+import { detectTargetedPersona } from '@/lib/personax/finance-context';
 import { buildTeaHistory, type TeaMsg, type TeaPersonaKey } from '@/lib/personax/tea-history';
 import { resolveChatSession } from '@/lib/personax/auth';
 import {
@@ -748,18 +749,6 @@ export async function POST(req: NextRequest) {
       const yearNow = kstNow.getUTCFullYear();
       const monthNow = kstNow.getUTCMonth() + 1;
       const financePrefix = `[현재 시점: ${yearNow}년 ${monthNow}월 — 최신(${yearNow}년) 데이터·보도 기준으로 답변. 과거 인물·정책을 현재형으로 단정하지 말 것.]\n`;
-
-      // ECHO 응답에서 마지막 질문이 향하는 페르소나 추출
-      // 마지막 물음표 직전 ~200자 윈도우에서 페르소나명을 찾는다.
-      const detectTargetedPersona = (echoResp: string): 'RAY' | 'JACK' | 'LUCIA' | null => {
-        if (!echoResp) return null;
-        const lastQ = echoResp.lastIndexOf('?');
-        const tail = lastQ > 0
-          ? echoResp.slice(Math.max(0, lastQ - 200), lastQ + 1)
-          : echoResp.slice(-200);
-        const m = tail.match(/(RAY|JACK|LUCIA)/i);
-        return m ? (m[1].toUpperCase() as 'RAY' | 'JACK' | 'LUCIA') : null;
-      };
 
       // 직전 user→assistant 페어 — 4명 페르소나 발화 모두 보존해서 충돌 맥락 유지
       const recentContext = (() => {
