@@ -15,12 +15,22 @@ interface HomeScreenProps {
 
 export default function HomeScreen({ onSubmit, onOpenHistory }: HomeScreenProps) {
   const [showHistory, setShowHistory] = useState(false);
+  const [selectedReviewConversationId, setSelectedReviewConversationId] = useState<string | null>(null);
   const openHistory = () => {
+    setSelectedReviewConversationId(null);
     if (onOpenHistory) {
       onOpenHistory();
       return;
     }
     setShowHistory(true);
+  };
+  const openReviewConversation = (conversationId: string) => {
+    setSelectedReviewConversationId(conversationId);
+    setShowHistory(true);
+  };
+  const closeHistory = () => {
+    setShowHistory(false);
+    setSelectedReviewConversationId(null);
   };
   const examples = [
     { emoji: '💼', text: '창업 vs 재취업, 어떻게 해야 할까요?', bg: '#FFF7E0', accent: '#F59E0B' },
@@ -57,7 +67,7 @@ export default function HomeScreen({ onSubmit, onOpenHistory }: HomeScreenProps)
           </button>
         </div>
       </header>
-      <ReviewCard onOpenHistory={openHistory} />
+      <ReviewCard onOpenHistory={openHistory} onOpenConversation={openReviewConversation} />
 
       {/* 메인 콘텐츠 - 상단 정렬 */}
       <div className="flex-1 flex flex-col overflow-hidden" style={{ minHeight: 0 }}>
@@ -157,7 +167,7 @@ export default function HomeScreen({ onSubmit, onOpenHistory }: HomeScreenProps)
       </div>
     </div>
     {showHistory && (
-      <HistoryModal onClose={() => setShowHistory(false)} />
+      <HistoryModal onClose={closeHistory} initialConversationId={selectedReviewConversationId ?? undefined} />
     )}
     </>
   );
