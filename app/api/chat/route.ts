@@ -1,5 +1,10 @@
 ﻿import { fetchInvestmentNews } from '@/lib/news';
 import { allocatePersonaNews, filterInvestmentNews } from '@/lib/personax/news-allocation';
+import {
+  appendMarketDataSourceLabel,
+  getMarketDataSourceLabelForGuard,
+  hasMarketDataForGuard,
+} from '@/lib/personax/market-data-label';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
 import type { NextRequest } from 'next/server';
@@ -690,52 +695,6 @@ export async function POST(req: NextRequest) {
       return await marketDataContextCache.get(userMessage) ?? '';
     };
 
-    const hasMarketDataForGuard = async (
-      userMessage: string,
-      questionType: ReturnType<typeof detectQuestionType>,
-    ): Promise<boolean> => {
-      if (questionType !== 'buy_or_wait') {
-        return false;
-      }
-
-      const marketDataPromptContext = await getOrBuildMarketDataContext(userMessage);
-      return marketDataPromptContext?.includes('"price"') ?? false;
-    };
-
-    const getMarketDataSourceLabelForGuard = async (
-      userMessage: string,
-      questionType: ReturnType<typeof detectQuestionType>,
-    ): Promise<string> => {
-      if (questionType !== 'buy_or_wait') {
-        return '';
-      }
-
-      const marketDataPromptContext = await getOrBuildMarketDataContext(userMessage);
-      if (!marketDataPromptContext?.includes('"price"')) {
-        return '';
-      }
-
-      const source =
-        marketDataPromptContext.match(/"source":\s*"([^"]+)"/)?.[1] ?? '';
-      return source ? `데이터 출처: ${source}` : '';
-    };
-
-    const appendMarketDataSourceLabel = (
-      personaText: Record<string, string>,
-      sourceLabel: string,
-    ): void => {
-      if (!sourceLabel || Object.values(personaText).some((text) => text?.includes('데이터 출처:'))) {
-        return;
-      }
-
-      const targetKey = personaText.echo ? 'echo' : Object.keys(personaText).find((key) => personaText[key]);
-      if (!targetKey) {
-        return;
-      }
-
-      personaText[targetKey] = `${personaText[targetKey].trimEnd()}\n\n${sourceLabel}`;
-    };
-
     // ✅ 페르소나별 순차 스트리밍 — 각 LLM 호출 완성 시점에 NDJSON 청크 1개씩 클라이언트로 전송
     const streamFallbackEvent: StreamEvent = {
       type: 'done',
@@ -1078,7 +1037,7 @@ export async function POST(req: NextRequest) {
               }
             }
             const questionType = detectQuestionType(msg);
-            const hasMarketData = await hasMarketDataForGuard(msg, questionType);
+            const hasMarketData = await hasMarketDataForGuard(msg, questionType, getOrBuildMarketDataContext);
             const guardDebugBeforeText = Object.values(personaText).join('\n\n');
             console.log('[guard-debug] route before applyResponseGuard', {
               questionType,
@@ -1100,7 +1059,7 @@ export async function POST(req: NextRequest) {
             if (hasMarketData) {
               appendMarketDataSourceLabel(
                 personaText,
-                await getMarketDataSourceLabelForGuard(msg, questionType),
+                await getMarketDataSourceLabelForGuard(msg, questionType, getOrBuildMarketDataContext),
               );
             }
 
@@ -1212,6 +1171,7 @@ export async function POST(req: NextRequest) {
           const hasMarketData = await hasMarketDataForGuard(
             priorUserQuestion,
             questionType,
+            getOrBuildMarketDataContext,
           );
           const guardDebugBeforeText2 = Object.values(personaText2).join('\n\n');
           console.log('[guard-debug] route r2 before applyResponseGuard', {
@@ -1234,7 +1194,7 @@ export async function POST(req: NextRequest) {
           if (hasMarketData) {
             appendMarketDataSourceLabel(
               personaText2,
-              await getMarketDataSourceLabelForGuard(priorUserQuestion, questionType),
+              await getMarketDataSourceLabelForGuard(priorUserQuestion, questionType, getOrBuildMarketDataContext),
             );
           }
 
