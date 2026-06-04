@@ -51,6 +51,7 @@ import {
   detectLegacyCategory,
   type CategoryV3,
 } from '@/lib/personax/classifier';
+import { hasExplicitConnector } from '@/lib/personax/routing-context';
 import {
   routeMessage,
   runRoutedRequest,
@@ -627,33 +628,6 @@ export async function POST(req: NextRequest) {
     const lastMsg = messages.at(-1)?.content || "";
 
     // ✅ LUCIA 허브 — 카테고리 감지 및 페르소나 라우팅
-
-    // ✅ V2 결함 #10 — 명시 연결어 정밀 패턴 (옵션 A++)
-    //   유저가 이전 맥락을 명시적으로 이어가려는 신호 감지.
-    //   카테고리 변경 시에도 이 패턴 있으면 이전 맥락 유지.
-    const explicitConnectorPatterns = [
-      // 옵션 A++ 정밀 패턴 7개
-      /방금\s/,                            // "방금 그거", "방금 말한"
-      /아까\s/,                            // "아까 말씀하신"
-      /그거\s(?!뭐였|좋|싫|괜찮)/,           // "그거 X" 단, 혼잣말/감탄 제외
-      /위에서/,                            // "위에서 한 얘기"
-      /그때\s/,                            // "그때 했던"
-      /전에\s(말|얘기|언급|했)/,             // "전에 말한"
-      /방금\s말[^아]/,                     // "방금 말씀하신" 단 "말 안 함" 제외
-      // 짧은 후속 질문 패턴 5개
-      /더\s자세히/,                        // "더 자세히"
-      /^그래서\??$/,                       // "그래서?", "그래서"
-      /^왜\??$/,                           // "왜?", "왜"
-      /^어떻게\??$/,                       // "어떻게?"
-      /^어떤\s/,                           // "어떤..."
-      // 짧은 확인 질문 패턴 4개 (V2 결함 #10 보정)
-      /맞나요\??$/,                        // "맞나요?", "이거 맞나요"
-      /^정말\??$/,                         // "정말?", "정말"
-      /^진짜\??$/,                         // "진짜?", "진짜"
-      /^이거\s/,                           // "이거 X" 시작
-    ];
-    const hasExplicitConnector = (text: string): boolean =>
-      explicitConnectorPatterns.some(re => re.test(text));
 
     const LUCIA_ROUTING_MESSAGE: Record<string, string> = {
       finance: '재테크 질문이시군요! RAY와 JACK이 전문가예요. 바로 연결해드릴게요. 📊',
