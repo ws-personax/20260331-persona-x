@@ -1,12 +1,14 @@
 import type { Verdict } from '@/lib/personax/types';
 import { DISCLAIMER } from '@/lib/personax/scoring';
-import { TREND_PICKS, extractTwoKeywords, getSector } from '@/lib/personax/market';
+import { TREND_PICKS, RECOMMEND_PATTERNS, detectAssetClass, extractTwoKeywords, getSector } from '@/lib/personax/market';
 
 type MarketDataSnapshot = {
   price?: string | null;
   change?: string | null;
+  currency?: string | null;
   trend?: {
     trend5d?: string | null;
+    trendContext?: string | null;
   } | null;
 } | null;
 
@@ -421,6 +423,93 @@ ${DISCLAIMER}`;
     const ray = `거래량 급증 판단 기준:\n✅ 진짜: 거래량 +30% 이상 + 가격 +1% 이상 동반\n❌ 페이크: 거래량 +30% 이상이지만 가격 ±0.5% 이내\n분석할 종목명을 입력하시면 실제 데이터로 판단합니다.`;
     const echo = `결론: 거래량 급증 판단 기준 제공 완료\n진짜 신호 = 거래량 +30% + 가격 +1% 동반\n페이크 = 거래량만 급증, 가격 정체\n\n조건: 종목명을 입력하시면 즉각 판단을 개시합니다.\n\n📡 데이터 출처 — 실시간 거래량 기준\n\n${DISCLAIMER}`;
     return buildMarketQuickBody({ ray, jack, lucia, echo, confidence: 80, breakdown: '거래량 분석' });
+  }
+
+  // ✅ 추천 질문 — 자산군별 추천 종목 제안
+  if (RECOMMEND_PATTERNS.some(p => lastMsg.includes(p))) {
+    // 나스닥 추세 확인 (간이)
+    let nasdaqTrend5d = '횡보';
+    try {
+      const ndData = await fetchMarketPrice('나스닥');
+      nasdaqTrend5d = ndData?.trend?.trend5d || '횡보';
+    } catch { /* 실패 시 기본값 */ }
+
+    // 자산군 + 추세 기반 추천 키 결정
+    const assetClass = detectAssetClass(lastMsg) || 'korean';
+    const trendKey = assetClass === 'crypto'
+      ? (nasdaqTrend5d === '상승' ? 'CRYPTO_UP' : nasdaqTrend5d === '하락' ? 'CRYPTO_DOWN' : 'CRYPTO_NEUTRAL')
+      : assetClass === 'us'
+      ? (nasdaqTrend5d === '상승' ? 'US_UP' : nasdaqTrend5d === '하락' ? 'US_DOWN' : 'US_NEUTRAL')
+      : (nasdaqTrend5d === '상승' ? 'KOREAN_UP' : nasdaqTrend5d === '하락' ? 'KOREAN_DOWN' : 'KOREAN_NEUTRAL');
+
+    const picks = TREND_PICKS[trendKey as keyof typeof TREND_PICKS];
+    const trendDesc = nasdaqTrend5d === '상승' ? '상승 추세' : nasdaqTrend5d === '하락' ? '하락 추세' : '횡보 구간';
+
+    // ✅ 3종목 병렬 브리핑 — 각 종목 실시간 데이터 + 간단 요약
+    const [d0, d1, d2] = await Promise.all(
+      picks.stocks.map(s => fetchMarketPrice(s).catch(() => null))
+    );
+    const stockDataArr = [d0, d1, d2];
+
+    // 종목별 1줄 상태 요약 생성
+    const summarizeStock = (name: string, d: typeof d0): string => {
+      if (!d) return `${name}: 데이터 미수급`;
+      const ch = parseFloat(d.change || '0');
+      const chStr = ch >= 0 ? `+${ch.toFixed(2)}%` : `${ch.toFixed(2)}%`;
+      const trend = d.trend?.trendContext
+        ? d.trend.trendContext.split(' — ')[0]  // 앞부분만
+        : (ch > 0.5 ? '상승 중' : ch < -0.5 ? '하락 중' : '횡보');
+      const currency = d.currency === 'KRW' ? '원' : ' USD';
+      const priceStr = `${d.price}${currency === '원' ? currency : ''}`;
+      const vol = parseFloat(d.change || '0');
+      const signal = ch > 1 ? '🟢 진입 검토' : ch < -1 ? '🔴 관망' : '🟡 조건 대기';
+      return `${name}: ${priceStr} (${chStr}) — ${trend} ${signal}`;
+    };
+
+    const briefings = picks.stocks.map((name, i) =>
+      summarizeStock(name, stockDataArr[i])
+    );
+
+    // 1순위 종목 선정 (등락률 + 추세 기반)
+    let topIdx = 0;
+    let topScore = -999;
+    stockDataArr.forEach((d, i) => {
+      if (!d) return;
+      const ch = parseFloat(d.change || '0');
+      const trendBonus = d.trend?.trend5d === '상승' ? 1 : d.trend?.trend5d === '하락' ? -1 : 0;
+      const score = ch + trendBonus;
+      if (score > topScore) { topScore = score; topIdx = i; }
+    });
+    const topStock = picks.stocks[topIdx];
+    const topData = stockDataArr[topIdx];
+    const topChange = topData ? parseFloat(topData.change || '0') : 0;
+    const topReason = topData?.trend?.trendContext
+      ? topData.trend.trendContext.split(' —')[0]
+      : topChange > 0 ? '상승 모멘텀 확인' : '방어적 선택';
+
+    const briefingText = briefings.join('\n');
+
+    const jackRec = `지휘관님, 현재 ${trendDesc} 기준 ${picks.sector} 브리핑입니다.\n\n${briefingText}\n\n1순위 추천: ${topStock} — ${topReason}. 분석을 시작할까요?`;
+    // ✅ 조사 자동 처리 — 받침 있으면 "이", 없으면 "가" / "을" vs "를"
+    const lastStock = picks.stocks[picks.stocks.length - 1];
+    const lastChar = lastStock.charCodeAt(lastStock.length - 1);
+    const hasBatchim = (lastChar - 0xAC00) % 28 !== 0;
+    const subjectParticle = hasBatchim ? '이' : '가';
+    const topChar = topStock.charCodeAt(topStock.length - 1);
+    const topHasBatchim = (topChar - 0xAC00) % 28 !== 0;
+    const objectParticle = topHasBatchim ? '을' : '를';
+    const luciaRec = `소장님, 제가 보기엔 ${lastStock}${subjectParticle} 오히려 주목할 만해요. 모두가 ${topStock}${objectParticle} 볼 때, 덜 주목받는 종목에서 기회가 나오는 경우가 많거든요. 한번 살펴보시겠어요?`;
+    const rayRec = `${trendDesc} 기준 브리핑:\n${briefingText}\n\n1순위: ${topStock} (점수 우위). 개별 분석 요청 시 상세 수치를 제공합니다.`;
+    const echoRec = `결론: 종목 브리핑 완료\n근거: 현재 ${trendDesc} + ${picks.sector}\n1순위: ${topStock} — ${topReason}\n조건: 종목명을 입력하시면 즉각 상세 분석을 개시합니다.\n비중: 개별 분석 완료 후 결정하십시오.\n\n${briefingText}\n\n📡 데이터 출처 — 실시간 추세 기반 추천\n\n⚠️ PersonaX는 AI 금융 콘텐츠 플랫폼입니다.\n제공되는 모든 분석은 참고용 시나리오이며\n투자 자문·매매 추천이 아닙니다.\n투자 판단과 그에 따른 손익의 책임은\n전적으로 투자자 본인에게 있습니다.`;
+
+    return {
+      reply: [jackRec, luciaRec, rayRec, echoRec].join('\n\n'),
+      personas: {
+        jack: jackRec, lucia: luciaRec, ray: rayRec, echo: echoRec,
+        verdict: '관망', confidence: 0, breakdown: '추천 질문', positionSizing: '0%',
+        jackNews: null, luciaNews: null, rayNews: null, echoNews: null,
+      },
+    };
   }
 
   return null;
