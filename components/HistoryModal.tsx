@@ -215,25 +215,25 @@ export default function HistoryModal({ onClose, initialConversationId }: History
   };
 
   const headerStyle: CSSProperties = {
-    background: 'rgba(178,199,218,0.95)',
+    background: 'rgba(220,196,154,0.96)',
     padding: '12px 16px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottom: '1px solid rgba(0,0,0,0.06)',
+    borderBottom: '1px solid rgba(92,61,30,0.16)',
     flexShrink: 0,
   };
 
   const closeBtnStyle: CSSProperties = {
-    background: '#fff',
-    border: '1px solid #d1d5db',
+    background: '#FFF8E8',
+    border: '1px solid #C9A46A',
     borderRadius: 8,
     width: 32,
     height: 32,
     fontSize: 18,
     fontWeight: 700,
     cursor: 'pointer',
-    color: '#374151',
+    color: '#5C3D1E',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -242,7 +242,7 @@ export default function HistoryModal({ onClose, initialConversationId }: History
 
   const ModalHeader = () => (
     <header style={headerStyle}>
-      <span style={{ fontWeight: 800, fontSize: 18, color: '#1f2937' }}>History</span>
+      <span style={{ fontWeight: 800, fontSize: 18, color: '#3F2F1D' }}>History</span>
       <button type="button" onClick={onClose} aria-label="닫기" style={closeBtnStyle}>x</button>
     </header>
   );
@@ -284,10 +284,10 @@ export default function HistoryModal({ onClose, initialConversationId }: History
                 type="button"
                 onClick={resetDetail}
                 style={{
-                  background: '#fff',
-                  border: '1px solid #d1d5db',
+                  background: '#FFF8E8',
+                  border: '1px solid #C9A46A',
                   borderRadius: 8,
-                  color: '#374151',
+                  color: '#5C3D1E',
                   cursor: 'pointer',
                   fontSize: 13,
                   fontWeight: 800,
@@ -298,12 +298,12 @@ export default function HistoryModal({ onClose, initialConversationId }: History
                 ← History
               </button>
 
-              <div style={{ background: '#fff', borderRadius: 14, padding: '16px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
-                <p style={{ fontSize: 16, fontWeight: 800, color: '#111827', margin: '0 0 4px' }}>
+              <div style={{ background: '#FFF8E8', border: '1px solid #E0C48D', borderRadius: 14, padding: '16px', boxShadow: '0 1px 4px rgba(92,61,30,0.10)' }}>
+                <p style={{ fontSize: 16, fontWeight: 800, color: '#3F2F1D', margin: '0 0 4px' }}>
                   {selectedDetail?.conversation?.title || 'Untitled decision'}
                 </p>
                 {selectedDetail?.conversation?.created_at && (
-                  <p style={{ fontSize: 11, color: '#9ca3af', margin: '0 0 14px' }}>
+                  <p style={{ fontSize: 11, color: '#7A5A35', margin: '0 0 14px' }}>
                     {formatDate(selectedDetail.conversation.created_at)} · {selectedDetail.conversation.decision_type || selectedDetail.conversation.category || 'decision'}
                   </p>
                 )}
