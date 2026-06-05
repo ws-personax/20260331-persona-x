@@ -90,7 +90,7 @@ import {
 } from '@/lib/personax/response-guard';
 import { buildMarketDataPromptContext } from '@/lib/personax/market-data';
 import { buildMemoryContext } from '@/lib/personax/memory-context';
-import { fetchMemoryContextItems } from '@/lib/personax/memory-store';
+import { fetchMemoryContextItems, saveMemoryFromDecisionSummary } from '@/lib/personax/memory-store';
 import type { DecisionSummary } from '@/lib/personax/decision-summary';
 import { mapLegacyEchoRound2, mapOrderedRound1 } from '@/lib/personax/streaming';
 import { streamRespond, type StreamEvent } from '@/lib/personax/stream-response';
@@ -886,7 +886,7 @@ export async function POST(req: NextRequest) {
             messageCount: conversationMessages?.length,
           });
 
-          await saveConversation(supabaseServer, {
+          const saveResult = await saveConversation(supabaseServer, {
             session,
             category: categoryForConversation,
             title: msg.slice(0, 50),
@@ -894,6 +894,16 @@ export async function POST(req: NextRequest) {
             decisionSummary,
             decisionType,
           });
+
+          if (decisionSummary && saveResult?.conversationId) {
+            await saveMemoryFromDecisionSummary({
+              supabase: getAdminSupabase() ?? supabaseServer,
+              conversationId: saveResult.conversationId,
+              category: categoryForConversation,
+              decisionType,
+              decisionSummary,
+            });
+          }
         };
 
         if (isRound1) {

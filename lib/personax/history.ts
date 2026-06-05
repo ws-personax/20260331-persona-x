@@ -60,6 +60,10 @@ const buildDecisionMemoryFields = (
   };
 };
 
+export type SaveConversationResult = {
+  conversationId: string;
+};
+
 export async function saveConversation(
   supabase: Awaited<ReturnType<typeof createServerSupabase>>,
   params: {
@@ -70,13 +74,13 @@ export async function saveConversation(
     decisionSummary?: DecisionSummary;
     decisionType?: string;
   },
-) {
+): Promise<SaveConversationResult | null> {
   try {
     if (!params.session.providerUserId) {
       console.warn('[saveConversation] skip — providerUserId missing', {
         source: params.session.source,
       });
-      return;
+      return null;
     }
 
     const db = getSupabase() ?? supabase;
@@ -95,7 +99,7 @@ export async function saveConversation(
 
     if (convErr || !conv) {
       console.warn('[saveConversation] conversation insert failed:', convErr);
-      return;
+      return null;
     }
 
     const rows = params.messages
@@ -107,14 +111,16 @@ export async function saveConversation(
         content: m.content,
       }));
 
-    if (rows.length === 0) return;
+    if (rows.length === 0) return { conversationId: conv.id };
 
     const { error: msgErr } = await db.from('messages').insert(rows);
     if (msgErr) {
       console.warn('[saveConversation] messages insert failed:', msgErr);
     }
+    return { conversationId: conv.id };
   } catch (e) {
     console.warn('[saveConversation] failed:', e);
+    return null;
   }
 }
 
