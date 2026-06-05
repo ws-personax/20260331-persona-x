@@ -5,7 +5,6 @@ import {
   getMarketDataSourceLabelForGuard,
   hasMarketDataForGuard,
 } from '@/lib/personax/market-data-label';
-import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
 import type { NextRequest } from 'next/server';
 import { GoogleGenerativeAI, type GenerationConfig, type Tool } from '@google/generative-ai';
@@ -78,8 +77,7 @@ import {
   HEE_FALLBACK,
   PERSONA_FALLBACK,
 } from '@/lib/personax/fallbacks';
-import { saveHistory, saveTeaConversation, saveConversation } from '@/lib/personax/history';
-import { buildConversationMessages } from '@/lib/personax/conversation-messages';
+import { saveHistory, saveTeaConversation } from '@/lib/personax/history';
 import { buildPriorRayResponse, buildRecentFinanceContext, detectTargetedPersona } from '@/lib/personax/finance-context';
 import { buildTeaHistory, type TeaMsg, type TeaPersonaKey } from '@/lib/personax/tea-history';
 import { buildTeaFallbacks, selectTeaPersona } from '@/lib/personax/tea-fallbacks';
@@ -90,7 +88,8 @@ import {
 } from '@/lib/personax/response-guard';
 import { buildMarketDataPromptContext } from '@/lib/personax/market-data';
 import { buildMemoryContext } from '@/lib/personax/memory-context';
-import { fetchMemoryContextItems, saveMemoryFromDecisionSummary } from '@/lib/personax/memory-store';
+import { fetchMemoryContextItems } from '@/lib/personax/memory-store';
+import { getAdminSupabase, saveUnifiedConversation } from '@/lib/personax/chat-persistence';
 import type { DecisionSummary } from '@/lib/personax/decision-summary';
 import { mapLegacyEchoRound2, mapOrderedRound1 } from '@/lib/personax/streaming';
 import { streamRespond, type StreamEvent } from '@/lib/personax/stream-response';
@@ -376,21 +375,6 @@ const callTeaPersona = async (
     }
   }
   return null;
-};
-
-const getSupabase = () => {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key);
-};
-
-// service role client — RLS 우회 (서버 전용 로깅: tea_logs 등)
-const getAdminSupabase = () => {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key);
 };
 
 // ─────────────────────────────────────────────
@@ -853,59 +837,6 @@ export async function POST(req: NextRequest) {
           }
         };
 
-        const saveUnifiedConversation = async (
-          personaText: Record<TaggedPersonaKey, string>,
-          decisionSummary?: DecisionSummary,
-          decisionType?: string,
-        ) => {
-          const { bodyProviderUserId, session } = await getChatSession();
-
-          console.log('[providerUserId source]', {
-            bodyProviderUserId,
-            finalProviderUserId: session.providerUserId,
-            source: session.source,
-          });
-
-          let supabaseServer: Awaited<ReturnType<typeof createServerSupabase>> | null = null;
-          try {
-            supabaseServer = await createServerSupabase();
-          } catch (e) {
-            console.warn('[saveConversation] supabase client init failed:', e);
-          }
-
-          if (!supabaseServer) return;
-
-          const categoryForConversation = _categoryV3 ?? 'general';
-          const conversationMessages = buildConversationMessages(msg, '', personaText);
-
-          console.log('[route:saveConversation params]', {
-            providerUserId: session.providerUserId,
-            userId: session.userId,
-            category: categoryForConversation,
-            hasMessages: Array.isArray(conversationMessages),
-            messageCount: conversationMessages?.length,
-          });
-
-          const saveResult = await saveConversation(supabaseServer, {
-            session,
-            category: categoryForConversation,
-            title: msg.slice(0, 50),
-            messages: conversationMessages,
-            decisionSummary,
-            decisionType,
-          });
-
-          if (decisionSummary && saveResult?.conversationId) {
-            await saveMemoryFromDecisionSummary({
-              supabase: getAdminSupabase() ?? supabaseServer,
-              conversationId: saveResult.conversationId,
-              category: categoryForConversation,
-              decisionType,
-              decisionSummary,
-            });
-          }
-        };
-
         if (isRound1) {
           if (_routerDecision.strategy === 'solo' && _routerDecision.invokedPersona) {
             const optionDMessages = (messages as Array<{ role?: string; content?: string }>).slice(-1);
@@ -1047,7 +978,14 @@ export async function POST(req: NextRequest) {
               console.warn('[tea:tagged-r1] 로그 저장 실패 (무시)', e);
             }
 
-            await saveUnifiedConversation(personaText, r1.decisionSummary, r1.decisionType);
+            await saveUnifiedConversation({
+              getChatSession,
+              category: _categoryV3 ?? 'general',
+              title: msg,
+              personaText,
+              decisionSummary: r1.decisionSummary,
+              decisionType: r1.decisionType,
+            });
 
             send({
               type: 'done',
@@ -1182,7 +1120,12 @@ export async function POST(req: NextRequest) {
             console.warn('[tea:tagged-r2] 로그 저장 실패 (무시)', e);
           }
 
-          await saveUnifiedConversation(personaText2);
+          await saveUnifiedConversation({
+            getChatSession,
+            category: _categoryV3 ?? 'general',
+            title: msg,
+            personaText: personaText2,
+          });
 
           send({
             type: 'done',
