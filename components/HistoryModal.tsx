@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import type { CSSProperties } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 type HistoryItem = {
@@ -57,18 +58,18 @@ const formatDate = (iso: string) => {
   });
 };
 
-const formatReviewDate = (date: string | null) => {
-  if (!date) return '-';
-  return new Date(`${date}T00:00:00`).toLocaleDateString('ko-KR', {
+const formatGroupDate = (iso: string) => {
+  const d = new Date(iso);
+  return d.toLocaleDateString('ko-KR', {
     month: 'short',
     day: 'numeric',
   });
 };
 
 const statusLabel = (status: string | null) => {
-  if (status === 'pending') return 'review pending';
-  if (status === 'done') return 'review done';
-  return status || '-';
+  if (status === 'pending') return '리뷰 대기';
+  if (status === 'done') return '리뷰 완료';
+  return status || '';
 };
 
 const personaLabel = (persona: string | null) => {
@@ -87,6 +88,7 @@ export default function HistoryModal({ onClose, initialConversationId }: History
   const [selectedDetail, setSelectedDetail] = useState<HistoryDetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
+  const [filterDays, setFilterDays] = useState<7 | 30 | 0>(0);
 
   useEffect(() => {
     const loadData = async () => {
@@ -136,20 +138,28 @@ export default function HistoryModal({ onClose, initialConversationId }: History
     };
   }, []);
 
-  const [filterDays, setFilterDays] = useState<7 | 30 | 0>(0);
-
   const filteredItems = useMemo(() => {
     if (!filterDays) return items;
     const cutoff = new Date(Date.now() - filterDays * 24 * 60 * 60 * 1000);
     return items.filter((item) => new Date(item.created_at) >= cutoff);
   }, [items, filterDays]);
 
-  const stats = useMemo(() => {
-    return {
-      total: filteredItems.length,
-      pending: filteredItems.filter((item) => item.review_status === 'pending').length,
-      executed: filteredItems.filter((item) => item.executed).length,
-    };
+  const groupedItems = useMemo(() => {
+    const groups: Array<{ date: string; items: HistoryItem[] }> = [];
+
+    filteredItems.forEach((item) => {
+      const date = formatGroupDate(item.created_at);
+      const currentGroup = groups[groups.length - 1];
+
+      if (currentGroup?.date === date) {
+        currentGroup.items.push(item);
+        return;
+      }
+
+      groups.push({ date, items: [item] });
+    });
+
+    return groups;
   }, [filteredItems]);
 
   const resetDetail = () => {
@@ -194,7 +204,7 @@ export default function HistoryModal({ onClose, initialConversationId }: History
     void loadDetail(initialConversationId);
   }, [initialConversationId]);
 
-  const overlayStyle: React.CSSProperties = {
+  const overlayStyle: CSSProperties = {
     position: 'fixed',
     inset: 0,
     zIndex: 1000,
@@ -204,7 +214,7 @@ export default function HistoryModal({ onClose, initialConversationId }: History
     overflow: 'hidden',
   };
 
-  const headerStyle: React.CSSProperties = {
+  const headerStyle: CSSProperties = {
     background: 'rgba(178,199,218,0.95)',
     padding: '12px 16px',
     display: 'flex',
@@ -214,7 +224,7 @@ export default function HistoryModal({ onClose, initialConversationId }: History
     flexShrink: 0,
   };
 
-  const closeBtnStyle: React.CSSProperties = {
+  const closeBtnStyle: CSSProperties = {
     background: '#fff',
     border: '1px solid #d1d5db',
     borderRadius: 8,
@@ -267,7 +277,7 @@ export default function HistoryModal({ onClose, initialConversationId }: History
       <ModalHeader />
 
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        <div style={{ maxWidth: 720, margin: '0 auto', padding: '20px 16px', paddingBottom: 'max(40px, env(safe-area-inset-bottom))' }}>
+        <div style={{ maxWidth: 720, margin: '0 auto', padding: '12px 12px', paddingBottom: 'max(32px, env(safe-area-inset-bottom))' }}>
           {selectedConversationId ? (
             <div>
               <button
@@ -294,7 +304,7 @@ export default function HistoryModal({ onClose, initialConversationId }: History
                 </p>
                 {selectedDetail?.conversation?.created_at && (
                   <p style={{ fontSize: 11, color: '#9ca3af', margin: '0 0 14px' }}>
-                    {formatDate(selectedDetail.conversation.created_at)} 쨌 {selectedDetail.conversation.decision_type || selectedDetail.conversation.category || 'decision'}
+                    {formatDate(selectedDetail.conversation.created_at)} · {selectedDetail.conversation.decision_type || selectedDetail.conversation.category || 'decision'}
                   </p>
                 )}
 
@@ -336,105 +346,84 @@ export default function HistoryModal({ onClose, initialConversationId }: History
             </div>
           ) : (
             <>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-            {([0, 7, 30] as const).map((days) => (
-              <button
-                key={days}
-                type="button"
-                onClick={() => setFilterDays(days)}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: 20,
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontWeight: 700,
-                  fontSize: 12,
-                  background: filterDays === days ? '#111827' : '#fff',
-                  color: filterDays === days ? '#fff' : '#6b7280',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                }}
-              >
-                {days === 0 ? '전체' : `최근 ${days}일`}
-              </button>
-            ))}
-          </div>
-
-          <div style={{ background: '#fff', borderRadius: 16, padding: 20, marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-              <div style={{ textAlign: 'center', minWidth: 60 }}>
-                <p style={{ fontSize: 11, color: '#6b7280', margin: '0 0 4px', fontWeight: 600 }}>결정</p>
-                <p style={{ fontSize: 28, fontWeight: 800, color: '#111827', margin: 0 }}>{stats.total}</p>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                {([0, 7, 30] as const).map((days) => (
+                  <button
+                    key={days}
+                    type="button"
+                    onClick={() => setFilterDays(days)}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: 20,
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontWeight: 700,
+                      fontSize: 12,
+                      background: filterDays === days ? '#111827' : '#fff',
+                      color: filterDays === days ? '#fff' : '#6b7280',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    }}
+                  >
+                    {days === 0 ? '전체' : `최근 ${days}일`}
+                  </button>
+                ))}
               </div>
-              <div style={{ textAlign: 'center', minWidth: 60 }}>
-                <p style={{ fontSize: 11, color: '#6b7280', margin: '0 0 4px', fontWeight: 600 }}>리뷰 대기</p>
-                <p style={{ fontSize: 28, fontWeight: 800, color: '#111827', margin: 0 }}>{stats.pending}</p>
-              </div>
-              <div style={{ textAlign: 'center', minWidth: 60 }}>
-                <p style={{ fontSize: 11, color: '#6b7280', margin: '0 0 4px', fontWeight: 600 }}>실행</p>
-                <p style={{ fontSize: 28, fontWeight: 800, color: '#111827', margin: 0 }}>{stats.executed}</p>
-              </div>
-            </div>
-          </div>
 
-          {filteredItems.length === 0 ? (
-            <div style={{ background: '#fff', borderRadius: 16, padding: 32, textAlign: 'center' }}>
-              <p style={{ color: '#6b7280', fontWeight: 600 }}>저장된 Decision Memory가 없습니다.</p>
-              <button type="button" onClick={onClose} style={{ display: 'inline-block', marginTop: 12, background: '#111827', color: '#fff', padding: '10px 20px', borderRadius: 10, fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer' }}>
-                닫기
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {filteredItems.map((item) => (
-                <div
-                  key={item.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => void loadDetail(item.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      void loadDetail(item.id);
-                    }
-                  }}
-                  style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', cursor: 'pointer' }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
-                    <div style={{ minWidth: 0 }}>
-                      <p style={{ fontSize: 16, fontWeight: 800, color: '#111827', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {item.title || 'Untitled decision'}
-                      </p>
-                      <p style={{ fontSize: 11, color: '#9ca3af', margin: '4px 0 0' }}>
-                        {formatDate(item.created_at)} · {item.decision_type || item.category || 'decision'}
-                      </p>
-                    </div>
-                    <span style={{ fontSize: 11, color: '#9ca3af', flexShrink: 0 }}>{statusLabel(item.review_status)}</span>
-                  </div>
-
-                  {item.verdict && (
-                    <span style={{ display: 'inline-block', fontSize: 11, background: '#111827', color: '#fff', padding: '3px 8px', borderRadius: 5, fontWeight: 700, marginBottom: 8 }}>
-                      {item.verdict}
-                    </span>
-                  )}
-
-                  {item.next_action && (
-                    <p style={{ fontSize: 13, color: '#374151', lineHeight: 1.5, margin: '0 0 8px' }}>
-                      {item.next_action}
-                    </p>
-                  )}
-
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span style={{ fontSize: 11, color: '#6b7280' }}>리뷰: {formatReviewDate(item.review_date)}</span>
-                    {item.reasons?.slice(0, 1).map((reason) => (
-                      <span key={reason} style={{ fontSize: 11, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
-                        {reason}
-                      </span>
-                    ))}
-                  </div>
+              {filteredItems.length === 0 ? (
+                <div style={{ background: '#fff', borderRadius: 16, padding: 32, textAlign: 'center' }}>
+                  <p style={{ color: '#6b7280', fontWeight: 600 }}>저장된 Decision Memory가 없습니다.</p>
+                  <button type="button" onClick={onClose} style={{ display: 'inline-block', marginTop: 12, background: '#111827', color: '#fff', padding: '10px 20px', borderRadius: 10, fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer' }}>
+                    닫기
+                  </button>
                 </div>
-              ))}
-            </div>
-          )}
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {groupedItems.map((group) => (
+                    <section key={group.date} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <p style={{ color: '#6b7280', fontSize: 12, fontWeight: 800, margin: '2px 4px 0' }}>
+                        {group.date}
+                      </p>
+
+                      {group.items.map((item) => {
+                        const status = statusLabel(item.review_status);
+                        return (
+                          <div
+                            key={item.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => void loadDetail(item.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                void loadDetail(item.id);
+                              }
+                            }}
+                            style={{ background: '#fff', borderRadius: 10, padding: '9px 11px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer' }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                              <p style={{ fontSize: 14, fontWeight: 800, color: '#111827', margin: 0, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {item.title || 'Untitled decision'}
+                              </p>
+                              <span style={{ fontSize: 10, color: '#9ca3af', flexShrink: 0 }}>{formatDate(item.created_at)}</span>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5, minWidth: 0 }}>
+                              <span style={{ fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {item.decision_type || item.category || 'decision'}
+                              </span>
+                              {status && (
+                                <span style={{ fontSize: 10, color: '#374151', background: '#f3f4f6', borderRadius: 999, padding: '2px 6px', fontWeight: 700, flexShrink: 0 }}>
+                                  {status}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </section>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </div>
