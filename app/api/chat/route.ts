@@ -5,7 +5,6 @@ import {
   getMarketDataSourceLabelForGuard,
   hasMarketDataForGuard,
 } from '@/lib/personax/market-data-label';
-import { createClient as createServerSupabase } from '@/lib/supabase/server';
 import type { NextRequest } from 'next/server';
 import { GoogleGenerativeAI, type GenerationConfig, type Tool } from '@google/generative-ai';
 import Anthropic from '@anthropic-ai/sdk';
@@ -85,8 +84,10 @@ import {
   applyResponseGuard,
 } from '@/lib/personax/response-guard';
 import { buildMarketDataPromptContext } from '@/lib/personax/market-data';
-import { buildMemoryContext } from '@/lib/personax/memory-context';
-import { fetchMemoryContextItems } from '@/lib/personax/memory-store';
+import {
+  buildOptionDMemoryContext as buildOptionDMemoryContextFromSession,
+  createChatSessionResolver,
+} from '@/lib/personax/chat-memory-context';
 import { getAdminSupabase, saveUnifiedConversation } from '@/lib/personax/chat-persistence';
 import type { DecisionSummary } from '@/lib/personax/decision-summary';
 import { mapLegacyEchoRound2, mapOrderedRound1 } from '@/lib/personax/streaming';
@@ -688,35 +689,8 @@ export async function POST(req: NextRequest) {
       return await marketDataContextCache.get(userMessage) ?? '';
     };
 
-    let chatSessionPromise: ReturnType<typeof resolveChatSession> | null = null;
-    const getChatSession = () => {
-      if (!chatSessionPromise) {
-        chatSessionPromise = resolveChatSession(req, requestProviderUserId);
-      }
-      return chatSessionPromise;
-    };
-
-    const buildOptionDMemoryContext = async (): Promise<string> => {
-      try {
-        const { session } = await getChatSession();
-        if (!session.providerUserId) return '';
-
-        const supabaseServer = await createServerSupabase();
-        const memoryItems = await fetchMemoryContextItems({
-          supabase: supabaseServer,
-          providerUserId: session.providerUserId,
-          userId: session.userId,
-        });
-
-        return buildMemoryContext({
-          items: memoryItems,
-          providerUserId: session.providerUserId,
-          userId: session.userId,
-        });
-      } catch {
-        return '';
-      }
-    };
+    const getChatSession = createChatSessionResolver(req, requestProviderUserId);
+    const buildOptionDMemoryContext = () => buildOptionDMemoryContextFromSession(getChatSession);
 
     // ✅ 페르소나별 순차 스트리밍 — 각 LLM 호출 완성 시점에 NDJSON 청크 1개씩 클라이언트로 전송
     const streamFallbackEvent: StreamEvent = {
