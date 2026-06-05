@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
-import { readKakaoSessionFromRequest } from '@/lib/auth/kakao';
+import { resolveProviderUserIdForRead } from '@/lib/personax/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -45,37 +45,14 @@ const createHistoryClient = async () => {
   return createServerSupabase();
 };
 
-const fallbackProviderUserId = (req: NextRequest): string | null => {
-  const fromQuery = req.nextUrl.searchParams.get('providerUserId')?.trim();
-  if (fromQuery) return fromQuery;
-
-  const fromHeader = req.headers.get('x-provider-user-id')?.trim();
-  return fromHeader || null;
-};
-
-const resolveProviderUserId = async (req: NextRequest): Promise<string | null> => {
-  const kakaoSession = readKakaoSessionFromRequest(req);
-  let providerUserId = kakaoSession?.id ? `kakao_${kakaoSession.id}` : null;
-
-  if (!providerUserId) {
-    try {
-      const supabaseServer = await createServerSupabase();
-      const { data } = await supabaseServer.auth.getUser();
-      providerUserId = data.user?.id ?? null;
-    } catch {
-      providerUserId = null;
-    }
-  }
-
-  return providerUserId ?? fallbackProviderUserId(req);
-};
-
 export async function GET(
   req: NextRequest,
   { params }: { params: { conversationId: string } },
 ) {
   try {
-    const providerUserId = await resolveProviderUserId(req);
+    const providerUserId = await resolveProviderUserIdForRead(req, {
+      includeHeaderFallback: true,
+    });
     if (!providerUserId) {
       return NextResponse.json(
         { conversation: null, messages: [] },
