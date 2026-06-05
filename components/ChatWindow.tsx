@@ -320,184 +320,6 @@ const TEA_PERSONAS_INFO: { key: 'lucia' | 'jack' | 'echo'; emoji: string; name: 
   { key: 'echo',  emoji: '🎯', name: 'ECHO 대표',  desc: '핵심을 짚어드릴게요',     border: '#b45309', bg: '#fefce8', fg: '#78350f' },
 ];
 
-const TEA_PERSONA_HEADLINES: Record<'lucia' | 'jack' | 'echo', { line1: string; line2: string; quote: string }> = {
-  lucia: { line1: '판단은 잠시 내려놓으시고', line2: '마음을 꺼내보세요',        quote: '괜찮지 않아도 괜찮아요.' },
-  jack:  { line1: '솔직하게 털어놓으세요.',  line2: '방향을 잡아드리겠습니다.', quote: '망설임이 가장 큰 적입니다.' },
-  echo:  { line1: '핵심만 말씀해주세요.',    line2: '판단해드리겠습니다.',      quote: '핵심을 보면 답이 보입니다.' },
-};
-
-const LUCIA_GREETINGS: Record<'morning' | 'lunch' | 'afternoon' | 'evening' | 'night', string[]> = {
-  morning: [
-    '좋은 아침이에요. 오늘 하루도 잘 버텨봐요.',
-    '아침부터 뭔가 묵직한 게 있으면 말해요. 들을게요.',
-    '오늘 하루 어떤 마음으로 시작하고 있어요?',
-    '잘 잤어요? 요즘 잠은 좀 어때요?',
-    '오늘 하루 제일 먼저 해결하고 싶은 게 있어요?',
-    '아침부터 이미 지쳐있으면 말해요. 같이 생각해봐요.',
-    '오늘 하루도 잘 부탁해요. 뭐든 털어놔도 돼요.',
-    '좋은 아침. 오늘 마음 상태는 어때요?',
-    '아침에 일어나자마자 든 생각이 뭐였어요?',
-    '오늘도 바쁜 하루 시작이죠. 잠깐 숨 고르고 가요.',
-  ],
-  lunch: [
-    '밥은 먹었어요? 밥 먹으면서도 머릿속이 복잡하면 말해요.',
-    '점심시간에 잠깐 숨 고르고 있어요. 오전 어땠어요?',
-    '밥 먹고 잠깐 여기 들렀어요? 뭔가 있으면 털어놔요.',
-    '점심 먹었어요? 오늘 오전에 제일 힘들었던 게 뭐예요?',
-    '잠깐 쉬는 시간에 왔군요. 오늘 어때요?',
-    '점심 먹으면서도 생각나는 게 있으면 말해요.',
-    '밥은 챙겨먹고 있어요? 요즘 입맛은 어때요?',
-    '점심시간에 혼자 있고 싶을 때 여기 와요. 뭐든 괜찮아요.',
-    '오전에 뭔가 있었어요? 얼굴이 좀 피곤해 보이는 것 같아서요.',
-    '오늘 오전, 별일 없었어요?',
-  ],
-  afternoon: [
-    '오후가 되면 왠지 더 지치죠. 지금 어때요?',
-    '오늘 하루 반쯤 왔어요. 지금 기분은요?',
-    '오후 3시면 제일 힘든 시간이에요. 뭔가 있으면 말해요.',
-    '오후에 문득 생각나는 게 있으면 털어놔요.',
-    '지금 어디서 이걸 보고 있어요? 잠깐 쉬는 중이에요?',
-    '오늘 하루 어떻게 흘러가고 있어요?',
-    '오후에 갑자기 기운이 빠질 때 여기 와도 돼요.',
-    '지금 제일 머릿속에 맴도는 게 뭐예요?',
-    '오후엔 왠지 감정이 더 예민해지는 것 같아요. 지금 어때요?',
-    '퇴근까지 얼마 남았어요? 오늘 하루 버틸 만해요?',
-  ],
-  evening: [
-    '오늘 하루 수고했어요. 뭔가 털어놓고 싶은 거 있어요?',
-    '저녁 먹었어요? 오늘 어땠어요?',
-    '퇴근하고 나면 그제야 감정이 올라올 때가 있죠. 지금 어때요?',
-    '오늘 제일 힘들었던 순간이 언제였어요?',
-    '저녁엔 하루를 돌아보게 되더라고요. 오늘 어떤 하루였어요?',
-    '퇴근길에 뭔가 계속 생각났으면 말해요.',
-    '오늘 잘 버텼어요. 뭔가 있었으면 털어놔요.',
-    '저녁 시간에 여기 왔군요. 오늘 많이 힘들었어요?',
-    '하루 마무리하면서 뭔가 정리가 안 되면 말해요.',
-    '오늘 하루, 본인한테 수고했다고 말해줬어요?',
-  ],
-  night: [
-    '하루 마무리할 시간이에요. 오늘 어땠어요?',
-    '오늘 하루 잘 버텼어요. 뭔가 털어놓고 싶은 거 있어요?',
-    '저녁 먹고 좀 쉬고 있어요? 오늘 어떤 하루였어요?',
-    '하루 끝자락에 문득 떠오르는 게 있으면 말해요.',
-    '오늘 제일 힘들었던 순간이 언제였어요?',
-    '밤 되면 하루가 정리되는 것 같죠. 오늘 어땠어요?',
-    '오늘 본인한테 수고했다고 말해줬어요?',
-    '하루 돌아보면서 뭔가 걸리는 게 있으면 말해요.',
-    '오늘 하루 중에 제일 기억에 남는 순간이 뭐예요?',
-    '오늘도 잘 버텼어요. 잠들기 전에 잠깐 얘기해요.',
-  ],
-};
-
-function pickLuciaGreeting(): string | null {
-  const nowKST = new Date(Date.now() + 9 * 60 * 60 * 1000);
-  const hour = nowKST.getUTCHours();
-  let bucket: keyof typeof LUCIA_GREETINGS | null = null;
-  if (hour >= 9 && hour < 12) bucket = 'morning';
-  else if (hour >= 12 && hour < 14) bucket = 'lunch';
-  else if (hour >= 14 && hour < 18) bucket = 'afternoon';
-  else if (hour >= 18 && hour < 20) bucket = 'evening';
-  else if (hour >= 20 && hour < 22) bucket = 'night';
-  if (!bucket) return null;
-  const list = LUCIA_GREETINGS[bucket];
-  return list[Math.floor(Math.random() * list.length)];
-}
-
-const TeaTabContent = ({
-  teaPersona,
-  luciaGreeting,
-}: {
-  teaPersona: 'lucia' | 'jack' | 'echo';
-  luciaGreeting: string | null;
-}) => {
-  const headline = TEA_PERSONA_HEADLINES[teaPersona];
-
-  return (
-    <div style={{ padding: '20px 12px 200px' }}>
-      <h2
-        style={{
-          fontSize: 21,
-          fontWeight: 800,
-          lineHeight: 1.4,
-          color: '#111827',
-          textAlign: 'center',
-          margin: '0 0 20px',
-        }}
-      >
-        {headline.line1}
-        <br />
-        {headline.line2}
-      </h2>
-      {/* 앱 시작 시 1번만 픽 (마운트 시 결정). 22:00~08:59 비활성. */}
-      {teaPersona === 'lucia' && luciaGreeting && (
-        <div style={{ maxWidth: 440, margin: '0 auto', padding: '0 4px' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-            <div
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: '50%',
-                background: PERSONAS.lucia.iconBg,
-                color: '#fff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 15,
-                fontWeight: 800,
-                flexShrink: 0,
-                boxShadow: '0 2px 6px rgba(168, 85, 247, 0.25)',
-                position: 'relative',
-                overflow: 'hidden',
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/avatars/lucia.webp"
-                alt={PERSONAS.lucia.name}
-                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-              {PERSONAS.lucia.initial}
-            </div>
-            <div
-              style={{
-                background: PERSONAS.lucia.bubbleBg,
-                border: `1px solid ${PERSONAS.lucia.bubbleBorder}`,
-                borderRadius: '4px 18px 18px 18px',
-                padding: '12px 16px',
-                maxWidth: '85%',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 800,
-                  color: PERSONAS.lucia.iconBg,
-                  marginBottom: 5,
-                  letterSpacing: 0.3,
-                }}
-              >
-                LUCIA
-              </div>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 14.5,
-                  lineHeight: 1.6,
-                  color: PERSONAS.lucia.textColor,
-                }}
-              >
-                {luciaGreeting}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
 interface ChatWindowProps {
   initialMessage?: string;
 }
@@ -508,7 +330,6 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
   const [input, setInput] = useState('');
   const [showQuickQ, setShowQuickQ] = useState(false);
   const [teaPersona, setTeaPersona] = useState<'lucia' | 'jack' | 'echo'>('lucia');
-  const [luciaGreeting, setLuciaGreeting] = useState<string | null>(null);
   const [kakaoUser, setKakaoUser] = useState<KakaoUser | null>(null);
   const [providerUserId, setProviderUserId] = useState<string | null>(null);
   // ✅ 히스토리 모달 — 페이지 이동 없이 같은 supabase 인스턴스로 데이터 조회 (모바일 세션 단절 방지)
@@ -518,10 +339,6 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
   useEffect(() => {
     // eslint-disable-next-line no-console
   }, [teaPersona]);
-
-  useEffect(() => {
-    setLuciaGreeting(pickLuciaGreeting());
-  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
