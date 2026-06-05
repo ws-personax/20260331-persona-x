@@ -1,8 +1,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { MemoryContextItem } from './memory-types';
+import type { MemoryContextItem, MemoryWriteParams, MemoryWriteResult } from './memory-types';
 
 const DEFAULT_MEMORY_QUERY_LIMIT = 10;
 const MAX_MEMORY_CONTEXT_ITEMS = 3;
+const MAX_MEMORY_TEXT_LENGTH = 300;
+const MAX_MEMORY_REASON_LENGTH = 220;
+const MAX_MEMORY_NEXT_ACTION_LENGTH = 260;
+const MAX_MEMORY_REASONS = 3;
+const MAX_MEMORY_COUNTER_VIEWS = 1;
+const DEFAULT_DECISION_IMPORTANCE = 3;
 
 type ConversationMemoryRow = {
   id: string;
@@ -58,6 +64,70 @@ const toMemoryContextItem = (row: ConversationMemoryRow): MemoryContextItem => (
   executed: row.executed,
   decisionImportance: row.decision_importance,
 });
+
+const compactText = (value: string | null | undefined, maxLength: number): string | null => {
+  const compacted = (value || '').replace(/\s+/g, ' ').trim();
+  if (!compacted) return null;
+  return compacted.length > maxLength ? compacted.slice(0, maxLength) : compacted;
+};
+
+const compactTextList = (
+  values: string[] | null | undefined,
+  maxItems: number,
+  maxLength: number,
+): string[] | null => {
+  const compacted = (values || [])
+    .map((value) => compactText(value, maxLength))
+    .filter((value): value is string => Boolean(value))
+    .slice(0, maxItems);
+
+  return compacted.length > 0 ? compacted : null;
+};
+
+export async function saveMemoryFromDecisionSummary(
+  params: MemoryWriteParams,
+): Promise<MemoryWriteResult> {
+  if (!params.conversationId || !params.decisionSummary) {
+    return { ok: false, conversationId: params.conversationId, error: 'missing conversationId or decisionSummary' };
+  }
+
+  const decisionType =
+    compactText(params.decisionType, MAX_MEMORY_TEXT_LENGTH) ||
+    compactText(params.category, MAX_MEMORY_TEXT_LENGTH);
+  const counterView = compactText(params.decisionSummary.counterView, MAX_MEMORY_TEXT_LENGTH);
+
+  try {
+    const { error } = await params.supabase
+      .from('conversations')
+      .update({
+        verdict: compactText(params.decisionSummary.verdict, MAX_MEMORY_TEXT_LENGTH),
+        reasons: compactTextList(
+          params.decisionSummary.reasons,
+          MAX_MEMORY_REASONS,
+          MAX_MEMORY_REASON_LENGTH,
+        ),
+        counter_views: counterView ? [counterView].slice(0, MAX_MEMORY_COUNTER_VIEWS) : null,
+        next_action: compactText(
+          params.decisionSummary.nextAction,
+          MAX_MEMORY_NEXT_ACTION_LENGTH,
+        ),
+        decision_type: decisionType,
+        decision_importance: DEFAULT_DECISION_IMPORTANCE,
+      })
+      .eq('id', params.conversationId);
+
+    if (error) {
+      console.warn('[memory-store] saveMemoryFromDecisionSummary failed:', error);
+      return { ok: false, conversationId: params.conversationId, error: error.message };
+    }
+
+    return { ok: true, conversationId: params.conversationId };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.warn('[memory-store] saveMemoryFromDecisionSummary failed:', message);
+    return { ok: false, conversationId: params.conversationId, error: message };
+  }
+}
 
 export async function fetchMemoryContextItems(
   params: FetchMemoryContextItemsParams,
