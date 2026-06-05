@@ -1864,7 +1864,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
           }}
         />
       )}
-      <footer style={{ background: '#fff', padding: '12px', paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))', borderTop: '1px solid #e5e7eb', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
+      <footer style={{ background: '#E8DCC0', padding: '12px', paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))', borderTop: '1px solid #C9A46A', zIndex: 50, position: 'fixed', bottom: 0, left: 0, right: 0 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
           <textarea
             ref={textareaRef}
@@ -1875,11 +1875,13 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
             style={{
               flex: 1,
               minWidth: 0,
-              border: '1px solid #d1d5db',
+              background: '#FFF8E8',
+              border: '1px solid #B98236',
               borderRadius: 12,
               padding: '10px',
               resize: 'none',
               fontSize: 14,
+              color: '#3F2F1D',
               outline: 'none',
               minHeight: 56,
               height: 56,
@@ -1893,7 +1895,8 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
             onClick={() => handleSend()}
             disabled={!input.trim() || isLoading}
             style={{
-              background: '#FAE100',
+              background: '#B98236',
+              color: '#FFF8E8',
               border: 'none',
               borderRadius: 12,
               padding: '0 18px',

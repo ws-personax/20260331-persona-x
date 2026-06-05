@@ -50,13 +50,13 @@ export default function HomeScreen({ onSubmit, onOpenHistory }: HomeScreenProps)
             type="button"
             onClick={openHistory}
             style={{
-              background: '#fff',
+              background: '#FFF8E8',
               padding: '5px 12px',
               borderRadius: 8,
               fontSize: 12,
               fontWeight: 700,
-              color: '#374151',
-              border: '1px solid #d1d5db',
+              color: '#5C3D1E',
+              border: '1px solid #C9A46A',
               whiteSpace: 'nowrap',
               flexShrink: 0,
               cursor: 'pointer',
@@ -189,11 +189,11 @@ function InputBar({ onSubmit }: { onSubmit: (text: string) => void }) {
         display: 'flex',
         alignItems: 'center',
         gap: '10px',
-        background: '#ffffff',
-        border: '2px solid #1a1a2e',
+        background: '#FFF8E8',
+        border: '2px solid #B98236',
         borderRadius: '24px',
         padding: '10px 12px 10px 18px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+        boxShadow: '0 4px 12px rgba(92,61,30,0.12)',
       }}
     >
       <input
@@ -211,7 +211,7 @@ function InputBar({ onSubmit }: { onSubmit: (text: string) => void }) {
           border: 'none',
           fontSize: '16px',
           padding: '10px 0',
-          color: '#1a1a2e',
+          color: '#3F2F1D',
           letterSpacing: '-0.3px',
           minWidth: 0,
         }}
@@ -223,7 +223,7 @@ function InputBar({ onSubmit }: { onSubmit: (text: string) => void }) {
           width: '40px',
           height: '40px',
           borderRadius: '50%',
-          background: '#f7f7fa',
+          background: '#F3E4C6',
           border: 'none',
           display: 'flex',
           alignItems: 'center',
@@ -233,10 +233,10 @@ function InputBar({ onSubmit }: { onSubmit: (text: string) => void }) {
         }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="9" y="2" width="6" height="12" rx="3" fill="#6b7280" />
+          <rect x="9" y="2" width="6" height="12" rx="3" fill="#7A5A35" />
           <path
             d="M5 11v1a7 7 0 0 0 14 0v-1"
-            stroke="#6b7280"
+            stroke="#7A5A35"
             strokeWidth="2"
             strokeLinecap="round"
           />
@@ -245,7 +245,7 @@ function InputBar({ onSubmit }: { onSubmit: (text: string) => void }) {
             y1="19"
             x2="12"
             y2="22"
-            stroke="#6b7280"
+            stroke="#7A5A35"
             strokeWidth="2"
             strokeLinecap="round"
           />
@@ -254,7 +254,7 @@ function InputBar({ onSubmit }: { onSubmit: (text: string) => void }) {
             y1="22"
             x2="15"
             y2="22"
-            stroke="#6b7280"
+            stroke="#7A5A35"
             strokeWidth="2"
             strokeLinecap="round"
           />
@@ -264,8 +264,8 @@ function InputBar({ onSubmit }: { onSubmit: (text: string) => void }) {
         type="button"
         onClick={handleSubmit}
         style={{
-          background: '#FEE500',
-          color: '#191919',
+          background: '#B98236',
+          color: '#FFF8E8',
           fontSize: '15px',
           fontWeight: 800,
           letterSpacing: '-0.3px',

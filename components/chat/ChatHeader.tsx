@@ -13,7 +13,7 @@ export const ChatHeader = ({ onOpenHistory }: ChatHeaderProps) => (
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      borderBottom: '1px solid #f1f1f4',
+      borderBottom: '1px solid #C9A46A',
       position: 'sticky',
       top: 0,
       zIndex: 10,
@@ -28,13 +28,13 @@ export const ChatHeader = ({ onOpenHistory }: ChatHeaderProps) => (
         type="button"
         onClick={onOpenHistory}
         style={{
-          background: '#fff',
+          background: '#FFF8E8',
           padding: '5px 12px',
           borderRadius: 8,
           fontSize: 12,
           fontWeight: 700,
-          color: '#374151',
-          border: '1px solid #d1d5db',
+          color: '#5C3D1E',
+          border: '1px solid #C9A46A',
           whiteSpace: 'nowrap',
           flexShrink: 0,
           cursor: 'pointer',
