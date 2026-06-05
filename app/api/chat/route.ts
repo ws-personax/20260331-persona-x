@@ -90,6 +90,7 @@ import {
 } from '@/lib/personax/chat-memory-context';
 import { getAdminSupabase, saveUnifiedConversation } from '@/lib/personax/chat-persistence';
 import type { DecisionSummary } from '@/lib/personax/decision-summary';
+import { buildRound2ContextFromMessages } from '@/lib/personax/finance-round2-context';
 import { mapLegacyEchoRound2, mapOrderedRound1 } from '@/lib/personax/streaming';
 import { streamPersonaTagged } from '@/lib/personax/stream-persona-events';
 import { streamRespond, type StreamEvent } from '@/lib/personax/stream-response';
@@ -998,37 +999,12 @@ export async function POST(req: NextRequest) {
         }
 
         // 2라운드 — 직전 어시스턴트 메시지에서 1라운드 컨텍스트 추출 + 직전 유저 답변 전달.
-        const priorAssistant = (() => {
-          if (!Array.isArray(messages)) return null;
-          for (let i = messages.length - 2; i >= 0; i--) {
-            const m = messages[i] as { role?: string; personas?: { ray?: string; jack?: string; lucia?: string; echo?: string; order?: TaggedPersonaKey[] } };
-            if (m?.role === 'assistant' && m?.personas) return m;
-          }
-          return null;
-        })();
-        const priorOrder: TaggedPersonaKey[] = (priorAssistant?.personas?.order && priorAssistant.personas.order.length >= 3)
-          ? applyV3OrderOverride(priorAssistant.personas.order)
-          : order;
-        const priorText: Record<TaggedPersonaKey, string> = {
-          ray:   priorAssistant?.personas?.ray   || '',
-          jack:  priorAssistant?.personas?.jack  || '',
-          lucia: priorAssistant?.personas?.lucia || '',
-          echo:  priorAssistant?.personas?.echo  || '',
-        };
-        const promptPriorOrder = toPromptOrder(priorOrder);
-        const priorRound1: TaggedRound1Result = {
-          first: priorText[promptPriorOrder[0]] || '',
-          second: priorText[promptPriorOrder[1]] || '',
-          third: priorText[promptPriorOrder[2]] || '',
-          echoQuestion: priorText.echo,
-        };
-        // 원 질문 (가장 최근 user msg 두 개 중 앞의 것 — 즉 1라운드 진입 질문)
-        const priorUserQuestion = (() => {
-          if (!Array.isArray(messages)) return msg;
-          const userMsgs = messages.filter((m: { role?: string }) => m?.role === 'user');
-          if (userMsgs.length >= 2) return (userMsgs[userMsgs.length - 2] as { content?: string }).content || msg;
-          return msg;
-        })();
+        const { priorOrder, priorRound1, priorUserQuestion } = buildRound2ContextFromMessages({
+          messages,
+          fallbackOrder: order,
+          applyOrderOverride: applyV3OrderOverride,
+          fallbackQuestion: msg,
+        });
 
         const r2 = await callTaggedRound2(
           priorUserQuestion,
