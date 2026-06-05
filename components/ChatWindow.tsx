@@ -314,41 +314,6 @@ const EchoBubble = memo(function EchoBubble({
 //   답변하기 → handleSendWithPosition(value, null) → teaRound=2.
 //   건너뛰기 → handleSendWithPosition('', null) → 빈 값으로 teaRound=2.
 // 입력창 옆에 붙는 [🎤 / 🔊] 세로 스택 — 일반 모드와 ECHO 모드에서 공통 사용
-const TabButton = ({
-  active,
-  icon,
-  title,
-  onClick,
-}: {
-  active: boolean;
-  icon: string;
-  title: string;
-  onClick: () => void;
-}) => (
-  <button
-    type="button"
-    onClick={onClick}
-    style={{
-      padding: '9px 16px',
-      background: active ? '#1f2937' : '#ffffff',
-      color: active ? '#ffffff' : '#6b7280',
-      border: active ? '1px solid #1f2937' : '1px solid #d1d5db',
-      borderRadius: 20,
-      cursor: 'pointer',
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 6,
-      fontSize: 13,
-      fontWeight: 700,
-      whiteSpace: 'nowrap',
-      transition: 'background 0.15s, color 0.15s',
-    }}
-  >
-    <span style={{ fontSize: 15 }}>{icon}</span>
-    <span>{title}</span>
-  </button>
-);
-
 type FinanceQuickPanel = '뉴스' | '추천' | '고급';
 const FINANCE_TOP_BUTTONS: { panel: FinanceQuickPanel; emoji: string; label: string; color: string; bg: string; border: string }[] = [
   { panel: '뉴스', emoji: '📰', label: '주요 뉴스', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
