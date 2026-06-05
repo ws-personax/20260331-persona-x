@@ -36,6 +36,30 @@ export async function getCurrentUser(): Promise<string | null> {
   }
 }
 
+export async function resolveProviderUserIdForRead(
+  req: NextRequest,
+  options: { includeHeaderFallback?: boolean } = {},
+): Promise<string | null> {
+  const kakaoSession = getKakaoSession(req);
+  let providerUserId = buildProviderUserId('kakao', kakaoSession?.id);
+
+  if (!providerUserId) {
+    providerUserId = await getCurrentUser();
+  }
+
+  if (providerUserId) return providerUserId;
+
+  const fromQuery = req.nextUrl.searchParams.get('providerUserId')?.trim();
+  if (fromQuery) return fromQuery;
+
+  if (options.includeHeaderFallback) {
+    const fromHeader = req.headers.get('x-provider-user-id')?.trim();
+    if (fromHeader) return fromHeader;
+  }
+
+  return null;
+}
+
 export async function resolveUserId(
   req: NextRequest,
   bodyProviderUserId?: unknown,
