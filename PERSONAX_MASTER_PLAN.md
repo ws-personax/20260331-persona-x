@@ -930,6 +930,54 @@ Personal Memory 이전에는 구현하지 않는다.
 
 ## 22. June 2026 Refactoring Rules
 
+## Identity Strategy
+
+### Current State
+
+- `provider_user_id` is the active identity key.
+- `user_id` is nullable and reserved for canonical identity migration.
+- History, Review, and Memory currently rely on `provider_user_id`.
+- `conversations.user_id` is prepared, but it is not yet the canonical PersonaX identity key.
+
+### Short-Term Principles
+
+- Do not break the `provider_user_id` fallback.
+- Do not switch History, Review, or Memory queries to `user_id`-only.
+- Keep existing History, Review, and Memory visible for provider-only users.
+- Preserve current Kakao-based `provider_user_id` behavior until a shared identity scope is ready.
+
+### Mid-Term Principles
+
+- Introduce `resolveIdentityScope()`.
+- The identity scope should include:
+  - canonical `user_id` when available
+  - `provider_user_id` fallback
+  - future linked identity keys
+- History, Review, and Memory should use the shared identity scope instead of custom per-route identity logic.
+- Route handlers should stay orchestration-only and delegate identity resolution to shared library code.
+
+### Required Before July Personal Memory
+
+- Design `user_id`-first plus `provider_user_id` fallback queries.
+- Existing provider-only rows must remain visible after the transition.
+- Account linking and backfill strategy must be designed before any migration.
+- Review Card and Memory retrieval must use the same identity scope as History.
+
+### Long-Term Direction
+
+- Add a `users` table.
+- Add a `user_identities` table.
+- Use canonical `users.id` as the final Decision OS identity key.
+- Link providers such as Kakao, Google, and Naver under one canonical user.
+- Treat `provider_user_id` as a provider credential identity, not the final product identity.
+
+### Warnings
+
+- Do not implement Account Linking now.
+- Do not switch to `user_id`-only queries now.
+- Preserving existing `provider_user_id` data is the first priority.
+- Identity changes must not make existing History, Review, or Memory disappear.
+
 반드시 수행:
 
 - conversations.user_id nullable 추가
