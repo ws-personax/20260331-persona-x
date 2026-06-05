@@ -91,6 +91,7 @@ import {
 import { getAdminSupabase, saveUnifiedConversation } from '@/lib/personax/chat-persistence';
 import type { DecisionSummary } from '@/lib/personax/decision-summary';
 import { mapLegacyEchoRound2, mapOrderedRound1 } from '@/lib/personax/streaming';
+import { streamPersonaTagged } from '@/lib/personax/stream-persona-events';
 import { streamRespond, type StreamEvent } from '@/lib/personax/stream-response';
 import { tryBuildMarketQuickResponse } from '@/lib/personax/market-quick-handlers';
 import {
@@ -805,19 +806,6 @@ export async function POST(req: NextRequest) {
           // || ['stock', 'crypto', 'economy'].includes(category)  // legacy dead branches — 보존
         const isRound1 = !teaRound || teaRound <= 1;
 
-        const streamPersonaTagged = async (key: TaggedPersonaKey, full: string) => {
-          let acc = '';
-          for (const c of chunkText(full, 15)) {
-            acc += c;
-            if (key === 'echo') {
-              send({ type: 'echo', round: 1, text: acc });
-            } else {
-              send({ type: 'persona', key, round: 1, text: acc });
-            }
-            await new Promise(r => setTimeout(r, 20));
-          }
-        };
-
         if (isRound1) {
           if (_routerDecision.strategy === 'solo' && _routerDecision.invokedPersona) {
             const optionDMessages = (messages as Array<{ role?: string; content?: string }>).slice(-1);
@@ -845,7 +833,7 @@ export async function POST(req: NextRequest) {
               const _isHeeSolo = _categoryV3 === 'emotional' && detectEmotionalSubtypeHee(msg);
               reply = (_isHeeSolo ? HEE_FALLBACK : PERSONA_FALLBACK)[invoked as TaggedPersonaKey];
             }
-            await streamPersonaTagged(invoked, reply);
+            await streamPersonaTagged(send, invoked, reply);
             const echoFollowup = invoked === 'echo' ? reply : buildSoloEchoFollowup(invoked);
 
             send({
@@ -948,7 +936,7 @@ export async function POST(req: NextRequest) {
             }
 
             for (const key of order) {
-              await streamPersonaTagged(key, personaText[key]);
+              await streamPersonaTagged(send, key, personaText[key]);
             }
 
             try {
@@ -1096,7 +1084,7 @@ export async function POST(req: NextRequest) {
           }
 
           for (const key of priorOrder) {
-            await streamPersonaTagged(key, personaText2[key]);
+            await streamPersonaTagged(send, key, personaText2[key]);
           }
 
           try {
