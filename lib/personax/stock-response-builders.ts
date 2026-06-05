@@ -42,6 +42,70 @@ type TrendContextInfo = {
   trendStrength?: string | null;
 };
 
+type StockPersonaText = {
+  ray: string;
+  jack: string;
+  lucia: string;
+  echo: string;
+};
+
+const SAFE_INVESTMENT_FALLBACK_MARKER = '현재가는 별도 확인이 필요합니다';
+
+function sanitizeInternalMarketDataTerms(text: string): string {
+  return text
+    .replace(/\bhasMarketData\b/g, '시세 데이터 확인 여부')
+    .replace(/\bmarketData\b/g, '시세 데이터')
+    .replace(/\bMarketData\b/g, '시세 데이터');
+}
+
+function inferAssetLabel(userMessage: string): string {
+  if (/비트코인|bitcoin|btc/i.test(userMessage)) return '비트코인';
+  if (/이더리움|ethereum|eth/i.test(userMessage)) return '이더리움';
+  if (/코인|crypto|암호화폐/i.test(userMessage)) return '코인';
+  return '해당 자산';
+}
+
+export function normalizeNoMarketDataInvestmentPersonaText(
+  personaText: StockPersonaText,
+  params: {
+    userMessage: string;
+    questionType: string;
+    hasMarketData?: boolean;
+    isInvestmentContext: boolean;
+  },
+): void {
+  personaText.ray = sanitizeInternalMarketDataTerms(personaText.ray);
+  personaText.jack = sanitizeInternalMarketDataTerms(personaText.jack);
+  personaText.lucia = sanitizeInternalMarketDataTerms(personaText.lucia);
+  personaText.echo = sanitizeInternalMarketDataTerms(personaText.echo);
+
+  if (
+    !params.isInvestmentContext ||
+    params.hasMarketData !== false ||
+    (params.questionType !== 'buy_or_wait' && params.questionType !== 'sell_or_hold')
+  ) {
+    return;
+  }
+
+  const values = [personaText.ray, personaText.jack, personaText.lucia, personaText.echo];
+  const fallbackCount = values.filter(text => text.includes(SAFE_INVESTMENT_FALLBACK_MARKER)).length;
+  if (fallbackCount < 2) return;
+
+  const assetLabel = inferAssetLabel(params.userMessage);
+  personaText.ray =
+    `${assetLabel} 실시간 시세가 확인되지 않아 하락 종료 시점은 단정할 수 없습니다.\n` +
+    '확인할 축은 24시간 거래대금, 하락 속도 둔화, 비트코인 동조 흐름입니다.';
+  personaText.jack =
+    '날짜를 찍는 예측보다 조건을 정하는 편이 안전합니다.\n' +
+    '거래량이 줄면서 하락폭이 둔화되고, 반등 시도가 확인될 때까지는 보수적으로 보겠습니다.';
+  personaText.lucia =
+    '떨어지는 기간을 맞히려 하기보다 감당 가능한 손실 한도를 먼저 정해야 해요.\n' +
+    '불안해서 계속 확인하게 된다면 비중을 줄이는 것도 선택지입니다.';
+  personaText.echo =
+    '결론: 현재 데이터로는 하락 종료 시점을 단정하지 않습니다.\n' +
+    '조건: 실시간 시세와 거래량이 확인되면 지지선과 손절 기준으로 다시 판단하겠습니다.';
+}
+
 export function buildFinalRay(params: {
   keyword: string;
   marketData: StockMarketData | null;

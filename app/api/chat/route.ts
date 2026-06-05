@@ -96,6 +96,7 @@ import {
   buildFinalRay,
   buildJackDetail,
   buildLuciaDetail,
+  normalizeNoMarketDataInvestmentPersonaText,
   buildRayDetail,
   buildStockDetailResponse,
 } from '@/lib/personax/stock-response-builders';
@@ -950,6 +951,12 @@ export async function POST(req: NextRequest) {
               sample: guardDebugBeforeText.slice(0, 300),
             });
             applyResponseGuard(personaText, questionType, hasMarketData);
+            normalizeNoMarketDataInvestmentPersonaText(personaText, {
+              userMessage: msg,
+              questionType,
+              hasMarketData,
+              isInvestmentContext: _categoryV3 === 'invest' || _isHeeInvestComplex,
+            });
             const guardDebugAfterText = Object.values(personaText).join('\n\n');
             console.log('[guard-debug] route after applyResponseGuard', {
               questionType,
@@ -1092,6 +1099,12 @@ export async function POST(req: NextRequest) {
             sample: guardDebugBeforeText2.slice(0, 300),
           });
           applyResponseGuard(personaText2, questionType, hasMarketData);
+          normalizeNoMarketDataInvestmentPersonaText(personaText2, {
+            userMessage: priorUserQuestion,
+            questionType,
+            hasMarketData,
+            isInvestmentContext: _categoryV3 === 'invest',
+          });
           const guardDebugAfterText2 = Object.values(personaText2).join('\n\n');
           console.log('[guard-debug] route r2 after applyResponseGuard', {
             questionType,
