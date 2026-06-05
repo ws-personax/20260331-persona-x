@@ -16,6 +16,7 @@ import {
 import { SpeakerButton } from '@/components/chat/SpeakerButton';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { ChatHeader } from '@/components/chat/ChatHeader';
+import { EchoNewsChip } from '@/components/chat/EchoNewsChip';
 import { QuickQuestionPanel } from '@/components/chat/QuickQuestionPanel';
 import { VoiceControlsColumn } from '@/components/chat/VoiceControlsColumn';
 import {
@@ -126,35 +127,6 @@ const parseEchoParts = (text: string) => {
 
   return { content, dataSource: dataLine, marketClosedNote: marketClosedLine };
 };
-
-const EchoNewsChip = ({ news }: { news: NewsLink }) => (
-  <div style={{ padding: '6px 12px 4px 58px' }}>
-    <a
-      href={news.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        fontSize: 11,
-        color: '#92400e',
-        background: '#fffbeb',
-        border: '1px solid #fde68a',
-        borderRadius: 6,
-        padding: '3px 8px',
-        textDecoration: 'none',
-        fontWeight: 600,
-        maxWidth: 220,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-      }}
-    >
-      📰 {news.title}
-    </a>
-  </div>
-);
 
 const NoticeBox = ({
   dataSource,
