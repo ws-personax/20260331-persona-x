@@ -27,7 +27,7 @@ import {
 } from '@/lib/personax/market';
 import { buildMarketSessionLabels } from '@/lib/personax/market-session-label';
 import { cleanEchoSelfReference, cleanJackEnding, detectStage3GuardViolations } from '@/lib/personax/guards';
-import { buildJackText, buildLuciaText, buildEchoText, RAY_TAIL, JACK_TAIL, LUCIA_TAIL, ECHO_TAIL } from '@/lib/personax/templates';
+import { buildJackText, buildLuciaText, buildEchoText, ECHO_TAIL } from '@/lib/personax/templates';
 import type { DiscussMode, IndicatorFlags, PrevContext } from '@/lib/personax/templates';
 
 // ✅ 차 한잔 탭 페르소나별 시스템 프롬프트 (분리된 파일)
@@ -63,7 +63,6 @@ import {
   chunkText,
   cleanText,
   firstParagraph,
-  normalizeDetails,
   removeDangsin,
   sleep,
   summarize,
@@ -93,6 +92,13 @@ import { getAdminSupabase, saveUnifiedConversation } from '@/lib/personax/chat-p
 import type { DecisionSummary } from '@/lib/personax/decision-summary';
 import { mapLegacyEchoRound2, mapOrderedRound1 } from '@/lib/personax/streaming';
 import { streamRespond, type StreamEvent } from '@/lib/personax/stream-response';
+import {
+  buildFinalRay,
+  buildJackDetail,
+  buildLuciaDetail,
+  buildRayDetail,
+  buildStockDetailResponse,
+} from '@/lib/personax/stock-response-builders';
 import {
   createFallbackDebatePlan,
   parseDebatePlanJson,
@@ -2422,70 +2428,15 @@ ${DISCLAIMER}`;
       : '미지원';
 
     // ✅ RAY — 중립 팩트 3줄 (시세 / 거래량 / 변동성). 이평선·뉴스는 언급하지 않음.
-    const finalRay = (() => {
-      const closedNote = rayTimeNote ? rayTimeNote : '';
-      const rayChangeNum = safeNum(marketData?.change);
-      const changeStr = marketData?.change
-        ? ` (${rayChangeNum >= 0 ? '+' : ''}${rayChangeNum.toFixed(2)}%)`
-        : '';
-
-      // 거래량 라인 (숫자 포함). 코인은 24시간 거래량.
-      const rayFmtVol = (v: number): string => {
-        if (v >= 100000000) return `${(v / 100000000).toFixed(1)}억주`;
-        if (v >= 10000) return `${Math.round(v / 10000).toLocaleString()}만주`;
-        return `${v.toLocaleString()}주`;
-      };
-      // ✅ 비정상적으로 작은 값(< 1000주)도 데이터 미수급으로 취급
-      const rayRawVol = marketData?.rawVolume && marketData.rawVolume >= 1000 ? marketData.rawVolume : null;
-      const rayAvgVol = marketData?.avgVolume && marketData.avgVolume >= 1000 ? marketData.avgVolume : null;
-      let volLine: string;
-      if (assetType === 'CRYPTO') {
-        volLine = marketData?.volume ? `24시간 거래량 ${marketData.volume}` : '24시간 거래량 미수급';
-      } else if (rayRawVol && rayAvgVol) {
-        // 판정 3단계 — 저조 / 보통 / 증가
-        const delta = rayRawVol > rayAvgVol * 1.1 ? '증가' : rayRawVol < rayAvgVol * 0.9 ? '저조' : '보통';
-        volLine = `거래량 ${rayFmtVol(rayRawVol)} (5일 평균 ${rayFmtVol(rayAvgVol)}, ${delta})`;
-      } else if (rayRawVol) {
-        // avgVolume 미수급이어도 raw 수치는 표시
-        volLine = `거래량 ${rayFmtVol(rayRawVol)}`;
-      } else {
-        // ✅ 데이터가 진짜 없는 경우 — "거래량 저조" 오표시 차단
-        volLine = '거래량 데이터 미수급';
-      }
-
-      const line1 = `${keyword} ${rayPriceDisplay}${changeStr}${closedNote}`;
-      const line2 = volLine;
-      const line3 = vix.label;
-
-      // ✅ RAY 섹터 비교 한 줄 — 조건부 삽입 (quote 바로 앞)
-      //    조건: 이전 종목 존재 + 같은 섹터 + 다른 키워드 + 양쪽 change% 확보
-      //    판정: Δ = currentChange - prevChange
-      //          > +1.0 → "상대적 강세", < -1.0 → "상대적 약세", 그 외 → "유사한 흐름"
-      //    0.3%p는 장중 노이즈 범위라 1.0%p 이상 차이 날 때만 강/약 표현.
-      let sectorCompareLine = '';
-      const currSectorForCompare = getSector(keyword) ?? null;
-      const prevSectorForCompare = prevCtx?.prevSector ?? null;
-      if (
-        prevCtx &&
-        prevCtx.prevKeyword &&
-        prevCtx.prevKeyword !== keyword &&
-        prevSectorForCompare &&
-        currSectorForCompare &&
-        prevSectorForCompare === currSectorForCompare &&
-        prevCtx.prevChangePercent !== null &&
-        prevCtx.prevChangePercent !== undefined &&
-        Number.isFinite(rayChangeNum)
-      ) {
-        const delta = rayChangeNum - prevCtx.prevChangePercent;
-        const judgment = delta > 1.0 ? '상대적 강세' : delta < -1.0 ? '상대적 약세' : '유사한 흐름';
-        const prevChangeStr = `${prevCtx.prevChangePercent >= 0 ? '+' : ''}${prevCtx.prevChangePercent.toFixed(2)}%`;
-        const candidate = `같은 ${currSectorForCompare} 섹터, ${prevCtx.prevDisplayName || prevCtx.prevKeyword}(${prevChangeStr}) 대비 ${judgment}.`;
-        // 35자 이내 가드
-        if (candidate.length <= 35) sectorCompareLine = candidate;
-      }
-
-      return [line1, line2, line3, sectorCompareLine].filter(Boolean).join('\n');
-    })();
+    const finalRay = buildFinalRay({
+      keyword,
+      marketData,
+      assetType,
+      vix,
+      rayPriceDisplay,
+      rayTimeNote,
+      prevCtx,
+    });
 
     // ─── ✅ Gemini 완전 제거 — 에코 템플릿 직접 사용 ───
     // ✅ 지수/시장 키워드 감지 — 투자 지시 대신 시장 해석으로 전환
@@ -2614,227 +2565,37 @@ ${DISCLAIMER}`;
     }
 
     // ─── RAY/JACK/LUCIA 자세히 보기 상세 ───
-    let finalRayDetails: string | null = null;
-    let finalJackDetails: string | null = null;
-    let finalLuciaDetails: string | null = null;
+    const finalRayDetails = marketData && !isMarketIndex
+      ? buildRayDetail({ keyword, marketData, currency, assetType, vix, prevCtx })
+      : null;
+    const finalJackDetails = marketData && !isMarketIndex
+      ? buildJackDetail({ trendCtx, vol, nData, newsCount: news.length, flags, discussMode, conflict, verdict })
+      : null;
+    const finalLuciaDetails = marketData && !isMarketIndex
+      ? buildLuciaDetail({ keyword, marketData, vix, vol, pos, nData, newsCount: news.length, flags, discussMode, conflict, verdict })
+      : null;
 
-    if (marketData && !isMarketIndex) {
-      const fmtPx = (n: number) =>
-        currency === 'KRW' ? `${Math.round(n).toLocaleString('ko-KR')}원` : `$${n.toFixed(2)}`;
-      const fmtVol = (v: number): string => {
-        if (v >= 100000000) return `${(v / 100000000).toFixed(1)}억주`;
-        if (v >= 10000) return `${Math.round(v / 10000).toLocaleString()}만주`;
-        return `${v.toLocaleString()}주`;
-      };
-
-      // RAY 상세 — 이모지는 허용 셋(✅ ⚠️ 🔹 📊 📈 💡 🔴 🟡 🟢)만 사용
-      const rayLines: string[] = [];
-      const trend = marketData.trend;
-      const curPrice = marketData.rawPrice;
-      if (trend?.ma5 && trend?.ma20 && curPrice) {
-        const ma5Dir = curPrice > trend.ma5 ? '현재가 위' : '현재가 아래';
-        const ma20Dir = curPrice > trend.ma20 ? '현재가 위' : '현재가 아래';
-        rayLines.push('📊 이평선 상세');
-        rayLines.push(`  5일선: ${fmtPx(trend.ma5)} (${ma5Dir}, ${trend.trend5d})`);
-        rayLines.push(`  20일선: ${fmtPx(trend.ma20)} (${ma20Dir}, ${trend.trend20d})`);
-      }
-      if (assetType !== 'CRYPTO') {
-        const rv = marketData.rawVolume;
-        const av = marketData.avgVolume;
-        if (rv > 0 && av > 0) {
-          const ratioPct = Math.round((rv / av) * 100);
-          if (rayLines.length) rayLines.push('');
-          rayLines.push('📊 거래량 상세');
-          rayLines.push(`  오늘: ${fmtVol(rv)} / 5일 평균: ${fmtVol(av)}`);
-          rayLines.push(`  평균 대비: ${ratioPct}%`);
-        }
-      } else if (marketData.volume) {
-        if (rayLines.length) rayLines.push('');
-        rayLines.push('📊 거래량 상세');
-        rayLines.push(`  24시간 거래대금: ${marketData.volume}`);
-      }
-      const ampMatch = vix.label.match(/([\d.]+)%\s*진폭/);
-      if (ampMatch) {
-        const amp = parseFloat(ampMatch[1]);
-        const meaning =
-          amp < 2 ? '저변동성 — 방향성 약함'
-          : amp < 4 ? '중변동성 — 일반적 수준'
-          : '고변동성 — 급등락 주의';
-        if (rayLines.length) rayLines.push('');
-        rayLines.push('📈 변동성 의미');
-        rayLines.push(`  일중 ${amp.toFixed(1)}% 진폭 — ${meaning}`);
-      }
-      if (
-        prevCtx?.prevSector &&
-        getSector(keyword) === prevCtx.prevSector &&
-        prevCtx.prevChangePercent !== null &&
-        prevCtx.prevChangePercent !== undefined &&
-        Number.isFinite(parseFloat(marketData.change))
-      ) {
-        const curCh = parseFloat(marketData.change);
-        const delta = curCh - prevCtx.prevChangePercent;
-        const judgment = delta > 1.0 ? '상대적 강세' : delta < -1.0 ? '상대적 약세' : '유사한 흐름';
-        const prevStr = `${prevCtx.prevChangePercent >= 0 ? '+' : ''}${prevCtx.prevChangePercent.toFixed(2)}%`;
-        const deltaStr = `${delta >= 0 ? '+' : ''}${delta.toFixed(2)}%p`;
-        if (rayLines.length) rayLines.push('');
-        rayLines.push('📊 섹터 비교');
-        rayLines.push(`  ${prevCtx.prevDisplayName || prevCtx.prevKeyword}(${prevStr}) 대비 ${judgment} (Δ ${deltaStr})`);
-      }
-      finalRayDetails = rayLines.length > 0 ? rayLines.join('\n') : null;
-
-      // JACK 상세
-      const maComment = trendCtx.trendSummary
-        || (trendCtx.trendStrength === 'strong_up' ? '단기·중기 모두 상승 추세'
-          : trendCtx.trendStrength === 'weak_up' ? '단기 상승, 중기 미확인'
-          : trendCtx.trendStrength === 'strong_down' ? '단기·중기 모두 하락 추세'
-          : trendCtx.trendStrength === 'weak_down' ? '단기 조정, 중기 지지선 주시'
-          : '이평선 방향성 불명확');
-      const volComment = vol.isHigh
-        ? `${vol.label} — 세력 개입 가능성`
-        : vol.score < 0
-          ? `${vol.label} — 관심도 약화`
-          : `${vol.label} — 특이 신호 없음`;
-      const newsComment = nData.sentiment === '긍정'
-        ? `호재성 뉴스 ${news.length}건 — 우호적 분위기`
-        : nData.sentiment === '부정'
-          ? `악재성 뉴스 ${news.length}건 — 경계 분위기`
-          : `뉴스 ${news.length}건 (중립) — 명확한 촉매 부재`;
-      // ✅ 시나리오는 verdict가 아닌 방향(direction)으로 분기 — bull인데 하락 톤 섞이는 모순 차단
-      const jackDirection: 'bull' | 'bear' | 'sideways' | 'high_volatility_up' | 'high_volatility_down' =
-        flags.vixHigh && flags.priceUp   ? 'high_volatility_up'
-        : flags.vixHigh && flags.priceDown ? 'high_volatility_down'
-        : discussMode === 'bull'  ? 'bull'
-        : discussMode === 'bear'  ? 'bear'
-        : 'sideways';
-      const scenario =
-        jackDirection === 'bull' ? '상승 추세 유지 중. 거래량 동반 여부가 핵심 확인 포인트.'
-        : jackDirection === 'bear' ? '하락 압력 우세. 리스크 기준선 이탈 여부 모니터링 필요.'
-        : jackDirection === 'high_volatility_up' ? '단기 급등 구간. 되돌림 가능성 열어두는 것이 합리적.'
-        : jackDirection === 'high_volatility_down' ? '단기 급락 구간. 추가 하락 여부 확인 전 접근 신중.'
-        : '방향성 부재 구간. 돌파 또는 이탈 방향 확인이 우선.';
-      const risk = conflict === 'conflict_jack_buy'
-        ? '확인 신호 부재 — 거래량·뉴스 한 축 확인 전 충분한 확인 후 판단 권장'
-        : conflict === 'conflict_lucia_buy'
-          ? '하락 속 역발상 위험 — 바닥 확인 전 진입은 칼날 잡기'
-          : verdict === '관망'
-            ? '지표 혼조 — 억지 진입 시 손익비 악화'
-            : flags.vixHigh
-              ? '고변동성 구간 — 분할 접근으로 평단 관리'
-              : '시장 급변 시 리스크 기준선 이탈 여부 모니터링 권장';
-      finalJackDetails = [
-        '✅ 진입 근거 항목별',
-        `  이평선: ${maComment}`,
-        `  거래량: ${volComment}`,
-        `  뉴스: ${newsComment}`,
-        '',
-        '핵심 시나리오',
-        `  ${scenario}`,
-        '',
-        '⚠️ 주의 리스크',
-        `  ${risk}`,
-      ].join('\n');
-
-      // LUCIA 상세
-      const luciaWarning = conflict === 'conflict_jack_buy'
-        ? `${keyword} 추세는 살아있지만 확인 신호(거래량·뉴스)가 약해요. 군중이 기회라 부를 때가 가장 위험할 수 있어요.`
-        : conflict === 'conflict_lucia_buy'
-          ? `하락 속 역발상 기회가 보이지만 바닥 확인이 먼저예요. 떨어지는 칼날은 잡지 마세요.`
-          : verdict === '매도 우위'
-            ? `하방 압력이 누적되고 있어요. 손실을 줄이는 것이 곧 수익이에요.`
-            : verdict === '관망'
-              ? `지표가 엇갈려요. 확실하지 않을 땐 현금도 포지션이에요.`
-              : `강세 흐름에서도 과열·되돌림 가능성은 상존해요. 분할 접근이 안전해요.`;
-      const riskIndicators: string[] = [];
-      if (vix.label.includes('고변동성') || vix.label.includes('중변동성')) {
-        riskIndicators.push(`변동성: ${vix.label}`);
-      }
-      if (nData.sentiment === '부정' && news.length > 0) {
-        riskIndicators.push(`악재 뉴스 ${news.length}건 — 추가 악재 주시`);
-      }
-      if (pos.label.includes('고점')) {
-        riskIndicators.push(`${pos.label} — 되돌림 구간 경계`);
-      } else if (pos.label.includes('저점')) {
-        riskIndicators.push(`${pos.label} — 반등 전 추가 하락 여지`);
-      }
-      if (flags.priceDown) {
-        riskIndicators.push(`오늘 ${marketData.change}% 하락`);
-      }
-      if (vol.isHigh && (discussMode === 'bear' || verdict === '매도 우위')) {
-        riskIndicators.push('거래량 급증 + 하락 = 매도 압력');
-      }
-      if (riskIndicators.length === 0) {
-        riskIndicators.push('경고 등급 리스크 지표 없음 — 기본 리스크 관리 유지');
-      }
-      const emotionalGuard = verdict === '매수 우위'
-        ? 'FOMO로 뒤늦게 올라타면 고점에서 물릴 수 있어요.'
-        : verdict === '매도 우위'
-          ? '공포로 바닥 투매는 반등을 놓쳐요. 리스크 관리 규칙은 지키되 감정은 거르세요.'
-          : '조급함이 가장 큰 리스크예요. 조건 충족 전까지는 관찰 권장.';
-      finalLuciaDetails = [
-        '⚠️ 경고 근거 상세',
-        `  ${luciaWarning}`,
-        '',
-        '📊 리스크 지표',
-        ...riskIndicators.slice(0, 3).map(s => `  • ${s}`),
-        '',
-        '💡 감정적 판단 경계',
-        `  ${emotionalGuard}`,
-      ].join('\n');
-    }
-
-
-    // ✅ MBTI 강화 문구 — 상승/하락 풀로 분리 (각 10개)
-
-    // JACK (INTJ · 전략가) — 상승/하락
-    const JACK_BULLISH = [
-      '이건 사이클이 아닙니다 — 구조적 변화입니다.',
-      '강세장은 비관 속에서 태어납니다.',
-      '추세는 친구라는 말이 있어요.',
-      '모멘텀이 살아있는 구간이에요.',
-      '기회는 준비된 자에게만 옵니다.',
-      '지금이 마지막 저점일 수 있습니다.',
-      '시장은 용기 있는 자의 편입니다.',
-      '데이터가 말하는 방향을 참고해볼 수 있어요. 감정은 한 발 떨어뜨려두는 게 도움이 돼요.',
-      '망설임이 가장 큰 리스크입니다.',
-      '추세에 올라타는 것이 통계적으로 유리한 흐름이에요.',
-    ];
-    const JACK_BEARISH = [
-      '데이터가 경고를 보내는 구간이에요.',
-      '후퇴도 전략입니다. 재진입 기회는 반드시 옵니다.',
-      '현금도 포지션입니다.',
-      '살아남아야 다음 기회가 있습니다.',
-      '손실을 줄이는 것이 첫 번째 임무입니다.',
-      '시장에 맞서는 흐름은 부담이 커요.',
-      '바닥 확인이 먼저입니다.',
-      '떨어지는 칼날은 피하는 게 일반적인 원칙이에요.',
-      '지지선 흐름을 살펴보는 것도 도움이 돼요.',
-      '재진입 기회는 반드시 옵니다.',
-    ];
-    // JACK: bear → 하락, else(bull/conflict) → 상승
-    const jackMbtiPool = discussMode === 'bear' ? JACK_BEARISH : JACK_BULLISH;
-
-    // RAY (INTP · 데이터 분석) — 중립 명언 8개
-    const rayMbtiPhrases = [
-      '데이터는 거짓말하지 않습니다. 해석이 거짓말할 뿐.',
-      '가설은 많습니다 — 확률로 승부합니다.',
-      '신호와 소음을 구분하는 것이 핵심입니다.',
-      '역사는 반복됩니다. 패턴을 보십시오.',
-      '분산이 유일한 무료 점심입니다.',
-      '과거 데이터가 미래를 완벽히 예측하지는 않지만, 무시하면 더 위험합니다.',
-      '감정이 아닌 확률로 판단하십시오.',
-      '시장은 단기적으로 투표기계, 장기적으로 저울입니다.',
-    ];
-
-    // ✅ 10개 풀에 맞춘 로테이션
-    const mbtiIdx   = Math.floor(Date.now() / 1000) % 10;
-    const rayRotIdx = Math.floor(Date.now() / 1000) % rayMbtiPhrases.length;
-
-    // ✅ 모든 페르소나 — [본문] → [MBTI 라인] → [TAIL] 순서 통일
-    const finalJackOut  = finalJack  + '\n— ' + jackMbtiPool[mbtiIdx]   + JACK_TAIL;
-    const finalLuciaOut = finalLucia + LUCIA_TAIL;
-    const finalRayOut   = finalRay   + '\n— ' + rayMbtiPhrases[rayRotIdx] + RAY_TAIL;
-
-    const finalReply = [finalRayOut, finalJackOut, finalLuciaOut, finalEcho].filter(Boolean).join('\n\n');
+    const {
+      finalRayOut,
+      finalJackOut,
+      finalLuciaOut,
+      finalEchoOut,
+      finalReply,
+      echoDetailsOut,
+      rayDetailsOut,
+      jackDetailsOut,
+      luciaDetailsOut,
+    } = buildStockDetailResponse({
+      finalRay,
+      finalJack,
+      finalLucia,
+      finalEcho,
+      finalEchoDetails,
+      finalRayDetails,
+      finalJackDetails,
+      finalLuciaDetails,
+      discussMode,
+    });
 
     const { rayNews, jackNews, luciaNews, echoNews } = allocatePersonaNews(news);
 
@@ -2861,22 +2622,6 @@ ${DISCLAIMER}`;
       }
     } else if (!userId) {
       console.warn('[saveHistory] 저장 스킵 — userId null');
-    }
-
-    // ✅ 자세히 보기 전용 후처리 — 지시형 표현 완화 + 이모지 허용 셋 통일
-    //    (summary / 메인 페르소나 말풍선은 지휘관 톤 유지를 위해 미적용)
-    const echoDetailsOut   = normalizeDetails(finalEchoDetails);
-    const rayDetailsOut    = normalizeDetails(finalRayDetails);
-    const jackDetailsOut   = normalizeDetails(finalJackDetails);
-    const luciaDetailsOut  = normalizeDetails(finalLuciaDetails);
-
-    // invest 카테고리 필수 어휘 안전망 (레거시 stock-detail path) —
-    //   4명 응답에 '손절선'·'지지선' 둘 다 없으면 ECHO 끝에 손절선 가이드 1줄 부착.
-    //   Option D path 안전망(line 1666)과 동일 정책을 레거시 경로에도 적용.
-    let finalEchoOut = finalEcho;
-    const _stockAllText = finalJackOut + finalLuciaOut + finalRayOut + finalEcho;
-    if (!_stockAllText.includes('손절선') && !_stockAllText.includes('지지선')) {
-      finalEchoOut = finalEcho.trimEnd().replace(/[?。！!]$/, '') + '\n손절선 정해놓으셨어요?';
     }
 
     return respond({
