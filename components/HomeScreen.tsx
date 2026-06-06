@@ -67,8 +67,6 @@ export default function HomeScreen({ onSubmit, onOpenHistory }: HomeScreenProps)
           </button>
         </div>
       </header>
-      <ReviewCard onOpenHistory={openHistory} onOpenConversation={openReviewConversation} />
-
       {/* 메인 콘텐츠 - 상단 정렬 */}
       <div className="flex-1 flex flex-col overflow-hidden" style={{ minHeight: 0 }}>
         {/* 타이틀 + 부제 */}
@@ -154,6 +152,8 @@ export default function HomeScreen({ onSubmit, onOpenHistory }: HomeScreenProps)
         {/* 카드 아래 빈 공간 */}
         <div className="flex-1"></div>
       </div>
+
+      <ReviewCard onOpenHistory={openHistory} onOpenConversation={openReviewConversation} />
 
       {/* 입력창 - 하단 고정, 크고 눈에 띄게 */}
       <div

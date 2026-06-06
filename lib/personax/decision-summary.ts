@@ -11,7 +11,7 @@ const LUMP_SUM_PURPOSE_PATTERN =
   /퇴직금|목돈|상속금|노후\s*자금|노후자금|은퇴\s*자금|은퇴자금/;
 
 const LUMP_SUM_INVESTMENT_EXECUTION_PATTERN =
-  /투자|주식|ETF|채권|펀드|매수|사야|살까|비중|자산\s*배분|자산배분|포트폴리오|IRP|연금저축|예금|적금/;
+  /투자|주식|ETF|채권|펀드|매수|사야|살까|비중|자산\s*배분|자산배분|포트폴리오|IRP|연금저축|예금|적금|XRP|xrp|리플|이더리움|ETH|eth|솔라나|SOL|sol/;
 
 const isLumpSumPurposeQuestion = (question: string): boolean => {
   const q = normalizeQuestion(question);
@@ -48,7 +48,7 @@ const inferQuestionType = (question: string, questionType: string): string => {
     /아파트|부동산|단지|입지|학군|교통|직주근접|실거주|전세|청약|재건축|재개발/.test(q) &&
     /추천|지역|어디|괜찮|좋을까|10억|9억|8억|7억|6억/.test(q)
   ) return 'real_estate_recommendation';
-  if (/사야|매수|팔아야|매도|비트코인|삼성전자|주식|코인|투자/.test(q)) return 'buy_or_wait';
+  if (/사야|매수|팔아야|매도|비트코인|XRP|xrp|리플|이더리움|ETH|eth|솔라나|SOL|sol|삼성전자|주식|코인|투자/.test(q)) return 'buy_or_wait';
   if (LUMP_SUM_PURPOSE_PATTERN.test(q) && LUMP_SUM_INVESTMENT_EXECUTION_PATTERN.test(q)) return 'buy_or_wait';
   if (/창업.*재취업|재취업.*창업|창업\s*vs\s*재취업/i.test(q)) return 'startup_vs_job';
   if (/계속\s*만나|헤어|이 사람|관계|연애|이혼|시기|질투|무시|비난|뒷담|견제|상처|거리두기|경계|대인관계|친구|동료|직장동료|상사|부하|갈등|트러블|미워|싫어|눈치|왕따|따돌림|험담/.test(q)) return 'relationship';
@@ -72,6 +72,28 @@ const counterFallbackByType = (type: string): string => {
   }
 
   return '다른 선택지도 조건이 맞으면 검토할 가치가 있습니다.';
+};
+
+const inferBuyOrWaitVerdict = (...values: Array<string | undefined>): string => {
+  const text = values.filter(Boolean).join(' ');
+
+  if (/변동성|리스크|위험|손실|하락|급락|폭락|불안|손절/.test(text)) {
+    return '리스크 기준 우선 구간입니다';
+  }
+  if (/분할|나눠|나누어|적립|DCA/.test(text)) {
+    return '분할 접근 검토 구간입니다';
+  }
+  if (/관망|대기|기다|보류|지켜보|추격/.test(text)) {
+    return '관망 우세입니다';
+  }
+  if (/진입|가격\s*기준|기준가|조건|타이밍|사야|살까|매수/.test(text)) {
+    return '진입 조건 점검 단계입니다';
+  }
+  if (/확인|데이터|정보|근거|체크|검토/.test(text)) {
+    return '추가 확인이 먼저입니다';
+  }
+
+  return '추가 확인이 먼저입니다';
 };
 
 export function buildDecisionSummary(params: {
@@ -99,7 +121,7 @@ export function buildDecisionSummary(params: {
 
   if (type === 'buy_or_wait') {
     return {
-      verdict: '지금은 조건부 판단입니다',
+      verdict: inferBuyOrWaitVerdict(params.question, params.ray, params.jack, params.lucia, params.echo),
       reasons: ['현재 가격과 등락률을 먼저 확인해야 합니다', '리스크 기준 없이 행동하면 손실 폭이 커질 수 있습니다'],
       counterView: counterFallbackByType(type),
       nextAction: '오늘은 투자 기간, 손실 한도, 추가 확인할 가격 기준을 각각 1줄로 적어보세요',
