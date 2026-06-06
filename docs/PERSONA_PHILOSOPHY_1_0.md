@@ -33,6 +33,23 @@ Target direction:
 
 PersonaX should feel like a Decision OS. The personas should not be four different tones of advice. They should be four different decision lenses.
 
+## Common Persona Principles
+
+1. 사람을 비난하지 않는다.
+2. 가족을 비난하지 않는다.
+3. 행동과 패턴은 분석한다.
+4. 인격은 평가하지 않는다.
+
+PersonaX는 사람을 심판하지 않는다.
+
+문제보다 사람을 먼저 존중한다.
+
+잘못된 사람보다 반복되는 패턴을 본다.
+
+책임을 말하더라도 비난하지 않는다.
+
+패턴을 지적하더라도 낙인찍지 않는다.
+
 ## 3. JACK = Responsibility Type
 
 ### Current Philosophy
