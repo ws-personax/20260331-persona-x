@@ -9,6 +9,43 @@ type ReviewItem = {
   review_date: string | null;
   decision_type: string | null;
   review_status: string | null;
+  created_at: string;
+};
+
+const KST_TIME_ZONE = 'Asia/Seoul';
+
+const kstDayNumber = (value: string): number | null => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: KST_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const year = Number(parts.find((part) => part.type === 'year')?.value);
+  const month = Number(parts.find((part) => part.type === 'month')?.value);
+  const day = Number(parts.find((part) => part.type === 'day')?.value);
+
+  if (!year || !month || !day) return null;
+  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+};
+
+const buildRecordLabel = (createdAt: string | null): string => {
+  if (!createdAt) return '과거의 내가 남긴 기록';
+
+  const createdDay = kstDayNumber(createdAt);
+  if (createdDay === null) return '과거의 내가 남긴 기록';
+
+  const todayDay = kstDayNumber(new Date().toISOString());
+  if (todayDay === null) return '과거의 내가 남긴 기록';
+
+  const diff = Math.max(0, todayDay - createdDay);
+  if (diff === 0) return '오늘 남긴 기록';
+  if (diff === 1) return '어제의 내가 남긴 기록';
+  return `${diff}일 전의 내가 남긴 기록`;
 };
 
 type ReviewCardProps = {
@@ -66,7 +103,7 @@ export default function ReviewCard({ onOpenHistory, onOpenConversation }: Review
         }}
       >
         <span style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#6b7280', marginBottom: 6 }}>
-          과거의 내가 남긴 기록
+          {buildRecordLabel(item.created_at)}
         </span>
 
         <div style={{ display: 'block', fontSize: 15, color: '#111827', lineHeight: 1.55, marginBottom: 8 }}>
