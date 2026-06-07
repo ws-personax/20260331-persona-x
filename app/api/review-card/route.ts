@@ -14,6 +14,7 @@ type ReviewCardItem = {
   review_date: string | null;
   decision_type: string | null;
   review_status: string | null;
+  created_at: string;
 };
 
 const empty = () =>
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
     const today = new Date().toISOString().split('T')[0];
     const { data: scheduledRows, error: scheduledError } = await supabase
       .from('conversations')
-      .select('id, title, verdict, review_date, decision_type, review_status')
+      .select('id, title, verdict, review_date, decision_type, review_status, created_at')
       .eq('provider_user_id', providerUserId)
       .eq('review_status', 'pending')
       .lte('review_date', today)
@@ -68,7 +69,7 @@ export async function GET(req: NextRequest) {
 
       const { data: meaningfulRows, error: meaningfulError } = await supabase
         .from('conversations')
-        .select('id, title, verdict, review_date, decision_type, review_status')
+        .select('id, title, verdict, review_date, decision_type, review_status, created_at')
         .eq('provider_user_id', providerUserId)
         .is('review_date', null)
         .not('verdict', 'is', null)
