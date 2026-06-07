@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { MemoryContextItem, MemoryWriteParams, MemoryWriteResult } from './memory-types';
+import { calculateDecisionImportance } from './decision-summary';
 
 const DEFAULT_MEMORY_QUERY_LIMIT = 10;
 const MAX_MEMORY_CONTEXT_ITEMS = 3;
@@ -8,8 +9,6 @@ const MAX_MEMORY_REASON_LENGTH = 220;
 const MAX_MEMORY_NEXT_ACTION_LENGTH = 260;
 const MAX_MEMORY_REASONS = 3;
 const MAX_MEMORY_COUNTER_VIEWS = 1;
-const DEFAULT_DECISION_IMPORTANCE = 3;
-
 type ConversationMemoryRow = {
   id: string;
   created_at: string;
@@ -95,6 +94,13 @@ export async function saveMemoryFromDecisionSummary(
     compactText(params.decisionType, MAX_MEMORY_TEXT_LENGTH) ||
     compactText(params.category, MAX_MEMORY_TEXT_LENGTH);
   const counterView = compactText(params.decisionSummary.counterView, MAX_MEMORY_TEXT_LENGTH);
+  const decisionImportance = calculateDecisionImportance({
+    decisionType: params.decisionType,
+    category: params.category,
+    verdict: params.decisionSummary.verdict,
+    reasons: params.decisionSummary.reasons,
+    nextAction: params.decisionSummary.nextAction,
+  });
 
   try {
     const { error } = await params.supabase
@@ -112,7 +118,7 @@ export async function saveMemoryFromDecisionSummary(
           MAX_MEMORY_NEXT_ACTION_LENGTH,
         ),
         decision_type: decisionType,
-        decision_importance: DEFAULT_DECISION_IMPORTANCE,
+        decision_importance: decisionImportance,
       })
       .eq('id', params.conversationId);
 

@@ -3,9 +3,77 @@ export type DecisionSummary = {
   reasons: string[];
   counterView: string;
   nextAction: string;
+  importance?: number;
 };
 
 const normalizeQuestion = (question: string): string => question.replace(/\s+/g, ' ').trim();
+
+type DecisionImportanceParams = {
+  question?: string;
+  title?: string;
+  decisionType?: string | null;
+  category?: string | null;
+  verdict?: string | null;
+  reasons?: unknown;
+  nextAction?: string | null;
+};
+
+const compactImportanceText = (value: unknown): string => {
+  if (typeof value === 'string') return value.replace(/\s+/g, ' ').trim();
+  if (Array.isArray(value)) {
+    return value.map((item) => compactImportanceText(item)).filter(Boolean).join(' ');
+  }
+  return '';
+};
+
+const buildImportanceText = (params: DecisionImportanceParams): string => [
+  params.question,
+  params.title,
+  params.decisionType,
+  params.category,
+  params.verdict,
+  params.nextAction,
+  compactImportanceText(params.reasons),
+]
+  .map((value) => compactImportanceText(value))
+  .filter(Boolean)
+  .join(' ')
+  .toLowerCase();
+
+export function calculateDecisionImportance(params: DecisionImportanceParams): number {
+  const text = buildImportanceText(params);
+  const decisionType = compactImportanceText(params.decisionType).toLowerCase();
+  const category = compactImportanceText(params.category).toLowerCase();
+  const typeText = `${decisionType} ${category}`.trim();
+
+  const fivePointPatterns = [
+    /창업|재취업|이직|은퇴|결혼|이혼|부모|자녀|육아|가족|요양|간병|직장 그만둘까|삶의 방향|인생 방향/,
+  ];
+  const fourPointPatterns = [
+    /퇴직금|부동산|아파트|집|주택|대출|전세|월세|사업자?|1억|2억|3억|억\b|목돈|노후|장기투자|생활비|생계|장기자금|보증금/,
+  ];
+  const twoPointPatterns = [
+    /투자할까|사야할까|사야 할까|팔아야할까|팔아야 할까|갈아탈까|들어갈까|홀딩할까|보유할까|고를까|정할까|할까 말까|어느 쪽이 나을까/,
+  ];
+  const onePointPatterns = [
+    /시세|주가|가격|몇 원|얼마|뉴스|어때|전망|지금 사|매수|매도|코인|xrp|비트코인|테슬라|삼성전자/,
+  ];
+
+  if (fivePointPatterns.some((pattern) => pattern.test(text)) || /startup_vs_job|career|relationship|family/.test(typeText)) {
+    return 5;
+  }
+  if (fourPointPatterns.some((pattern) => pattern.test(text))) {
+    return 4;
+  }
+  if (twoPointPatterns.some((pattern) => pattern.test(text))) {
+    return 2;
+  }
+  if (onePointPatterns.some((pattern) => pattern.test(text))) {
+    return 1;
+  }
+
+  return 3;
+}
 
 const LUMP_SUM_PURPOSE_PATTERN =
   /퇴직금|목돈|상속금|노후\s*자금|노후자금|은퇴\s*자금|은퇴자금/;
@@ -106,9 +174,20 @@ export function buildDecisionSummary(params: {
 }): DecisionSummary {
   const type = inferQuestionType(params.question, params.questionType);
   const anchor = firstNonEmpty(params.echo, params.jack, params.ray, params.lucia);
+  const withImportance = (summary: DecisionSummary): DecisionSummary => ({
+    ...summary,
+    importance: calculateDecisionImportance({
+      question: params.question,
+      decisionType: type,
+      category: type,
+      verdict: summary.verdict,
+      reasons: summary.reasons,
+      nextAction: summary.nextAction,
+    }),
+  });
 
   if (type === 'real_estate_recommendation') {
-    return {
+    return withImportance({
       verdict: '지역 추천보다 먼저 실거주 기준과 예산 안전선을 정해야 합니다',
       reasons: [
         '10억 이하 아파트는 입지, 직주근접, 교통, 학군, 공급 물량에 따라 판단이 달라집니다',
@@ -116,80 +195,80 @@ export function buildDecisionSummary(params: {
       ],
       counterView: '다만 이미 직장 위치와 예산이 확정되어 있다면 후보 지역을 바로 좁혀도 됩니다',
       nextAction: '출퇴근 지역, 보유 현금, 대출 가능 금액, 실거주/투자 목적을 먼저 정리하세요',
-    };
+    });
   }
 
   if (type === 'buy_or_wait') {
-    return {
+    return withImportance({
       verdict: inferBuyOrWaitVerdict(params.question, params.ray, params.jack, params.lucia, params.echo),
       reasons: ['현재 가격과 등락률을 먼저 확인해야 합니다', '리스크 기준 없이 행동하면 손실 폭이 커질 수 있습니다'],
       counterView: counterFallbackByType(type),
       nextAction: '오늘은 투자 기간, 손실 한도, 추가 확인할 가격 기준을 각각 1줄로 적어보세요',
-    };
+    });
   }
 
   if (type === 'startup_vs_job') {
-    return {
+    return withImportance({
       verdict: '현재 조건에서는 재취업 우선입니다',
       reasons: ['현금흐름 확보가 먼저입니다', '창업 리스크를 줄일 준비 시간이 필요합니다'],
       counterView: '다만 창업 준비는 사이드 프로젝트로 병행할 수 있습니다',
       nextAction: '30일 내 지원 기업 10곳과 창업 검증 과제 1개를 함께 정리하세요',
-    };
+    });
   }
 
   if (type === 'relationship') {
     const subtype = inferRelationshipSummarySubtype(params.question);
 
     if (subtype === 'conflict') {
-      return {
+      return withImportance({
         verdict: '상대 감정에 반응하기보다 패턴을 보고 선을 정해야 합니다',
         reasons: ['시기와 견제는 설득보다 반복 패턴 확인이 중요합니다', '감정적으로 맞서면 관계의 주도권을 상대에게 넘길 수 있습니다'],
         counterView: '다만 실제 피해나 공개적인 공격이 있다면 조용한 거리두기만으로는 부족할 수 있습니다',
         nextAction: '2주 동안 상대의 말과 행동 중 반복되는 침범 패턴 3가지를 기록하고, 노출할 정보와 거리를 줄이세요',
-      };
+    });
     }
 
     if (subtype === 'boundary') {
-      return {
+      return withImportance({
         verdict: '관계를 끊을지보다 어디까지 허용할지 먼저 정해야 합니다',
         reasons: ['불편함이 반복된다면 감정보다 경계선 설정이 먼저입니다', '모든 관계를 끝내기보다 접촉 범위를 줄이는 선택지도 있습니다'],
         counterView: '다만 상대가 반복적으로 선을 넘는다면 관계 유지보다 보호가 우선입니다',
         nextAction: '상대에게 허용할 말, 시간, 거리의 기준을 각각 하나씩 정하고 그 기준을 넘으면 대응을 줄이세요',
-      };
+    });
     }
 
-    return {
+    return withImportance({
       verdict: '계속 여부는 반복 행동을 보고 조건부로 판단해야 합니다',
       reasons: ['감정보다 반복되는 행동 패턴이 더 중요합니다', '관계가 나를 계속 작아지게 만드는지 확인해야 합니다'],
       counterView: '다만 일회성 실수라면 대화 후 변화 여부를 볼 여지는 있습니다',
       nextAction: '2주 동안 불편했던 행동 3개와 실제로 바뀐 행동 3개를 기록하세요',
-    };
+    });
   }
 
   if (type === 'career') {
-    return {
+    return withImportance({
       verdict: '지금은 선택지를 좁히기보다 조건을 정리할 때입니다',
       reasons: ['커리어 결정은 감정, 돈, 시간 조건이 함께 맞아야 합니다', '바로 움직이기 전 손실 가능한 범위를 알아야 합니다'],
       counterView: '다만 이미 회복 불가능한 환경이라면 빠른 전환도 선택지입니다',
       nextAction: '이번 주 안에 돈, 시간, 성장 기준을 각각 3줄로 정리하세요',
-    };
+    });
   }
 
   if (isLumpSumPurposeQuestion(params.question)) {
-    return {
+    return withImportance({
       verdict: '먼저 이 돈의 목적을 정해야 합니다',
       reasons: ['퇴직금이나 목돈은 투자 대상보다 사용 목적이 먼저 정해져야 합니다', '노후자금, 생활비, 부채상환, 창업자금, 가족지원은 서로 다른 기준이 필요합니다'],
       counterView: '다만 이미 투자 목적이 명확하다면 상품 비교로 넘어가도 됩니다',
       nextAction: '이 돈을 노후자금, 생활비, 부채상환, 창업자금, 가족지원 중 어디에 쓸지 1순위와 2순위로 나누어 적으세요',
-    };
+    });
   }
 
-  return {
+  return withImportance({
     verdict: anchor ? '결정 기준을 먼저 세워야 합니다' : '추가 정보 확인 후 결정해야 합니다',
     reasons: ['지금 질문은 기준이 없으면 답이 흔들립니다', '다음 행동을 작게 정해야 재점검할 수 있습니다'],
     counterView: '다만 상황이 급하면 가장 회복 가능한 선택을 우선할 수 있습니다',
     nextAction: '오늘 안에 선택 기준 3개와 바로 할 행동 1개를 적으세요',
-  };
+    });
 }
 
 export function formatDecisionSummary(summary: DecisionSummary): string {
