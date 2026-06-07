@@ -80,6 +80,15 @@ const personaLabel = (persona: string | null) => {
   return persona || 'Assistant';
 };
 
+const pickText = (value: unknown) => {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    const first = value[0];
+    return typeof first === 'string' ? first : '';
+  }
+  return '';
+};
+
 export default function HistoryModal({ onClose, initialConversationId }: HistoryModalProps) {
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -299,14 +308,64 @@ export default function HistoryModal({ onClose, initialConversationId }: History
               </button>
 
               <div style={{ background: '#FFF8E8', border: '1px solid #E0C48D', borderRadius: 14, padding: '16px', boxShadow: '0 1px 4px rgba(92,61,30,0.10)' }}>
-                <p style={{ fontSize: 16, fontWeight: 800, color: '#3F2F1D', margin: '0 0 4px' }}>
+                {selectedDetail?.conversation?.created_at && (
+                  <p style={{ fontSize: 11, color: '#7A5A35', margin: '0 0 8px', fontWeight: 700 }}>
+                    {formatDate(selectedDetail.conversation.created_at)}
+                  </p>
+                )}
+                <p style={{ fontSize: 14, fontWeight: 800, color: '#3F2F1D', margin: '0 0 2px' }}>
+                  그날 당신은
+                </p>
+                <p style={{ fontSize: 18, fontWeight: 800, color: '#3F2F1D', margin: '0 0 2px' }}>
                   {selectedDetail?.conversation?.title || 'Untitled decision'}
+                </p>
+                <p style={{ fontSize: 14, fontWeight: 800, color: '#3F2F1D', margin: '0 0 12px' }}>
+                  을 고민하고 있었습니다.
                 </p>
                 {selectedDetail?.conversation?.created_at && (
                   <p style={{ fontSize: 11, color: '#7A5A35', margin: '0 0 14px' }}>
-                    {formatDate(selectedDetail.conversation.created_at)} · {selectedDetail.conversation.decision_type || selectedDetail.conversation.category || 'decision'}
+                    {selectedDetail.conversation.decision_type || selectedDetail.conversation.category || 'decision'}
                   </p>
                 )}
+
+                {selectedDetail?.conversation?.verdict && (
+                  <div style={{ background: '#fff', borderRadius: 12, padding: '14px', marginBottom: 14, border: '1px solid #E0C48D', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                    <p style={{ color: '#3F2F1D', fontSize: 14, fontWeight: 800, margin: '0 0 10px' }}>
+                      내가 내린 결정
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <p style={{ color: '#111827', fontSize: 14, lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
+                        <span style={{ fontWeight: 800 }}>결론:</span> {selectedDetail.conversation.verdict}
+                      </p>
+                      {pickText(selectedDetail.conversation.reasons) && (
+                        <p style={{ color: '#111827', fontSize: 14, lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
+                          <span style={{ fontWeight: 800 }}>이유:</span> {pickText(selectedDetail.conversation.reasons)}
+                        </p>
+                      )}
+                      {pickText(selectedDetail.conversation.counter_views) && (
+                        <p style={{ color: '#111827', fontSize: 14, lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
+                          <span style={{ fontWeight: 800 }}>놓치기 쉬운 관점:</span> {pickText(selectedDetail.conversation.counter_views)}
+                        </p>
+                      )}
+                      {pickText(selectedDetail.conversation.next_action) && (
+                        <p style={{ color: '#111827', fontSize: 14, lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
+                          <span style={{ fontWeight: 800 }}>그때 정한 행동:</span> {pickText(selectedDetail.conversation.next_action)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ marginBottom: 10 }}>
+                  <p style={{ color: '#3F2F1D', fontSize: 14, fontWeight: 800, margin: '0 0 4px' }}>
+                    4명의 의견
+                  </p>
+                  <p style={{ color: '#7A5A35', fontSize: 11, fontWeight: 700, margin: 0 }}>
+                    그날 당신은
+                    {' '}
+                    서로 다른 관점들을 들었습니다.
+                  </p>
+                </div>
 
                 {detailLoading ? (
                   <p style={{ color: '#374151', fontWeight: 700, margin: 0 }}>대화 내용을 불러오는 중...</p>
@@ -340,6 +399,21 @@ export default function HistoryModal({ onClose, initialConversationId }: History
                         </div>
                       );
                     })}
+                  </div>
+                )}
+
+                {selectedDetail?.conversation?.review_date && (
+                  <div style={{ marginTop: 16 }}>
+                    <p style={{ color: '#3F2F1D', fontSize: 14, fontWeight: 800, margin: '0 0 4px' }}>
+                      오늘 다시 보기
+                    </p>
+                    <p style={{ color: '#7A5A35', fontSize: 11, fontWeight: 700, margin: 0, lineHeight: 1.6 }}>
+                      오늘 다시 이 결정을 봅니다.
+                      {' '}
+                      그때의 고민과 결론을
+                      {' '}
+                      지금의 나로 다시 확인해 보세요.
+                    </p>
                   </div>
                 )}
               </div>
