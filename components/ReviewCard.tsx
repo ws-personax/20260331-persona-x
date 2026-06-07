@@ -66,21 +66,35 @@ export default function ReviewCard({ onOpenHistory, onOpenConversation }: Review
         }}
       >
         <span style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#6b7280', marginBottom: 6 }}>
-          지난번 결정이 있어요
+          과거의 내가 남긴 기록
         </span>
-        <span style={{ display: 'block', fontSize: 15, fontWeight: 800, lineHeight: 1.35, marginBottom: 6 }}>
-          {item.title || '저장된 결정'}
-        </span>
-        {item.verdict && (
-          <span style={{ display: 'block', fontSize: 13, color: '#374151', lineHeight: 1.45, marginBottom: item.review_date ? 6 : 0 }}>
-            {item.verdict}
+
+        <div style={{ display: 'block', fontSize: 15, color: '#111827', lineHeight: 1.55, marginBottom: 8 }}>
+          <span style={{ display: 'block', fontWeight: 800 }}>그때 당신은</span>
+          <span style={{ display: 'block', fontWeight: 800, margin: '2px 0' }}>
+            {item.title || '이 결정을'}
           </span>
+          <span style={{ display: 'block' }}>을 고민하고 있었습니다.</span>
+        </div>
+
+        {item.verdict && (
+          <div style={{ display: 'block', fontSize: 13, color: '#374151', lineHeight: 1.55, marginBottom: 8 }}>
+            <span style={{ display: 'block', fontWeight: 700, marginBottom: 2 }}>결론은</span>
+            <span style={{ display: 'block' }}>{item.verdict}</span>
+            <span style={{ display: 'block', marginTop: 2 }}>이었습니다.</span>
+          </div>
         )}
+
+        <span style={{ display: 'block', fontSize: 13, color: '#111827', lineHeight: 1.45, marginBottom: 6 }}>
+          오늘 다시 그 결정을 봅니다.
+        </span>
+
         {item.review_date && (
           <span style={{ display: 'block', fontSize: 12, color: '#6b7280', fontWeight: 700 }}>
-            리뷰 예정: {item.review_date}
+            다시 보는 날: {item.review_date}
           </span>
         )}
+
         <span
           role="button"
           tabIndex={0}
@@ -110,6 +124,7 @@ export default function ReviewCard({ onOpenHistory, onOpenConversation }: Review
         >
           당시 대화 보기
         </span>
+
         <span
           role="button"
           tabIndex={0}
