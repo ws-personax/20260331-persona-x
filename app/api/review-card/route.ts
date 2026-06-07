@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
       .select('id, title, verdict, review_date, decision_type, review_status, created_at')
       .eq('provider_user_id', providerUserId)
       .eq('review_status', 'pending')
+      .gte('decision_importance', 4)
       .lte('review_date', today)
       .order('review_date', { ascending: true })
       .limit(3);
@@ -73,6 +74,7 @@ export async function GET(req: NextRequest) {
         .eq('provider_user_id', providerUserId)
         .is('review_date', null)
         .not('verdict', 'is', null)
+        .gte('decision_importance', 4)
         .lte('created_at', cutoffIso)
         .or('reasons.not.is.null,next_action.not.is.null')
         .order('created_at', { ascending: false })
