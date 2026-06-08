@@ -692,7 +692,8 @@ export async function POST(req: NextRequest) {
     };
 
     const getChatSession = createChatSessionResolver(req, requestProviderUserId);
-    const buildOptionDMemoryContext = () => buildOptionDMemoryContextFromSession(getChatSession);
+    const buildOptionDMemoryContext = (categoryV3?: string | null) =>
+      buildOptionDMemoryContextFromSession(getChatSession, categoryV3);
 
     // ✅ 페르소나별 순차 스트리밍 — 각 LLM 호출 완성 시점에 NDJSON 청크 1개씩 클라이언트로 전송
     const streamFallbackEvent: StreamEvent = {
@@ -860,7 +861,7 @@ export async function POST(req: NextRequest) {
           // ✅ 이전 질문 키워드 오염 차단 — Stage2/Stage3에는 현재 질문만 전달
           const optionDMessages = (messages as Array<{ role?: string; content?: string }>).slice(-1);
           const marketDataPromptContext = await getOrBuildMarketDataContext(msg);
-          const memoryContext = await buildOptionDMemoryContext();
+          const memoryContext = await buildOptionDMemoryContext(_categoryV3);
           let r1: OptionDRound1Result | null = await callOptionDWithStage3Guard(
             optionDMessages,
             category,

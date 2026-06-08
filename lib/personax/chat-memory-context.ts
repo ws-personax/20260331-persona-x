@@ -28,6 +28,7 @@ export function createChatSessionResolver(
 
 export async function buildOptionDMemoryContext(
   getChatSession: ChatSessionResolver,
+  currentCategoryV3?: string | null,
 ): Promise<string> {
   try {
     const { session } = await getChatSession();
@@ -38,6 +39,7 @@ export async function buildOptionDMemoryContext(
       supabase: supabaseServer,
       providerUserId: session.providerUserId,
       userId: session.userId,
+      currentCategoryV3,
     });
 
     return buildMemoryContext({
