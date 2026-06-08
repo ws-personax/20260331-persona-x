@@ -14,8 +14,20 @@ export const detectTargetedPersona = (echoResp: string): 'RAY' | 'JACK' | 'LUCIA
 export const buildRecentFinanceContext = (
   messages: unknown,
   shouldWeakenContext: boolean,
+  prevCategoryV3?: string | null,
+  currentCategoryV3?: string | null,
 ): string => {
   if (!Array.isArray(messages) || messages.length < 2) return '';
+
+  // V3 카테고리가 명시적으로 전환된 경우 이전 컨텍스트 완전 차단.
+  // legacy category 감지로 놓치는 invest→emotional, action→invest 등 전환을 포착.
+  const categoryV3Changed = !!(
+    prevCategoryV3 && currentCategoryV3 && prevCategoryV3 !== currentCategoryV3
+  );
+  if (shouldWeakenContext || categoryV3Changed) {
+    return '[새 주제로 전환 — 이전 맥락 무관, 마지막 메시지에만 집중]';
+  }
+
   const prior = messages.slice(0, -1).slice(-8) as Array<{
     role?: string;
     content?: string;
@@ -49,14 +61,6 @@ export const buildRecentFinanceContext = (
     } else {
       turns.push(`[유저: ${q}]`);
     }
-  }
-  if (shouldWeakenContext) {
-    // ✅ V2 결함 #10 보정 — 완전 차단 (라이브 검증으로 200자 요약 불충분 확인)
-    //   카테고리 변경 + 명시 연결어 없음 = 새 주제로 전환
-    //   이전 맥락 정보를 LLM에게 노출하지 않음 (끌어올 정보 자체를 차단)
-    //   마스터 통찰 보호: shouldWeakenContext 로직이 이미 "새 주제"만 감지하므로
-    //   명시 연결어/같은 카테고리는 영향 없음 (유지됨)
-    return '[새 주제로 전환 — 이전 맥락 무관, 마지막 메시지에만 집중]';
   }
   return turns.join(' → ');
 };
