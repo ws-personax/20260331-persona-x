@@ -17,6 +17,7 @@ import {
   buildDataCollectionPrompt,
   buildPersonaAnalysisPrompt,
   buildScriptPrompt,
+  buildCategoryVocabBlockRule,
   type AllPersonaKey,
   type CallStrategy,
 } from '@/app/api/chat/prompts/orchestrator-tagged';
@@ -1138,7 +1139,9 @@ ${
 ⛔ [CLOSER] 블록은 반드시 ${(router.closerPersona || 'jack').toUpperCase()} 톤. FIRST(${(router.firstPersona || 'lucia').toUpperCase()})는 CLOSER 불가.${closerJackRule}`;
     // Stage 3 — 기본 GPT-4.1-mini, USE_GEMINI_STAGE3=true 시 Gemini Flash로 분기.
     // solo·Stage 1·Stage 2는 기존 callLLM 유지.
-    const scriptRaw = await callStage3(OPTION_D_SYSTEM, scriptPrompt);
+    // 카테고리 어휘 차단 규칙을 system prompt에도 주입 — user prompt(buildScriptPrompt) 중복 명시로 준수율 강화.
+    const stage3System = `${OPTION_D_SYSTEM}${buildCategoryVocabBlockRule(router.categoryV3)}`;
+    const scriptRaw = await callStage3(stage3System, scriptPrompt);
     // ✅ 후처리 필터 — 슬롯별 페르소나 키로 postProcessPersonaOutput 적용.
     //    first/second/third → router.order[0/1/2], closer → router.closerPersona,
     //    luciaClose → 'lucia' 고정, echoQuestion → 'echo' 고정.
@@ -1177,7 +1180,7 @@ ${
 추상/철학 질문 금지. 양자택일 또는 숫자 질문.
 [ECHO_QUESTION] 태그로 감싸서 출력. 2줄 이내. ?로 끝낼 것.`;
       try {
-        const retryRaw = await callStage3(OPTION_D_SYSTEM, retryPrompt);
+        const retryRaw = await callStage3(stage3System, retryPrompt);
         echoQuestionRaw = extractTag(retryRaw, 'ECHO_QUESTION') || '';
       } catch (e) {
         console.warn('[runRoutedRequest] ECHO_QUESTION 재요청 실패', e);
