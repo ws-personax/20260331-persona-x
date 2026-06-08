@@ -83,10 +83,13 @@ export const detectEmotionalSubtypeHee = (msg: string): boolean => {
   return HEE_KEYWORDS.test(text);
 };
 
+/** multi-match 우선순위 — emotional은 최하위: 다른 도메인 카테고리가 있으면 emotional 제외. */
+const CATEGORY_V3_PRIORITY: readonly CategoryV3[] = ['invest', 'action', 'principle', 'knowledge', 'emotional'];
+
 /**
- * 카테고리 감지 V3 — invest / action / emotional / principle 4분류.
+ * 카테고리 감지 V3 — invest / action / emotional / principle / knowledge 5분류.
  * 규칙:
- *  - 2개 이상 카테고리 동시 매치 → 복합 질문으로 보고 emotional 처리
+ *  - 2개 이상 카테고리 동시 매치 → 우선순위(invest>action>principle>knowledge>emotional) 최상위 반환
  *  - 매치 0개 → 모호한 질문으로 보고 emotional 기본값
  *  - 단일 매치 → 해당 카테고리
  */
@@ -105,6 +108,8 @@ export const detectCategoryV3 = (msg: string): CategoryV3 => {
   const counts = countCategoryMatches(text);
   const matched = (Object.keys(counts) as CategoryV3[]).filter((k) => counts[k] > 0);
   if (matched.length === 0) return 'emotional';
-  if (matched.length >= 2) return 'emotional';
-  return matched[0];
+  for (const cat of CATEGORY_V3_PRIORITY) {
+    if (matched.includes(cat)) return cat;
+  }
+  return 'emotional';
 };
