@@ -1253,7 +1253,9 @@ export async function POST(req: NextRequest) {
         const echoText  = cleanEchoSelfReference(cleanNews(echoLLM)  || '구조적 흐름은 정보가 안정된 뒤 다시 정리해드릴게요.');
 
         // ── ✅ 2라운드 — ECHO 1라운드 판결을 직접 질문으로 받아 각 페르소나가 그 질문에만 답하기 ──
-        const round2Context = `${newsPrefix}사용자 질문: ${lastMsg}\n\n[1라운드 RAY]\n${rayText}\n[1라운드 JACK]\n${jackText}\n[1라운드 LUCIA]\n${luciaText}\n[1라운드 ECHO]\n${echoText}\n\n`;
+        // 1라운드 원문 전체 대신 50자 요약만 주입 — 이전 주제 어휘가 2라운드 프롬프트를 오염시키지 않도록.
+        const ctx50 = (t: string) => t.length > 50 ? `${t.slice(0, 50)}...` : t;
+        const round2Context = `${newsPrefix}사용자 질문: ${lastMsg}\n\n[1라운드 RAY]\n${ctx50(rayText)}\n[1라운드 JACK]\n${ctx50(jackText)}\n[1라운드 LUCIA]\n${ctx50(luciaText)}\n[1라운드 ECHO]\n${ctx50(echoText)}\n\n`;
         const round2Prefix = '[ECHO가 방금 질문을 던졌다. RAY: 반드시 숫자/데이터로 시작해 2줄 이내 답하라. JACK: 짧고 투박하게 ~요 로 끝내라. 2줄 이내. LUCIA: ~잖아요 ~거든요 톤으로 2줄 이내. 아이고 금지. 페르소나 호칭에 님 붙이지 말 것.]';
         const ray2History:   TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
         const jack2History:  TeaMsg[] = [{ role: 'user', content: `${round2Context}${round2Prefix}` }];
