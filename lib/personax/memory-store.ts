@@ -33,6 +33,8 @@ export type FetchMemoryContextItemsParams = {
   providerUserId?: string | null;
   userId?: string | null;
   limit?: number;
+  /** 현재 질문의 V3 카테고리 — 동일 카테고리 기록만 반환. 미전달 시 전체 조회(레거시 호환). */
+  currentCategoryV3?: string | null;
 };
 
 const hasDecisionSignal = (row: ConversationMemoryRow): boolean =>
@@ -141,12 +143,22 @@ export async function fetchMemoryContextItems(
   if (!params.providerUserId) return [];
 
   const limit = params.limit ?? DEFAULT_MEMORY_QUERY_LIMIT;
-  const { data, error } = await params.supabase
+  const selectStr =
+    'id, created_at, provider_user_id, user_id, category, title, verdict, reasons, counter_views, next_action, decision_type, review_date, review_status, result, executed, decision_importance';
+
+  // currentCategoryV3가 주어진 경우 동일 카테고리 기록만 조회.
+  // 다른 카테고리 기록은 현재 질문과 무관한 컨텍스트로 판단해 완전 제외.
+  // 같은 카테고리 기록이 없으면 빈 배열 반환 — 교차 카테고리 폴백 없음.
+  let queryBuilder = params.supabase
     .from('conversations')
-    .select(
-      'id, created_at, provider_user_id, user_id, category, title, verdict, reasons, counter_views, next_action, decision_type, review_date, review_status, result, executed, decision_importance',
-    )
-    .eq('provider_user_id', params.providerUserId)
+    .select(selectStr)
+    .eq('provider_user_id', params.providerUserId);
+
+  if (params.currentCategoryV3) {
+    queryBuilder = queryBuilder.eq('category', params.currentCategoryV3);
+  }
+
+  const { data, error } = await queryBuilder
     .order('decision_importance', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false })
     .limit(limit);
