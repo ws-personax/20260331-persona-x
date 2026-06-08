@@ -625,6 +625,7 @@ export async function POST(req: NextRequest) {
       .reverse()
       .find((m) => m?.role === 'user')?.content || '';
     const prevCategory = _prevUserMsg ? detectLegacyCategory(_prevUserMsg) : null;
+    const _prevCategoryV3 = _prevUserMsg ? detectCategoryV3(_prevUserMsg) : null;
     const category = detectLegacyCategory(lastMsg);
     const categoryChanged = !!(prevCategory && prevCategory !== category);
     const _hasConnector = hasExplicitConnector(lastMsg);
@@ -748,7 +749,7 @@ export async function POST(req: NextRequest) {
       const monthNow = kstNow.getUTCMonth() + 1;
       const financePrefix = `[현재 시점: ${yearNow}년 ${monthNow}월 — 최신(${yearNow}년) 데이터·보도 기준으로 답변. 과거 인물·정책을 현재형으로 단정하지 말 것.]\n`;
 
-      const recentContext = buildRecentFinanceContext(messages, shouldWeakenContext);
+      const recentContext = buildRecentFinanceContext(messages, shouldWeakenContext, _prevCategoryV3, _categoryV3);
       const ctxSuffix = recentContext
         ? `\n[직전 대화 주제: ${recentContext}]\n현재 질문: ${msg}`
         : `\n${msg}`;
