@@ -264,8 +264,8 @@ export function buildDecisionSummary(params: {
   }
 
   return withImportance({
-    verdict: anchor ? '결정 기준을 먼저 세워야 합니다' : '추가 정보 확인 후 결정해야 합니다',
-    reasons: ['지금 질문은 기준이 없으면 답이 흔들립니다', '다음 행동을 작게 정해야 재점검할 수 있습니다'],
+    verdict: anchor ? '지금은 답보다 판단의 기준을 좁혀야 합니다' : '추가 정보 확인 후 결정해야 합니다',
+    reasons: ['선택지가 많을수록 기준 없이 고르면 나중에 흔들립니다', '행동 하나를 작게 잡아야 다음 점검 시점이 보입니다'],
     counterView: '다만 상황이 급하면 가장 회복 가능한 선택을 우선할 수 있습니다',
     nextAction: '오늘 안에 선택 기준 3개와 바로 할 행동 1개를 적으세요',
     });
