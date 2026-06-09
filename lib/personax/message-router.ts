@@ -114,7 +114,13 @@ async function callGeminiStage3(system: string, user: string): Promise<string> {
       thinkingConfig: { thinkingBudget: 0 },
     } as GenerationConfig,
   });
+  const finishReason = result?.response?.candidates?.[0]?.finishReason;
   const blockReason = result?.response?.promptFeedback?.blockReason;
+  console.log('[stage3-gemini-finish]', {
+    model: modelName,
+    finishReason: finishReason ?? null,
+    hasBlockReason: Boolean(blockReason),
+  });
   if (blockReason) {
     console.warn(`[stage3-gemini] ${modelName} 차단 — blockReason=${blockReason}`);
     return '';
@@ -1142,6 +1148,15 @@ ${
     // 어휘 차단 규칙은 user prompt(buildScriptPrompt) 말미에 이미 포함 — system 중복 제거.
     const stage3System = OPTION_D_SYSTEM;
     const scriptRaw = await callStage3(stage3System, scriptPrompt);
+    console.log('[stage3-raw]', {
+      length: scriptRaw.length,
+      hasFirst: scriptRaw.includes('[FIRST]'),
+      hasSecond: scriptRaw.includes('[SECOND]'),
+      hasThird: scriptRaw.includes('[THIRD]'),
+      hasEchoQuestion: scriptRaw.includes('[ECHO_QUESTION]'),
+      categoryV3: router.categoryV3,
+      question: lastMessage.slice(0, 30),
+    });
     // ✅ 후처리 필터 — 슬롯별 페르소나 키로 postProcessPersonaOutput 적용.
     //    first/second/third → router.order[0/1/2], closer → router.closerPersona,
     //    luciaClose → 'lucia' 고정, echoQuestion → 'echo' 고정.
