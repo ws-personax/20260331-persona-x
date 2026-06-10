@@ -862,7 +862,9 @@ export async function POST(req: NextRequest) {
           // ✅ 이전 질문 키워드 오염 차단 — Stage2/Stage3에는 현재 질문만 전달
           const optionDMessages = (messages as Array<{ role?: string; content?: string }>).slice(-1);
           const marketDataPromptContext = await getOrBuildMarketDataContext(msg);
-          const memoryContext = await buildOptionDMemoryContext(_categoryV3);
+          const memoryContext = (shouldWeakenContext || !_categoryV3)
+            ? ''
+            : await buildOptionDMemoryContext(_categoryV3);
           let r1: OptionDRound1Result | null = await callOptionDWithStage3Guard(
             optionDMessages,
             category,
