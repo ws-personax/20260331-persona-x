@@ -154,9 +154,8 @@ export async function fetchMemoryContextItems(
     .select(selectStr)
     .eq('provider_user_id', params.providerUserId);
 
-  if (params.currentCategoryV3) {
-    queryBuilder = queryBuilder.eq('category', params.currentCategoryV3);
-  }
+  if (!params.currentCategoryV3) return [];
+  queryBuilder = queryBuilder.eq('category', params.currentCategoryV3);
 
   const { data, error } = await queryBuilder
     .order('decision_importance', { ascending: false, nullsFirst: false })
