@@ -49,7 +49,10 @@ const LUMP_SUM_UNDECIDED_PATTERN =
   /퇴직금|목돈|상속금|노후\s*자금|노후자금|은퇴\s*자금|은퇴자금/;
 
 const INVESTMENT_EXECUTION_PATTERN =
-  /투자|주식|ETF|채권|펀드|매수|사야|살까|비중|자산\s*배분|자산배분|포트폴리오|IRP|연금저축|예금|적금/;
+  /투자|주식|ETF|채권|펀드|매수|사야|살까|비중|자산\s*배분|자산배분|포트폴리오|IRP|연금저축|예금|적금|넣어야|넣을까|어디에\s*넣/;
+
+const MONEY_FRUSTRATION_PATTERN =
+  /돈[이가은을]?\s*(?:전혀\s*)?(?:못\s*모으|안\s*모|새(?:어나)?)|저축[이가은을]?\s*(?:안\s*(?:되|돼)|못\s*하)|월급[이가은을]?.*새어나/;
 
 /** 키워드 매치 카운트 */
 const countCategoryMatches = (text: string): Record<CategoryV3, number> => {
@@ -101,6 +104,12 @@ export const detectCategoryV3 = (msg: string): CategoryV3 => {
   if (detectEmotionalSubtypeHee(text)) return 'emotional';
   if (
     LUMP_SUM_UNDECIDED_PATTERN.test(text) &&
+    !INVESTMENT_EXECUTION_PATTERN.test(text)
+  ) {
+    return 'emotional';
+  }
+  if (
+    MONEY_FRUSTRATION_PATTERN.test(text) &&
     !INVESTMENT_EXECUTION_PATTERN.test(text)
   ) {
     return 'emotional';
