@@ -807,7 +807,7 @@ export async function POST(req: NextRequest) {
           category === 'finance' ||
           category === 'news';
           // || ['stock', 'crypto', 'economy'].includes(category)  // legacy dead branches — 보존
-        const isRound1 = !teaRound || teaRound <= 1;
+        const isRound1 = !teaRound || teaRound <= 1 || shouldWeakenContext;
 
         if (isRound1) {
           if (_routerDecision.strategy === 'solo' && _routerDecision.invokedPersona) {
