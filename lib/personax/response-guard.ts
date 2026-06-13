@@ -19,6 +19,12 @@ const SAFE_INVESTMENT_FALLBACK =
 const INVESTMENT_QUESTION_PATTERN =
   /사야|살까|살까요|매수|팔아야|매도|보유|관망|투자해도|진입|손절|물타|비중|주식|코인|비트코인|삼성전자|LG전자|엘지전자|종목|현재가|지지선|저항선|수익률|PER|PBR/i;
 
+const INVESTMENT_CONTEXT_PATTERN =
+  /주식|ETF|종목|코인|비트코인|삼성전자|LG전자|엘지전자|SK하이닉스|테슬라|애플|엔비디아|코스피|코스닥|나스닥|S&P|펀드|채권|배당|투자|현재가|지지선|저항선|평단|손익률|손실률|수익률|PER|PBR/i;
+
+const INVESTMENT_EXIT_OR_HOLD_PATTERN =
+  /손절|익절|매도|보유|들고\s*갈|계속\s*들고|평단|손익률|손실률|비중|팔까|팔까요|팔아야/i;
+
 const LUMP_SUM_ALLOCATION_PATTERN =
   /퇴직금|자산\s*배분|자산배분|노후\s*자금|노후자금|목돈|상속금/;
 
@@ -179,8 +185,22 @@ function removeDirectTradeInstructions(answer: string): string {
   return result;
 }
 
+function isInvestmentExitOrHoldQuestion(question: string): boolean {
+  return (
+    INVESTMENT_EXIT_OR_HOLD_PATTERN.test(question) &&
+    (
+      INVESTMENT_CONTEXT_PATTERN.test(question) ||
+      /익절|매도|보유|평단|손익률|손실률|비중/.test(question)
+    )
+  );
+}
+
 export function detectQuestionType(question: string): QuestionType {
-  if (/계속\s*만나|계속할|헤어|그만해야|그만\s*만나|끊어야|손절해야|이혼/.test(question)) {
+  if (isInvestmentExitOrHoldQuestion(question)) {
+    return 'buy_or_wait';
+  }
+
+  if (/계속\s*만나|계속할|계속\s*가야|헤어|그만해야|그만\s*만나|끊어야|손절해야|이혼/.test(question)) {
     return 'continue_or_stop';
   }
 
