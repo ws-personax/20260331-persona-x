@@ -1,3 +1,5 @@
+import { stripInternalScriptTagsFromValue } from '@/lib/personax/response-guard';
+
 export type StreamEvent =
   | { type: 'persona'; key: 'ray' | 'jack' | 'lucia'; round: 1 | 2; text: string }
   | { type: 'echo'; round: 1 | 2; text: string }
@@ -12,7 +14,8 @@ export const streamRespond = (
     async start(controller) {
       const send = (event: StreamEvent) => {
         try {
-          controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'));
+          const safeEvent = stripInternalScriptTagsFromValue(event);
+          controller.enqueue(encoder.encode(JSON.stringify(safeEvent) + '\n'));
         } catch (e) {
           console.warn('[stream] enqueue 실패', e);
         }

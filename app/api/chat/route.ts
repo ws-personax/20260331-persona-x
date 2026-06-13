@@ -82,6 +82,7 @@ import { resolveChatSession } from '@/lib/personax/auth';
 import {
   detectQuestionType,
   applyResponseGuard,
+  stripInternalScriptTagsFromValue,
 } from '@/lib/personax/response-guard';
 import { buildMarketDataPromptContext } from '@/lib/personax/market-data';
 import {
@@ -671,13 +672,14 @@ export async function POST(req: NextRequest) {
       && !!luciaRoutingMsg
       && !_alreadyIntroduced;
     const respond = (body: unknown, init?: ResponseInit): Response => {
+      const safeBody = stripInternalScriptTagsFromValue(body);
       if (
         _shouldInjectLuciaIntro &&
-        body && typeof body === 'object' && !Array.isArray(body)
+        safeBody && typeof safeBody === 'object' && !Array.isArray(safeBody)
       ) {
-        return Response.json({ ...(body as Record<string, unknown>), luciaIntro: luciaRoutingMsg }, init);
+        return Response.json({ ...(safeBody as Record<string, unknown>), luciaIntro: luciaRoutingMsg }, init);
       }
-      return Response.json(body as Parameters<typeof Response.json>[0], init);
+      return Response.json(safeBody as Parameters<typeof Response.json>[0], init);
     };
 
     const marketDataContextCache = new Map<string, Promise<string>>();
