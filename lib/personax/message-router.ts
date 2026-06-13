@@ -695,6 +695,9 @@ export const postProcessPersonaOutput = (
   return out;
 };
 
+const STRUCTURAL_TAG_RE =
+  /\[(FIRST|SECOND|THIRD|CLOSER|ECHO_QUESTION|LUCIA_CLOSE|ECHO_FINAL|FIRST_2|SECOND_2|THIRD_2)\]/gi;
+
 const extractTag = (text: string | null, tag: string): string => {
   if (!text) return '';
   const re = new RegExp(
@@ -702,7 +705,8 @@ const extractTag = (text: string | null, tag: string): string => {
     'i',
   );
   const m = text.match(re);
-  return stripPersonaLabelLines((m?.[1] || '').trim());
+  const raw = (m?.[1] || '').trim().replace(STRUCTURAL_TAG_RE, '');
+  return stripPersonaLabelLines(raw);
 };
 
 const suppressUnsupportedMarketDataContext = (context: string): string => (
