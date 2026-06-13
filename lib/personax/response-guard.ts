@@ -13,6 +13,47 @@ export type QuestionType =
 
 export type DirectAnswerPersonaKey = 'lucia' | 'jack' | 'ray' | 'echo';
 
+const INTERNAL_SCRIPT_TAG_PATTERN =
+  /[ \t]*\[(?:FIRST|SECOND|THIRD|CLOSER)\][ \t]*(?:\r?\n)?/gi;
+
+export function stripInternalScriptTags(answer: string): string {
+  return answer
+    .replace(INTERNAL_SCRIPT_TAG_PATTERN, (match, offset, source) => {
+      if (/\r?\n/.test(match)) {
+        return '';
+      }
+
+      const before = source.slice(0, offset);
+      const after = source.slice(offset + match.length);
+      return /\S$/.test(before) && /^\S/.test(after) ? ' ' : '';
+    })
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+export function stripInternalScriptTagsFromValue<T>(value: T): T {
+  if (typeof value === 'string') {
+    return stripInternalScriptTags(value) as T;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => stripInternalScriptTagsFromValue(item)) as T;
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        stripInternalScriptTagsFromValue(item),
+      ]),
+    ) as T;
+  }
+
+  return value;
+}
+
 const SAFE_INVESTMENT_FALLBACK =
   '현재가는 별도 확인이 필요합니다. 확인된 시장 데이터 없이 구체적 가격, 지지선, 손절선, 진입 구간을 단정할 수 없습니다. 판단 기준은 실적, 업황, 투자 기간, 감당 가능한 손실 범위입니다.';
 
@@ -326,7 +367,7 @@ export function applyResponseGuard(
 
     personaText[key] = removeFuturePersonaReferences(
       key as PersonaKey,
-      answer,
+      stripInternalScriptTags(answer),
     );
 
     if (key === 'echo' && shouldSanitizeEchoInvestmentTerms(questionType)) {
@@ -348,6 +389,7 @@ export function applyResponseGuard(
     if (hasMarketData === true && questionType === 'buy_or_wait') {
       const factLockedAnswer = sanitizeMarketDataFactLock(personaText[key], true);
       personaText[key] = removeDirectTradeInstructions(factLockedAnswer);
+      personaText[key] = stripInternalScriptTags(personaText[key]);
       continue;
     }
 
@@ -358,6 +400,7 @@ export function applyResponseGuard(
     );
     if (sanitizedAnswer !== answer) {
       personaText[key] = sanitizedAnswer;
+      personaText[key] = stripInternalScriptTags(personaText[key]);
       continue;
     }
 
@@ -377,5 +420,7 @@ export function applyResponseGuard(
         personaText[key] = `${fallback}\n\n${personaText[key]}`;
       }
     }
+
+    personaText[key] = stripInternalScriptTags(personaText[key]);
   }
 }
