@@ -822,7 +822,14 @@ export async function POST(req: NextRequest) {
         const prevDecisionType = _prevUserMsg ? _inferDecisionType(_prevUserMsg, _prevCategoryV3) : null;
         const currentDecisionType = _inferDecisionType(lastMsg, _categoryV3);
         const decisionTypeChanged = !!(prevDecisionType && currentDecisionType && prevDecisionType !== currentDecisionType);
-        const isRound1 = !teaRound || teaRound <= 1 || shouldWeakenContext || categoryV3Changed || decisionTypeChanged;
+        const CONTINUATION_KEYWORDS = [
+          '방금', '위 내용', '그럼', '그 경우', '이어서', '아까',
+          '그 선택', '두 번째', '앞에서', '계속', '그것', '그거',
+          '이전', '아까 말한', '방금 전', '위에서', '그 내용',
+          '그 얘기', '그 문제', '그 질문',
+        ];
+        const _hasExplicitContinuation = CONTINUATION_KEYWORDS.some(kw => lastMsg.includes(kw));
+        const isRound1 = !teaRound || teaRound <= 1 || shouldWeakenContext || categoryV3Changed || decisionTypeChanged || !_hasExplicitContinuation;
 
         if (isRound1) {
           if (_routerDecision.strategy === 'solo' && _routerDecision.invokedPersona) {
