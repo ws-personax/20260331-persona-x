@@ -298,7 +298,7 @@ export function hasDirectAnswer(
 ): boolean {
   switch (questionType) {
     case 'continue_or_stop':
-      return /마음의 안전감|반복 패턴|계속할 조건|멈춰야 할 신호|반복 행동|관계를 재평가|상황을 재평가/.test(answer);
+      return /진짜 문제|반복 패턴|왜 .* 반복|구조|마음의 안전감|반복 행동|관계를 재평가|상황을 재평가/.test(answer);
     case 'buy_or_wait':
       return (
         /현재가는 별도 확인이 필요합니다|확인된 시장 데이터 없이는 구체적 가격 판단을 할 수 없습니다|판단 기준은 실적, 업황, 투자 기간, 감당 가능한 손실 범위입니다/.test(answer) &&
@@ -321,7 +321,7 @@ const DIRECT_ANSWER_FALLBACKS: Record<
     lucia: '지금은 마음의 안전감을 먼저 확인해야 합니다. 이 관계가 편안함을 주는지, 반복해서 작아지게 만드는지부터 봐야 합니다.',
     jack: '말보다 반복 행동을 기준으로 보셔야 합니다. 상대의 상황보다 대응 태도를 봐야 합니다.',
     ray: '관계 지속 여부는 반복 패턴으로 봐야 합니다. 약속 이행, 갈등 후 회복, 존중의 일관성이 판단 기준입니다.',
-    echo: '계속할 조건과 멈춰야 할 신호를 분리해야 합니다. 감정이 아니라 반복되는 구조를 봐야 합니다.',
+    echo: '이 관계가 문제가 아니라 왜 같은 패턴을 반복하는지가 문제입니다.',
   },
   buy_or_wait: {
     lucia: SAFE_INVESTMENT_FALLBACK,
