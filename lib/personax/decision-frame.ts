@@ -95,7 +95,7 @@ const CONFLICT_LEVEL_BY_TYPE: Record<QuestionType, ConflictLevel> = {
 const REQUIRED_BY_TYPE: Record<QuestionType, string[]> = {
   continue_or_stop: [
     '계속 / 중단 / 조건부 계속 중 하나를 명확히 제시',
-    '계속 만날 조건과 멈춰야 할 신호를 구분',
+    '왜 같은 관계 패턴을 반복하는지 구조를 분석',
     '오늘 할 일 1개',
   ],
   buy_or_wait: [
@@ -122,7 +122,7 @@ const REQUIRED_BY_TYPE: Record<QuestionType, string[]> = {
 const OUTPUT_RULES_BY_TYPE: Record<QuestionType, string[]> = {
   continue_or_stop: [
     '첫 문장은 반드시 "계속", "중단", "조건부 계속" 중 하나로 시작한다.',
-    '"계속할 조건"과 "멈춰야 할 신호"를 분리해서 말한다.',
+    '"관계 지속 여부"보다 반복되는 선택 패턴을 설명한다.',
     '선택 없이 감정 해석이나 기준 나열로 시작하지 않는다.',
   ],
   buy_or_wait: [
