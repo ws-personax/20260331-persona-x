@@ -254,6 +254,15 @@ export function buildDecisionSummary(params: {
     });
   }
 
+  if (type === 'knowledge') {
+    return withImportance({
+      verdict: '하나의 정답으로 단정하기보다 객관적 기준과 체감 기준을 구분해야 합니다',
+      reasons: ['통계나 법령상 기준과 사람들이 실제로 체감하는 기준은 다르게 갈리는 경우가 많습니다', '어떤 맥락(소득, 자산, 통계 분류 등)을 기준으로 묻는지에 따라 답이 달라집니다'],
+      counterView: '다만 특정 기준(예: 통계청 분류, 법령상 정의)을 이미 정해두고 묻는 거라면 그 기준으로 바로 답할 수 있습니다',
+      nextAction: '어떤 기준(소득, 자산, 통계 분류, 법령 등)으로 알고 싶은지 한 가지만 정해서 다시 물어보세요',
+    });
+  }
+
   if (isLumpSumPurposeQuestion(params.question)) {
     return withImportance({
       verdict: '먼저 이 돈의 목적을 정해야 합니다',
