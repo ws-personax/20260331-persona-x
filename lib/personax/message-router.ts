@@ -46,6 +46,7 @@ import {
   type DecisionContext,
 } from '@/lib/personax/context/decision-context';
 import { buildMarketDataPromptContext } from '@/lib/personax/market-data';
+import { inferDecisionType } from '@/lib/personax/decision-type-map';
 
 // 지연 초기화 — 모듈 로드 시점이 아닌 첫 호출 시점에 OpenAI 클라이언트 생성.
 // 빌드 단계에서 OPENAI_API_KEY가 없어도 throw하지 않도록 함.
@@ -716,32 +717,7 @@ const suppressUnsupportedMarketDataContext = (context: string): string => (
 const inferDecisionSummaryType = (
   question: string,
   router: RouterDecision,
-): string => {
-  const hasRealEstateRecommendationIntent =
-    /아파트|부동산|단지|입지|학군|교통|직주근접|실거주|전세|청약|재건축|재개발/.test(question) &&
-    /추천|지역|어디|괜찮|좋을까|10억|9억|8억|7억|6억/.test(question);
-
-  if (/창업.*재취업|재취업.*창업|창업\s*vs\s*재취업/i.test(question)) {
-    return 'startup_vs_job';
-  }
-  if (/계속\s*만나|헤어|이 사람|관계|연애|이혼|시기|질투|무시|비난|뒷담|견제|상처|거리두기|경계|대인관계|친구|동료|직장동료|상사|부하|갈등|트러블|미워|싫어|눈치|왕따|따돌림|험담/.test(question)) {
-    return 'relationship';
-  }
-  if (/이직|커리어|진로|퇴사|회사|직장/.test(question)) {
-    return 'career';
-  }
-  if (hasRealEstateRecommendationIntent) {
-    return 'real_estate_recommendation';
-  }
-  if (router.categoryV3 === 'invest' || /사야|매수|팔아야|매도|비트코인|XRP|xrp|리플|이더리움|ETH|eth|솔라나|SOL|sol|삼성전자|주식|코인|투자/.test(question)) {
-    return 'buy_or_wait';
-  }
-  if (router.categoryV3 === 'knowledge') {
-    return 'knowledge';
-  }
-
-  return 'generic';
-};
+): string => inferDecisionType(question, router.categoryV3);
 
 /**
  * 3단계 호출 단일 실행자 — 기존 callOptionD의 본문 흡수.
