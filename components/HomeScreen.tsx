@@ -153,7 +153,9 @@ export default function HomeScreen({ onSubmit, onOpenHistory }: HomeScreenProps)
         <div className="flex-1"></div>
       </div>
 
-      <ReviewCard onOpenHistory={openHistory} onOpenConversation={openReviewConversation} />
+      <div className="flex-shrink-0" style={{ paddingTop: 4 }}>
+        <ReviewCard onOpenHistory={openHistory} onOpenConversation={openReviewConversation} />
+      </div>
 
       {/* 입력창 - 하단 고정, 크고 눈에 띄게 */}
       <div
