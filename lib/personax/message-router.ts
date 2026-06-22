@@ -372,6 +372,9 @@ export const enforceOrder = (
     const remaining = arr.filter((k) => k !== 'jack' && k !== 'echo' && k !== 'ray');
     arr = ['ray', 'jack', ...remaining];
   }
+  if (categoryV3 === 'knowledge') {
+    return ['ray', 'lucia', 'jack', 'echo'];
+  }
   if (categoryV3 === 'principle') {
     const withoutJackEcho = arr.filter((k) => k !== 'jack' && k !== 'echo');
     arr = [...withoutJackEcho, 'echo', 'jack'];
@@ -1184,10 +1187,11 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
     const closer = postProcessPersonaOutput(extractTag(scriptRaw, 'CLOSER') || '', closerKeyForFilter, ppOpts);
     const luciaClose = postProcessPersonaOutput(extractTag(scriptRaw, 'LUCIA_CLOSE') || '', 'lucia', ppOpts);
 
-    // ECHO_QUESTION 누락 감지 — invest/action/principle(=비-emotional) 카테고리에서만 보정.
+    // ECHO_QUESTION 누락 감지 — invest/action/principle(=비-emotional/knowledge) 카테고리에서만 보정.
     //   emotional은 [LUCIA_CLOSE] 액자 구조라 ECHO_QUESTION이 의도적으로 부재.
+    //   knowledge는 ECHO가 질문이 아니라 정리형/판결형으로 닫을 수 있어 재요청·물음표 강제를 적용하지 않는다.
     //   1차 추출이 빈 값이면 ECHO_QUESTION만 별도 재요청, 그것도 실패 시 invest 폴백 문장 사용.
-    const expectsEchoQuestion = router.categoryV3 !== 'emotional';
+    const expectsEchoQuestion = router.categoryV3 !== 'emotional' && router.categoryV3 !== 'knowledge';
     let echoQuestionRaw = extractTag(scriptRaw, 'ECHO_QUESTION') || '';
     if (expectsEchoQuestion && !echoQuestionRaw.trim()) {
       console.warn('[runRoutedRequest] ECHO_QUESTION 누락 → 별도 재요청');
@@ -1218,6 +1222,7 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
     }
     const echoQuestionProcessed = postProcessPersonaOutput(echoQuestionRaw, 'echo');
     // ECHO "?" 종결 강제 — invest/action/principle 카테고리는 반드시 질문으로 닫는다.
+    //   knowledge는 정리형/판결형 종결을 허용하므로 제외한다.
     //   프롬프트 레벨 "반드시 ?로 끝" 규칙은 LLM이 가끔 무시 → 후처리로 100% 보정.
     //   기존 ., !, , ; : 같은 종결부호는 제거 후 "?" 부착. 이미 ?로 끝나면 그대로.
     const echoQuestion = expectsEchoQuestion && echoQuestionProcessed
