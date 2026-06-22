@@ -42,7 +42,7 @@ const CATEGORY_V3_KEYWORDS: Record<CategoryV3, RegExp> = {
   action: /퇴사|이직|창업|재취업|취업|부업|사업|커리어|직장|상사|회사|면접|지원|연봉|업무|책임|떠넘겨|버틸까|그만둘까|결단|결정|도전|스포츠|야구|축구|농구|골프|경기|승부|선수|이길|우승|시작할|그만둘|바꿀|옮길|뛰어들|승부|뛸까|명퇴|명예퇴직|희망퇴직|권고사직|퇴직 권유/,
   emotional: /감정|관계|일상|걱정|가족|경사|좋은소식|기쁜|슬프|우울|불안|외로|힘들|지쳐|피곤|마음|위로|공감|가족|부모|자녀|남편|아내|친구|동료|선배|후배|시댁|처가|결혼|이혼|아이|손주|손자|손녀|기뻐|기쁘|설레|행복|축하|경사|반가|잠이|잠 못|잠을 못|못 자|수면|불면|속상|속상해|속상하|아파|아프|강아지|반려동물|반려견|반려묘|고양이|반려|쓰러|쓰러졌|쓰러지|사기 당|사기를 당|당했어요|피해|취업을 못|취업 못/,
   principle: /인생|원칙|철학|판단|방향|의미|가치|본질|삶|살아간|어떻게 살|어떻게 사|왜 사|왜 살|잘 사|잘 살아|사는 게|사는 거|사는 길|살아가|살아간|어떤 사람|어떤 길|선택의 기준|기준이 뭐|무엇이 옳|옳은가|맞는가|진리|진정|정답이 뭐|인생 정답|삶의 정답|AI 때문|직업 없어|직업이 없어|일자리 없어|일 없어질|일 사라질|직업 사라|일자리 사라|사랑|우정|성공|정의|뜻|개념/,
-  knowledge: /AI|수능|정치|뉴스|과학|역사|경제|사회|기준은|기준이|이란|란\s*무엇|무엇인가/,
+  knowledge: /AI|수능|정치|뉴스|과학|역사|경제|사회|인플레이션|물가|통화량|금리|환율|GDP|실업률|경기침체|무역|무역수지|경제지표|지표|통계|기준은|기준이|이란|란\s*무엇|무엇인가/,
 };
 
 const LUMP_SUM_UNDECIDED_PATTERN =
@@ -53,6 +53,12 @@ const INVESTMENT_EXECUTION_PATTERN =
 
 const MONEY_FRUSTRATION_PATTERN =
   /돈[이가은을]?\s*(?:전혀\s*)?(?:못\s*모으|안\s*모|새(?:어나)?|관리\s*(?:안|못|.*안\s*(?:되|돼)))|저축[이가은을]?\s*(?:안\s*(?:되|돼)|못\s*하)|월급[이가은을]?.*새어나|생활비[가은을]?\s*(?:감당(?:이)?\s*안|.*감당이?\s*안\s*(?:되|돼))|카드값[이가은을]?\s*감당(?:이)?\s*안|고정비[가은을]?\s*부담|지출[이가은을]?\s*(?:너무\s*많|관리\s*(?:안|못))|빚[이가은을]?\s*버거|대출[이가은을]?\s*(?:버거|감당(?:이)?\s*안)/;
+
+const ECONOMIC_KNOWLEDGE_CONCEPT_PATTERN =
+  /인플레이션|물가|통화량|금리|환율|GDP|실업률|경기침체|무역|무역수지|경제지표|지표|통계/;
+
+const KNOWLEDGE_EXPLANATION_INTENT_PATTERN =
+  /왜|무엇|무슨|이란|란\s*무엇|무엇인가|중요한가|오르나|변하나|생기나|뜻|정의|개념/;
 
 /** 키워드 매치 카운트 */
 const countCategoryMatches = (text: string): Record<CategoryV3, number> => {
@@ -113,6 +119,13 @@ export const detectCategoryV3 = (msg: string): CategoryV3 => {
     !INVESTMENT_EXECUTION_PATTERN.test(text)
   ) {
     return 'emotional';
+  }
+  if (
+    ECONOMIC_KNOWLEDGE_CONCEPT_PATTERN.test(text) &&
+    KNOWLEDGE_EXPLANATION_INTENT_PATTERN.test(text) &&
+    !INVESTMENT_EXECUTION_PATTERN.test(text)
+  ) {
+    return 'knowledge';
   }
   const counts = countCategoryMatches(text);
   const matched = (Object.keys(counts) as CategoryV3[]).filter((k) => counts[k] > 0);
