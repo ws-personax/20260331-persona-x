@@ -970,7 +970,24 @@ export const buildScriptPrompt = (
 [CLOSER]
 (결론 담당 페르소나 대사 1~2줄 + 선택적 질문)
 
-${buildKnowledgeWebSearchRule(categoryV3 as CategoryV3 | undefined)}${categoryV3 === 'knowledge' ? KNOWLEDGE_FEW_SHOT_EXAMPLES : ''}
+${buildKnowledgeWebSearchRule(categoryV3 as CategoryV3 | undefined)}${categoryV3 === 'knowledge' ? `
+🚨 [KNOWLEDGE MODE — 페르소나 행동 강제]
+이 질문은 개념·지식 설명 요청입니다. 고민 상담이 아닙니다.
+
+- RAY: 개념의 정의, 원인, 구조를 먼저 설명한다. 감정 추정 금지.
+- LUCIA: 어려운 개념을 쉬운 비유와 일상 언어로 풀어준다. 상처·불안·뒤처짐 추정 금지.
+- JACK: 이 개념이 현실에서 어떻게 적용되는지 설명한다. 훈계·행동 교정 금지.
+- ECHO: 핵심 원리와 경계 조건을 짧게 요약한다. 사용자 심리 분석·철학적 반문 금지.
+
+절대 금지:
+- "당신이 진짜 묻는 건"
+- "뒤처지고 있는 건 아닌지"
+- "자존 지점"
+- "본질보다 현상을 쫓는 패턴"
+- "기준 타령"
+- "시세 데이터 없이는"
+- "확인 가능한 데이터가 필요합니다"
+` : ''}${categoryV3 === 'knowledge' ? KNOWLEDGE_FEW_SHOT_EXAMPLES : ''}
 
 🚨 ECHO 순서 가드 (위반 시 답변 무효 — 모든 블록·모든 카테고리 공통)
 - ECHO는 **이미 발언한 페르소나만 호명할 수 있다**. 발언 순서는 [FIRST] → [SECOND] → [THIRD] → [CLOSER] 순서를 따른다.
