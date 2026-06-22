@@ -1231,9 +1231,13 @@ export async function POST(req: NextRequest) {
       //   카테고리별 라우팅(sports→jack, finance→ray 등) 전부 무력화.
       //   PersonaX의 본질 = 4명 = 티키타카 = 도파민 = 차별성.
       const isExplicitPersonaPick = false;
+      const isEconomicKnowledgeQuestion =
+        /인플레이션|물가|통화량|금리|환율|GDP|실업률|경기침체|무역|무역수지|경제지표|지표|통계/.test(lastMsg) &&
+        /왜|무엇|무슨|이란|란\s*무엇|무엇인가|중요한가|오르나|변하나|생기나|뜻|정의|개념/.test(lastMsg);
       const isKnowledgeDefinitionQuestion =
         _categoryV3 === 'knowledge' &&
-        /이란\s*무엇|란\s*무엇|무엇인가|무엇인지|뜻|정의|개념|기준은|기준이/.test(lastMsg);
+        (/이란\s*무엇|란\s*무엇|무엇인가|무엇인지|뜻|정의|개념|기준은|기준이/.test(lastMsg) ||
+          isEconomicKnowledgeQuestion);
       if (category === 'news' && !isKnowledgeDefinitionQuestion && !isExplicitPersonaPick) {
         // 시간 컨텍스트 프리픽스 — 검색 결과가 구식 자료(2024 이하)에 편향되는 문제 방지
         const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
