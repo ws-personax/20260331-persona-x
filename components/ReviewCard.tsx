@@ -83,54 +83,62 @@ export default function ReviewCard({ onOpenHistory, onOpenConversation }: Review
   if (hidden || items.length === 0) return null;
 
   const item = items[0];
+  const title = item.title || '저장된 결정';
+  const verdict = item.verdict || '당시 결론을 다시 확인해보세요';
 
   return (
-    <div style={{ padding: '0 16px 14px', flexShrink: 0 }}>
+    <div style={{ padding: '0 16px 8px', flexShrink: 0 }}>
       <button
         type="button"
         onClick={onOpenHistory}
         style={{
           width: '100%',
           textAlign: 'left',
-          background: '#fff',
-          border: '1px solid rgba(17,24,39,0.12)',
-          borderRadius: 14,
-          padding: '14px 44px 14px 16px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          background: '#FFF9E6',
+          border: '1px solid #F4D58D',
+          borderLeft: '4px solid #F59E0B',
+          borderRadius: 12,
+          padding: '10px 42px 10px 12px',
+          boxShadow: '0 1px 4px rgba(120,72,0,0.08)',
           cursor: 'pointer',
           position: 'relative',
           color: '#111827',
+          minHeight: 72,
         }}
       >
-        <span style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#6b7280', marginBottom: 6 }}>
-          {buildRecordLabel(item.created_at)}
+        <span style={{ display: 'block', fontSize: 12, fontWeight: 900, color: '#92400e', marginBottom: 3 }}>
+          결정 리뷰 알림
         </span>
 
-        <div style={{ display: 'block', fontSize: 15, color: '#111827', lineHeight: 1.55, marginBottom: 8 }}>
-          <span style={{ display: 'block', fontWeight: 800 }}>그때 당신은</span>
-          <span style={{ display: 'block', fontWeight: 800, margin: '2px 0' }}>
-            {item.title || '이 결정을'}
-          </span>
-          <span style={{ display: 'block' }}>을 고민하고 있었습니다.</span>
-        </div>
-
-        {item.verdict && (
-          <div style={{ display: 'block', fontSize: 13, color: '#374151', lineHeight: 1.55, marginBottom: 8 }}>
-            <span style={{ display: 'block', fontWeight: 700, marginBottom: 2 }}>결론은</span>
-            <span style={{ display: 'block' }}>{item.verdict}</span>
-            <span style={{ display: 'block', marginTop: 2 }}>이었습니다.</span>
-          </div>
-        )}
-
-        <span style={{ display: 'block', fontSize: 13, color: '#111827', lineHeight: 1.45, marginBottom: 6 }}>
-          오늘 다시 그 결정을 봅니다.
+        <span
+          style={{
+            display: 'block',
+            fontSize: 12,
+            color: '#6b7280',
+            fontWeight: 700,
+            marginBottom: 4,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {buildRecordLabel(item.created_at)} · {title}
         </span>
 
-        {item.review_date && (
-          <span style={{ display: 'block', fontSize: 12, color: '#6b7280', fontWeight: 700 }}>
-            다시 보는 날: {item.review_date}
-          </span>
-        )}
+        <span
+          style={{
+            display: '-webkit-box',
+            WebkitLineClamp: 1,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            fontSize: 12.5,
+            color: '#374151',
+            lineHeight: 1.35,
+            marginBottom: 6,
+          }}
+        >
+          당시 결론: {verdict}
+        </span>
 
         <span
           role="button"
@@ -148,18 +156,17 @@ export default function ReviewCard({ onOpenHistory, onOpenConversation }: Review
           }}
           style={{
             display: 'inline-flex',
-            marginTop: 10,
             borderRadius: 8,
-            border: '1px solid #d1d5db',
-            background: '#f9fafb',
-            color: '#374151',
-            padding: '6px 10px',
+            border: '1px solid #F4C763',
+            background: '#fff',
+            color: '#78350f',
+            padding: '4px 8px',
             fontSize: 12,
             fontWeight: 800,
             cursor: 'pointer',
           }}
         >
-          당시 대화 보기
+          다시 보기
         </span>
 
         <span
@@ -181,12 +188,12 @@ export default function ReviewCard({ onOpenHistory, onOpenConversation }: Review
             position: 'absolute',
             top: 10,
             right: 10,
-            width: 28,
-            height: 28,
+            width: 24,
+            height: 24,
             borderRadius: 8,
-            border: '1px solid #e5e7eb',
-            background: '#f9fafb',
-            color: '#6b7280',
+            border: '1px solid #F4D58D',
+            background: '#fff',
+            color: '#92400e',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
