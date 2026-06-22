@@ -1234,9 +1234,13 @@ export async function POST(req: NextRequest) {
       const isEconomicKnowledgeQuestion =
         /인플레이션|물가|통화량|금리|환율|GDP|실업률|경기침체|무역|무역수지|경제지표|지표|통계/.test(lastMsg) &&
         /왜|무엇|무슨|이란|란\s*무엇|무엇인가|중요한가|오르나|변하나|생기나|뜻|정의|개념/.test(lastMsg);
+      // ✅ "OO이란 뭔가요?" 같은 캐주얼 정의형 질문은 "무엇" 없이도 잡아야 함.
+      //   다만 "이란 이스라엘 전쟁 뉴스 알려줘" 같은 실제 뉴스 요청은 명시 뉴스 키워드로 보호.
+      const isExplicitNewsRequest = /뉴스|속보|오늘|최근|최신|전쟁|발표|보도|기사/.test(lastMsg);
       const isKnowledgeDefinitionQuestion =
         _categoryV3 === 'knowledge' &&
-        (/이란\s*무엇|란\s*무엇|무엇인가|무엇인지|뜻|정의|개념|기준은|기준이/.test(lastMsg) ||
+        !isExplicitNewsRequest &&
+        (/이란\s*무엇|란\s*무엇|무엇인가|무엇인지|뭔가요|뭔지|뜻|정의|개념|기준은|기준이/.test(lastMsg) ||
           isEconomicKnowledgeQuestion);
       if (category === 'news' && !isKnowledgeDefinitionQuestion && !isExplicitPersonaPick) {
         // 시간 컨텍스트 프리픽스 — 검색 결과가 구식 자료(2024 이하)에 편향되는 문제 방지
