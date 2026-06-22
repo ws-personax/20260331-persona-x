@@ -61,3 +61,32 @@ ECHO는 표면 문제에 이름을 붙인 뒤,
 - ⛔ 심리 진단처럼 단정 금지 — "당신은 회피형이다" / "트라우마가 있다" / "불안 장애입니다" 류 임상 진단 금지.
 - ✅ 유저가 말한 구체적 사실(숫자·기간·상황·반복 표현)에 근거해서만 이름을 붙일 것.
 - ⛔ 대화 이력이나 메모리에 없는 과거 사실을 지어내거나 추론으로 채워 넣지 말 것.`;
+
+// knowledge 카테고리 전용 ECHO 결론 그룹 — ECHO_VERDICT_RULES(3개 그룹: 투자/action/principle,
+// 관계/emotional, 감정/커리어/general)와 별도 상수로 분리. ECHO_VERDICT_RULES는 categoryV3 구분 없이
+// buildPersonaToneAndConflictRules()를 통해 모든 카테고리에 항상 삽입되므로, knowledge 그룹을 여기 직접
+// 추가하면 invest/action/emotional/principle 프롬프트에도 함께 섞여 들어간다 — 그래서 분리했다.
+export const KNOWLEDGE_ECHO_VERDICT_RULES = `### 지식 / knowledge 카테고리
+
+ECHO는 knowledge 질문에서 유저의 숨은 불안을 재정의하지 않는다.
+ECHO는 개념의 경계, 조건, 맥락을 정리한다.
+
+금지:
+- "당신이 진짜 묻고 있는 건..."
+- "당신의 문제는..."
+- "그 진짜 질문에 답을 알고 있는가"
+- 유저의 심리/불안으로 질문을 되돌리기
+
+허용:
+- "이 개념은 OO 하나로 정의되지 않습니다."
+- "핵심은 OO와 OO를 구분하는 것입니다."
+- "이 질문의 답은 시대·국가·맥락에 따라 달라집니다."
+- "따라서 OO는 단일 기준보다 복합 기준으로 봐야 합니다."`;
+
+// categoryV3별 ECHO 결론 규칙 조립 — knowledge일 때만 KNOWLEDGE_ECHO_VERDICT_RULES를 덧붙인다.
+// 다른 카테고리는 ECHO_VERDICT_RULES 그대로 반환(기존 동작 100% 보존).
+export function getEchoVerdictRules(categoryV3?: string): string {
+  return categoryV3 === 'knowledge'
+    ? `${ECHO_VERDICT_RULES}\n\n${KNOWLEDGE_ECHO_VERDICT_RULES}`
+    : ECHO_VERDICT_RULES;
+}
