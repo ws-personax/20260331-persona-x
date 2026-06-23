@@ -6,6 +6,7 @@ export type DecisionSummary = {
   counterView: string;
   nextAction: string;
   importance?: number;
+  summaryType?: string;
 };
 
 const normalizeQuestion = (question: string): string => question.replace(/\s+/g, ' ').trim();
@@ -173,6 +174,7 @@ export function buildDecisionSummary(params: {
   const anchor = firstNonEmpty(params.echo, params.jack, params.ray, params.lucia);
   const withImportance = (summary: DecisionSummary): DecisionSummary => ({
     ...summary,
+    summaryType: type,
     importance: calculateDecisionImportance({
       question: params.question,
       decisionType: type,
@@ -294,6 +296,29 @@ export function formatDecisionSummary(summary: DecisionSummary): string {
     : counterFallbackByType('generic');
   const verdict = cleanLine(summary.verdict);
   const nextAction = cleanLine(summary.nextAction);
+
+  if (summary.summaryType === 'knowledge') {
+    const point3 = cleanLine(summary.counterView).replace(/^다만\s*/, '') || '개념은 맥락에 따라 적용 기준이 달라질 수 있습니다';
+    const lines = [
+      separator,
+      '',
+      '한 줄 정의',
+      verdict,
+      '',
+      '왜 중요한가',
+      reasons[0] || '개념을 구분하면 실제 상황을 해석하는 기준이 선명해집니다',
+      '',
+      '핵심 포인트',
+      '',
+      `1. ${reasons[0] || verdict}`,
+      `2. ${reasons[1] || '맥락에 따라 같은 개념도 다르게 설명될 수 있습니다'}`,
+      `3. ${point3}`,
+      '',
+      separator,
+    ];
+
+    return lines.join('\n').replace(/(━━━━━━━━━━)\?+$/g, '$1');
+  }
 
   const lines = [
     separator,
