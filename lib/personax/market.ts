@@ -15,6 +15,8 @@ export const CRYPTO_MAP: Record<string, string> = {
   '도지':    'KRW-DOGE', 'DOGE': 'KRW-DOGE',
   '에이다':   'KRW-ADA', 'ADA':  'KRW-ADA',
   '바이낸스': 'KRW-BNB', 'BNB':  'KRW-BNB',
+  // ✅ 범용 코인 질문(특정 코인명 미지정) — BTC를 대표값으로 매핑
+  '코인': 'KRW-BTC', '암호화폐': 'KRW-BTC', 'crypto': 'KRW-BTC',
 };
 
 export const STOCK_MAP: Record<string, string> = {
