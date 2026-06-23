@@ -13,6 +13,7 @@ import {
   SIX_FULL_SIMULATIONS,
   FEWSHOT_FINAL_CHECKLIST,
   KNOWLEDGE_FEW_SHOT_EXAMPLES,
+  RELATIONSHIP_FEW_SHOT_EXAMPLES,
 } from '@/lib/personax/few-shot-examples';
 import { getEchoVerdictRules } from '@/lib/personax/echo';
 
@@ -928,6 +929,7 @@ export const buildScriptPrompt = (
   categoryV3?: CategoryV3,
   hasPriorConversation: boolean = false,
   closerPersona?: AllPersonaKey,
+  decisionType?: string,
 ): string => {
   const normalizedCategory = (category || '').toLowerCase();
   // 희(喜) 모드 감지 — emotional 서브타입. 마지막 user 메시지에서 좋은 소식 키워드 확인.
@@ -988,7 +990,7 @@ ${buildKnowledgeWebSearchRule(categoryV3 as CategoryV3 | undefined)}${categoryV3
 - "시세 데이터 없이는"
 - "확인 가능한 데이터가 필요합니다"
 - ECHO 문장이 물음표(?)로 끝나는 모든 경우
-` : ''}${categoryV3 === 'knowledge' ? KNOWLEDGE_FEW_SHOT_EXAMPLES : ''}
+` : ''}${categoryV3 === 'knowledge' ? KNOWLEDGE_FEW_SHOT_EXAMPLES : ''}${decisionType === 'relationship' ? RELATIONSHIP_FEW_SHOT_EXAMPLES : ''}
 
 🚨 ECHO 순서 가드 (위반 시 답변 무효 — 모든 블록·모든 카테고리 공통)
 - ECHO는 **이미 발언한 페르소나만 호명할 수 있다**. 발언 순서는 [FIRST] → [SECOND] → [THIRD] → [CLOSER] 순서를 따른다.

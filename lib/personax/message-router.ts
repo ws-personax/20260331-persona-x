@@ -770,6 +770,7 @@ export async function runRoutedRequest(
       await buildMarketDataPromptContext(lastMessage);
     const marketDataPromptContext = suppressUnsupportedMarketDataContext(rawMarketDataPromptContext);
     const memoryContext = params.memoryContext?.trim() || '';
+    const decisionType = inferDecisionSummaryType(lastMessage, router);
 
     // ──────────────────────────────────────────────────────────────
     // SOLO 우선순위 결정 — Stage 1·2 진입 전에 평가.
@@ -816,6 +817,7 @@ export async function runRoutedRequest(
         router.categoryV3,
         router.hasPriorConversation,
         router.closerPersona,
+        decisionType,
       )}
 
 ## 🚨 단독 응답 모드 (최우선 — 다른 모든 규칙보다 우선)
@@ -1148,6 +1150,7 @@ ${
       router.categoryV3,
       router.hasPriorConversation,
       router.closerPersona,
+      decisionType,
     )}
 
 기존 화면 표시 참고 순서: ${router.order.map((key, index) => `${index + 1}. ${key.toUpperCase()}`).join(' / ')}
@@ -1232,7 +1235,6 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
       : echoQuestionProcessed;
     const hasDecisionSummary = (...values: string[]): boolean =>
       values.some((value) => value.includes('PersonaX 결론'));
-    const decisionType = inferDecisionSummaryType(lastMessage, router);
     const decisionSummary = hasDecisionSummary(
       first,
       second,
