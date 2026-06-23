@@ -32,11 +32,11 @@ export function inferDecisionType(
   if (hasRealEstateRecommendationIntent) {
     return 'real_estate_recommendation';
   }
-  if (categoryV3 === 'invest' || /사야|매수|팔아야|매도|비트코인|XRP|xrp|리플|이더리움|ETH|eth|솔라나|SOL|sol|삼성전자|주식|코인|투자/.test(question)) {
-    return 'buy_or_wait';
-  }
   if (categoryV3 === 'knowledge') {
     return 'knowledge';
+  }
+  if (categoryV3 === 'invest' || /사야|매수|팔아야|매도|비트코인|XRP|xrp|리플|이더리움|ETH|eth|솔라나|SOL|sol|삼성전자|주식|코인|투자/.test(question)) {
+    return 'buy_or_wait';
   }
 
   return 'generic';
