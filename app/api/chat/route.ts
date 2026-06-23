@@ -828,7 +828,11 @@ export async function POST(req: NextRequest) {
           '이전', '아까 말한', '방금 전', '위에서', '그 내용',
           '그 얘기', '그 문제', '그 질문',
         ];
-        const _hasExplicitContinuation = CONTINUATION_KEYWORDS.some(kw => lastMsg.includes(kw));
+        // ✅ 새 독립 질문 감지 — CONTINUATION_KEYWORDS와 우연히 겹쳐도(예: "되면"≠"그럼")
+        //   실제로는 새 주제의 조건문/전환 질문인 경우 Round2(이전 답변 재사용)로 빠지지 않도록 강제 차단.
+        const NEW_TOPIC_PATTERN = /그런데|근데|다른 질문|새로운|별개로|주제를 바꿔서|참고로|~하면 ~할까|되면|된다면|한다면/;
+        const _isNewIndependentQuestion = NEW_TOPIC_PATTERN.test(lastMsg);
+        const _hasExplicitContinuation = !_isNewIndependentQuestion && CONTINUATION_KEYWORDS.some(kw => lastMsg.includes(kw));
         const isRound1 = !teaRound || teaRound <= 1 || shouldWeakenContext || categoryV3Changed || decisionTypeChanged || !_hasExplicitContinuation;
 
         if (isRound1) {
