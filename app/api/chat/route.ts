@@ -48,6 +48,7 @@ import {
   detectLegacyCategory,
   type CategoryV3,
 } from '@/lib/personax/classifier';
+import { resolveIntent } from '@/lib/personax/intent-resolver';
 import { hasExplicitConnector } from '@/lib/personax/routing-context';
 import {
   routeMessage,
@@ -640,6 +641,12 @@ export async function POST(req: NextRequest) {
       lastMsg,
       category,
     );
+    const intent = resolveIntent({
+      lastMessage: lastMsg,
+      previousUserMessage: _prevUserMsg || null,
+      teaRound,
+      shouldWeakenContext,
+    });
     const _categoryV3 = _routerDecision.categoryV3;
     const _firstPersonaV3 = _routerDecision.firstPersona;
     const _closerPersonaV3 = _routerDecision.closerPersona;
