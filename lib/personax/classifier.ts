@@ -51,6 +51,12 @@ const LUMP_SUM_UNDECIDED_PATTERN =
 const INVESTMENT_EXECUTION_PATTERN =
   /투자|주식|ETF|S&P500|SP500|S&P|배당주|채권|펀드|매수|사야|살까|비중|자산\s*배분|자산배분|포트폴리오|IRP|연금저축|예금|적금|넣어야|넣을까|어디에\s*넣/;
 
+const INVESTMENT_KNOWLEDGE_CONCEPT_PATTERN =
+  /워런\s*버핏|버핏|가치투자|장기투자|투자\s*철학|투자\s*원칙|투자란|투자란\s*무엇|투자의\s*뜻|투자\s*개념|투자.*(?:뭐예요|무엇인가|무엇인지|뜻|정의|개념|철학|원칙|왜)/;
+
+const INVESTMENT_EXECUTION_BLOCK_PATTERN =
+  /사야|살까|매수|매도|들어가|넣어|어디에|추천|전략|포트폴리오|종목|ETF|S&P|SP500|삼성전자|테슬라|엔비디아|1억|얼마|수익|손실/;
+
 const MONEY_FRUSTRATION_PATTERN =
   /돈[이가은을]?\s*(?:전혀\s*)?(?:못\s*모으|안\s*모|새(?:어나)?|관리\s*(?:안|못|.*안\s*(?:되|돼)))|저축[이가은을]?\s*(?:안\s*(?:되|돼)|못\s*하)|월급[이가은을]?.*새어나|생활비[가은을]?\s*(?:감당(?:이)?\s*안|.*감당이?\s*안\s*(?:되|돼))|카드값[이가은을]?\s*감당(?:이)?\s*안|고정비[가은을]?\s*부담|지출[이가은을]?\s*(?:너무\s*많|관리\s*(?:안|못))|빚[이가은을]?\s*버거|대출[이가은을]?\s*(?:버거|감당(?:이)?\s*안)/;
 
@@ -119,6 +125,12 @@ export const detectCategoryV3 = (msg: string): CategoryV3 => {
     !INVESTMENT_EXECUTION_PATTERN.test(text)
   ) {
     return 'emotional';
+  }
+  if (
+    INVESTMENT_KNOWLEDGE_CONCEPT_PATTERN.test(text) &&
+    !INVESTMENT_EXECUTION_BLOCK_PATTERN.test(text)
+  ) {
+    return 'knowledge';
   }
   if (
     ECONOMIC_KNOWLEDGE_CONCEPT_PATTERN.test(text) &&
