@@ -24,6 +24,16 @@ const QUESTION_SETS = {
     '미국 CPI가 예상보다 낮게 나오면 증시는?',
     '유가가 급등하면 한국 증시는?',
   ],
+  'Complex Intent': [
+    '행복이란 뭔가요? 근데 비트코인은?',
+    '친구와 손절할까요? 그리고 이직도 고민됩니다.',
+    '창업할까요? 그런데 요즘 코인도 오른다고 하던데.',
+    '삼성전자 지금 사야 할까요? 그리고 부동산은?',
+    '어떻게 해야 할까요?',
+    '미국 금리가 오르면 삼성전자는?',
+    '친구한테 돈을 빌려줘야 할까요?',
+    '행복한 투자란 뭔가요?',
+  ],
 } as const;
 
 type QuestionGroup = keyof typeof QUESTION_SETS;
@@ -45,6 +55,7 @@ const rows = (Object.entries(QUESTION_SETS) as Array<[
       categoryV3,
       decisionType,
       asset: intent.asset?.assetType ?? '',
+      splitNeeded: intent.splitNeeded,
     };
   }),
 );
