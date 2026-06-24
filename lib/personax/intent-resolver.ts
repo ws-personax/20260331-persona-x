@@ -46,6 +46,7 @@ export type ResolvedIntent = {
   asset: DetectedMarketAsset | null;
   hasExplicitConnector: boolean;
   isRound1Materials: IntentRound1Materials;
+  splitNeeded: boolean;
 };
 
 export type ResolveIntentInput = {
@@ -108,5 +109,6 @@ export function resolveIntent(input: ResolveIntentInput): ResolvedIntent {
       isNewIndependentQuestion,
       isRound1,
     },
+    splitNeeded: false,
   };
 }
