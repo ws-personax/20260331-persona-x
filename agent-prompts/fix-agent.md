@@ -22,3 +22,25 @@ D. QA 결과
 E. commit hash
 F. push 결과
 G. PR 링크
+
+## LLM 비용 정책
+
+Level 1 (항상 허용 / 비용 0원):
+- git diff, rg, grep, 정적 분석
+- npx tsc --noEmit
+- npm run qa:intent
+- 파일 읽기
+
+Level 2 (주의 / 승인 권장):
+- 실제 API QA (삼성전자, 창업 등 직접 호출)
+- 10개 이상 질문 API 테스트
+
+Level 3 (승인 필수):
+- promptfoo 실행
+- 대규모 LLM 회귀 테스트
+- 수십 개 API 자동 호출
+
+기본 원칙:
+- QA는 정적 분석 우선
+- 실제 API 호출은 꼭 필요한 경우만
+- promptfoo는 마스터 승인 없이 실행 금지
