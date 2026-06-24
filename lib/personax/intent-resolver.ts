@@ -36,6 +36,13 @@ export type IntentRound1Materials = {
   isRound1: boolean;
 };
 
+export type IntentSummary = {
+  categoryV3: CategoryV3;
+  decisionType: DecisionType;
+  asset: DetectedMarketAsset | null;
+  topic: string | null;
+};
+
 export type ResolvedIntent = {
   legacyCategory: LegacyCategory;
   previousLegacyCategory: LegacyCategory | null;
@@ -47,6 +54,8 @@ export type ResolvedIntent = {
   hasExplicitConnector: boolean;
   isRound1Materials: IntentRound1Materials;
   splitNeeded: boolean;
+  primaryIntent: IntentSummary | null;
+  secondaryIntent: IntentSummary | null;
 };
 
 export type ResolveIntentInput = {
@@ -127,5 +136,7 @@ export function resolveIntent(input: ResolveIntentInput): ResolvedIntent {
       isRound1,
     },
     splitNeeded: false,
+    primaryIntent: null,
+    secondaryIntent: null,
   };
 }
