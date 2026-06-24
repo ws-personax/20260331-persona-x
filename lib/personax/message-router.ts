@@ -699,13 +699,14 @@ export const postProcessPersonaOutput = (
   return out;
 };
 
-const STRUCTURAL_TAG_RE =
-  /\[(FIRST|SECOND|THIRD|CLOSER|ECHO_QUESTION|LUCIA_CLOSE|ECHO_FINAL|FIRST_2|SECOND_2|THIRD_2)\]/gi;
+// ✅ 알려진 태그 목록이 아니라 임의의 대문자 구조 태그(예: [FOURTH], [UNKNOWN_TAG])도
+//   경계/제거 대상으로 인식한다 — LLM이 미지원 태그를 출력해도 누출·혼합을 막기 위함.
+const STRUCTURAL_TAG_RE = /\[[A-Z_0-9]+\]/gi;
 
 const extractTag = (text: string | null, tag: string): string => {
   if (!text) return '';
   const re = new RegExp(
-    `\\[${tag}\\][^\\S\\n]*\\n?([\\s\\S]*?)(?=\\n\\s*\\[(?:DATA_PACK|LUCIA_VIEW|JACK_VIEW|RAY_VIEW|ECHO_VIEW|FIRST|SECOND|THIRD|CLOSER|LUCIA_CLOSE|ECHO_QUESTION)\\]|$)`,
+    `\\[${tag}\\][^\\S\\n]*\\n?([\\s\\S]*?)(?=\\n\\s*\\[[A-Z_0-9]+\\]|$)`,
     'i',
   );
   const m = text.match(re);
