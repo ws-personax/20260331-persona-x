@@ -48,7 +48,6 @@ import {
   detectLegacyCategory,
   type CategoryV3,
 } from '@/lib/personax/classifier';
-import { inferDecisionType } from '@/lib/personax/decision-type-map';
 import { resolveIntent } from '@/lib/personax/intent-resolver';
 import { hasExplicitConnector } from '@/lib/personax/routing-context';
 import {
@@ -817,22 +816,8 @@ export async function POST(req: NextRequest) {
           category === 'finance' ||
           category === 'news';
           // || ['stock', 'crypto', 'economy'].includes(category)  // legacy dead branches — 보존
-        const categoryV3Changed = !!(_prevCategoryV3 && _categoryV3 && _prevCategoryV3 !== _categoryV3);
-        const prevDecisionType = _prevUserMsg ? inferDecisionType(_prevUserMsg, _prevCategoryV3 ?? undefined) : null;
-        const currentDecisionType = inferDecisionType(lastMsg, _categoryV3);
-        const decisionTypeChanged = !!(prevDecisionType && currentDecisionType && prevDecisionType !== currentDecisionType);
-        const CONTINUATION_KEYWORDS = [
-          '방금', '위 내용', '그럼', '그 경우', '이어서', '아까',
-          '그 선택', '두 번째', '앞에서', '계속', '그것', '그거',
-          '이전', '아까 말한', '방금 전', '위에서', '그 내용',
-          '그 얘기', '그 문제', '그 질문',
-        ];
-        // ✅ 새 독립 질문 감지 — CONTINUATION_KEYWORDS와 우연히 겹쳐도(예: "되면"≠"그럼")
-        //   실제로는 새 주제의 조건문/전환 질문인 경우 Round2(이전 답변 재사용)로 빠지지 않도록 강제 차단.
-        const NEW_TOPIC_PATTERN = /그런데|근데|다른 질문|새로운|별개로|주제를 바꿔서|참고로|~하면 ~할까|되면|된다면|한다면/;
-        const _isNewIndependentQuestion = NEW_TOPIC_PATTERN.test(lastMsg);
-        const _hasExplicitContinuation = !_isNewIndependentQuestion && CONTINUATION_KEYWORDS.some(kw => lastMsg.includes(kw));
-        const isRound1 = !teaRound || teaRound <= 1 || shouldWeakenContext || categoryV3Changed || decisionTypeChanged || !_hasExplicitContinuation;
+        // ✅ continuation/isRound1 판단은 intent-resolver.ts로 이동 — 로직 변경 없음
+        const { isRound1 } = intent.isRound1Materials;
 
         if (isRound1) {
           if (_routerDecision.strategy === 'solo' && _routerDecision.invokedPersona) {
