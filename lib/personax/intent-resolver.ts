@@ -85,6 +85,11 @@ function extractFirstClause(text: string): string {
   return match ? text.slice(0, match.index).trim() : text.trim();
 }
 
+function extractSecondClause(text: string): string {
+  const match = SPLIT_CONJUNCTION_PATTERN.exec(text);
+  return match ? text.slice(match.index + match[0].length).trim() : '';
+}
+
 export function detectSplitNeeded(text: string): boolean {
   const match = SPLIT_CONJUNCTION_PATTERN.exec(text);
   if (!match) return false;
@@ -136,6 +141,9 @@ export function resolveIntent(input: ResolveIntentInput): ResolvedIntent {
   const primaryIntent = splitNeeded
     ? buildIntentSummary(extractFirstClause(input.lastMessage))
     : null;
+  const secondaryIntent = splitNeeded
+    ? buildIntentSummary(extractSecondClause(input.lastMessage))
+    : null;
 
   return {
     legacyCategory,
@@ -158,6 +166,6 @@ export function resolveIntent(input: ResolveIntentInput): ResolvedIntent {
     },
     splitNeeded,
     primaryIntent,
-    secondaryIntent: null,
+    secondaryIntent,
   };
 }
