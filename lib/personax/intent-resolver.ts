@@ -135,7 +135,7 @@ export function resolveIntent(input: ResolveIntentInput): ResolvedIntent {
       isNewIndependentQuestion,
       isRound1,
     },
-    splitNeeded: false,
+    splitNeeded: detectSplitNeeded(input.lastMessage),
     primaryIntent: null,
     secondaryIntent: null,
   };
