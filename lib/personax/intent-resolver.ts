@@ -56,6 +56,23 @@ export type ResolveIntentInput = {
   shouldWeakenContext?: boolean;
 };
 
+// ✅ V2 Step 2 — 복합 질문 감지 순수 함수. resolveIntent()에는 아직 연결하지 않음.
+const SPLIT_CONJUNCTION_PATTERN = /그리고|근데|그런데|또한|그뿐만 아니라/;
+
+export function detectSplitNeeded(text: string): boolean {
+  const match = SPLIT_CONJUNCTION_PATTERN.exec(text);
+  if (!match) return false;
+
+  const beforeClause = text.slice(0, match.index);
+  const afterClause = text.slice(match.index + match[0].length);
+  if (!beforeClause.trim() || !afterClause.trim()) return false;
+
+  const beforeCategoryV3 = detectCategoryV3(beforeClause);
+  const afterCategoryV3 = detectCategoryV3(afterClause);
+
+  return beforeCategoryV3 !== afterCategoryV3;
+}
+
 export function resolveIntent(input: ResolveIntentInput): ResolvedIntent {
   const previousUserMessage = input.previousUserMessage || '';
   const legacyCategory = detectLegacyCategory(input.lastMessage);
