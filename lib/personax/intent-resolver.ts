@@ -68,6 +68,23 @@ export type ResolveIntentInput = {
 // ✅ V2 Step 2 — 복합 질문 감지 순수 함수. resolveIntent()에는 아직 연결하지 않음.
 const SPLIT_CONJUNCTION_PATTERN = /그리고|근데|그런데|또한|그뿐만 아니라/;
 
+function buildIntentSummary(text: string): IntentSummary {
+  const topic = text.trim();
+  const categoryV3 = detectCategoryV3(topic);
+
+  return {
+    categoryV3,
+    decisionType: inferDecisionType(topic, categoryV3),
+    asset: detectMarketAsset(topic),
+    topic: topic || null,
+  };
+}
+
+function extractFirstClause(text: string): string {
+  const match = SPLIT_CONJUNCTION_PATTERN.exec(text);
+  return match ? text.slice(0, match.index).trim() : text.trim();
+}
+
 export function detectSplitNeeded(text: string): boolean {
   const match = SPLIT_CONJUNCTION_PATTERN.exec(text);
   if (!match) return false;
@@ -115,6 +132,10 @@ export function resolveIntent(input: ResolveIntentInput): ResolvedIntent {
     categoryV3Changed ||
     decisionTypeChanged ||
     !hasExplicitContinuation;
+  const splitNeeded = detectSplitNeeded(input.lastMessage);
+  const primaryIntent = splitNeeded
+    ? buildIntentSummary(extractFirstClause(input.lastMessage))
+    : null;
 
   return {
     legacyCategory,
@@ -135,8 +156,8 @@ export function resolveIntent(input: ResolveIntentInput): ResolvedIntent {
       isNewIndependentQuestion,
       isRound1,
     },
-    splitNeeded: detectSplitNeeded(input.lastMessage),
-    primaryIntent: null,
+    splitNeeded,
+    primaryIntent,
     secondaryIntent: null,
   };
 }
