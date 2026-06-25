@@ -1,6 +1,25 @@
+/**
+ * Persona Self-Check QA
+ *
+ * 현재: 내장 fixture 답변을 정적 evaluator로 평가한다.
+ * 향후: 브라우저 자동화 또는 API 응답 텍스트를 stdin JSON으로 연결해
+ * 동일 evaluator를 재사용할 수 있다.
+ *
+ * 이 스크립트는 fetch, LLM SDK, app API를 호출하지 않는다.
+ */
+declare const require: any;
+
 type PersonaKey = 'ray' | 'jack' | 'lucia' | 'echo';
 
 type PersonaResponses = Record<PersonaKey, string>;
+
+interface PersonaEvaluationInput {
+  question: string;
+  ray: string;
+  jack: string;
+  lucia: string;
+  echo: string;
+}
 
 type CheckResult = {
   label: string;
@@ -179,46 +198,94 @@ export const evaluatePersonaAnswer = (
   };
 };
 
+export const evaluatePersonaResponses = (
+  input: PersonaEvaluationInput,
+): Array<PersonaEvaluation & { question: string }> => (
+  (['ray', 'jack', 'lucia', 'echo'] as PersonaKey[]).map((persona) => ({
+    question: input.question,
+    ...evaluatePersonaAnswer(persona, input[persona]),
+  }))
+);
+
 const formatPassFail = (passed: boolean): 'PASS' | 'FAIL' =>
   passed ? 'PASS' : 'FAIL';
 
-const evaluations = QUESTIONS.flatMap((question) => {
-  const responses = FIXTURE_RESPONSES[question];
-  return (Object.keys(responses) as PersonaKey[]).map((persona) => ({
+const buildFixtureInputs = (): PersonaEvaluationInput[] => (
+  QUESTIONS.map((question) => ({
     question,
-    ...evaluatePersonaAnswer(persona, responses[persona]),
-  }));
-});
-
-console.table(
-  evaluations.map((item) => ({
-    question: item.question,
-    persona: item.persona.toUpperCase(),
-    result: formatPassFail(item.passed),
-    failedChecks: item.checks
-      .filter((check) => !check.passed)
-      .map((check) => check.label)
-      .join(', '),
-  })),
+    ...FIXTURE_RESPONSES[question],
+  }))
 );
 
-const personaRates = (['ray', 'jack', 'lucia', 'echo'] as PersonaKey[]).map((persona) => {
-  const items = evaluations.filter((item) => item.persona === persona);
-  const passed = items.filter((item) => item.passed).length;
-  return {
-    persona: persona.toUpperCase(),
-    passed,
-    total: items.length,
-    passRate: `${Math.round((passed / items.length) * 100)}%`,
-  };
-});
+const readStdinInput = (): PersonaEvaluationInput => {
+  const { readFileSync } = require('fs');
+  const raw = readFileSync(0, 'utf8').trim();
+  if (!raw) {
+    throw new Error('--stdin requires a JSON payload');
+  }
 
-console.table(personaRates);
+  const parsed = JSON.parse(raw) as Partial<PersonaEvaluationInput>;
+  for (const key of ['question', 'ray', 'jack', 'lucia', 'echo'] as const) {
+    if (typeof parsed[key] !== 'string' || !parsed[key]?.trim()) {
+      throw new Error(`--stdin JSON must include non-empty "${key}"`);
+    }
+  }
 
-const totalPassed = evaluations.filter((item) => item.passed).length;
-const totalRate = Math.round((totalPassed / evaluations.length) * 100);
-console.log(`Overall pass rate: ${totalPassed}/${evaluations.length} (${totalRate}%)`);
+  return parsed as PersonaEvaluationInput;
+};
 
-if (totalPassed !== evaluations.length) {
-  process.exitCode = 1;
+const hasReadableStdin = (): boolean => {
+  const { fstatSync } = require('fs');
+  try {
+    const stat = fstatSync(0);
+    return stat.isFIFO() || stat.isFile();
+  } catch {
+    return false;
+  }
+};
+
+const printEvaluationReport = (
+  evaluations: Array<PersonaEvaluation & { question: string }>,
+): void => {
+  console.table(
+    evaluations.map((item) => ({
+      question: item.question,
+      persona: item.persona.toUpperCase(),
+      result: formatPassFail(item.passed),
+      failedChecks: item.checks
+        .filter((check) => !check.passed)
+        .map((check) => check.label)
+        .join(', '),
+    })),
+  );
+
+  const personaRates = (['ray', 'jack', 'lucia', 'echo'] as PersonaKey[]).map((persona) => {
+    const items = evaluations.filter((item) => item.persona === persona);
+    const passed = items.filter((item) => item.passed).length;
+    return {
+      persona: persona.toUpperCase(),
+      passed,
+      total: items.length,
+      passRate: `${Math.round((passed / items.length) * 100)}%`,
+    };
+  });
+
+  console.table(personaRates);
+
+  const totalPassed = evaluations.filter((item) => item.passed).length;
+  const totalRate = Math.round((totalPassed / evaluations.length) * 100);
+  console.log(`Overall pass rate: ${totalPassed}/${evaluations.length} (${totalRate}%)`);
+
+  if (totalPassed !== evaluations.length) {
+    process.exitCode = 1;
+  }
+};
+
+const args = process.argv.slice(2);
+const mode = args.includes('--stdin') || hasReadableStdin() ? 'stdin' : 'fixture';
+
+if (mode === 'stdin') {
+  printEvaluationReport(evaluatePersonaResponses(readStdinInput()));
+} else {
+  printEvaluationReport(buildFixtureInputs().flatMap(evaluatePersonaResponses));
 }
