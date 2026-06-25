@@ -1262,47 +1262,50 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
           ? echoQuestionProcessed
           : echoQuestionProcessed.trimEnd().replace(/[.!,;:。！]+$/, '') + '?')
       : echoQuestionProcessed;
-    const hasDecisionSummary = (...values: string[]): boolean =>
-      values.some((value) => value.includes('PersonaX 결론'));
-    const decisionSummary = hasDecisionSummary(
-      first,
-      second,
-      third,
-      closer,
-      luciaClose,
-      echoQuestion,
-    )
-      ? undefined
-      : buildPersonaXDecisionSummary({
-        question: lastMessage,
-        questionType: decisionType,
-        [firstKey]: first,
-        [secondKey]: second,
-        [thirdKey]: third,
-        echo: echoQuestion || closer,
-      });
-    const decisionSummaryText = decisionSummary
-      ? formatDecisionSummary(decisionSummary)
-      : '';
+    const stripDecisionSummaryBlock = (value: string): string => {
+      if (!value) return value;
+
+      const summaryStart = value.match(/(?:^|\r?\n)[ \t]*PersonaX 결론[\s\S]*$/m);
+      if (!summaryStart || summaryStart.index === undefined) return value;
+
+      return value.slice(0, summaryStart.index).trimEnd();
+    };
+
+    const cleanedFirst = stripDecisionSummaryBlock(first);
+    const cleanedSecond = stripDecisionSummaryBlock(second);
+    const cleanedThird = stripDecisionSummaryBlock(third);
+    const cleanedCloser = stripDecisionSummaryBlock(closer);
+    const cleanedLuciaClose = stripDecisionSummaryBlock(luciaClose);
+    const cleanedEchoQuestion = stripDecisionSummaryBlock(echoQuestion);
+
+    const decisionSummary = buildPersonaXDecisionSummary({
+      question: lastMessage,
+      questionType: decisionType,
+      [firstKey]: cleanedFirst,
+      [secondKey]: cleanedSecond,
+      [thirdKey]: cleanedThird,
+      echo: cleanedEchoQuestion || cleanedCloser,
+    });
+    const decisionSummaryText = formatDecisionSummary(decisionSummary);
     const appendSummary = (value: string): string =>
       value ? `${value}\n\n${decisionSummaryText}` : decisionSummaryText;
-    let firstWithSummary = first;
-    let secondWithSummary = second;
-    let thirdWithSummary = third;
-    let closerWithSummary = closer;
-    let echoQuestionWithSummary = echoQuestion;
+    let firstWithSummary = cleanedFirst;
+    let secondWithSummary = cleanedSecond;
+    let thirdWithSummary = cleanedThird;
+    let closerWithSummary = cleanedCloser;
+    let echoQuestionWithSummary = cleanedEchoQuestion;
     if (decisionSummaryText) {
       const lastOutputKey = router.order[router.order.length - 1] || 'echo';
-      if (lastOutputKey === router.closerPersona && closer) {
-        closerWithSummary = appendSummary(closer);
+      if (lastOutputKey === router.closerPersona && cleanedCloser) {
+        closerWithSummary = appendSummary(cleanedCloser);
       } else if (lastOutputKey === firstKey) {
-        firstWithSummary = appendSummary(first);
+        firstWithSummary = appendSummary(cleanedFirst);
       } else if (lastOutputKey === secondKey) {
-        secondWithSummary = appendSummary(second);
+        secondWithSummary = appendSummary(cleanedSecond);
       } else if (lastOutputKey === thirdKey) {
-        thirdWithSummary = appendSummary(third);
+        thirdWithSummary = appendSummary(cleanedThird);
       } else {
-        echoQuestionWithSummary = appendSummary(echoQuestion);
+        echoQuestionWithSummary = appendSummary(cleanedEchoQuestion);
       }
     }
 
@@ -1313,7 +1316,7 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
       echoQuestion: echoQuestionWithSummary,
       closerContent: closerWithSummary,
       closerKey: router.closerPersona as TaggedPersonaKey,
-      luciaClose,
+      luciaClose: cleanedLuciaClose,
       // 품질 가드 위반 시 Stage 3만 재호출하도록 Stage 1+2 결과 노출.
       decisionSummary,
       decisionType,
