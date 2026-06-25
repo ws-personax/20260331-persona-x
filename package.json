@@ -8,6 +8,7 @@
     "start": "next start",
     "qa:intent": "tsx scripts/personax-qa.ts",
     "qa:persona": "tsx scripts/personax-qa-persona.ts",
+    "qa:report": "tsx scripts/personax-qa-report.ts",
     "lint": "next lint"
   },
   "dependencies": {
