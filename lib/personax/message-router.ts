@@ -660,6 +660,9 @@ export const postProcessPersonaOutput = (
   // 4-1) [/ECHO_QUESTION] 닫는 태그 누수 제거 — LLM이 가끔 닫는 태그를 본문에 노출.
   out = out.replace(/\[\/ECHO_QUESTION\]\??/g, '');
 
+  // 4-1-1) 줄 시작 구조 라벨 제거 — "## SECOND" / "SECOND:" 류 내부 태그 누수 차단.
+  out = out.replace(STRUCTURAL_LABEL_LINE_RE, '');
+
   // 4-2) JACK 3인칭 자기 호명 제거 — JACK이/JACK은/JACK의 → '' (jack 슬롯에서만 적용).
   //      Hidden Objective(시간 낭비 극혐) 톤에서 3인칭 자기 호명은 캐릭터 붕괴 신호.
   if (personaKey === 'jack') {
@@ -699,15 +702,35 @@ export const postProcessPersonaOutput = (
   return out;
 };
 
-// ✅ 알려진 태그 목록이 아니라 임의의 대문자 구조 태그(예: [FOURTH], [UNKNOWN_TAG])도
-//   경계/제거 대상으로 인식한다 — LLM이 미지원 태그를 출력해도 누출·혼합을 막기 위함.
-const STRUCTURAL_TAG_RE = /\[[A-Z_0-9]+\]/gi;
+// ✅ 대괄호 구조 태그와 마크다운 헤더 구조 태그를 모두 경계/제거 대상으로 인식한다.
+//   LLM이 "## SECOND"처럼 출력해도 사용자 화면 노출·블록 혼합을 막기 위함.
+const STRUCTURAL_LABELS = [
+  'FIRST',
+  'SECOND',
+  'THIRD',
+  'CLOSER',
+  'FOURTH',
+  'FIFTH',
+  'LUCIA_VIEW',
+  'JACK_VIEW',
+  'RAY_VIEW',
+  'ECHO_VIEW',
+] as const;
+const STRUCTURAL_LABEL_PATTERN = STRUCTURAL_LABELS.join('|');
+const STRUCTURAL_TAG_RE = new RegExp(
+  `\\[[A-Z_0-9]+\\]|^\\s*#{1,6}\\s*(?:${STRUCTURAL_LABEL_PATTERN})(?=\\s*(?:[:：-]|$))\\s*(?:[:：-]\\s*)?`,
+  'gim',
+);
+const STRUCTURAL_LABEL_LINE_RE = new RegExp(
+  `^\\s*(?:#{1,6}\\s*)?(?:${STRUCTURAL_LABEL_PATTERN})(?=\\s*(?:[:：-]|$))\\s*(?:[:：-]\\s*)?`,
+  'gim',
+);
 
 const extractTag = (text: string | null, tag: string): string => {
   if (!text) return '';
   const re = new RegExp(
-    `\\[${tag}\\][^\\S\\n]*\\n?([\\s\\S]*?)(?=\\n\\s*\\[[A-Z_0-9]+\\]|$)`,
-    'i',
+    `(?:\\[${tag}\\]|^\\s*#{1,6}\\s*${tag}(?=\\s*(?:[:：-]|$))\\s*(?:[:：-]\\s*)?)[^\\S\\n]*\\n?([\\s\\S]*?)(?=\\n\\s*(?:\\[[A-Z_0-9]+\\]|#{1,6}\\s*(?:${STRUCTURAL_LABEL_PATTERN})(?=\\s*(?:[:：-]|$)))|$)`,
+    'im',
   );
   const m = text.match(re);
   const raw = (m?.[1] || '').trim().replace(STRUCTURAL_TAG_RE, '');
