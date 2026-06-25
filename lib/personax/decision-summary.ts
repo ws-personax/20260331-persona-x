@@ -199,8 +199,8 @@ export function buildDecisionSummary(params: {
 
   if (type === 'buy_or_wait') {
     return withImportance({
-      verdict: inferBuyOrWaitVerdict(params.question, params.ray, params.jack, params.lucia, params.echo),
-      reasons: ['현재 가격과 등락률을 먼저 확인해야 합니다', '리스크 기준 없이 행동하면 손실 폭이 커질 수 있습니다'],
+      verdict: '투자의 핵심은 수익보다 리스크 기준입니다',
+      reasons: ['매수보다 손실 관리 기준을 먼저 정해야 합니다', inferBuyOrWaitVerdict(params.question, params.ray, params.jack, params.lucia, params.echo)],
       counterView: counterFallbackByType(type),
       nextAction: '오늘은 투자 기간, 손실 한도, 추가 확인할 가격 기준을 각각 1줄로 적어보세요',
     });
@@ -208,8 +208,8 @@ export function buildDecisionSummary(params: {
 
   if (type === 'startup_vs_job') {
     return withImportance({
-      verdict: '현재 조건에서는 재취업 우선입니다',
-      reasons: ['현금흐름 확보가 먼저입니다', '창업 리스크를 줄일 준비 시간이 필요합니다'],
+      verdict: '창업과 재취업은 선택보다 검증 순서가 먼저입니다',
+      reasons: ['실행 시점과 준비 수준을 함께 판단해야 합니다', '지금 필요한 것은 결론보다 현금흐름, 고객 검증, 재취업 조건의 비교입니다'],
       counterView: '다만 창업 준비는 사이드 프로젝트로 병행할 수 있습니다',
       nextAction: '30일 내 지원 기업 10곳과 창업 검증 과제 1개를 함께 정리하세요',
     });
@@ -220,8 +220,8 @@ export function buildDecisionSummary(params: {
 
     if (subtype === 'conflict') {
       return withImportance({
-        verdict: '상대 감정에 반응하기보다 패턴을 보고 선을 정해야 합니다',
-        reasons: ['시기와 견제는 설득보다 반복 패턴 확인이 중요합니다', '감정적으로 맞서면 관계의 주도권을 상대에게 넘길 수 있습니다'],
+        verdict: '관계는 감정보다 반복 행동으로 판단합니다',
+        reasons: ['경계선을 확인하는 것이 먼저입니다', '시기와 견제는 설득보다 반복 패턴 확인이 중요합니다'],
         counterView: '다만 실제 피해나 공개적인 공격이 있다면 조용한 거리두기만으로는 부족할 수 있습니다',
         nextAction: '2주 동안 상대의 말과 행동 중 반복되는 침범 패턴 3가지를 기록하고, 노출할 정보와 거리를 줄이세요',
     });
@@ -229,16 +229,16 @@ export function buildDecisionSummary(params: {
 
     if (subtype === 'boundary') {
       return withImportance({
-        verdict: '관계를 끊을지보다 어디까지 허용할지 먼저 정해야 합니다',
-        reasons: ['불편함이 반복된다면 감정보다 경계선 설정이 먼저입니다', '모든 관계를 끝내기보다 접촉 범위를 줄이는 선택지도 있습니다'],
+        verdict: '관계는 감정보다 반복 행동으로 판단합니다',
+        reasons: ['경계선을 확인하는 것이 먼저입니다', '불편함이 반복된다면 감정보다 허용 범위를 정해야 합니다'],
         counterView: '다만 상대가 반복적으로 선을 넘는다면 관계 유지보다 보호가 우선입니다',
         nextAction: '상대에게 허용할 말, 시간, 거리의 기준을 각각 하나씩 정하고 그 기준을 넘으면 대응을 줄이세요',
     });
     }
 
     return withImportance({
-      verdict: '계속 여부는 반복 행동을 보고 조건부로 판단해야 합니다',
-      reasons: ['감정보다 반복되는 행동 패턴이 더 중요합니다', '관계가 나를 계속 작아지게 만드는지 확인해야 합니다'],
+      verdict: '관계는 감정보다 반복 행동으로 판단합니다',
+      reasons: ['경계선을 확인하는 것이 먼저입니다', '관계가 나를 계속 작아지게 만드는지 확인해야 합니다'],
       counterView: '다만 일회성 실수라면 대화 후 변화 여부를 볼 여지는 있습니다',
       nextAction: '2주 동안 불편했던 행동 3개와 실제로 바뀐 행동 3개를 기록하세요',
     });
@@ -246,8 +246,8 @@ export function buildDecisionSummary(params: {
 
   if (type === 'career') {
     return withImportance({
-      verdict: '지금은 선택지를 좁히기보다 조건을 정리할 때입니다',
-      reasons: ['커리어 결정은 감정, 돈, 시간 조건이 함께 맞아야 합니다', '바로 움직이기 전 손실 가능한 범위를 알아야 합니다'],
+      verdict: '커리어 결정은 실행 시점과 준비 수준을 함께 판단해야 합니다',
+      reasons: ['지금 필요한 것은 선택보다 검증입니다', '바로 움직이기 전 돈, 시간, 회복 가능성의 조건을 확인해야 합니다'],
       counterView: '다만 이미 회복 불가능한 환경이라면 빠른 전환도 선택지입니다',
       nextAction: '이번 주 안에 돈, 시간, 성장 기준을 각각 3줄로 정리하세요',
     });
@@ -255,8 +255,8 @@ export function buildDecisionSummary(params: {
 
   if (type === 'knowledge') {
     return withImportance({
-      verdict: '하나의 정답으로 단정하기보다 객관적 기준과 체감 기준을 구분해야 합니다',
-      reasons: ['통계나 법령상 기준과 사람들이 실제로 체감하는 기준은 다르게 갈리는 경우가 많습니다', '어떤 맥락(소득, 자산, 통계 분류 등)을 기준으로 묻는지에 따라 답이 달라집니다'],
+      verdict: '개념을 이해하는 것과 실제 적용은 다릅니다',
+      reasons: ['정의보다 활용 기준을 기억해야 합니다', '어떤 맥락(소득, 자산, 통계 분류 등)을 기준으로 묻는지에 따라 답이 달라집니다'],
       counterView: '다만 특정 기준(예: 통계청 분류, 법령상 정의)을 이미 정해두고 묻는 거라면 그 기준으로 바로 답할 수 있습니다',
       nextAction: '어떤 기준(소득, 자산, 통계 분류, 법령 등)으로 알고 싶은지 한 가지만 정해서 다시 물어보세요',
     });
@@ -272,10 +272,10 @@ export function buildDecisionSummary(params: {
   }
 
   return withImportance({
-    verdict: anchor ? '지금은 하나의 답으로 닫기보다 서로 다른 가능성을 분리해야 합니다' : '추가 정보 확인 후 결정해야 합니다',
-    reasons: ['답을 하나로 빨리 정하면 놓치는 선택지가 생깁니다', '각 선택이 가져올 대가를 나눠봐야 다음 행동이 선명해집니다'],
-    counterView: '다만 상황이 급하면 가장 회복 가능한 선택을 우선할 수 있습니다',
-    nextAction: '오늘 안에 가능한 선택지 3개와 각각의 대가 1개씩을 적으세요',
+    verdict: anchor ? '하나의 정답보다 자신의 기준을 세우는 것이 중요합니다' : '추가 정보보다 먼저 판단 기준을 정해야 합니다',
+    reasons: ['각 페르소나의 기준을 비교해 자신의 판단 기준을 정리해야 합니다', '답을 하나로 빨리 정하면 놓치는 기준이 생깁니다'],
+    counterView: '다만 상황이 급하면 가장 회복 가능하고 되돌릴 수 있는 기준을 우선할 수 있습니다',
+    nextAction: '오늘 안에 RAY식 검증 기준, JACK식 행동 기준, LUCIA식 회복 기준, ECHO식 반복 기준을 각각 1줄로 적으세요',
     });
 }
 
