@@ -1,3 +1,22 @@
+const countMatchedTerms = (answer: string, terms: readonly string[]): number =>
+  terms.filter((term) => answer.includes(term)).length;
+
+const PERSONA_DNA_SIGNAL_GROUPS = [
+  ['책임', '선택', '행동', '대가'],
+  ['정의', '분해', '비교', '검증'],
+  ['인간', '감정', '관계', '상처'],
+  ['반복', '패턴', '구조', '누적'],
+] as const;
+
+const hasPersonaDnaSignals = (answer: string): boolean => {
+  const groupMatches = PERSONA_DNA_SIGNAL_GROUPS.map((terms) =>
+    countMatchedTerms(answer, terms),
+  );
+  const totalMatches = groupMatches.reduce((sum, count) => sum + count, 0);
+
+  return groupMatches.every((count) => count >= 1) && totalMatches >= 6;
+};
+
 export const QA_QUESTIONS = [
   {
     id: 'list',
@@ -25,6 +44,31 @@ export const QA_QUESTIONS = [
     check: (answer: string) =>
       /계속|중단|멈추|조건부|만나도|그만/.test(answer),
   },
+  {
+    id: 'abstract_happiness',
+    question: '행복이란?',
+    check: hasPersonaDnaSignals,
+  },
+  {
+    id: 'abstract_success',
+    question: '성공이란?',
+    check: hasPersonaDnaSignals,
+  },
+  {
+    id: 'abstract_freedom',
+    question: '자유란?',
+    check: hasPersonaDnaSignals,
+  },
+  {
+    id: 'abstract_good_life',
+    question: '좋은 삶이란?',
+    check: hasPersonaDnaSignals,
+  },
+  {
+    id: 'abstract_life_meaning',
+    question: '인생의 의미란?',
+    check: hasPersonaDnaSignals,
+  },
 ] as const;
 
 export function scoreQA(answers: Record<string, string>): number {
@@ -32,5 +76,5 @@ export function scoreQA(answers: Record<string, string>): number {
     item.check(answers[item.id] ?? ''),
   ).length;
 
-  return passed * 25;
+  return Math.round((passed / QA_QUESTIONS.length) * 100);
 }
