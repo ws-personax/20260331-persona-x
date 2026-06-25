@@ -281,11 +281,17 @@ const printEvaluationReport = (
   }
 };
 
+const isDirectCli = process.argv[1]
+  ?.replace(/\\/g, '/')
+  .endsWith('/scripts/personax-qa-persona.ts');
+
 const args = process.argv.slice(2);
 const mode = args.includes('--stdin') || hasReadableStdin() ? 'stdin' : 'fixture';
 
-if (mode === 'stdin') {
-  printEvaluationReport(evaluatePersonaResponses(readStdinInput()));
-} else {
-  printEvaluationReport(buildFixtureInputs().flatMap(evaluatePersonaResponses));
+if (isDirectCli) {
+  if (mode === 'stdin') {
+    printEvaluationReport(evaluatePersonaResponses(readStdinInput()));
+  } else {
+    printEvaluationReport(buildFixtureInputs().flatMap(evaluatePersonaResponses));
+  }
 }
