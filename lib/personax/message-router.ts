@@ -540,19 +540,6 @@ const stripPersonaLabelLines = (s: string): string =>
 // runRoutedRequest의 solo·full 경로 양쪽 호출에서 사용.
 // ──────────────────────────────────────────────────────────────────────────
 
-// ECHO 전용 — 문장 끝 물음표 종결 선언형 강제 변환 (JACK/LUCIA/RAY 미적용).
-// ECHO 가 [FIRST]/[SECOND]/[THIRD]/[CLOSER] 슬롯에서 의도치 않게 질문형으로 종결하는 케이스 차단.
-// "알고 있는가?" 처럼 더 구체적인 패턴을 "는가?" 보다 먼저 적용해 치환 오작동 방지.
-const ECHO_TRAILING_Q_TO_DECL: ReadonlyArray<readonly [RegExp, string]> = [
-  [/알고\s*있는가\?/g, '알고 있습니다.'],
-  [/습니까\?/g, '습니다.'],
-  [/인가요\?/g, '입니다.'],
-  [/는가\?/g, '입니다.'],
-  [/인가\?/g, '입니다.'],
-  [/입니다\?/g, '입니다.'],
-  [/합니다\?/g, '합니다.'],
-];
-
 // 투자 법적 표현 교체 — 더 긴/구체적인 패턴 우선 (매수하세요 → 사세요 순)
 const LEGAL_REPLACEMENTS: ReadonlyArray<readonly [RegExp, string]> = [
   [/매수하세요/g, '진입을 고려해볼 수 있어요'],
@@ -709,11 +696,9 @@ export const postProcessPersonaOutput = (
   //    "처럼"은 앞에 명사가 와야 하므로 "그처럼"으로 보정해 의미 흐름 유지.
   out = out.replace(/([.!?])\s*처럼/g, '$1 그처럼');
 
-  // 7) ECHO 전용 — 물음표 종결 선언형 강제 변환. JACK/LUCIA/RAY 절대 미적용.
+  // 7) ECHO 전용 — 마지막 문장 종결 ? → . 일반화. JACK/LUCIA/RAY 절대 미적용.
   if (personaKey === 'echo') {
-    for (const [pat, replacement] of ECHO_TRAILING_Q_TO_DECL) {
-      out = out.replace(pat, replacement);
-    }
+    out = out.replace(/\?(\s*)$/, '.$1');
   }
 
   // 연속 공백·줄바꿈 정리
