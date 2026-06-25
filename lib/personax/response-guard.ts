@@ -118,6 +118,17 @@ function sanitizeJackAlwaysAggressiveTerms(answer: string): string {
   return answer.replace(/자살행위/g, '리스크가 매우 큽니다');
 }
 
+const DECISION_SUMMARY_HEAD_PATTERN = /(?:^|\n)\s*PersonaX 결론(?:\n|$)/;
+const DECISION_SUMMARY_LABEL_PATTERN =
+  /(?:^|\n)\s*(?:핵심 이유:|반대 의견:|다음 행동:|한 줄 정의|왜 중요한가|핵심 포인트)(?:\n|$)/;
+
+function isDecisionSummaryBlock(answer: string): boolean {
+  return (
+    DECISION_SUMMARY_HEAD_PATTERN.test(answer) &&
+    DECISION_SUMMARY_LABEL_PATTERN.test(answer)
+  );
+}
+
 const DIRECT_TRADE_INSTRUCTION_PATTERN =
   /(?:무조건|지금\s*(?:당장)?|즉시|전량)?\s*(?:사세요|사라|매수하세요|매수해라|매수하라|파세요|팔아라|매도하세요|매도해라|매도하라|들어가세요|들어가라)|몰빵|수익\s*보장|손실\s*없음|확실한\s*수익/g;
 
@@ -365,10 +376,13 @@ export function applyResponseGuard(
       continue;
     }
 
-    personaText[key] = removeFuturePersonaReferences(
-      key as PersonaKey,
-      stripInternalScriptTags(answer),
-    );
+    const cleanedAnswer = stripInternalScriptTags(answer);
+    personaText[key] = isDecisionSummaryBlock(cleanedAnswer)
+      ? cleanedAnswer
+      : removeFuturePersonaReferences(
+        key as PersonaKey,
+        cleanedAnswer,
+      );
 
     if (key === 'echo' && shouldSanitizeEchoInvestmentTerms(questionType)) {
       personaText[key] = sanitizeEchoInvestmentTerms(personaText[key]);
