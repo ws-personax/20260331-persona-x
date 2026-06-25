@@ -93,6 +93,7 @@ type KakaoUser = {
 };
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+const isDevQaExportEnabled = process.env.NODE_ENV !== 'production';
 const formatTime = (d: Date) =>
   d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Seoul' });
 
@@ -723,6 +724,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
   const [pendingInitialPosition, setPendingInitialPosition] = useState<Partial<Position> | null>(null);
   const [pendingOrder, setPendingOrder] = useState<PersonaKey[] | null>(null);
   const [pendingEchoQuestion, setPendingEchoQuestion] = useState<string | null>(null);
+  const [copiedQaExportId, setCopiedQaExportId] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -771,6 +773,77 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
     el.style.height = `${nextHeight}px`;
     el.style.overflowY = el.scrollHeight > 160 ? 'auto' : 'hidden';
   }, [input]);
+
+  const buildQaExportPayload = useCallback((msg: Message, msgIdx: number) => {
+    if (!msg.personas) return null;
+
+    const question = messagesRef.current
+      .slice(0, msgIdx)
+      .reverse()
+      .find(m => m.role === 'user')
+      ?.content
+      ?.trim();
+
+    if (!question) return null;
+
+    return {
+      question,
+      personas: {
+        RAY: msg.personas.ray || '',
+        JACK: msg.personas.jack || '',
+        LUCIA: msg.personas.lucia || '',
+        ECHO: msg.personas.echo || '',
+      },
+      summary: msg.personas.echo || msg.content || '',
+    };
+  }, []);
+
+  const canExportQaPayload = useCallback((msg: Message, msgIdx: number): boolean => {
+    const payload = buildQaExportPayload(msg, msgIdx);
+    if (!payload) return false;
+    return Object.values(payload.personas).every(value => value.trim().length > 0);
+  }, [buildQaExportPayload]);
+
+  const handleCopyQaExport = useCallback(async (msg: Message, msgIdx: number) => {
+    const payload = buildQaExportPayload(msg, msgIdx);
+    if (!payload) return;
+
+    const json = JSON.stringify(payload, null, 2);
+    await navigator.clipboard.writeText(json);
+    setCopiedQaExportId(msg.id);
+    window.setTimeout(() => {
+      setCopiedQaExportId(current => (current === msg.id ? null : current));
+    }, 1600);
+  }, [buildQaExportPayload]);
+
+  const renderQaExportButton = useCallback((msg: Message, msgIdx: number) => {
+    if (!isDevQaExportEnabled || !msg.personas) return null;
+
+    const canExport = canExportQaPayload(msg, msgIdx);
+    const copied = copiedQaExportId === msg.id;
+    return (
+      <button
+        type="button"
+        disabled={!canExport}
+        onClick={() => handleCopyQaExport(msg, msgIdx)}
+        title="Copy Persona QA JSON for npm run qa:run"
+        style={{
+          alignSelf: 'flex-start',
+          marginTop: 8,
+          border: '1px dashed #9ca3af',
+          borderRadius: 6,
+          background: canExport ? '#f9fafb' : '#f3f4f6',
+          color: canExport ? '#374151' : '#9ca3af',
+          cursor: canExport ? 'pointer' : 'not-allowed',
+          fontSize: 11,
+          fontWeight: 700,
+          padding: '5px 8px',
+        }}
+      >
+        {copied ? 'QA JSON copied' : 'QA Export'}
+      </button>
+    );
+  }, [canExportQaPayload, copiedQaExportId, handleCopyQaExport]);
 
   const handleSendWithPosition = useCallback(async (text: string, position: Position | null, isAdvanced: boolean = false) => {
     stopSpeaking();
@@ -1377,6 +1450,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                           marketClosedNote={noticeMarketClosed}
                           hideDisclaimer={noticeHideDisclaimer}
                         />
+                        {renderQaExportButton(msg, msgIdx)}
                       </>
                     );
                   }
@@ -1511,6 +1585,7 @@ export default function ChatWindow({ initialMessage }: ChatWindowProps = {}) {
                         marketClosedNote={noticeMarketClosed}
                         hideDisclaimer={noticeHideDisclaimer}
                       />
+                      {renderQaExportButton(msg, msgIdx)}
                     </>
                   );
                 })() : null}

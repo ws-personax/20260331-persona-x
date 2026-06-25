@@ -19,6 +19,21 @@ interface PersonaEvaluationInput {
   echo: string;
 }
 
+interface PersonaXExportInput {
+  question: string;
+  personas: {
+    RAY?: string;
+    JACK?: string;
+    LUCIA?: string;
+    ECHO?: string;
+    ray?: string;
+    jack?: string;
+    lucia?: string;
+    echo?: string;
+  };
+  summary?: string;
+}
+
 interface CheckResult {
   label: string;
   passed: boolean;
@@ -85,19 +100,50 @@ const isPersonaEvaluationInput = (value: unknown): value is PersonaEvaluationInp
   ));
 };
 
+const isPersonaXExportInput = (value: unknown): value is PersonaXExportInput => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const input = value as Partial<PersonaXExportInput>;
+  const personas = input.personas;
+  return typeof input.question === 'string'
+    && Boolean(input.question.trim())
+    && Boolean(personas)
+    && typeof personas === 'object'
+    && ['RAY', 'JACK', 'LUCIA', 'ECHO'].every((key) => (
+      typeof personas[key as keyof PersonaXExportInput['personas']] === 'string'
+      && Boolean(personas[key as keyof PersonaXExportInput['personas']]?.trim())
+    ));
+};
+
+const fromPersonaXExport = (input: PersonaXExportInput): PersonaEvaluationInput => ({
+  question: input.question,
+  ray: input.personas.RAY ?? input.personas.ray ?? '',
+  jack: input.personas.JACK ?? input.personas.jack ?? '',
+  lucia: input.personas.LUCIA ?? input.personas.lucia ?? '',
+  echo: input.personas.ECHO ?? input.personas.echo ?? '',
+});
+
 const normalizeInputs = (value: unknown): PersonaEvaluationInput[] => {
   if (Array.isArray(value)) {
-    if (!value.every(isPersonaEvaluationInput)) {
-      throw new Error('qa:run array input must contain PersonaEvaluationInput objects');
+    if (!value.every((item) => isPersonaEvaluationInput(item) || isPersonaXExportInput(item))) {
+      throw new Error('qa:run array input must contain PersonaEvaluationInput or PersonaX export objects');
     }
-    return value;
+    return value.map((item) => (
+      isPersonaEvaluationInput(item) ? item : fromPersonaXExport(item)
+    ));
   }
 
-  if (!isPersonaEvaluationInput(value)) {
-    throw new Error('qa:run input must include question, ray, jack, lucia, and echo strings');
+  if (isPersonaXExportInput(value)) {
+    return [fromPersonaXExport(value)];
   }
 
-  return [value];
+  if (isPersonaEvaluationInput(value)) {
+    return [value];
+  }
+
+  throw new Error('qa:run input must include question with ray/jack/lucia/echo or personas.RAY/JACK/LUCIA/ECHO strings');
 };
 
 const scoreChecks = (checks: CheckResult[]): number => {
