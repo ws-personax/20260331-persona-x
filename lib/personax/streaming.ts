@@ -2,6 +2,10 @@ import type { TaggedPersonaKey } from './message-router';
 import { emptyPersonaText } from './fallbacks';
 import { toPromptOrder } from './utils';
 
+// ECHO 전용 — 문자열 끝 ? → . 교체. JACK/LUCIA/RAY 미적용.
+const stripEchoTrailingQuestionMark = (text: string): string =>
+  text.replace(/\?(\s*)$/, '.$1');
+
 type Round1MappingResult = {
   first?: string;
   second?: string;
@@ -35,6 +39,10 @@ export const mapOrderedRound1 = (
   });
   if (result.echoQuestion) {
     personaText.echo = result.echoQuestion;
+    // echoQuestion 슬롯은 반드시 "?"로 닫는다 (invest/action/principle 카테고리 기대치).
+    if (!personaText.echo.trimEnd().endsWith('?')) {
+      personaText.echo = personaText.echo.trimEnd().replace(/[.!,;:。！]+$/, '') + '?';
+    }
   }
   // 복합 카테고리(finance+emotional 등) — order에 echo가 없고 echoQuestion도 비어있을 때,
   //   LUCIA_CLOSE가 실제 닫는 질문 역할이므로 personaText.echo에 동기화.
@@ -42,11 +50,8 @@ export const mapOrderedRound1 = (
   if (!personaText.echo && result.luciaClose) {
     personaText.echo = result.luciaClose;
   }
-  // ECHO 종결 "?" 보편 강제 — invest/action/principle은 message-router에서 echoQuestion에 적용됐고,
-  //   emotional은 ECHO가 THIRD 슬롯이라 "."로 끝나는 경우가 많음. UI/테스트 기대치(ECHO=질문자) 부합.
-  if (personaText.echo && !personaText.echo.trimEnd().endsWith('?')) {
-    personaText.echo = personaText.echo.trimEnd().replace(/[.!,;:。！]+$/, '') + '?';
-  }
+  // ECHO가 FIRST/SECOND/THIRD 슬롯(비-ECHO_QUESTION 경로)에 있을 때는
+  // message-router.ts Step 7이 이미 trailing ? → . 변환을 완료했으므로 재강제 금지.
   return personaText;
 };
 
@@ -59,6 +64,6 @@ export const mapLegacyEchoRound2 = (
   personaText[promptOrder[0]] = result.first;
   personaText[promptOrder[1]] = result.second;
   personaText[promptOrder[2]] = result.third;
-  personaText.echo = result.echoFinal;
+  personaText.echo = stripEchoTrailingQuestionMark(result.echoFinal);
   return personaText;
 };
