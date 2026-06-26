@@ -6,9 +6,10 @@ import LoginScreen from '@/components/LoginScreen';
 import HomeScreen from '@/components/HomeScreen';
 import ChatWindow from '@/components/ChatWindow';
 import RoomList from '@/components/rooms/RoomList';
+import RoomDetail from '@/components/rooms/RoomDetail';
 import { createClient } from '@/lib/supabase/client';
 
-type Stage = 'splash' | 'login' | 'home' | 'chat' | 'rooms';
+type Stage = 'splash' | 'login' | 'home' | 'chat' | 'rooms' | 'room-detail';
 type SessionUser = { name?: string | null; email?: string | null } | null;
 
 export default function Page() {
@@ -17,6 +18,7 @@ export default function Page() {
   const [user, setUser] = useState<SessionUser>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [initialMessage, setInitialMessage] = useState<string | undefined>(undefined);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
 
   // ✅ 기존 Supabase + 카카오 세션 체크 — AuthButton과 동일 로직
   useEffect(() => {
@@ -124,7 +126,19 @@ export default function Page() {
     return (
       <RoomList
         onBack={() => setStage('home')}
-        onSelectRoom={(roomId) => { console.log('[Room selected]', roomId); }}
+        onSelectRoom={(roomId) => {
+          setSelectedRoomId(roomId);
+          setStage('room-detail');
+        }}
+      />
+    );
+  }
+
+  if (stage === 'room-detail' && selectedRoomId) {
+    return (
+      <RoomDetail
+        roomId={selectedRoomId}
+        onBack={() => setStage('rooms')}
       />
     );
   }
