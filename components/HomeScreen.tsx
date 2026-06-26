@@ -11,9 +11,10 @@ interface HomeScreenProps {
   onSubmit: (text: string) => void;
   onOpenHistory?: () => void;
   onOpenMenu?: () => void;
+  onOpenRooms?: () => void;
 }
 
-export default function HomeScreen({ onSubmit, onOpenHistory }: HomeScreenProps) {
+export default function HomeScreen({ onSubmit, onOpenHistory, onOpenRooms }: HomeScreenProps) {
   const [showHistory, setShowHistory] = useState(false);
   const [selectedReviewConversationId, setSelectedReviewConversationId] = useState<string | null>(null);
   const openHistory = () => {
@@ -46,6 +47,25 @@ export default function HomeScreen({ onSubmit, onOpenHistory }: HomeScreenProps)
         <Logo size="sm" />
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           <AuthButton />
+          <button
+            type="button"
+            onClick={onOpenRooms}
+            style={{
+              background: '#FFF8E8',
+              padding: '5px 12px',
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#5C3D1E',
+              border: '1px solid #C9A46A',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+            }}
+          >
+            Rooms
+          </button>
           <button
             type="button"
             onClick={openHistory}
