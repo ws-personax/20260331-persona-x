@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { resolveProviderUserIdForRead } from '@/lib/personax/auth';
 import { getRoom, getRoomMessages, addRoomMessage } from '@/lib/personax/room-persistence';
+import { detectRoomPersonaCall, getRoomPersonaPlaceholder } from '@/lib/personax/room-persona-router';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -55,5 +56,18 @@ export async function POST(
     return NextResponse.json({ error: 'failed to save message' }, { status: 500 });
   }
 
-  return NextResponse.json({ message }, { status: 201 });
+  const personaCall = detectRoomPersonaCall(content);
+  if (!personaCall) {
+    return NextResponse.json({ message }, { status: 201 });
+  }
+
+  const placeholderContent = getRoomPersonaPlaceholder(personaCall.persona);
+  const personaMessage = await addRoomMessage(
+    params.roomId,
+    'persona',
+    placeholderContent,
+    personaCall.persona,
+  );
+
+  return NextResponse.json({ message, personaMessage: personaMessage ?? undefined }, { status: 201 });
 }
