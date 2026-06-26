@@ -82,8 +82,12 @@ export default function RoomDetail({ roomId, onBack }: RoomDetailProps) {
 
     if (!res.ok) return;
 
-    const json = await res.json() as { message: RoomMessage };
-    setMessages((prev) => [...prev, json.message]);
+    const json = await res.json() as { message: RoomMessage; personaMessage?: RoomMessage };
+    setMessages((prev) => {
+      const next = [...prev, json.message];
+      if (json.personaMessage) next.push(json.personaMessage);
+      return next;
+    });
   };
 
   if (loading) {

@@ -42,7 +42,7 @@ export default function RoomChatInput({ onSend }: RoomChatInputProps) {
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) handleSend();
         }}
-        placeholder="메시지를 입력하세요"
+        placeholder="메시지를 입력하거나 @JACK @RAY @LUCIA @ECHO 를 호출하세요"
         disabled={sending}
         style={{
           flex: 1,
