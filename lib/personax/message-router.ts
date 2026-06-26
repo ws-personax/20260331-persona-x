@@ -1222,8 +1222,11 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
     // ECHO_QUESTION 누락 감지 — invest/action/principle(=비-emotional/knowledge) 카테고리에서만 보정.
     //   emotional은 [LUCIA_CLOSE] 액자 구조라 ECHO_QUESTION이 의도적으로 부재.
     //   knowledge는 ECHO가 질문이 아니라 정리형/판결형으로 닫을 수 있어 재요청·물음표 강제를 적용하지 않는다.
-    //   1차 추출이 빈 값이면 ECHO_QUESTION만 별도 재요청, 그것도 실패 시 invest 폴백 문장 사용.
+    //   1차 추출이 빈 값이면 ECHO_QUESTION만 별도 재요청, 그것도 실패 시 투자 실행 질문일 때만 투자 폴백 문장 사용.
     const expectsEchoQuestion = router.categoryV3 !== 'emotional' && router.categoryV3 !== 'knowledge';
+    const isInvestmentEchoFallback =
+      router.categoryV3 === 'invest' &&
+      decisionType === 'buy_or_wait';
     let echoQuestionRaw = extractTag(scriptRaw, 'ECHO_QUESTION') || '';
     if (expectsEchoQuestion && !echoQuestionRaw.trim()) {
       console.warn('[runRoutedRequest] ECHO_QUESTION 누락 → 별도 재요청');
@@ -1249,7 +1252,9 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
       }
       if (!echoQuestionRaw.trim()) {
         console.warn('[runRoutedRequest] ECHO_QUESTION 재요청도 빈 값 → 폴백 사용');
-        echoQuestionRaw = '지금 손절선 정해놓으셨어요?';
+        echoQuestionRaw = isInvestmentEchoFallback
+          ? '지금 손절선 정해놓으셨어요?'
+          : '지금 반복되는 기준이 무엇인지 보이십니까?';
       }
     }
     const echoQuestionProcessed = postProcessPersonaOutput(echoQuestionRaw, 'echo');
