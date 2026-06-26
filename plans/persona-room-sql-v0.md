@@ -32,6 +32,8 @@
 ### 1. rooms
 
 ```sql
+create extension if not exists pgcrypto;
+
 -- ============================================================
 -- rooms: Room 기본 정보 테이블
 -- v0: provider_user_id 단일 owner 기반
@@ -129,6 +131,8 @@ begin
   return new;
 end;
 $$ language plpgsql;
+
+drop trigger if exists trg_rooms_updated_at on rooms;
 
 create trigger trg_rooms_updated_at
   before update on rooms
