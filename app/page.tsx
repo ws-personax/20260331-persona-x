@@ -5,9 +5,10 @@ import Splash from '@/components/Splash';
 import LoginScreen from '@/components/LoginScreen';
 import HomeScreen from '@/components/HomeScreen';
 import ChatWindow from '@/components/ChatWindow';
+import RoomList from '@/components/rooms/RoomList';
 import { createClient } from '@/lib/supabase/client';
 
-type Stage = 'splash' | 'login' | 'home' | 'chat';
+type Stage = 'splash' | 'login' | 'home' | 'chat' | 'rooms';
 type SessionUser = { name?: string | null; email?: string | null } | null;
 
 export default function Page() {
@@ -114,6 +115,16 @@ export default function Page() {
           setInitialMessage(text);
           setStage('chat');
         }}
+        onOpenRooms={() => setStage('rooms')}
+      />
+    );
+  }
+
+  if (stage === 'rooms') {
+    return (
+      <RoomList
+        onBack={() => setStage('home')}
+        onSelectRoom={(roomId) => { console.log('[Room selected]', roomId); }}
       />
     );
   }
