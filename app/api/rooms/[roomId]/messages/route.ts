@@ -2,6 +2,9 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { resolveProviderUserIdForRead } from '@/lib/personax/auth';
 import { getRoom, getRoomMessages, addRoomMessage } from '@/lib/personax/room-persistence';
 import { detectRoomPersonaCall, getRoomPersonaPlaceholder } from '@/lib/personax/room-persona-router';
+import { buildRoomPersonaBlockedMessage, isRoomPersonaAllowed } from '@/lib/personax/room-participant-access';
+import { resolveSpeaker } from '@/lib/personax/speaker-engine';
+import type { SpeakerKey } from '@/lib/personax/room-types';
 import { callTeaPersona } from '@/lib/personax/tea-llm-caller';
 import { TEA_SYSTEM_ECHO } from '@/app/api/chat/prompts/tea-echo';
 import { TEA_SYSTEM_JACK } from '@/app/api/chat/prompts/tea-jack';
@@ -11,68 +14,6 @@ import { TEA_SYSTEM_RAY } from '@/app/api/chat/prompts/tea-ray';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-type SpeakerType = 'user' | 'persona' | 'system';
-type RoomPersonaKey = 'jack' | 'ray' | 'lucia' | 'echo';
-
-interface Speaker {
-  id: string;
-  type: SpeakerType;
-  name: string;
-  persona?: RoomPersonaKey;
-}
-
-const FREE_ROOM_PERSONAS: RoomPersonaKey[] = ['jack', 'lucia'];
-const PAID_ROOM_PERSONAS: RoomPersonaKey[] = ['jack', 'lucia', 'ray', 'echo'];
-
-const getRoomAccessTier = (room: { title: string; topic: string | null }): 'free' | 'paid' => {
-  const marker = `${room.title} ${room.topic ?? ''}`.toLowerCase();
-  // 임시 하드코딩: 추후 Room Participants 테이블로 교체한다.
-  if (/(유료|paid|premium|pro|프리미엄)/i.test(marker)) return 'paid';
-  if (/(무료|free)/i.test(marker)) return 'free';
-  return 'free';
-};
-
-const isRoomPersonaAllowed = (
-  room: { title: string; topic: string | null },
-  persona: RoomPersonaKey,
-): boolean => {
-  const allowed = getRoomAccessTier(room) === 'paid' ? PAID_ROOM_PERSONAS : FREE_ROOM_PERSONAS;
-  return allowed.includes(persona);
-};
-
-const resolveSpeaker = (input: {
-  type: SpeakerType;
-  id?: string;
-  name?: string;
-  persona?: RoomPersonaKey;
-}): Speaker => {
-  const speaker: Speaker = {
-    id: input.id ?? `${input.type}:${input.persona ?? input.name ?? 'default'}`,
-    type: input.type,
-    name:
-      input.name ??
-      (input.type === 'persona' && input.persona ? input.persona.toUpperCase() : input.type.toUpperCase()),
-  };
-
-  if (input.persona) {
-    speaker.persona = input.persona;
-  }
-
-  return speaker;
-};
-
-const buildRoomPersonaBlockedMessage = (
-  room: { title: string; topic: string | null },
-  persona: RoomPersonaKey,
-): string => {
-  const allowed = getRoomAccessTier(room) === 'paid' ? PAID_ROOM_PERSONAS : FREE_ROOM_PERSONAS;
-  return [
-    `${persona.toUpperCase()}는 이 채팅방에서 아직 호출할 수 없습니다.`,
-    `현재 허용된 참여자: ${allowed.map((name) => name.toUpperCase()).join(', ')}.`,
-    '추후 Room Participants 테이블이 추가되면 이 규칙으로 교체할 예정입니다.',
-  ].join('\n');
-};
 
 const getRoomPersonaSystemPrompt = (persona: 'jack' | 'ray' | 'lucia' | 'echo'): string => {
   switch (persona) {
@@ -180,7 +121,7 @@ export async function POST(
     params.roomId,
     personaSpeaker.type,
     placeholderContent,
-    personaSpeaker.persona,
+    personaSpeaker.persona as SpeakerKey,
   );
 
   return NextResponse.json({ message, personaMessage: personaMessage ?? undefined }, { status: 201 });
