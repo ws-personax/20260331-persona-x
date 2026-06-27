@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import type { Room } from '@/lib/personax/room-types';
@@ -28,10 +28,10 @@ export default function RoomCreate({ onCreated, onCancel }: RoomCreateProps) {
         body: JSON.stringify({ title: trimmedTitle, topic: topic.trim() || undefined }),
       });
 
-      const json = await res.json() as { room?: Room; error?: string };
+      const json = (await res.json()) as { room?: Room; error?: string };
 
       if (!res.ok) {
-        setError(json.error ?? '생성 실패');
+        setError(json.error ?? '채팅방 생성에 실패했습니다.');
         return;
       }
 
@@ -58,16 +58,18 @@ export default function RoomCreate({ onCreated, onCancel }: RoomCreateProps) {
   return (
     <div style={{ padding: '20px 16px' }}>
       <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1a1a2e', marginBottom: 16, marginTop: 0 }}>
-        새 Room 만들기
+        새 채팅방 만들기
       </h3>
 
       <div style={{ marginBottom: 12 }}>
         <input
           type="text"
-          placeholder="Room 제목 *"
+          placeholder="채팅방 제목 *"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleCreate();
+          }}
           style={inputStyle}
         />
       </div>
@@ -120,7 +122,7 @@ export default function RoomCreate({ onCreated, onCancel }: RoomCreateProps) {
             cursor: title.trim() && !loading ? 'pointer' : 'default',
           }}
         >
-          {loading ? '생성 중...' : '만들기'}
+          {loading ? '만드는 중...' : '만들기'}
         </button>
       </div>
     </div>
