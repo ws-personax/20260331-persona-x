@@ -3,6 +3,8 @@ import { resolveProviderUserIdForRead } from '@/lib/personax/auth';
 import { getRoom, getRoomMessages, addRoomMessage } from '@/lib/personax/room-persistence';
 import { detectRoomPersonaCall, getRoomPersonaPlaceholder } from '@/lib/personax/room-persona-router';
 import { buildRoomPersonaBlockedMessage, isRoomPersonaAllowed } from '@/lib/personax/room-participant-access';
+import { resolveSpeaker } from '@/lib/personax/speaker-engine';
+import type { SpeakerKey } from '@/lib/personax/room-types';
 import { callTeaPersona } from '@/lib/personax/tea-llm-caller';
 import { TEA_SYSTEM_ECHO } from '@/app/api/chat/prompts/tea-echo';
 import { TEA_SYSTEM_JACK } from '@/app/api/chat/prompts/tea-jack';
@@ -70,7 +72,12 @@ export async function POST(
     return NextResponse.json({ error: 'content is required' }, { status: 400 });
   }
 
-  const message = await addRoomMessage(params.roomId, 'user', content);
+  const userSpeaker = resolveSpeaker({
+    type: 'user',
+    id: providerUserId,
+    name: providerUserId,
+  });
+  const message = await addRoomMessage(params.roomId, userSpeaker.type, content);
   if (!message) {
     return NextResponse.json({ error: 'failed to save message' }, { status: 500 });
   }
@@ -81,9 +88,14 @@ export async function POST(
   }
 
   if (!isRoomPersonaAllowed(room, personaCall.persona)) {
+    const blockedSpeaker = resolveSpeaker({
+      type: 'system',
+      id: `room:${params.roomId}:persona-block`,
+      name: 'SYSTEM',
+    });
     const blockedMessage = await addRoomMessage(
       params.roomId,
-      'system',
+      blockedSpeaker.type,
       buildRoomPersonaBlockedMessage(room, personaCall.persona),
     );
     return NextResponse.json(
@@ -92,6 +104,12 @@ export async function POST(
     );
   }
 
+  const personaSpeaker = resolveSpeaker({
+    type: 'persona',
+    id: personaCall.persona,
+    name: personaCall.persona.toUpperCase(),
+    persona: personaCall.persona,
+  });
   const personaSystemPrompt = getRoomPersonaSystemPrompt(personaCall.persona);
   const personaResponse = await callTeaPersona(
     personaCall.persona,
@@ -101,9 +119,9 @@ export async function POST(
   const placeholderContent = personaResponse?.trim() || getRoomPersonaPlaceholder(personaCall.persona);
   const personaMessage = await addRoomMessage(
     params.roomId,
-    'persona',
+    personaSpeaker.type,
     placeholderContent,
-    personaCall.persona,
+    personaSpeaker.persona as SpeakerKey,
   );
 
   return NextResponse.json({ message, personaMessage: personaMessage ?? undefined }, { status: 201 });
