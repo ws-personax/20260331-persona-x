@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import GuestOnboardingCard from '@/components/GuestOnboardingCard';
 import type { Room } from '@/lib/personax/room-types';
+import PersonaHero from './PersonaHero';
 import RoomCreate from './RoomCreate';
 
 interface RoomListProps {
@@ -214,6 +215,8 @@ export default function RoomList({
           </div>
         </div>
       </div>
+
+      <PersonaHero />
 
       {showCreate && (
         <div
