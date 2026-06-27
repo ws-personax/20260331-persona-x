@@ -2,18 +2,21 @@
 
 import { useState } from 'react';
 import AuthButton from './AuthButton';
+import GuestOnboardingCard from './GuestOnboardingCard';
 import HistoryModal from './HistoryModal';
 import Logo from './Logo';
 import ReviewCard from './ReviewCard';
 
 interface HomeScreenProps {
   userName?: string;
+  isGuest: boolean;
   onSubmit: (text: string) => void;
   onOpenHistory?: () => void;
   onOpenMenu?: () => void;
+  onOpenSignup: () => void;
 }
 
-export default function HomeScreen({ onSubmit, onOpenHistory }: HomeScreenProps) {
+export default function HomeScreen({ onSubmit, onOpenHistory, isGuest, onOpenSignup }: HomeScreenProps) {
   const [showHistory, setShowHistory] = useState(false);
   const [selectedReviewConversationId, setSelectedReviewConversationId] = useState<string | null>(null);
 
@@ -70,6 +73,8 @@ export default function HomeScreen({ onSubmit, onOpenHistory }: HomeScreenProps)
             </button>
           </div>
         </header>
+
+        {isGuest && <GuestOnboardingCard onOpenSignup={onOpenSignup} />}
 
         <div className="flex-1 flex flex-col overflow-hidden" style={{ minHeight: 0 }}>
           <div className="text-center flex-shrink-0" style={{ padding: '12px 24px 16px' }}>
