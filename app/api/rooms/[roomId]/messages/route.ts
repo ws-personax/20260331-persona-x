@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { resolveProviderUserIdForRead } from '@/lib/personax/auth';
 import { getRoom, getRoomMessages, addRoomMessage } from '@/lib/personax/room-persistence';
 import { detectRoomPersonaCall, getRoomPersonaPlaceholder } from '@/lib/personax/room-persona-router';
-import { buildRoomPersonaBlockedMessage, isRoomPersonaAllowed } from '@/lib/personax/room-participant-access';
 import { callTeaPersona } from '@/lib/personax/tea-llm-caller';
 import { TEA_SYSTEM_ECHO } from '@/app/api/chat/prompts/tea-echo';
 import { TEA_SYSTEM_JACK } from '@/app/api/chat/prompts/tea-jack';
@@ -13,7 +12,15 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+type SpeakerType = 'user' | 'persona' | 'system';
 type RoomPersonaKey = 'jack' | 'ray' | 'lucia' | 'echo';
+
+interface Speaker {
+  id: string;
+  type: SpeakerType;
+  name: string;
+  persona?: RoomPersonaKey;
+}
 
 const FREE_ROOM_PERSONAS: RoomPersonaKey[] = ['jack', 'lucia'];
 const PAID_ROOM_PERSONAS: RoomPersonaKey[] = ['jack', 'lucia', 'ray', 'echo'];
@@ -32,6 +39,27 @@ const isRoomPersonaAllowed = (
 ): boolean => {
   const allowed = getRoomAccessTier(room) === 'paid' ? PAID_ROOM_PERSONAS : FREE_ROOM_PERSONAS;
   return allowed.includes(persona);
+};
+
+const resolveSpeaker = (input: {
+  type: SpeakerType;
+  id?: string;
+  name?: string;
+  persona?: RoomPersonaKey;
+}): Speaker => {
+  const speaker: Speaker = {
+    id: input.id ?? `${input.type}:${input.persona ?? input.name ?? 'default'}`,
+    type: input.type,
+    name:
+      input.name ??
+      (input.type === 'persona' && input.persona ? input.persona.toUpperCase() : input.type.toUpperCase()),
+  };
+
+  if (input.persona) {
+    speaker.persona = input.persona;
+  }
+
+  return speaker;
 };
 
 const buildRoomPersonaBlockedMessage = (
@@ -103,7 +131,12 @@ export async function POST(
     return NextResponse.json({ error: 'content is required' }, { status: 400 });
   }
 
-  const message = await addRoomMessage(params.roomId, 'user', content);
+  const userSpeaker = resolveSpeaker({
+    type: 'user',
+    id: providerUserId,
+    name: providerUserId,
+  });
+  const message = await addRoomMessage(params.roomId, userSpeaker.type, content);
   if (!message) {
     return NextResponse.json({ error: 'failed to save message' }, { status: 500 });
   }
@@ -114,9 +147,14 @@ export async function POST(
   }
 
   if (!isRoomPersonaAllowed(room, personaCall.persona)) {
+    const blockedSpeaker = resolveSpeaker({
+      type: 'system',
+      id: `room:${params.roomId}:persona-block`,
+      name: 'SYSTEM',
+    });
     const blockedMessage = await addRoomMessage(
       params.roomId,
-      'system',
+      blockedSpeaker.type,
       buildRoomPersonaBlockedMessage(room, personaCall.persona),
     );
     return NextResponse.json(
@@ -125,6 +163,12 @@ export async function POST(
     );
   }
 
+  const personaSpeaker = resolveSpeaker({
+    type: 'persona',
+    id: personaCall.persona,
+    name: personaCall.persona.toUpperCase(),
+    persona: personaCall.persona,
+  });
   const personaSystemPrompt = getRoomPersonaSystemPrompt(personaCall.persona);
   const personaResponse = await callTeaPersona(
     personaCall.persona,
@@ -134,9 +178,9 @@ export async function POST(
   const placeholderContent = personaResponse?.trim() || getRoomPersonaPlaceholder(personaCall.persona);
   const personaMessage = await addRoomMessage(
     params.roomId,
-    'persona',
+    personaSpeaker.type,
     placeholderContent,
-    personaCall.persona,
+    personaSpeaker.persona,
   );
 
   return NextResponse.json({ message, personaMessage: personaMessage ?? undefined }, { status: 201 });
