@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 
@@ -42,7 +42,7 @@ export default function RoomChatInput({ onSend }: RoomChatInputProps) {
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) handleSend();
         }}
-        placeholder="메시지를 입력하거나 @JACK @RAY @LUCIA @ECHO 를 호출하세요"
+        placeholder="메시지를 입력하세요. @JACK @RAY @LUCIA @ECHO 를 호출할 수 있습니다."
         disabled={sending}
         style={{
           flex: 1,
@@ -73,7 +73,7 @@ export default function RoomChatInput({ onSend }: RoomChatInputProps) {
           flexShrink: 0,
         }}
       >
-        {sending ? '...' : '전송'}
+        {sending ? '전송 중...' : '전송'}
       </button>
     </div>
   );

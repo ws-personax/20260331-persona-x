@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useRef, useState } from 'react';
 import type { Room, RoomMessage } from '@/lib/personax/room-types';
@@ -45,16 +45,16 @@ export default function RoomDetail({ roomId, onBack }: RoomDetailProps) {
         if (!mounted) return;
 
         if (!roomRes.ok) {
-          setError('Room을 찾을 수 없습니다');
+          setError('채팅방을 찾을 수 없습니다.');
           return;
         }
 
-        const roomJson = await roomRes.json() as { room: Room };
+        const roomJson = (await roomRes.json()) as { room: Room };
         if (!mounted) return;
         setRoom(roomJson.room);
 
         if (msgRes.ok) {
-          const msgJson = await msgRes.json() as { messages: RoomMessage[] };
+          const msgJson = (await msgRes.json()) as { messages: RoomMessage[] };
           if (!mounted) return;
           setMessages(msgJson.messages ?? []);
         }
@@ -66,7 +66,9 @@ export default function RoomDetail({ roomId, onBack }: RoomDetailProps) {
     };
 
     fetchData();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [roomId]);
 
   useEffect(() => {
@@ -82,7 +84,7 @@ export default function RoomDetail({ roomId, onBack }: RoomDetailProps) {
 
     if (!res.ok) return;
 
-    const json = await res.json() as { message: RoomMessage; personaMessage?: RoomMessage };
+    const json = (await res.json()) as { message: RoomMessage; personaMessage?: RoomMessage };
     setMessages((prev) => {
       const next = [...prev, json.message];
       if (json.personaMessage) next.push(json.personaMessage);
@@ -134,7 +136,7 @@ export default function RoomDetail({ roomId, onBack }: RoomDetailProps) {
             fontSize: 13,
           }}
         >
-          돌아가기
+          채팅방 목록
         </button>
       </div>
     );
@@ -150,7 +152,6 @@ export default function RoomDetail({ roomId, onBack }: RoomDetailProps) {
         overflow: 'hidden',
       }}
     >
-      {/* 헤더 */}
       <header
         style={{
           padding: '14px 16px',
@@ -178,7 +179,7 @@ export default function RoomDetail({ roomId, onBack }: RoomDetailProps) {
             flexShrink: 0,
           }}
         >
-          ← Rooms
+          채팅방 목록
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
@@ -211,7 +212,6 @@ export default function RoomDetail({ roomId, onBack }: RoomDetailProps) {
         </div>
       </header>
 
-      {/* 메시지 목록 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
         {messages.length === 0 && (
           <p
@@ -231,7 +231,6 @@ export default function RoomDetail({ roomId, onBack }: RoomDetailProps) {
         <div ref={bottomRef} />
       </div>
 
-      {/* 입력창 */}
       <div
         style={{
           flexShrink: 0,
@@ -288,47 +287,54 @@ function MessageBubble({ message }: { message: RoomMessage }) {
             width: 32,
             height: 32,
             borderRadius: '50%',
-            flexShrink: 0,
             background: personaColor,
+            color: '#FFF8E8',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: 800,
-            color: '#fff',
-            letterSpacing: '-0.2px',
+            flexShrink: 0,
           }}
         >
-          {personaLabel[0]}
+          {personaLabel.slice(0, 1)}
         </div>
       )}
-      <div style={{ maxWidth: '72%' }}>
+      {isUser && (
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            background: '#5C3D1E',
+            color: '#FFF8E8',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 11,
+            fontWeight: 800,
+            flexShrink: 0,
+          }}
+        >
+          나
+        </div>
+      )}
+      <div
+        style={{
+          maxWidth: '78%',
+          background: isUser ? '#FFF8E8' : '#FFFFFF',
+          border: isUser ? '1px solid #D7B67A' : '1px solid #D9C5A6',
+          borderRadius: 14,
+          padding: '10px 12px',
+          boxShadow: '0 1px 4px rgba(92,61,30,0.06)',
+        }}
+      >
         {isPersona && (
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: personaColor,
-              marginBottom: 3,
-              letterSpacing: '-0.2px',
-            }}
-          >
+          <div style={{ fontSize: 11, fontWeight: 800, color: personaColor, marginBottom: 4 }}>
             {personaLabel}
           </div>
         )}
-        <div
-          style={{
-            background: isUser ? '#B98236' : '#FFF8E8',
-            color: isUser ? '#FFF8E8' : '#1a1a2e',
-            borderRadius: isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-            padding: '10px 14px',
-            fontSize: 14,
-            lineHeight: 1.5,
-            letterSpacing: '-0.2px',
-            wordBreak: 'break-word',
-            border: isUser ? 'none' : '1px solid #C9A46A',
-          }}
-        >
+        <div style={{ fontSize: 14, color: '#1f2937', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
           {message.content}
         </div>
       </div>

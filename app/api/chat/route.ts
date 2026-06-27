@@ -6,8 +6,6 @@ import {
   hasMarketDataForGuard,
 } from '@/lib/personax/market-data-label';
 import type { NextRequest } from 'next/server';
-import { GoogleGenerativeAI, type GenerationConfig, type Tool } from '@google/generative-ai';
-import Anthropic from '@anthropic-ai/sdk';
 
 // ✅ 분리된 모듈 import
 import type { Verdict } from '@/lib/personax/types';
@@ -62,11 +60,11 @@ import {
   chunkText,
   cleanText,
   firstParagraph,
-  removeDangsin,
   sleep,
   summarize,
   toPromptOrder,
 } from '@/lib/personax/utils';
+import { callTeaPersona } from '@/lib/personax/tea-llm-caller';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { cleanAdvanced, cleanNews, splitForBubble } from '@/lib/personax/text-format';
 import {
@@ -129,150 +127,6 @@ import { ADVANCED_SYSTEM_LUCIA } from './prompts/advanced-lucia';
 import { ADVANCED_SYSTEM_ECHO } from './prompts/advanced-echo';
 
 export const maxDuration = 60;
-
-// ─────────────────────────────────────────────
-// ✅ 차 한잔(teaMode) 전용 — Gemini Flash LLM 호출
-//   재테크 탭과 완전히 분리 (import/사용처 전부 teaMode 블록 안에서만)
-//   기존 GOOGLE_GENERATIVE_AI_API_KEY 재사용. LLM 실패 시 호출부에서
-//   기존 템플릿으로 폴백.
-// ─────────────────────────────────────────────
-// ✅ Pro/Flash 이중 폴백 구조
-//   Primary: Gemini 2.5 Pro (느리지만 페르소나 지시 준수율 높음, 60초 타임아웃)
-//   Fallback: Gemini 2.5 Flash → 2.0 Flash (빠른 폴백, 30초 타임아웃)
-const TEA_GEMINI_PRIMARY_MODEL = process.env.GEMINI_PRIMARY_MODEL || 'gemini-2.5-flash';
-const TEA_GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash';
-const TEA_GEMINI_FALLBACK_CHAIN: string[] = Array.from(
-  new Set([TEA_GEMINI_PRIMARY_MODEL, TEA_GEMINI_FALLBACK_MODEL, 'gemini-2.0-flash']),
-);
-// 모델별 타임아웃 — Pro는 60초, Flash는 30초
-const getModelTimeoutMs = (modelName: string): number => {
-  return modelName.toLowerCase().includes('pro') ? 60_000 : 30_000;
-};
-const TEA_RETRY_DELAY_MS = 500;
-const isRetriableModelError = (err: unknown): boolean => {
-  const anyErr = err as { status?: number; message?: string };
-  if (anyErr?.status === 503 || anyErr?.status === 429) return true;
-  const msg = (anyErr?.message || '').toLowerCase();
-  return (
-    msg.includes('503') ||
-    msg.includes('429') ||
-    msg.includes('overloaded') ||
-    msg.includes('unavailable') ||
-    msg.includes('rate limit') ||
-    msg.includes('too many requests') ||
-    msg.includes('timeout')
-  );
-};
-const teaGenAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '');
-
-// ─────────────────────────────────────────────
-// ✅ Claude Haiku 4.5 — Primary 모델 (Anthropic SDK)
-//   - 오케스트레이터 1차 호출 대상. 실패/타임아웃 시 Gemini Flash 폴백.
-//   - 검색(Google Search grounding) 요청은 Gemini로 우회 (Claude는 web_search 비활성).
-// ─────────────────────────────────────────────
-const CLAUDE_PRIMARY_MODEL = 'claude-haiku-4-5';
-const CLAUDE_TIMEOUT_MS = 30_000;
-const anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
-
-const toAnthropicMessages = (history: TeaMsg[]): Anthropic.MessageParam[] => {
-  const raw: Anthropic.MessageParam[] = history.map(m => ({
-    role: m.role === 'assistant' ? 'assistant' : 'user',
-    content: m.content,
-  }));
-  // 반드시 user로 시작
-  while (raw.length > 0 && raw[0].role !== 'user') raw.shift();
-  // 마지막은 user로 끝나야 응답 받음
-  while (raw.length > 0 && raw[raw.length - 1].role !== 'user') raw.pop();
-  return raw;
-};
-
-const callClaudeHaiku = async (
-  persona: TeaPersonaKey,
-  system: string,
-  history: TeaMsg[],
-): Promise<string | null> => {
-  const tag = `[tea:${persona}:claude]`;
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.warn(`${tag} ANTHROPIC_API_KEY 미설정 → Gemini 폴백`);
-    return null;
-  }
-  if (history.length === 0) {
-    console.warn(`${tag} 히스토리 0 → Gemini 폴백`);
-    return null;
-  }
-  const messages = toAnthropicMessages(history);
-  if (messages.length === 0) {
-    console.warn(`${tag} messages 무효 → Gemini 폴백`);
-    return null;
-  }
-  try {
-    const response = await Promise.race([
-      anthropicClient.messages.create({
-        model: CLAUDE_PRIMARY_MODEL,
-        max_tokens: 1200,
-        // 페르소나 시스템 프롬프트는 호출마다 동일 → 프롬프트 캐싱으로 비용/지연 절감
-        system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
-        messages,
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`${CLAUDE_PRIMARY_MODEL} timeout after ${CLAUDE_TIMEOUT_MS}ms`)), CLAUDE_TIMEOUT_MS),
-      ),
-    ]);
-    if (response.stop_reason === 'refusal') {
-      console.warn(`${tag} ${CLAUDE_PRIMARY_MODEL} refusal → Gemini 폴백`);
-      return null;
-    }
-    const text = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-      .map(b => b.text)
-      .join('')
-      .trim();
-    if (!text) {
-      console.warn(`${tag} ${CLAUDE_PRIMARY_MODEL} 빈 응답 (stop_reason=${response.stop_reason}) → Gemini 폴백`);
-      return null;
-    }
-    return text;
-  } catch (err) {
-    const anyErr = err as Error & { status?: number };
-    if (err instanceof Anthropic.APIError) {
-      console.error(`${tag} ${CLAUDE_PRIMARY_MODEL} APIError status=${anyErr.status} → Gemini 폴백`, err.message);
-    } else if (err instanceof Error) {
-      console.error(`${tag} ${CLAUDE_PRIMARY_MODEL} 호출 실패 (${err.name}) → Gemini 폴백:`, err.message);
-    } else {
-      console.error(`${tag} ${CLAUDE_PRIMARY_MODEL} 호출 실패 (unknown) → Gemini 폴백:`, err);
-    }
-    return null;
-  }
-};
-
-// Gemini contents 형식으로 변환.
-//   - role: 'user' → 'user', 'assistant' → 'model'
-//   - contents 는 반드시 'user' 역할로 시작해야 하므로 앞의 model 턴을 제거.
-//   - consecutive same-role 은 줄바꿈으로 병합 (Gemini 는 strict alternation 요구).
-//   - 마지막이 model 이면 꼬리를 잘라 user 로 끝나도록 (Gemini 는 마지막 user 만 응답).
-const toGeminiContents = (history: TeaMsg[]) => {
-  type G = { role: 'user' | 'model'; parts: { text: string }[] };
-  const raw: G[] = history.map(m => ({
-    role: m.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: m.content }],
-  }));
-  // 선두의 model 턴 제거 (user 시작 요구)
-  while (raw.length > 0 && raw[0].role !== 'user') raw.shift();
-  // 마지막이 model 이면 뒤로부터 잘라서 user 로 끝나게
-  while (raw.length > 0 && raw[raw.length - 1].role !== 'user') raw.pop();
-  // consecutive same-role 병합
-  const merged: G[] = [];
-  for (const item of raw) {
-    const last = merged[merged.length - 1];
-    if (last && last.role === item.role) {
-      last.parts[0].text = `${last.parts[0].text}\n\n${item.parts[0].text}`;
-    } else {
-      merged.push({ role: item.role, parts: [{ text: item.parts[0].text }] });
-    }
-  }
-  return merged;
-};
-
 // ─────────────────────────────────────────────
 // ✅ '당신' 호칭 후처리 필터
 //   LLM이 가끔 '당신은/이/의/을/...'로 화자를 가리키는데,
@@ -280,114 +134,6 @@ const toGeminiContents = (history: TeaMsg[]) => {
 //   조사별 패턴을 먼저 제거하고, 단독 '당신'(앞뒤 공백 포함)도 정리.
 //   JSON 응답(오케스트레이터)에도 안전 — JSON 문법 문자(",{,} 등)와 충돌 없음.
 // ─────────────────────────────────────────────
-const callTeaPersona = async (
-  persona: TeaPersonaKey,
-  system: string,
-  history: TeaMsg[],
-  options?: { enableSearch?: boolean },
-): Promise<string | null> => {
-  const tag = `[tea:${persona}]`;
-
-  // ✅ Primary: Claude Haiku 4.5 (검색 비요청 시에만)
-  //   검색 grounding이 필요한 호출은 Gemini googleSearch tool로 직접 우회.
-  if (!options?.enableSearch) {
-    const claudeResult = await callClaudeHaiku(persona, system, history);
-    if (claudeResult) return removeDangsin(claudeResult);
-    // Claude 실패 → Gemini Flash 폴백으로 진행
-  }
-
-  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-    console.warn(`${tag} GOOGLE_GENERATIVE_AI_API_KEY 미설정 → 템플릿 폴백`);
-    return null;
-  }
-  if (history.length === 0) {
-    console.warn(`${tag} 히스토리 0 → 템플릿 폴백`);
-    return null;
-  }
-  const contents = toGeminiContents(history);
-  if (contents.length === 0 || contents[contents.length - 1].role !== 'user') {
-    console.warn(`${tag} contents 무효 (length=${contents.length}) → 템플릿 폴백`);
-    return null;
-  }
-  // ✅ Gemini 2.5 Google Search grounding — 시사/실시간 정보 질문에만 선택 적용 (비용 통제)
-  //    SDK Tool 타입에 googleSearch 필드가 아직 노출되지 않아 unknown 캐스팅 사용.
-  const searchTools: Tool[] | undefined = options?.enableSearch
-    ? ([{ googleSearch: {} }] as unknown as Tool[])
-    : undefined;
-  for (let i = 0; i < TEA_GEMINI_FALLBACK_CHAIN.length; i++) {
-    const modelName = TEA_GEMINI_FALLBACK_CHAIN[i];
-    const nextModel = TEA_GEMINI_FALLBACK_CHAIN[i + 1];
-    try {
-      const model = teaGenAI.getGenerativeModel({
-        model: modelName,
-        systemInstruction: system,
-        ...(searchTools ? { tools: searchTools } : {}),
-      });
-      // ✅ 모델별 타임아웃 — Pro 60s / Flash 30s (Promise.race로 강제 컷)
-      const timeoutMs = getModelTimeoutMs(modelName);
-      const result = await Promise.race([
-        model.generateContent({
-          contents,
-          generationConfig: {
-            maxOutputTokens: 1200,
-            temperature: 0.7,
-            thinkingConfig: { thinkingBudget: 0 },
-          } as GenerationConfig,
-        }),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`${modelName} timeout after ${timeoutMs}ms`)), timeoutMs),
-        ),
-      ]);
-      const blockReason = result?.response?.promptFeedback?.blockReason;
-      if (blockReason) {
-        console.warn(`${tag} ${modelName} 차단됨 — blockReason=${blockReason} → 템플릿 폴백`);
-        return null;
-      }
-      const finishReason = result?.response?.candidates?.[0]?.finishReason;
-      let text = '';
-      try {
-        text = result?.response?.text?.() || '';
-      } catch (e) {
-        console.error(`${tag} ${modelName} text() 추출 실패 (finishReason=${finishReason}) — full error:`, e);
-        if (e instanceof Error) {
-          console.error(`${tag} ${modelName} text() 추출 실패 — name=${e.name}, message=${e.message}, stack=${e.stack}`);
-        }
-        return null;
-      }
-      if (!text.trim()) {
-        console.warn(`${tag} ${modelName} 빈 응답 (finishReason=${finishReason}) → 템플릿 폴백`);
-        return null;
-      }
-      return removeDangsin(text.trim());
-    } catch (err) {
-      const retriable = isRetriableModelError(err);
-      const anyErr = err as Error & { status?: number; statusText?: string; errorDetails?: unknown; response?: unknown };
-      console.error(`${tag} ${modelName} 호출 오류 — full error object:`, err);
-      if (err instanceof Error) {
-        console.error(
-          `${tag} ${modelName} 호출 오류 — name=${err.name}, message=${err.message}, status=${anyErr.status ?? 'n/a'}`,
-        );
-        if (anyErr.errorDetails !== undefined) {
-          console.error(`${tag} ${modelName} errorDetails:`, anyErr.errorDetails);
-        }
-      } else {
-        try { console.error(`${tag} ${modelName} 호출 오류 (non-Error) JSON:`, JSON.stringify(err)); } catch { /* ignore */ }
-      }
-      if (!retriable) {
-        console.error(`${tag} ${modelName} 재시도 불가 오류 → 템플릿 폴백`);
-        return null;
-      }
-      if (nextModel) {
-        console.warn(`${tag} ${modelName} 실패 → ${nextModel} 시도 (${TEA_RETRY_DELAY_MS}ms 대기)`);
-        await sleep(TEA_RETRY_DELAY_MS);
-        continue;
-      }
-      console.error(`${tag} ${modelName} 실패 — 폴백 체인 소진 → 템플릿 폴백`);
-      return null;
-    }
-  }
-  return null;
-};
 
 // ─────────────────────────────────────────────
 // ✅ 단일 호출 태그 기반 오케스트레이터 (1라운드 / 2라운드 분리)

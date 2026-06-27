@@ -90,10 +90,10 @@ export default function Page() {
         onComplete={() => {
           // splash 끝났을 때 세션 체크가 안 끝났으면 잠시 더 splash 유지
           if (!authChecked) {
-            setTimeout(() => setStage(user ? 'home' : 'login'), 300);
+            setTimeout(() => setStage(user ? 'rooms' : 'login'), 300);
             return;
           }
-          setStage(user ? 'home' : 'login');
+          setStage(user ? 'rooms' : 'login');
         }}
       />
     );
@@ -104,7 +104,7 @@ export default function Page() {
       <LoginScreen
         onKakaoLogin={onKakaoLogin}
         onGoogleLogin={onGoogleLogin}
-        onSkip={() => setStage('home')}
+        onSkip={() => setStage('rooms')}
       />
     );
   }
@@ -117,7 +117,6 @@ export default function Page() {
           setInitialMessage(text);
           setStage('chat');
         }}
-        onOpenRooms={() => setStage('rooms')}
       />
     );
   }
@@ -126,6 +125,10 @@ export default function Page() {
     return (
       <RoomList
         onBack={() => setStage('home')}
+        onStartChat={(text) => {
+          setInitialMessage(text);
+          setStage('chat');
+        }}
         onSelectRoom={(roomId) => {
           setSelectedRoomId(roomId);
           setStage('room-detail');
