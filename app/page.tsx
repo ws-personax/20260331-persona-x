@@ -7,6 +7,7 @@ import HomeScreen from '@/components/HomeScreen';
 import ChatWindow from '@/components/ChatWindow';
 import RoomList from '@/components/rooms/RoomList';
 import RoomDetail from '@/components/rooms/RoomDetail';
+import HistoryModal from '@/components/HistoryModal';
 import { createClient } from '@/lib/supabase/client';
 
 type Stage = 'splash' | 'login' | 'home' | 'chat' | 'rooms' | 'room-detail';
@@ -19,6 +20,7 @@ export default function Page() {
   const [authChecked, setAuthChecked] = useState(false);
   const [initialMessage, setInitialMessage] = useState<string | undefined>(undefined);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   // ✅ 기존 Supabase + 카카오 세션 체크 — AuthButton과 동일 로직
   useEffect(() => {
@@ -129,6 +131,7 @@ export default function Page() {
           setInitialMessage(text);
           setStage('chat');
         }}
+        onOpenHistory={() => setShowHistory(true)}
         onSelectRoom={(roomId) => {
           setSelectedRoomId(roomId);
           setStage('room-detail');
@@ -147,8 +150,11 @@ export default function Page() {
   }
 
   return (
-    <main>
-      <ChatWindow initialMessage={initialMessage} />
-    </main>
+    <>
+      <main>
+        <ChatWindow initialMessage={initialMessage} />
+      </main>
+      {showHistory && <HistoryModal onClose={() => setShowHistory(false)} />}
+    </>
   );
 }

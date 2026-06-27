@@ -8,9 +8,10 @@ interface RoomListProps {
   onBack: () => void;
   onSelectRoom: (roomId: string) => void;
   onStartChat: (text: string) => void;
+  onOpenHistory: () => void;
 }
 
-export default function RoomList({ onBack, onSelectRoom, onStartChat }: RoomListProps) {
+export default function RoomList({ onBack, onSelectRoom, onStartChat, onOpenHistory }: RoomListProps) {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +99,23 @@ export default function RoomList({ onBack, onSelectRoom, onStartChat }: RoomList
           채팅
         </span>
         <div style={{ flex: 1 }} />
+        <button
+          type="button"
+          onClick={onOpenHistory}
+          style={{
+            background: '#FFF8E8',
+            color: '#5C3D1E',
+            border: '1px solid #C9A46A',
+            borderRadius: 8,
+            padding: '6px 12px',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          기록
+        </button>
         <button
           type="button"
           onClick={() => setShowCreate((v) => !v)}
