@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { resolveProviderUserIdForRead } from '@/lib/personax/auth';
 import { getRoom, getRoomMessages, addRoomMessage } from '@/lib/personax/room-persistence';
 import { detectRoomPersonaCall, getRoomPersonaPlaceholder } from '@/lib/personax/room-persona-router';
+import { buildRoomPersonaBlockedMessage, isRoomPersonaAllowed } from '@/lib/personax/room-participant-access';
 import { callTeaPersona } from '@/lib/personax/tea-llm-caller';
 import { TEA_SYSTEM_ECHO } from '@/app/api/chat/prompts/tea-echo';
 import { TEA_SYSTEM_JACK } from '@/app/api/chat/prompts/tea-jack';
