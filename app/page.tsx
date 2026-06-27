@@ -92,10 +92,10 @@ export default function Page() {
         onComplete={() => {
           // splash 끝났을 때 세션 체크가 안 끝났으면 잠시 더 splash 유지
           if (!authChecked) {
-            setTimeout(() => setStage(user ? 'rooms' : 'login'), 300);
+            setTimeout(() => setStage('rooms'), 300);
             return;
           }
-          setStage(user ? 'rooms' : 'login');
+          setStage('rooms');
         }}
       />
     );
@@ -115,10 +115,12 @@ export default function Page() {
     return (
       <HomeScreen
         userName={user?.name ?? undefined}
+        isGuest={!user}
         onSubmit={(text) => {
           setInitialMessage(text);
           setStage('chat');
         }}
+        onOpenSignup={() => setStage('login')}
       />
     );
   }
@@ -127,10 +129,12 @@ export default function Page() {
     return (
       <RoomList
         onBack={() => setStage('home')}
+        isGuest={!user}
         onStartChat={(text) => {
           setInitialMessage(text);
           setStage('chat');
         }}
+        onOpenSignup={() => setStage('login')}
         onOpenHistory={() => setShowHistory(true)}
         onSelectRoom={(roomId) => {
           setSelectedRoomId(roomId);

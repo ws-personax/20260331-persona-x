@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useEffect, useState } from 'react';
+import GuestOnboardingCard from '@/components/GuestOnboardingCard';
 import type { Room } from '@/lib/personax/room-types';
 import RoomCreate from './RoomCreate';
 
@@ -9,9 +10,18 @@ interface RoomListProps {
   onSelectRoom: (roomId: string) => void;
   onStartChat: (text: string) => void;
   onOpenHistory: () => void;
+  isGuest: boolean;
+  onOpenSignup: () => void;
 }
 
-export default function RoomList({ onBack, onSelectRoom, onStartChat, onOpenHistory }: RoomListProps) {
+export default function RoomList({
+  onBack,
+  onSelectRoom,
+  onStartChat,
+  onOpenHistory,
+  isGuest,
+  onOpenSignup,
+}: RoomListProps) {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -135,6 +145,8 @@ export default function RoomList({ onBack, onSelectRoom, onStartChat, onOpenHist
         </button>
       </header>
 
+      {isGuest && <GuestOnboardingCard onOpenSignup={onOpenSignup} />}
+
       <div style={{ padding: '0 16px 12px' }}>
         <div
           style={{
@@ -154,7 +166,7 @@ export default function RoomList({ onBack, onSelectRoom, onStartChat, onOpenHist
               letterSpacing: '-0.3px',
             }}
           >
-            1:1 Persona 시작
+            대화 시작
           </div>
           <p style={{ fontSize: 12, color: '#7A5A35', margin: '0 0 10px', lineHeight: 1.4 }}>
             지금 고민을 적고 바로 대화를 시작하세요.
@@ -190,14 +202,14 @@ export default function RoomList({ onBack, onSelectRoom, onStartChat, onOpenHist
                 border: 'none',
                 borderRadius: 12,
                 padding: '0 14px',
-                minWidth: 72,
+                minWidth: 92,
                 fontSize: 13,
                 fontWeight: 800,
                 cursor: quickStart.trim() ? 'pointer' : 'default',
                 whiteSpace: 'nowrap',
               }}
             >
-              시작
+              대화 시작
             </button>
           </div>
         </div>
