@@ -12,6 +12,39 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+type RoomPersonaKey = 'jack' | 'ray' | 'lucia' | 'echo';
+
+const FREE_ROOM_PERSONAS: RoomPersonaKey[] = ['jack', 'lucia'];
+const PAID_ROOM_PERSONAS: RoomPersonaKey[] = ['jack', 'lucia', 'ray', 'echo'];
+
+const getRoomAccessTier = (room: { title: string; topic: string | null }): 'free' | 'paid' => {
+  const marker = `${room.title} ${room.topic ?? ''}`.toLowerCase();
+  // 임시 하드코딩: 추후 Room Participants 테이블로 교체한다.
+  if (/(유료|paid|premium|pro|프리미엄)/i.test(marker)) return 'paid';
+  if (/(무료|free)/i.test(marker)) return 'free';
+  return 'free';
+};
+
+const isRoomPersonaAllowed = (
+  room: { title: string; topic: string | null },
+  persona: RoomPersonaKey,
+): boolean => {
+  const allowed = getRoomAccessTier(room) === 'paid' ? PAID_ROOM_PERSONAS : FREE_ROOM_PERSONAS;
+  return allowed.includes(persona);
+};
+
+const buildRoomPersonaBlockedMessage = (
+  room: { title: string; topic: string | null },
+  persona: RoomPersonaKey,
+): string => {
+  const allowed = getRoomAccessTier(room) === 'paid' ? PAID_ROOM_PERSONAS : FREE_ROOM_PERSONAS;
+  return [
+    `${persona.toUpperCase()}는 이 채팅방에서 아직 호출할 수 없습니다.`,
+    `현재 허용된 참여자: ${allowed.map((name) => name.toUpperCase()).join(', ')}.`,
+    '추후 Room Participants 테이블이 추가되면 이 규칙으로 교체할 예정입니다.',
+  ].join('\n');
+};
+
 const getRoomPersonaSystemPrompt = (persona: 'jack' | 'ray' | 'lucia' | 'echo'): string => {
   switch (persona) {
     case 'jack':
@@ -77,6 +110,18 @@ export async function POST(
   const personaCall = detectRoomPersonaCall(content);
   if (!personaCall) {
     return NextResponse.json({ message }, { status: 201 });
+  }
+
+  if (!isRoomPersonaAllowed(room, personaCall.persona)) {
+    const blockedMessage = await addRoomMessage(
+      params.roomId,
+      'system',
+      buildRoomPersonaBlockedMessage(room, personaCall.persona),
+    );
+    return NextResponse.json(
+      { message, personaMessage: blockedMessage ?? undefined, personaBlocked: true },
+      { status: 201 },
+    );
   }
 
   const personaSystemPrompt = getRoomPersonaSystemPrompt(personaCall.persona);
