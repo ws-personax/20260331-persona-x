@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { resolveProviderUserIdForRead } from '@/lib/personax/auth';
 import { getRoom, getRoomMessages, addRoomMessage } from '@/lib/personax/room-persistence';
 import { detectRoomPersonaCall, getRoomPersonaPlaceholder } from '@/lib/personax/room-persona-router';
+import { buildRoomPersonaBlockedMessage, isRoomPersonaAllowed } from '@/lib/personax/room-participant-access';
 import { callTeaPersona } from '@/lib/personax/tea-llm-caller';
 import { TEA_SYSTEM_ECHO } from '@/app/api/chat/prompts/tea-echo';
 import { TEA_SYSTEM_JACK } from '@/app/api/chat/prompts/tea-jack';
@@ -77,6 +78,18 @@ export async function POST(
   const personaCall = detectRoomPersonaCall(content);
   if (!personaCall) {
     return NextResponse.json({ message }, { status: 201 });
+  }
+
+  if (!isRoomPersonaAllowed(room, personaCall.persona)) {
+    const blockedMessage = await addRoomMessage(
+      params.roomId,
+      'system',
+      buildRoomPersonaBlockedMessage(room, personaCall.persona),
+    );
+    return NextResponse.json(
+      { message, personaMessage: blockedMessage ?? undefined, personaBlocked: true },
+      { status: 201 },
+    );
   }
 
   const personaSystemPrompt = getRoomPersonaSystemPrompt(personaCall.persona);
