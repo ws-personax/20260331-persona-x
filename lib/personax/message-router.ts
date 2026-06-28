@@ -146,6 +146,41 @@ async function callStage3(system: string, user: string): Promise<string> {
   return callGPTMini(system, user);
 }
 
+const formatPreviousPersonaResponses = (
+  previous: Array<{ name: string; text: string }>,
+): string => {
+  const body = previous
+    .filter((item) => item.text.trim())
+    .map((item) => `${item.name}:\n${item.text.trim()}`)
+    .join('\n\n');
+
+  return body
+    ? `\n\n### Previous Persona Responses\n${body}\n`
+    : '';
+};
+
+const buildTikiTakaBlockPrompt = (
+  basePrompt: string,
+  tag: string,
+  personaName: string,
+  previous: Array<{ name: string; text: string }>,
+): string => `${basePrompt}
+
+## TikiTaka Engine V1 — Context Passing
+이번 호출에서는 [${tag}] 블록만 작성한다.
+
+${formatPreviousPersonaResponses(previous)}
+위 내용은 참고(Context)로만 사용한다.
+동의하거나 반박할 필요는 없다.
+앞 발언을 복사하지 말고, ${personaName}의 관점으로 새로운 관점을 추가하라.
+이미 나온 내용을 반복하지 마라.
+
+출력 형식:
+[${tag}]
+{${personaName} 본문만 작성}
+
+다른 태그와 설명 문장은 출력하지 마라.`;
+
 export const FEATURE_OPTION_D = true;
 
 export type PersonaName = 'LUCIA' | 'JACK' | 'RAY' | 'ECHO';
@@ -1193,7 +1228,58 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
     // solo·Stage 1·Stage 2는 기존 callLLM 유지.
     // 어휘 차단 규칙은 user prompt(buildScriptPrompt) 말미에 이미 포함 — system 중복 제거.
     const stage3System = OPTION_D_SYSTEM;
-    const scriptRaw = await callStage3(stage3System, scriptPrompt);
+    const firstPrompt = buildTikiTakaBlockPrompt(scriptPrompt, 'FIRST', firstKey2, []);
+    const firstRawBlock = await callStage3(stage3System, firstPrompt);
+    const firstTikiTakaRaw = extractTag(firstRawBlock, 'FIRST') || '';
+
+    const secondPrompt = buildTikiTakaBlockPrompt(scriptPrompt, 'SECOND', secondKey2, [
+      { name: firstKey2, text: firstTikiTakaRaw },
+    ]);
+    const secondRawBlock = await callStage3(stage3System, secondPrompt);
+    const secondTikiTakaRaw = extractTag(secondRawBlock, 'SECOND') || '';
+
+    const thirdPrompt = buildTikiTakaBlockPrompt(scriptPrompt, 'THIRD', thirdKey2, [
+      { name: firstKey2, text: firstTikiTakaRaw },
+      { name: secondKey2, text: secondTikiTakaRaw },
+    ]);
+    const thirdRawBlock = await callStage3(stage3System, thirdPrompt);
+    const thirdTikiTakaRaw = extractTag(thirdRawBlock, 'THIRD') || '';
+
+    const closerPrompt = buildTikiTakaBlockPrompt(scriptPrompt, 'CLOSER', closerKey2, [
+      { name: firstKey2, text: firstTikiTakaRaw },
+      { name: secondKey2, text: secondTikiTakaRaw },
+      { name: thirdKey2, text: thirdTikiTakaRaw },
+    ]);
+    const closerRawBlock = await callStage3(stage3System, closerPrompt);
+    const closerTikiTakaRaw = extractTag(closerRawBlock, 'CLOSER') || '';
+
+    let luciaCloseRawBlock = '';
+    if (router.categoryV3 === 'emotional') {
+      const luciaClosePrompt = buildTikiTakaBlockPrompt(scriptPrompt, 'LUCIA_CLOSE', 'LUCIA', [
+        { name: firstKey2, text: firstTikiTakaRaw },
+        { name: secondKey2, text: secondTikiTakaRaw },
+        { name: thirdKey2, text: thirdTikiTakaRaw },
+        { name: closerKey2, text: closerTikiTakaRaw },
+      ]);
+      luciaCloseRawBlock = await callStage3(stage3System, luciaClosePrompt);
+    }
+
+    const scriptRawFromTikiTaka = [
+      `[FIRST]\n${firstTikiTakaRaw}`,
+      `[SECOND]\n${secondTikiTakaRaw}`,
+      `[THIRD]\n${thirdTikiTakaRaw}`,
+      `[CLOSER]\n${closerTikiTakaRaw}`,
+      luciaCloseRawBlock ? `[LUCIA_CLOSE]\n${extractTag(luciaCloseRawBlock, 'LUCIA_CLOSE') || ''}` : '',
+    ].filter(Boolean).join('\n\n');
+
+    const hasTikiTakaCoreBlocks =
+      firstTikiTakaRaw.trim() &&
+      secondTikiTakaRaw.trim() &&
+      thirdTikiTakaRaw.trim() &&
+      closerTikiTakaRaw.trim();
+    const scriptRaw = hasTikiTakaCoreBlocks
+      ? scriptRawFromTikiTaka
+      : await callStage3(stage3System, scriptPrompt);
     console.log('[stage3-raw]', {
       length: scriptRaw.length,
       hasFirst: scriptRaw.includes('[FIRST]'),
