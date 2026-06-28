@@ -52,6 +52,7 @@ import {
   recordMessage,
   recordSpeaker,
 } from '@/lib/personax/conversation-state';
+import { extractKeySentence } from '@/lib/personax/quote-engine';
 
 // 지연 초기화 — 모듈 로드 시점이 아닌 첫 호출 시점에 OpenAI 클라이언트 생성.
 // 빌드 단계에서 OPENAI_API_KEY가 없어도 throw하지 않도록 함.
@@ -164,6 +165,23 @@ const formatPreviousPersonaResponses = (
     : '';
 };
 
+const formatPreviousPersonaQuoteContext = (
+  previous: Array<{ name: string; text: string }>,
+): string => {
+  const body = previous
+    .map((item) => ({
+      name: item.name,
+      quote: extractKeySentence(item.text, 80),
+    }))
+    .filter((item) => item.quote)
+    .map((item) => `${item.name} said:\n"${item.quote}"`)
+    .join('\n\n');
+
+  return body
+    ? `\n\n### Previous Persona Context\n${body}\n\nUse the quotes above as context only. You do not have to agree or disagree. Do not repeat them; add a new point from your own perspective.\n`
+    : '';
+};
+
 const buildTikiTakaBlockPrompt = (
   basePrompt: string,
   tag: string,
@@ -175,6 +193,7 @@ const buildTikiTakaBlockPrompt = (
 이번 호출에서는 [${tag}] 블록만 작성한다.
 
 ${formatPreviousPersonaResponses(previous)}
+${formatPreviousPersonaQuoteContext(previous)}
 위 내용은 참고(Context)로만 사용한다.
 동의하거나 반박할 필요는 없다.
 앞 발언을 복사하지 말고, ${personaName}의 관점으로 새로운 관점을 추가하라.
