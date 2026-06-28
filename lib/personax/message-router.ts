@@ -47,6 +47,11 @@ import {
 } from '@/lib/personax/context/decision-context';
 import { buildMarketDataPromptContext } from '@/lib/personax/market-data';
 import { inferDecisionType } from '@/lib/personax/decision-type-map';
+import {
+  createConversationState,
+  recordMessage,
+  recordSpeaker,
+} from '@/lib/personax/conversation-state';
 
 // 지연 초기화 — 모듈 로드 시점이 아닌 첫 호출 시점에 OpenAI 클라이언트 생성.
 // 빌드 단계에서 OPENAI_API_KEY가 없어도 throw하지 않도록 함.
@@ -1228,15 +1233,29 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
     // solo·Stage 1·Stage 2는 기존 callLLM 유지.
     // 어휘 차단 규칙은 user prompt(buildScriptPrompt) 말미에 이미 포함 — system 중복 제거.
     const stage3System = OPTION_D_SYSTEM;
+    let conversationState = createConversationState({
+      question: lastMessage,
+      topic: router.categoryV3 ?? legacyCategory,
+    });
     const firstPrompt = buildTikiTakaBlockPrompt(scriptPrompt, 'FIRST', firstKey2, []);
     const firstRawBlock = await callStage3(stage3System, firstPrompt);
     const firstTikiTakaRaw = extractTag(firstRawBlock, 'FIRST') || '';
+    conversationState = recordMessage(
+      recordSpeaker(conversationState, firstKey2),
+      firstKey2,
+      firstTikiTakaRaw,
+    );
 
     const secondPrompt = buildTikiTakaBlockPrompt(scriptPrompt, 'SECOND', secondKey2, [
       { name: firstKey2, text: firstTikiTakaRaw },
     ]);
     const secondRawBlock = await callStage3(stage3System, secondPrompt);
     const secondTikiTakaRaw = extractTag(secondRawBlock, 'SECOND') || '';
+    conversationState = recordMessage(
+      recordSpeaker(conversationState, secondKey2),
+      secondKey2,
+      secondTikiTakaRaw,
+    );
 
     const thirdPrompt = buildTikiTakaBlockPrompt(scriptPrompt, 'THIRD', thirdKey2, [
       { name: firstKey2, text: firstTikiTakaRaw },
@@ -1244,6 +1263,11 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
     ]);
     const thirdRawBlock = await callStage3(stage3System, thirdPrompt);
     const thirdTikiTakaRaw = extractTag(thirdRawBlock, 'THIRD') || '';
+    conversationState = recordMessage(
+      recordSpeaker(conversationState, thirdKey2),
+      thirdKey2,
+      thirdTikiTakaRaw,
+    );
 
     const closerPrompt = buildTikiTakaBlockPrompt(scriptPrompt, 'CLOSER', closerKey2, [
       { name: firstKey2, text: firstTikiTakaRaw },
@@ -1252,6 +1276,11 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
     ]);
     const closerRawBlock = await callStage3(stage3System, closerPrompt);
     const closerTikiTakaRaw = extractTag(closerRawBlock, 'CLOSER') || '';
+    conversationState = recordMessage(
+      recordSpeaker(conversationState, closerKey2),
+      closerKey2,
+      closerTikiTakaRaw,
+    );
 
     let luciaCloseRawBlock = '';
     if (router.categoryV3 === 'emotional') {
@@ -1262,7 +1291,13 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
         { name: closerKey2, text: closerTikiTakaRaw },
       ]);
       luciaCloseRawBlock = await callStage3(stage3System, luciaClosePrompt);
+      conversationState = recordMessage(
+        recordSpeaker(conversationState, 'LUCIA'),
+        'LUCIA',
+        extractTag(luciaCloseRawBlock, 'LUCIA_CLOSE') || '',
+      );
     }
+    void conversationState;
 
     const scriptRawFromTikiTaka = [
       `[FIRST]\n${firstTikiTakaRaw}`,
