@@ -36,7 +36,7 @@ export function extractKeySentence(text: string, maxLength = 60): string {
 
   const sentence =
     compacted
-      .split(/(?<=[.!?\u3002\uff01\uff1f])\s+|(?<=\ub2e4[.?!]?)\s+|(?<=\uc694[.?!]?)\s+/)
+      .split(/[.!?\u3002\uff01\uff1f]\s+|\ub2e4\s+|\uc694\s+/)
       .map((part) => part.trim())
       .find((part) => part.length > 0) ?? compacted;
 
