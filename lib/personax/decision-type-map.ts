@@ -4,6 +4,7 @@ export type DecisionType =
   | 'career'
   | 'real_estate_recommendation'
   | 'buy_or_wait'
+  | 'philosophy'
   | 'knowledge'
   | 'generic';
 
@@ -32,11 +33,15 @@ export function inferDecisionType(
   if (hasRealEstateRecommendationIntent) {
     return 'real_estate_recommendation';
   }
-  if (categoryV3 === 'knowledge') {
-    return 'knowledge';
-  }
   if (categoryV3 === 'invest' || /사야|매수|팔아야|매도|비트코인|XRP|xrp|리플|이더리움|ETH|eth|솔라나|SOL|sol|삼성전자|주식|코인|투자/.test(question)) {
     return 'buy_or_wait';
+  }
+
+  if (/행복|성공|자유|좋은 삶|인생의 의미|삶의 의미|행복이란|성공이란|자유란|사랑이란|위로란|후회 없는 선택|같은 실수/.test(question)) {
+    return 'philosophy';
+  }
+  if (categoryV3 === 'knowledge') {
+    return 'knowledge';
   }
 
   return 'generic';
