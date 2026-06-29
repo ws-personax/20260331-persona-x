@@ -39,10 +39,6 @@ export const mapOrderedRound1 = (
   });
   if (result.echoQuestion) {
     personaText.echo = result.echoQuestion;
-    // echoQuestion 슬롯은 반드시 "?"로 닫는다 (invest/action/principle 카테고리 기대치).
-    if (!personaText.echo.trimEnd().endsWith('?')) {
-      personaText.echo = personaText.echo.trimEnd().replace(/[.!,;:。！]+$/, '') + '?';
-    }
   }
   // 복합 카테고리(finance+emotional 등) — order에 echo가 없고 echoQuestion도 비어있을 때,
   //   LUCIA_CLOSE가 실제 닫는 질문 역할이므로 personaText.echo에 동기화.
