@@ -4,7 +4,8 @@ export type DecisionType =
   | 'career'
   | 'real_estate_recommendation'
   | 'buy_or_wait'
-  | 'philosophy'
+  | 'philosophy_definition'
+  | 'philosophy_pattern'
   | 'knowledge'
   | 'generic';
 
@@ -37,8 +38,12 @@ export function inferDecisionType(
     return 'buy_or_wait';
   }
 
-  if (/행복|성공|자유|좋은 삶|인생의 의미|삶의 의미|행복이란|성공이란|자유란|사랑이란|위로란|후회 없는 선택|같은 실수/.test(question)) {
-    return 'philosophy';
+  if (/같은 실수|실수를 반복|후회|반복|습관|선택을 반복|왜 같은 패턴/.test(question)) {
+    return 'philosophy_pattern';
+  }
+
+  if (/행복|자유|성공|사랑|좋은 삶|인생의 의미|삶의 의미|의미란/.test(question)) {
+    return 'philosophy_definition';
   }
   if (categoryV3 === 'knowledge') {
     return 'knowledge';
