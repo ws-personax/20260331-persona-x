@@ -1398,15 +1398,7 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
       }
     }
     const echoQuestionProcessed = postProcessPersonaOutput(echoQuestionRaw, 'echo');
-    // ECHO "?" 종결 강제 — invest/action/principle 카테고리는 반드시 질문으로 닫는다.
-    //   knowledge는 정리형/판결형 종결을 허용하므로 제외한다.
-    //   프롬프트 레벨 "반드시 ?로 끝" 규칙은 LLM이 가끔 무시 → 후처리로 100% 보정.
-    //   기존 ., !, , ; : 같은 종결부호는 제거 후 "?" 부착. 이미 ?로 끝나면 그대로.
-    const echoQuestion = expectsEchoQuestion && echoQuestionProcessed
-      ? (echoQuestionProcessed.trimEnd().endsWith('?')
-          ? echoQuestionProcessed
-          : echoQuestionProcessed.trimEnd().replace(/[.!,;:。！]+$/, '') + '?')
-      : echoQuestionProcessed;
+    const echoQuestion = echoQuestionProcessed;
     const stripDecisionSummaryBlock = (value: string): string => {
       if (!value) return value;
 
