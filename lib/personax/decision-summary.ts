@@ -253,7 +253,7 @@ export function buildDecisionSummary(params: {
     });
   }
 
-  if (type === 'philosophy') {
+  if (type === 'philosophy_definition') {
     return withImportance({
       verdict: '정의보다 나만의 기준을 먼저 세우는 것이 중요합니다',
       reasons: [
@@ -263,6 +263,19 @@ export function buildDecisionSummary(params: {
       ],
       counterView: '단, 지금 당장 기준이 없다면 작은 실험부터 시작할 수 있습니다',
       nextAction: '오늘 이 개념이 내 삶에서 어떤 모습인지 한 줄로 적어보세요',
+    });
+  }
+
+  if (type === 'philosophy_pattern') {
+    return withImportance({
+      verdict: '패턴을 아는 것보다 다음 상황에서 멈출 기준이 더 중요합니다',
+      reasons: [
+        'RAY는 반복의 데이터 구조를 봤습니다',
+        'LUCIA는 감정의 흐름을 봤습니다',
+        'JACK은 멈출 조건을 봤습니다',
+      ],
+      counterView: '단, 반복의 원인을 지나치게 단순화하면 실제 맥락을 놓칠 수 있습니다',
+      nextAction: '다음에 같은 상황이 오면 멈출 조건 하나를 지금 적어두세요',
     });
   }
 
