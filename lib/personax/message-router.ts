@@ -1394,7 +1394,7 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
         console.warn('[runRoutedRequest] ECHO_QUESTION 재요청도 빈 값 → 폴백 사용');
         echoQuestionRaw = isInvestmentEchoFallback
           ? '지금 손절선 정해놓으셨어요?'
-          : '지금 반복되는 기준이 무엇인지 보이십니까?';
+          : '지금 반복되는 선택 기준을 먼저 정리해야 합니다.';
       }
     }
     const echoQuestionProcessed = postProcessPersonaOutput(echoQuestionRaw, 'echo');
