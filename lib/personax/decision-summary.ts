@@ -253,6 +253,19 @@ export function buildDecisionSummary(params: {
     });
   }
 
+  if (type === 'philosophy') {
+    return withImportance({
+      verdict: '정의보다 나만의 기준을 먼저 세우는 것이 중요합니다',
+      reasons: [
+        'RAY는 측정 가능한 조건으로 분해했습니다',
+        'LUCIA는 감정의 신호로 읽었습니다',
+        'JACK은 행동 가능한 선택으로 좁혔습니다',
+      ],
+      counterView: '단, 지금 당장 기준이 없다면 작은 실험부터 시작할 수 있습니다',
+      nextAction: '오늘 이 개념이 내 삶에서 어떤 모습인지 한 줄로 적어보세요',
+    });
+  }
+
   if (type === 'knowledge') {
     return withImportance({
       verdict: '개념을 이해하는 것과 실제 적용은 다릅니다',
