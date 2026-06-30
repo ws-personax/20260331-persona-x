@@ -6,6 +6,8 @@
 - 이 테스트는 Thinking Engine, Thinking Bias, Expertise, Expression Diversity가 실제 응답에 드러나는지 검증한다.
 - 실제 LLM/API 호출은 이 문서 생성 시 수행하지 않는다.
 - 앱에서 수동으로 답변을 복사해 채운 뒤 사람이 직접 맞춘다.
+- Fingerprint QA / Debate QA는 개발자가 직접 평가한다.
+- Decision QA는 베타 사용자 대상이며, 추후 실제 사용자 반응으로 작성한다.
 
 ---
 
@@ -284,3 +286,29 @@
 - Debate 품질 저하 원인
 - 보강할 Persona
 - 다음 개선 PR 후보
+
+## Decision QA (베타 사용자 대상)
+
+사용자 ID/번호:
+
+날짜:
+
+질문:
+
+① 실제 행동이 달라졌는가 (Y/N):
+
+② 저장하고 싶은 답변이었는가 (Y/N):
+
+③ 다시 보고 싶은 토론이었는가 (Y/N):
+
+④ 다른 사람에게 공유하고 싶은가 (Y/N):
+
+⑤ 다시 PersonaX를 열고 싶은가 (Y/N):
+
+코멘트:
+
+## Decision QA 평가 메모
+
+Decision QA는 PersonaX의 실제 제품 가치 검증이다.
+
+Fingerprint QA와 Debate QA가 높아도 Decision QA가 낮으면 제품 개선이 필요하다.
