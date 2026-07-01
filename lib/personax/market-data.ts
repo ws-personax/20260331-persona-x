@@ -56,7 +56,7 @@ export interface PersonaXMarketData {
 type MarketDataAdapter = (asset: DetectedMarketAsset) => Promise<PersonaXMarketData | null>;
 
 const INVESTMENT_ASSET_PATTERN =
-  /주식|종목|ETF|펀드|코인|비트코인|이더리움|BTC|ETH|KRW-BTC|환율|원달러|달러|금리|채권|원자재|금\b|은\b|원유|유가|부동산|아파트|집값|매수|매도|투자|수익|손실|포트폴리오|삼성전자|삼전|005930|테슬라|애플|엔비디아|나스닥|S&P500|SPY|QQQ/i;
+  /주식|종목|ETF|펀드|코인|비트코인|이더리움|BTC|ETH|KRW-BTC|환율|원달러|달러|금리|채권|원자재|금\b|은\b|원유|유가|부동산|아파트|집값|매수|매도|투자|수익|손실|포트폴리오|삼성전자|삼전|005930|테슬라|애플|엔비디아|나스닥|S&P500|SPY|QQQ|SK\s?하이닉스|하이닉스|SK\s?hynix|000660|LG에너지솔루션|LG에너지|카카오|네이버|NAVER/i;
 
 const ETF_SYMBOLS = new Set(['SPY', 'VOO', 'IVV', 'QQQ', 'TQQQ', 'SQQQ', 'DIA']);
 
@@ -71,6 +71,18 @@ const detectKnownAsset = (question: string): DetectedMarketAsset | null => {
       name: '삼성전자',
       symbol: '005930.KS',
       alternateSymbol: '005930',
+      market: 'KRX',
+    };
+  }
+
+  if (/SK\s?하이닉스|하이닉스|SK\s?hynix|000660(?:\.KS)?/i.test(question)) {
+    return {
+      assetType: 'korean_stock',
+      query: 'SK하이닉스',
+      lookupKey: 'SK하이닉스',
+      name: 'SK하이닉스',
+      symbol: '000660.KS',
+      alternateSymbol: '000660',
       market: 'KRX',
     };
   }

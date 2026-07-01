@@ -100,6 +100,28 @@ function sanitizeEchoInvestmentTerms(answer: string): string {
     .replace(/현재가/g, '현재 상황');
 }
 
+// "평균 거래량인 [avgVolume 값 누락] 의 N%" — avgVolume이 비어 LLM이 값 없이
+// "거래량인" 뒤에 바로 "의"를 붙여 만드는 비문. 정상 케이스는 "거래량인 150만주의 130%"처럼
+// "인"과 "의" 사이에 실제 값이 들어가므로, 그 사이가 공백뿐일 때만 걸린다.
+const AVG_VOLUME_GARBLE_PATTERN =
+  /[^,.。!?\n]*평균\s*거래량인\s*의\s*\d+(?:\.\d+)?\s*%[^,.。!?\n]*[,.。!?]?/g;
+
+function sanitizeAvgVolumeGarble(text: string): string {
+  if (!text || !/평균\s*거래량인\s*의\s*\d/.test(text)) {
+    return text;
+  }
+
+  return text
+    .replace(AVG_VOLUME_GARBLE_PATTERN, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => !/^[.。!！?？,，;；:\-\s]*$/.test(line))
+    .join('\n')
+    .trim();
+}
+
 function sanitizeRayAggressiveTerms(answer: string): string {
   return answer
     .replace(/자살행위/g, '리스크가 매우 큽니다')
@@ -389,6 +411,7 @@ export function applyResponseGuard(
     }
 
     if (key === 'ray') {
+      personaText[key] = sanitizeAvgVolumeGarble(personaText[key]);
       personaText[key] = sanitizeRayAggressiveTerms(personaText[key]);
     }
 
