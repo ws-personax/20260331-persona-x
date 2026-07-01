@@ -126,6 +126,88 @@ const firstNonEmpty = (...values: Array<string | undefined>): string => (
   values.find((value) => value?.trim())?.trim() ?? ''
 );
 
+const buildConsensusDecisionSummary = (
+  params: {
+    question: string;
+    ray?: string;
+    jack?: string;
+    lucia?: string;
+    echo?: string;
+  },
+  type: string,
+): DecisionSummary => {
+  const question = normalizeQuestion(params.question);
+  const text = [
+    question,
+    params.ray,
+    params.jack,
+    params.lucia,
+    params.echo,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const isComfortQuestion = /위로|곁에|공감|힘들|지쳐|상처|울|불안/.test(text);
+  const isRelationshipQuestion = type === 'relationship' || /관계|상대|연애|만나|헤어|경계|거리/.test(text);
+  const isStartupQuestion = type === 'startup_vs_job' || /창업|사업|퇴사|회사/.test(text);
+  const isCareerQuestion = type === 'career' || /이직|커리어|직장|일/.test(text);
+  const isInvestQuestion = type === 'buy_or_wait' || /투자|매수|매도|주식|코인|부동산|가격|손실/.test(text);
+
+  if (isStartupQuestion) {
+    return {
+      verdict: '4명의 의견은 표현은 달랐지만 준비 없는 전환은 위험하고, 창업은 의지보다 생활비와 검증 기준이 먼저라는 점에는 모였습니다.',
+      reasons: ['공통 기준은 준비 없는 창업의 위험입니다', '남은 차이는 행동을 먼저 할지, 검증과 회복 조건을 먼저 볼지입니다'],
+      counterView: '다만 JACK은 지금 실행 기준을, RAY는 시장 검증을, LUCIA는 감당 가능한 회복 여지를, ECHO는 같은 선택을 반복하는 구조를 우선해야 한다고 보았습니다.',
+      nextAction: '오늘은 창업 아이디어를 더 설명하지 말고, 버틸 수 있는 생활비 개월 수 하나만 계산하세요.',
+    };
+  }
+
+  if (isComfortQuestion) {
+    return {
+      verdict: '4명의 의견은 표현은 달랐지만 상대의 상태를 먼저 보고, 조언보다 감당 가능한 방식으로 곁에 있어야 한다는 점에는 모였습니다.',
+      reasons: ['공통 기준은 상대의 현재 상태입니다', '남은 차이는 행동, 공감, 검증, 구조 중 무엇을 먼저 볼지입니다'],
+      counterView: '다만 JACK은 필요한 행동을, LUCIA는 지금의 회복을, RAY는 실제로 도움이 되는 신호를, ECHO는 위로가 의존으로 반복되는 구조를 보았습니다.',
+      nextAction: '오늘은 조언을 하나 더 하지 말고, 하루 더 곁에 있으면서 상대가 원하는 도움 한 가지만 물어보세요.',
+    };
+  }
+
+  if (isRelationshipQuestion) {
+    return {
+      verdict: '4명의 의견은 표현은 달랐지만 상대를 바꾸려 하기보다 내 기준과 경계를 세워야 한다는 점에는 모였습니다.',
+      reasons: ['공통 기준은 반복 행동과 내 경계입니다', '남은 차이는 거리두기, 검증, 회복, 패턴 중 무엇을 우선할지입니다'],
+      counterView: '다만 JACK은 거리두기와 행동을, RAY는 반복 행동의 검증을, LUCIA는 회복 가능한 관계인지의 감각을, ECHO는 같은 상처가 반복되는 패턴을 우선했습니다.',
+      nextAction: '오늘은 상대를 설득하려 하지 말고, 내가 더는 허용하지 않을 경계선 하나만 적으세요.',
+    };
+  }
+
+  if (isInvestQuestion) {
+    return {
+      verdict: '4명의 의견은 표현은 달랐지만 수익 기대보다 손실 한도와 검증 기준을 먼저 정해야 한다는 점에는 모였습니다.',
+      reasons: ['공통 기준은 손실 한도와 검증 기준입니다', '남은 차이는 지금 행동할지, 더 확인할지, 감당 가능한 범위를 먼저 볼지입니다'],
+      counterView: '다만 JACK은 행동 기준을, RAY는 가격과 근거 검증을, LUCIA는 감정적으로 버틸 수 있는 손실 범위를, ECHO는 같은 투자 패턴의 반복을 우선했습니다.',
+      nextAction: '오늘은 매수 여부를 정하지 말고, 감당 가능한 최대 손실 금액 하나만 먼저 적으세요.',
+    };
+  }
+
+  if (isCareerQuestion) {
+    return {
+      verdict: '4명의 의견은 표현은 달랐지만 지금의 불만만으로 움직이지 말고, 바꿀 조건과 버틸 조건을 분리해야 한다는 점에는 모였습니다.',
+      reasons: ['공통 기준은 현재 조건과 전환 조건의 분리입니다', '남은 차이는 바로 움직일지, 검증할지, 회복 여지를 볼지입니다'],
+      counterView: '다만 JACK은 결정 기한을, RAY는 이직 조건 검증을, LUCIA는 소진 상태의 회복을, ECHO는 같은 직장 문제를 반복하는 구조를 우선했습니다.',
+      nextAction: '오늘은 이직 결론을 내리지 말고, 현재 회사에 남을 조건 하나와 떠날 조건 하나만 적으세요.',
+    };
+  }
+
+  return {
+    verdict: '4명의 의견은 표현은 달랐지만 지금은 결론을 늘리기보다 판단 기준을 하나로 좁혀야 한다는 점에는 모였습니다.',
+    reasons: ['공통 기준은 판단 기준을 좁히는 것입니다', '남은 차이는 행동, 검증, 회복, 패턴 중 무엇을 먼저 볼지입니다'],
+    counterView: '다만 JACK은 오늘의 행동을, RAY는 검증 기준을, LUCIA는 감당 가능한 회복을, ECHO는 반복되는 선택 구조를 우선해야 한다고 보았습니다.',
+    nextAction: '오늘은 결론을 더 찾지 말고, 이 판단에서 절대 양보하지 않을 기준 하나만 적으세요.',
+  };
+};
+
+const shouldUseConsensusSummary = (summaryType: string): boolean => summaryType !== 'knowledge';
+
 const counterFallbackByType = (type: string): string => {
   if (type === 'buy_or_wait') {
     return '단기 가격만 보고 판단하면 리스크를 놓칠 수 있습니다.';
@@ -184,6 +266,10 @@ export function buildDecisionSummary(params: {
       nextAction: summary.nextAction,
     }),
   });
+
+  if (shouldUseConsensusSummary(type)) {
+    return withImportance(buildConsensusDecisionSummary(params, type));
+  }
 
   if (type === 'real_estate_recommendation') {
     return withImportance({
@@ -298,10 +384,10 @@ export function buildDecisionSummary(params: {
   }
 
   return withImportance({
-    verdict: anchor ? '하나의 정답보다 자신의 기준을 세우는 것이 중요합니다' : '추가 정보보다 먼저 판단 기준을 정해야 합니다',
+    verdict: anchor ? '4명의 의견은 표현은 달랐지만 지금은 판단 기준을 하나로 좁혀야 합니다' : '추가 정보보다 먼저 판단 기준을 정해야 합니다',
     reasons: ['각 페르소나의 기준을 비교해 자신의 판단 기준을 정리해야 합니다', '답을 하나로 빨리 정하면 놓치는 기준이 생깁니다'],
     counterView: '다만 상황이 급하면 가장 회복 가능하고 되돌릴 수 있는 기준을 우선할 수 있습니다',
-    nextAction: '오늘 안에 RAY식 검증 기준, JACK식 행동 기준, LUCIA식 회복 기준, ECHO식 반복 기준을 각각 1줄로 적으세요',
+    nextAction: '오늘은 결론을 더 찾지 말고, 이 판단에서 절대 양보하지 않을 기준 하나만 적으세요',
     });
 }
 
@@ -350,15 +436,14 @@ export function formatDecisionSummary(summary: DecisionSummary): string {
     separator,
     '',
     'PersonaX 결론',
+    '',
+    '이번 토론의 공통점:',
     verdict,
     '',
-    '핵심 이유:',
-    ...(reasons.length ? reasons : cleanLines(counterFallbackByType('generic'))).map((reason) => `- ${reason}`),
-    '',
-    '반대 의견:',
+    '끝까지 갈린 부분:',
     counterView,
     '',
-    '다음 행동:',
+    '오늘의 권장 행동:',
     nextAction,
     '',
     separator,
