@@ -1393,7 +1393,7 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
       if (!echoQuestionRaw.trim()) {
         console.warn('[runRoutedRequest] ECHO_QUESTION 재요청도 빈 값 → 폴백 사용');
         echoQuestionRaw = isInvestmentEchoFallback
-          ? '지금 손절선 정해놓으셨어요?'
+          ? '지금 문제는 살지 말지가 아니라, 리스크 기준 없이 들어가려는 반복 패턴입니다.\n기준 없는 매수는 투자가 아니라 불안의 반복입니다.'
           : '지금 반복되는 선택 기준을 먼저 정리해야 합니다.';
       }
     }
