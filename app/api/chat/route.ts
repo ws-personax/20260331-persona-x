@@ -647,7 +647,7 @@ export async function POST(req: NextRequest) {
             applyPersonaFallback(personaText, _isHee);
 
             // invest 카테고리 필수 어휘 안전망 — 4명 응답에 '손절선'/'지지선' 둘 다 없으면
-            //   ECHO 질문 끝에 손절선 가이드 1줄을 강제 부착. 프롬프트 규칙은 LLM이 무시할 수 있음.
+            //   ECHO 끝에 투자 권유가 아닌 리스크 기준 원칙을 보강한다. 프롬프트 규칙은 LLM이 무시할 수 있음.
             // hee+invest 복합 케이스도 포함: HEE 모드(emotional)지만 메시지에 투자 키워드가
             //   있으면 (예: "삼성전자로 처음 수익 났어요") 경사 + 투자 vocab 둘 다 필요.
             const _isHeeInvestComplex =
@@ -657,7 +657,7 @@ export async function POST(req: NextRequest) {
             if (_categoryV3 === 'invest' || _isHeeInvestComplex) {
               const allText = personaText.ray + personaText.jack + personaText.lucia + personaText.echo;
               if (!allText.includes('손절선') && !allText.includes('지지선')) {
-                const fallback = '지금 손절선 정해놓으셨어요?';
+                const fallback = '지금 문제는 살지 말지가 아니라, 리스크 기준 없이 들어가려는 반복 패턴입니다.\n기준 없는 매수는 투자가 아니라 불안의 반복입니다.';
                 personaText.echo = personaText.echo
                   ? personaText.echo.trimEnd().replace(/[?。！!]$/, '') + ' ' + fallback
                   : fallback;

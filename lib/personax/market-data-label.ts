@@ -30,14 +30,18 @@ export const getMarketDataSourceLabelForGuard = async (
 
   const source =
     marketDataPromptContext.match(/"source":\s*"([^"]+)"/)?.[1] ?? '';
-  return source ? `데이터 출처: ${source}` : '';
+  return source ? `📡 데이터 출처 — ${source}` : '';
 };
 
 export const appendMarketDataSourceLabel = (
   personaText: Record<string, string>,
   sourceLabel: string,
 ): void => {
-  if (!sourceLabel || Object.values(personaText).some((text) => text?.includes('데이터 출처:'))) {
+  const normalizedSourceLabel = sourceLabel.replace(/^데이터 출처:\s*/, '📡 데이터 출처 — ');
+  if (
+    !normalizedSourceLabel ||
+    Object.values(personaText).some((text) => text?.includes('📡 데이터 출처') || text?.includes('데이터 출처:'))
+  ) {
     return;
   }
 
@@ -46,5 +50,5 @@ export const appendMarketDataSourceLabel = (
     return;
   }
 
-  personaText[targetKey] = `${personaText[targetKey].trimEnd()}\n\n${sourceLabel}`;
+  personaText[targetKey] = `${personaText[targetKey].trimEnd()}\n\n${normalizedSourceLabel}`;
 };

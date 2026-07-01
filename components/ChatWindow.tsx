@@ -100,7 +100,7 @@ const formatTime = (d: Date) =>
 const parseEchoParts = (text: string) => {
   const normalized = (text || '').replace(/\\n/g, '\n');
 
-  const markers = ['📡', '─────────────────────────'];
+  const markers = ['📡 데이터 출처', '데이터 출처:', '📡', '─────────────────────────'];
   let splitIdx = -1;
   for (const m of markers) {
     const idx = normalized.indexOf(m);
@@ -114,7 +114,8 @@ const parseEchoParts = (text: string) => {
   const content = normalized.slice(0, splitIdx).trim();
   const remainder = normalized.slice(splitIdx);
   const lines = remainder.split('\n');
-  const dataLine = (lines.find(l => l.includes('📡')) || '').trim();
+  const dataLineRaw = (lines.find(l => l.includes('📡 데이터 출처') || l.includes('데이터 출처:') || l.includes('📡')) || '').trim();
+  const dataLine = dataLineRaw.replace(/^데이터 출처:\s*/, '📡 데이터 출처 — ');
 
   const marketClosedLine = (lines.find(l => {
     const t = l.trim();
