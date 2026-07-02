@@ -39,9 +39,6 @@ const mapStage3PersonaText = (
   if (!personaText.echo && result.luciaClose) {
     personaText.echo = result.luciaClose;
   }
-  if (personaText.echo && !personaText.echo.trimEnd().endsWith('?')) {
-    personaText.echo = personaText.echo.trimEnd().replace(/[.!,;:。！]+$/, '') + '?';
-  }
   return personaText;
 };
 
