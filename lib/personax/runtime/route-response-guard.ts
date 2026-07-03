@@ -22,7 +22,11 @@ import {
 import { callTeaPersona } from '@/lib/personax/tea-llm-caller';
 import type { TeaMsg, TeaPersonaKey } from '@/lib/personax/tea-history';
 import type { DecisionSummary } from '@/lib/personax/decision-summary';
-import { detectStage3GuardViolations } from '@/lib/personax/guards';
+import {
+  detectStage3GuardViolations,
+  hasHeeRayBannedWord,
+  hasHeeJackBannedWord,
+} from '@/lib/personax/guards';
 import { detectQuestionType, applyResponseGuard } from '@/lib/personax/response-guard';
 import {
   appendMarketDataSourceLabel,
@@ -106,11 +110,61 @@ export async function callOptionD(
   });
 }
 
+// 희(喜) 모드 최후 방어선 전용 안전 문구 — Stage3(stage3-script-generation.ts)의
+// HEE_FORBIDDEN_RE/HEE_FALLBACKS(발화 전체를 통째로 교체하는 1차 방어)와는 별개 층.
+// 이 파일의 재생성(retry)마저 금지어휘를 포함할 때만 쓰는 "최후 방어선"이므로
+// Stage3와 중복 트리거되지 않도록 여기서는 detectStage3GuardViolations로 이미
+// 위반이 확정된 경우에만 호출한다.
+const HEE_RAY_SAFE_FALLBACK = '이런 순간은 통계적으로 드뭅니다. 오래 기억될 만한 가치가 있어요.';
+const HEE_JACK_SAFE_FALLBACK = '잘 됐습니다. 본인이 진짜 해낸 거예요.';
+
+// 재생성 결과에서 희(喜) 금지어휘가 남은 RAY/JACK 슬롯만 안전 fallback 문구로 교체.
+// isHeeMode가 아니면 아무것도 하지 않는다 — HEE_*_BAN_WORDS(리스크/책임/준비 등)는
+// 일반 투자 답변에서 흔히 쓰이는 정상 어휘라 hee 모드 밖에서 적용하면 오탐이 난다.
+function applyHeeSafeFallbacks(
+  result: OptionDRound1Result,
+  order: TaggedPersonaKey[],
+  isHeeMode: boolean,
+): OptionDRound1Result {
+  if (!isHeeMode) return result;
+
+  // solo 모드 — soloKey/soloContent 단일 슬롯만 검사.
+  if (result.soloKey) {
+    if (result.soloKey === 'ray' && hasHeeRayBannedWord(result.soloContent || '')) {
+      return { ...result, soloContent: HEE_RAY_SAFE_FALLBACK };
+    }
+    if (result.soloKey === 'jack' && hasHeeJackBannedWord(result.soloContent || '')) {
+      return { ...result, soloContent: HEE_JACK_SAFE_FALLBACK };
+    }
+    return result;
+  }
+
+  // full 모드 — order/closerKey로 first/second/third/closerContent 중 RAY·JACK 슬롯을 특정.
+  const fixed: OptionDRound1Result = { ...result };
+  const slots: Array<'first' | 'second' | 'third'> = ['first', 'second', 'third'];
+  let slotIdx = 0;
+  order.slice(0, 4).forEach((key) => {
+    if (key !== 'ray' && key !== 'jack') {
+      if (!(result.closerKey === key && result.closerContent)) slotIdx += 1;
+      return;
+    }
+    const banned = key === 'ray' ? hasHeeRayBannedWord : hasHeeJackBannedWord;
+    const fallback = key === 'ray' ? HEE_RAY_SAFE_FALLBACK : HEE_JACK_SAFE_FALLBACK;
+    if (result.closerKey === key && result.closerContent) {
+      if (banned(result.closerContent)) fixed.closerContent = fallback;
+    } else {
+      const slot = slots[slotIdx++];
+      if (slot && banned(result[slot] || '')) fixed[slot] = fallback;
+    }
+  });
+  return fixed;
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // Stage 3 응답 품질 가드 — 다음 두 조건 감지 시 1회 callOptionD 재호출.
 //   1) JACK 발화에 ~요로 끝나는 문장 — JACK은 짧고 강한 ~다/~입니다만 허용
 //   2) ECHO 발화에 "ECHO는/가" / "에코는/가" 자기 3인칭 언급
-// 재생성도 위반이면 재생성 결과를 그대로 사용 (LLM 한 번 더 기회 부여 의미).
+// 재생성도 위반이면(희(喜) 모드 한정) 최후 방어선으로 안전 fallback 문구를 적용한다.
 // ──────────────────────────────────────────────────────────────────────────
 export async function callOptionDWithStage3Guard(
   messages: Array<{ role?: string; content?: string }>,
@@ -153,7 +207,8 @@ export async function callOptionDWithStage3Guard(
     }
     const retryReasons = detectStage3GuardViolations(retry, order, isHeeMode);
     if (retryReasons.length > 0) {
-      console.warn('[stage3-guard] 재생성도 위반:', retryReasons.join(', '), '— 재생성 결과 사용');
+      console.warn('[stage3-guard] 재생성도 위반:', retryReasons.join(', '), '— 최후 방어선(안전 fallback) 적용');
+      return applyHeeSafeFallbacks(retry, order, isHeeMode);
     }
     return retry;
   }
@@ -170,7 +225,8 @@ export async function callOptionDWithStage3Guard(
   }
   const retryReasons = detectStage3GuardViolations(retry, order, isHeeMode);
   if (retryReasons.length > 0) {
-    console.warn('[stage3-guard] 재생성도 위반(solo):', retryReasons.join(', '), '— 재생성 결과 사용');
+    console.warn('[stage3-guard] 재생성도 위반(solo):', retryReasons.join(', '), '— 최후 방어선(안전 fallback) 적용');
+    return applyHeeSafeFallbacks(retry, order, isHeeMode);
   }
   return retry;
 }

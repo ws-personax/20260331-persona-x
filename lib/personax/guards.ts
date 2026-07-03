@@ -67,10 +67,12 @@ export const cleanEchoSelfReference = (text: string): string =>
     .replace(/에코\s*가/g, '제가');
 
 // 희(喜) 모드 전용 금지어휘 — RAY/JACK이 기쁨을 깎는 어휘로 빠지면 재생성 트리거.
-//   RAY: 준비/환경/부담/리스크/책임/결정 — "다음 스텝" 영역 침범으로 분위기 깎음
-//   JACK: 불안/리스크/부담/현실/걱정 — 마동석 짧은 인정 톤이 깨지고 무게로 빠짐
-const HEE_RAY_BAN_WORDS = /준비|환경|부담|리스크|책임|결정/;
-const HEE_JACK_BAN_WORDS = /불안|리스크|부담|현실|걱정/;
+//   RAY: 준비/환경/부담/리스크/손절/책임/결정 — "다음 스텝" 영역 침범으로 분위기 깎음
+//   JACK: 불안/리스크/손절/부담/현실/걱정 — 마동석 짧은 인정 톤이 깨지고 무게로 빠짐
+// PR #13(2f91180)에서 route.ts에 추가됐던 "손절"이 이후 리팩터(c94c19e, guard 유틸 추출)로
+// 이 파일로 옮겨오는 과정에서 누락됐던 것을 PR #13-B에서 복원.
+const HEE_RAY_BAN_WORDS = /준비|환경|부담|리스크|손절|책임|결정/;
+const HEE_JACK_BAN_WORDS = /불안|리스크|손절|부담|현실|걱정/;
 
 export const hasHeeRayBannedWord = (text: string): boolean =>
   !!text && HEE_RAY_BAN_WORDS.test(text);
