@@ -22,6 +22,10 @@ import {
   recordMessage,
   recordSpeaker,
 } from '@/lib/personax/conversation-state';
+import {
+  ECHO_VERDICT_MIN_STRUCTURE_RULE,
+  ECHO_VERDICT_TURNING_POINT_RULE,
+} from '@/lib/personax/prompts/rules';
 import { extractKeySentence } from '@/lib/personax/quote-engine';
 import { STRUCTURAL_LABEL_LINE_RE, extractTag } from '@/lib/personax/runtime/stage1-data-collection';
 import type {
@@ -884,6 +888,8 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
   //   emotional은 [LUCIA_CLOSE] 액자 구조라 ECHO_QUESTION이 의도적으로 부재.
   //   knowledge는 ECHO가 질문이 아니라 정리형/판결형으로 닫을 수 있어 재요청·물음표 강제를 적용하지 않는다.
   //   1차 추출이 빈 값이면 ECHO_QUESTION만 별도 재요청, 그것도 실패 시 투자 실행 질문일 때만 투자 폴백 문장 사용.
+  //   TikiTaka V1은 FIRST/SECOND/THIRD/CLOSER만 순차 조립하고 ECHO_QUESTION은 아직 1차 조립에 포함하지 않는다.
+  //   그래서 비-emotional/knowledge 경로의 ECHO_QUESTION은 현재 구조상 이 rescue path에서 별도 생성된다.
   const expectsEchoQuestion = router.categoryV3 !== 'emotional' && router.categoryV3 !== 'knowledge';
   const isInvestmentEchoFallback =
     router.categoryV3 === 'invest' &&
@@ -902,9 +908,11 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
 [3] ${orderUpper[2] || 'LUCIA'}: ${thirdRaw}
 [CLOSER] ${closerLabel}: ${closerRaw}
 
-위 대화에서 RAY/JACK/LUCIA 발언을 보고 ECHO 대표로서 본질 판결 1줄 + 유저에게 구체적 질문 1개를 작성하라.
-추상/철학 질문 금지. 양자택일 또는 숫자 질문.
-[ECHO_QUESTION] 태그로 감싸서 출력. 2줄 이내. ?로 끝낼 것.`;
+위 대화에서 RAY/JACK/LUCIA 발언을 보고 ECHO 대표로서 본질 판결 1~2줄을 작성하라.
+${ECHO_VERDICT_TURNING_POINT_RULE}
+${ECHO_VERDICT_MIN_STRUCTURE_RULE}
+마지막 문장은 반드시 판결형 선언으로 끝내고, 물음표로 끝나는 질문형 마무리는 금지한다.
+[ECHO_QUESTION] 태그로 감싸서 출력. 2줄 이내.`;
     try {
       const retryRaw = await callStage3(stage3System, retryPrompt);
       echoQuestionRaw = extractTag(retryRaw, 'ECHO_QUESTION') || '';
@@ -915,7 +923,7 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
       console.warn('[runRoutedRequest] ECHO_QUESTION 재요청도 빈 값 → 폴백 사용');
       echoQuestionRaw = isInvestmentEchoFallback
         ? '지금 문제는 살지 말지가 아니라, 리스크 기준 없이 들어가려는 반복 패턴입니다.\n기준 없는 매수는 투자가 아니라 불안의 반복입니다.'
-        : '지금 반복되는 선택 기준을 먼저 정리해야 합니다.';
+        : '지금 문제는 더 생각할지가 아니라, 같은 조건에서 같은 선택을 반복하는 구조입니다.\n결론보다 먼저 끊어야 할 반복 지점이 드러난 순간입니다.';
     }
   }
   const echoQuestionProcessed = postProcessPersonaOutput(echoQuestionRaw, 'echo');
