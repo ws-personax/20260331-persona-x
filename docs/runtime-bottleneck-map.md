@@ -254,6 +254,17 @@ PR2에서 나온 항목 + route.ts에서 새로 나온 항목을 합친 목록.
 6. **(PR3 신규)** Save 신뢰성 전략 3종 불일치(K) — tea_logs/saveTeaConversation/saveHistory가 각각 다른 재시도·타임아웃 정책 사용
 7. **(PR3 신규)** RAY 표현 체계 이중화(I) — Stage3 LLM 기반 vs 레거시 템플릿 기반이 코드 공유 없이 독립 존재
 
+### M-1. PR3.5-A 반영 — decisionType generic 축소
+
+- 수정 위치: `lib/personax/decision-type-map.ts`
+- 범위: 새 Summary 타입을 늘리지 않고 기존 `career` / `relationship` / `buy_or_wait` 분기로만 키워드 커버리지를 확장.
+- 추가 커버:
+  - 커리어/이직: 전직, 직무, 연봉, 승진, 팀/부서 이동, 오래 다닌 회사 맥락
+  - 가족 돌봄/요양: 부모님, 가족 돌봄, 요양원, 간병, 병원 동행, 케어
+  - 대인관계/채무 갈등: 돈 빌려줌, 안 갚음, 채무, 빚 문제
+  - 생활재무: 대출, 부채 상환, 저축, 예금/적금, 비상금, 생활비, 고정비, 카드값, 마이너스 통장
+- 의도: `decision-summary.ts`의 generic fallback("하나의 정답보다...") 반복 노출을 줄이되, categoryV3 / route.ts / Stage 구조는 건드리지 않음.
+
 ## N. 버그 후보 (PR3 추가분, 수정하지 않고 기록만)
 
 4. **invest 안전망 비대칭** (G-1/M-4): r1(1라운드)에는 `applyInvestVocabSafetyNet`이 있지만 r2(2라운드, ECHO_QUESTION 후속 답변)에는 동일 로직이 없어, 2라운드 응답에서는 '손절선'/'지지선' 누락 시에도 보강되지 않을 수 있음.
