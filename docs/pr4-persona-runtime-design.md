@@ -154,7 +154,42 @@ knowledge의 개념정리형처럼 의도적으로 다른 톤이 깨진다. 대�
 
 ---
 
-## 3. PR4-A/B/C 순서와 범위
+## 3. PR4 Non-goals
+
+PR4는 Persona Runtime을 통합하는 작업이다.
+
+아래 항목은 작업 중 수정 유혹이 생기더라도 절대 PR4 범위에 포함하지 않는다.
+필요하면 별도 PR로 분리한다.
+
+### 3.1 제외 대상
+
+- **`decision-summary.ts` 재설계 금지** — PR3.5-D 및 PR #219 판단으로 현재
+  정리 완료. 추가 문구 개선은 별도 소형 PR로 진행한다.
+- **`classifier.ts` / `categoryV3` 변경 금지** — Classifier 2차 개선 Backlog
+  에서 별도로 진행한다.
+- **Memory / History / Review Card 변경 금지** — Decision OS Phase3
+  로드맵 항목이다.
+- **Room / Speaker 확장 기능 추가 금지** — SNS Group Room, Multi Speaker,
+  Messenger 기능은 Phase4 이후로 미룬다.
+- **결제 / 구독 구조 변경 금지** — 무료/유료 Persona 정책은 별도 트랙에서
+  다룬다.
+- **Decision OS 기능 추가 금지** — Review, Memory, Timeline, Analytics 등은
+  이번 범위가 아니다.
+
+### 3.2 Scope Guard
+
+PR4 작업 중 위 항목을 반드시 수정해야 하는 의존성이 발견되더라도 작업자가
+임의로 범위를 확대하지 않는다.
+
+발견 즉시 다음을 보고하고, PR4에서는 수정하지 않는다:
+
+- 왜 필요한지
+- 영향 범위
+- 별도 PR 필요 여부
+
+---
+
+## 4. PR4-A/B/C 순서와 범위
 
 ### PR4-A — 순수 삭제 (Cost, 리스크 최저)
 - `runOrchestrator` 낭비 호출 및 그 산출물(`rayHistory`/`jackHistory`/
@@ -178,13 +213,13 @@ knowledge의 개념정리형처럼 의도적으로 다른 톤이 깨진다. 대�
   명시적으로 남기고 문서화할지, (b) 완전 삭제하고 LLM Runtime 단일화할지 결정.
 - LUCIA가 emotional에서 CLOSER 후보가 될 수 있는지 여부 결정.
 - action/principle에서 ECHO를 order(디베이트 슬롯)에서 아예 제외할지 검토
-  (현재는 생성 후 폐기되는 낭비 호출 — 4절 참고).
+  (현재는 생성 후 폐기되는 낭비 호출 — 5절 참고).
 - **이 단계는 코드 변경 전 별도 승인이 필요한 제품/캐릭터 결정을 포함**하므로,
   PR4-A/B와 분리해 독립 PR로 진행한다.
 
 ---
 
-## 4. 비용 영향 재추정
+## 5. 비용 영향 재추정
 
 기존 설계 문서 주석(`route.ts:835` 등)은 "Option D path는 Stage 1+2+3 = 2~3개
 LLM 호출로 완료"라고 가정하지만, 이는 TikiTaka 도입 **이전** 설계다. 현재 실제
@@ -225,9 +260,9 @@ LLM 호출로 완료"라고 가정하지만, 이는 TikiTaka 도입 **이전** �
 
 ---
 
-## 5. 성공 기준 / QA 재검증 계획
+## 6. 성공 기준 / QA 재검증 계획
 
-### 5.1 성공 기준
+### 6.1 성공 기준
 
 1. `PERSONA_RULE`에 `echo` 키가 존재하고, 5개 categoryV3 전부에서 ECHO 발화가
    (슬롯 종류와 무관하게) 최소 공통 규칙 — 감정 어휘로 LUCIA 침범 금지, 새
@@ -242,7 +277,7 @@ LLM 호출로 완료"라고 가정하지만, 이는 TikiTaka 도입 **이전** �
    안내문과 `buildCloserPersonaRuleSection`의 강제값이 서로 모순되지 않아야
    한다.
 
-### 5.2 QA 재검증 계획 (실행은 각 PR 단계에서 승인 하에 — Level 2/3 비용 정책 적용)
+### 6.2 QA 재검증 계획 (실행은 각 PR 단계에서 승인 하에 — Level 2/3 비용 정책 적용)
 
 최소 8개 대표 시나리오:
 1. invest — "SK하이닉스 지금 들어가도 될까요"
@@ -256,7 +291,7 @@ LLM 호출로 완료"라고 가정하지만, 이는 TikiTaka 도입 **이전** �
 
 각 시나리오에서 확인할 것: (a) 카테고리별 예상 경로대로 생성되는지(1절 표
 기준), (b) ECHO/LUCIA가 역할 고정 완화 이후에도 캐릭터 붕괴 없는지, (c) 호출
-수가 4절 추정치와 일치하는지(로그 `console.log('[stage3-raw]', ...)` 등으로
+수가 5절 추정치와 일치하는지(로그 `console.log('[stage3-raw]', ...)` 등으로
 확인).
 
 PR4-A는 코드 삭제만이므로 QA는 tsc + 정적 검증으로 충분하고 실제 LLM 호출
