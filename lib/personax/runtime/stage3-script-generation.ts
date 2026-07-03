@@ -908,11 +908,12 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
 [3] ${orderUpper[2] || 'LUCIA'}: ${thirdRaw}
 [CLOSER] ${closerLabel}: ${closerRaw}
 
-위 대화에서 RAY/JACK/LUCIA 발언을 보고 ECHO 대표로서 본질 판결 1~2줄을 작성하라.
+위 대화에서 RAY/JACK/LUCIA(및 CLOSER) 발언을 보고 ECHO 대표로서 Pattern → Action Translation 판결을 작성하라.
 ${ECHO_VERDICT_TURNING_POINT_RULE}
 ${ECHO_VERDICT_MIN_STRUCTURE_RULE}
-마지막 문장은 반드시 판결형 선언으로 끝내고, 물음표로 끝나는 질문형 마무리는 금지한다.
-[ECHO_QUESTION] 태그로 감싸서 출력. 2줄 이내.`;
+위 [1][2][3] 발언자 이름을 밝히며 각자 무엇을 말했는지 구체적으로 인용할 것 — 새로운 숫자·조건은 만들지 말고 위에 이미 나온 내용만 재구성할 것.
+마지막 문장은 반드시 판결형 선언(실행 기준)으로 끝내고, 물음표로 끝나는 질문형 마무리는 금지한다.
+[ECHO_QUESTION] 태그로 감싸서 출력. 3~4줄.`;
     try {
       const retryRaw = await callStage3(stage3System, retryPrompt);
       echoQuestionRaw = extractTag(retryRaw, 'ECHO_QUESTION') || '';
