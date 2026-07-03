@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseBrowser } from '@/lib/supabase/client';
 
 type HistoryItem = {
   id: string;
@@ -89,7 +90,7 @@ const pickText = (value: unknown) => {
   return '';
 };
 
-export default function HistoryModal({ onClose, initialConversationId }: HistoryModalProps) {
+export default function HistoryModal({ onClose, supabaseClient, initialConversationId }: HistoryModalProps) {
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -98,12 +99,23 @@ export default function HistoryModal({ onClose, initialConversationId }: History
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
   const [filterDays, setFilterDays] = useState<7 | 30 | 0>(0);
+  const supabase = useMemo(
+    () => supabaseClient ?? createSupabaseBrowser(),
+    [supabaseClient],
+  );
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
         setError('');
+
+        try {
+          await supabase.auth.refreshSession();
+        } catch (refreshError) {
+          console.warn('[history-modal] refreshSession ignored:', refreshError);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 250));
 
         const res = await fetch('/api/history', {
           credentials: 'include',
@@ -129,7 +141,7 @@ export default function HistoryModal({ onClose, initialConversationId }: History
     };
 
     void loadData();
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
