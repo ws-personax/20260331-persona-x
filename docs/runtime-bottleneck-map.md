@@ -1,5 +1,13 @@
 # Runtime 반복 패턴 병목 지도 (PR4 사전 조사)
 
+## PR3.5-E 메모 — ECHO_QUESTION rescue path
+
+- 현재 TikiTaka V1은 `[FIRST]`, `[SECOND]`, `[THIRD]`, `[CLOSER]`만 순차 생성한다.
+- `[ECHO_QUESTION]`은 1차 TikiTaka 조립에 포함되지 않고, `stage3-script-generation.ts`의 rescue path에서 별도 재요청으로 생성된다.
+- 이 구조 때문에 `action`/`principle`/`invest`처럼 `ECHO_QUESTION`을 기대하는 카테고리는 1차 조립 후 항상 누락 감지 경로를 탈 수 있다.
+- PR3.5-E에서는 구조를 바꾸지 않고 rescue prompt와 non-invest fallback 문구만 판결형으로 정리했다.
+- PR4 후보: TikiTaka V1 순차 생성 단계에 `[ECHO_QUESTION]` 또는 final ECHO verdict slot을 정식 블록으로 포함할지 재검토한다.
+
 PR2(`refactor/runtime-surgery-pr2`) 작업 중 message-router.ts를 Stage1/2/3으로
 분리하면서 함께 수행한 정적 조사 결과. **이 문서는 지도화만 수행하며, 아래 병목은
 이번 PR에서 수정하지 않는다.** PR4(Persona Runtime) 설계 시 참고용.
