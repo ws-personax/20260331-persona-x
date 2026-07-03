@@ -25,16 +25,16 @@ export function inferDecisionType(
   if (/창업.*재취업|재취업.*창업|창업\s*vs\s*재취업/i.test(question)) {
     return 'startup_vs_job';
   }
-  if (/계속\s*만나|헤어|이 사람|관계|연애|이혼|시기|질투|무시|비난|뒷담|견제|상처|거리두기|경계|대인관계|친구|동료|직장동료|상사|부하|갈등|트러블|미워|싫어|눈치|왕따|따돌림|험담/.test(question)) {
+  if (/계속\s*만나|헤어|이 사람|관계|연애|이혼|시기|질투|무시|비난|뒷담|견제|상처|거리두기|경계|대인관계|친구|동료|직장동료|상사|부하|갈등|트러블|미워|싫어|눈치|왕따|따돌림|험담|돈\s*빌려|빌려준\s*돈|빌린\s*돈|안\s*갚|못\s*갚|채무|빚\s*문제|부모님|어머니|아버지|가족\s*돌봄|가족돌봄|돌봄|요양|요양원|간병|병원\s*동행|케어/.test(question)) {
     return 'relationship';
   }
-  if (/명퇴|명예퇴직|희망퇴직|권고사직|퇴직|퇴직\s*후|은퇴\s*후|재취업|이직|커리어|진로|퇴사|회사|직장|창업/.test(question)) {
+  if (/명퇴|명예퇴직|희망퇴직|권고사직|퇴직|퇴직\s*후|은퇴\s*후|재취업|이직|커리어|진로|퇴사|회사|직장|창업|전직|직무|연봉|승진|팀\s*이동|부서\s*이동|5년\s*다녔|오래\s*다녔|계속\s*다녀/.test(question)) {
     return 'career';
   }
   if (hasRealEstateRecommendationIntent) {
     return 'real_estate_recommendation';
   }
-  if (categoryV3 === 'invest' || /사야|매수|팔아야|매도|비트코인|XRP|xrp|리플|이더리움|ETH|eth|솔라나|SOL|sol|삼성전자|주식|코인|투자/.test(question)) {
+  if (categoryV3 === 'invest' || /사야|매수|팔아야|매도|비트코인|XRP|xrp|리플|이더리움|ETH|eth|솔라나|SOL|sol|삼성전자|주식|코인|투자|대출|빚|부채|상환|갚을까|갚아야|저축|예금|적금|비상금|생활비|고정비|카드값|마이너스\s*통장|마통/.test(question)) {
     return 'buy_or_wait';
   }
 
