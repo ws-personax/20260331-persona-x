@@ -434,9 +434,27 @@ export async function POST(req: NextRequest) {
             marketDataPromptContext,
             memoryContext,
           );
-          // ✅ callOptionD 빈 결과 시 폴백 완전 차단 — null/빈 객체여도 정상 done 경로로 강제 통과
+          // ✅ callOptionD 빈 결과 시 폴백 강제 적용 — null/빈 객체여도 정상 done 경로로 강제 통과
+          //   (아래 PERSONA_FALLBACK 적용을 "차단"하는 게 아니라, 반대로 그 적용을 보장하는 코드다.
+          //    r1이 null이면 runRoutedRequest가 Stage1/2/3 어딘가에서 예외를 삼키고 null을 반환한
+          //    것이므로, 이 스텁 치환 자체가 곧 PERSONA_FALLBACK 발동의 트리거가 된다.)
+          //   ⚠️ 로그 카운팅 기준: [PERSONA_FALLBACK_TRIGGERED] 태그 1개만 실제 폴백 발동
+          //   시점(아래, applyPersonaFallback 직전)에 남긴다. r1 null 원인 자체는
+          //   [PERSONA_FALLBACK_ROOT_CAUSE](참고용, 카운팅 대상 아님)로 별도 표기해
+          //   grep -c '[PERSONA_FALLBACK_TRIGGERED]' 집계 시 이중 계산되지 않도록 한다.
+          const _r1WasNull = !r1;
           if (!r1) {
-            console.warn('[optionD] null 반환 → 빈 결과 객체로 강제 통과 (폴백 차단)');
+            console.warn(
+              '[PERSONA_FALLBACK_ROOT_CAUSE][optionD-null]',
+              JSON.stringify({
+                timestamp: new Date().toISOString(),
+                categoryV3: _categoryV3,
+                decisionType: intent.decisionType,
+                questionLength: msg.length,
+                questionPreview: msg.slice(0, 30),
+                reason: 'runRoutedRequest returned null (Stage1/2/3 예외 또는 실패 — message-router.ts catch 참고)',
+              }),
+            );
             r1 = { first: '', second: '', third: '', echoQuestion: '' };
           }
           if (r1) {
@@ -444,6 +462,26 @@ export async function POST(req: NextRequest) {
 
             // ✅ 빈 persona 보정 — LLM 파싱 실패로 빈 문자열 방어
             const _isHee = _categoryV3 === 'emotional' && detectEmotionalSubtypeHee(msg);
+            const _emptyKeysBeforeFallback = (Object.keys(personaText) as TaggedPersonaKey[]).filter(
+              (k) => !personaText[k].trim(),
+            );
+            if (_emptyKeysBeforeFallback.length > 0) {
+              console.warn(
+                '[PERSONA_FALLBACK_TRIGGERED]',
+                JSON.stringify({
+                  timestamp: new Date().toISOString(),
+                  categoryV3: _categoryV3,
+                  decisionType: intent.decisionType,
+                  questionLength: msg.length,
+                  questionPreview: msg.slice(0, 30),
+                  r1WasNull: _r1WasNull,
+                  emptyKeys: _emptyKeysBeforeFallback,
+                  reason: _r1WasNull
+                    ? 'runRoutedRequest null → 강제 빈 스텁'
+                    : 'runRoutedRequest 결과는 있으나 일부/전체 페르소나 필드가 빈 문자열 (Stage3 태그 추출 실패 등)',
+                }),
+              );
+            }
             applyPersonaFallback(personaText, _isHee);
 
             // invest 카테고리 필수 어휘 안전망 — 4명 응답에 '손절선'/'지지선' 둘 다 없으면
