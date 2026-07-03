@@ -162,6 +162,33 @@ const inferBuyOrWaitVerdict = (...values: Array<string | undefined>): string => 
   return '추가 확인이 먼저입니다';
 };
 
+const PERSONAL_FINANCE_BUY_OR_WAIT_PATTERN =
+  /대출|빚|부채|상환|갚|갚는|갚을|저축|예금|적금|비상금|생활비|고정비|카드값|카드\s*대금|마이너스\s*통장|마통|이자|원리금|할부/;
+
+const INVESTMENT_BUY_OR_WAIT_PATTERN =
+  /주식|ETF|채권|펀드|코인|비트코인|XRP|xrp|리플|이더리움|ETH|eth|솔라나|SOL|sol|삼성전자|하이닉스|테슬라|매수|매도|진입|손절선|지지선|주가|가격\s*기준|분할|비중|포트폴리오|투자/;
+
+const isPersonalFinanceBuyOrWaitQuestion = (question: string): boolean => {
+  const q = normalizeQuestion(question);
+  return PERSONAL_FINANCE_BUY_OR_WAIT_PATTERN.test(q) && !INVESTMENT_BUY_OR_WAIT_PATTERN.test(q);
+};
+
+const inferPersonalFinanceBuyOrWaitVerdict = (question: string): string => {
+  const q = normalizeQuestion(question);
+
+  if (/마이너스\s*통장|마통|카드값|카드\s*대금|고금리|이자/.test(q)) {
+    return '고금리 부채는 저축보다 먼저 정리할 가능성이 큽니다';
+  }
+  if (/비상금|생활비|고정비/.test(q)) {
+    return '상환보다 먼저 최소 생활 안전선을 남겨야 합니다';
+  }
+  if (/저축|예금|적금/.test(q) && /대출|빚|부채|상환|갚/.test(q)) {
+    return '이자율과 비상금 규모를 비교해야 순서를 정할 수 있습니다';
+  }
+
+  return '상환, 저축, 비상금의 우선순위를 먼저 나눠야 합니다';
+};
+
 export function buildDecisionSummary(params: {
   question: string;
   questionType: string;
@@ -198,6 +225,15 @@ export function buildDecisionSummary(params: {
   }
 
   if (type === 'buy_or_wait') {
+    if (isPersonalFinanceBuyOrWaitQuestion(params.question)) {
+      return withImportance({
+        verdict: '생활재무 결정은 수익보다 현금흐름의 안정성이 먼저입니다',
+        reasons: ['대출 상환과 저축은 이자율, 비상금, 고정비를 함께 봐야 합니다', inferPersonalFinanceBuyOrWaitVerdict(params.question)],
+        counterView: '다만 비상금이 전혀 없다면 모든 여유금을 상환에만 넣는 것도 위험합니다.',
+        nextAction: '오늘은 대출 이자율, 월 고정비, 남겨둘 비상금을 각각 1줄로 적고 상환 순서를 정하세요',
+      });
+    }
+
     return withImportance({
       verdict: '투자의 핵심은 수익보다 리스크 기준입니다',
       reasons: ['매수보다 손실 관리 기준을 먼저 정해야 합니다', inferBuyOrWaitVerdict(params.question, params.ray, params.jack, params.lucia, params.echo)],
