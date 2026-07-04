@@ -138,10 +138,69 @@ async function callStage3(system: string, user: string): Promise<string> {
   return callGPTMini(system, user);
 }
 
+const LUCIA_TARGET_PERSONA = 'LUCIA';
+
+const LUCIA_MARKET_NUMERIC_PATTERN =
+  /(?:\d[\d,.]*\s*(?:원|달러|만원|억원|조원|%|퍼센트|주|계약|개|배|달러대|원대|만|억|조|USD|KRW|BTC|ETH))|(?:[$₩]\s*\d[\d,.]*)|(?:\b\d[\d,.]*\b\s*(?:price|volume|support|resistance|stop|target)\b)/gi;
+
+const LUCIA_MARKET_LEVEL_PATTERN =
+  /(?:현재가|고가|저가|종가|시가|가격|거래량|손절선|손절가|지지선|저항선|목표가|진입가|매수가|매도가|익절|손절|저점|고점|상단|하단|눌림목|돌파|이탈|이평선|평균선|상승률|하락률|변동성|시총|confidence|entryCondition|positionSizing|stop-line|rawPrice|rawHigh|rawLow|rawVolume)[^\n.!?。]*\d[\d,.%₩$원달러만원억원조USDKRWBTCETH\s-]*/gi;
+
+const stripMarketNumbersForLucia = (text: string): string => text
+  .replace(LUCIA_MARKET_LEVEL_PATTERN, (match) => {
+    if (/고점|상단|저항선|과열|부담/.test(match)) return '높은 구간';
+    if (/저점|하단|지지선|눌림목|조정/.test(match)) return '낮은 구간';
+    if (/손절|이탈|리스크|위험/.test(match)) return '위험 관리 기준';
+    if (/거래량|변동성/.test(match)) return '시장 움직임';
+    if (/목표가|진입가|매수가|매도가|entryCondition|positionSizing|confidence/.test(match)) return '판단 기준';
+    return '시장 구간';
+  })
+  .replace(LUCIA_MARKET_NUMERIC_PATTERN, '')
+  .replace(/\s{2,}/g, ' ')
+  .replace(/\n{3,}/g, '\n\n')
+  .trim();
+
+const summarizePreviousDirectionForLucia = (name: string, text: string): string => {
+  const cleaned = stripMarketNumbersForLucia(text);
+  const normalized = text.toLowerCase();
+  const directions: string[] = [];
+
+  if (/관망|기다|대기|보류|서두르/.test(text)) directions.push('서두르지 말고 관망하자는 방향');
+  if (/신중|검증|확인|데이터|근거|기준/.test(text)) directions.push('근거와 기준을 먼저 확인하자는 방향');
+  if (/고점|과열|부담|비싸|상단|저항/.test(text)) directions.push('높은 구간의 부담을 조심하자는 방향');
+  if (/저점|눌림목|조정|하단|지지/.test(text)) directions.push('낮아지는 구간을 기다리자는 방향');
+  if (/손절|리스크|위험|이탈|깨지/.test(text)) directions.push('위험 관리가 필요하다는 방향');
+  if (/상승|돌파|강세|회복|positive|bullish/.test(normalized)) directions.push('흐름이 개선될 수 있다는 방향');
+  if (/하락|약세|부정|negative|bearish/.test(normalized)) directions.push('흐름이 약해질 수 있다는 방향');
+  if (!directions.length && /시장|구간|판단|기준|압박/.test(cleaned)) {
+    directions.push('판단 기준을 먼저 세우자는 방향');
+  }
+
+  const direction = directions.length
+    ? Array.from(new Set(directions)).slice(0, 2).join(', ')
+    : '판단 기준을 먼저 세우자는 방향';
+
+  return `${name}는 ${direction}으로 봤다. 숫자 자체보다 지금 판단의 압박과 기준을 확인하자는 취지다.`;
+};
+
+const sanitizePreviousForTargetPersona = (
+  previous: Array<{ name: string; text: string }>,
+  targetPersonaName: string,
+): Array<{ name: string; text: string }> => {
+  if (targetPersonaName.toUpperCase() !== LUCIA_TARGET_PERSONA) return previous;
+
+  return previous.map((item) => ({
+    name: item.name,
+    text: summarizePreviousDirectionForLucia(item.name, item.text),
+  }));
+};
+
 const formatPreviousPersonaResponses = (
   previous: Array<{ name: string; text: string }>,
+  targetPersonaName: string,
 ): string => {
-  const body = previous
+  const sanitizedPrevious = sanitizePreviousForTargetPersona(previous, targetPersonaName);
+  const body = sanitizedPrevious
     .filter((item) => item.text.trim())
     .map((item) => `${item.name}:\n${item.text.trim()}`)
     .join('\n\n');
@@ -153,8 +212,10 @@ const formatPreviousPersonaResponses = (
 
 const formatPreviousPersonaQuoteContext = (
   previous: Array<{ name: string; text: string }>,
+  targetPersonaName: string,
 ): string => {
-  const body = previous
+  const sanitizedPrevious = sanitizePreviousForTargetPersona(previous, targetPersonaName);
+  const body = sanitizedPrevious
     .map((item) => ({
       name: item.name,
       quote: extractKeySentence(item.text, 80),
@@ -178,8 +239,8 @@ const buildTikiTakaBlockPrompt = (
 ## TikiTaka Engine V1 — Context Passing
 이번 호출에서는 [${tag}] 블록만 작성한다.
 
-${formatPreviousPersonaResponses(previous)}
-${formatPreviousPersonaQuoteContext(previous)}
+${formatPreviousPersonaResponses(previous, personaName)}
+${formatPreviousPersonaQuoteContext(previous, personaName)}
 위 내용은 참고(Context)로만 사용한다.
 동의하거나 반박할 필요는 없다.
 앞 발언을 복사하지 말고, ${personaName}의 관점으로 새로운 관점을 추가하라.
