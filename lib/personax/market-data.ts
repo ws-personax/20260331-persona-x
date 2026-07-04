@@ -371,6 +371,120 @@ const DERIVED_OMITTED_RULES: Record<Exclude<MarketDataPersonaKey, 'ray'>, string
 - Translate market context into pattern/principle language without listing trading calculations.`,
 };
 
+const toNumericMarketValue = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value !== 'string') return null;
+
+  const normalized = value.replace(/,/g, '').trim();
+  if (!normalized) return null;
+
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const buildLuciaPriceLocation = (marketData: Record<string, unknown>): string => {
+  const price = toNumericMarketValue(marketData.rawPrice ?? marketData.price);
+  const high = toNumericMarketValue(marketData.rawHigh ?? marketData.high);
+  const low = toNumericMarketValue(marketData.rawLow ?? marketData.low);
+
+  if (price === null || high === null || low === null || high <= low) {
+    return '가격 위치 확인 필요';
+  }
+
+  const position = (price - low) / (high - low);
+  if (position >= 0.7) return '고점 근접';
+  if (position <= 0.3) return '저점 근접';
+  return '중간 구간';
+};
+
+const buildLuciaVolatilitySignal = (marketData: Record<string, unknown>): string => {
+  const price = toNumericMarketValue(marketData.rawPrice ?? marketData.price);
+  const high = toNumericMarketValue(marketData.rawHigh ?? marketData.high);
+  const low = toNumericMarketValue(marketData.rawLow ?? marketData.low);
+
+  if (price === null || high === null || low === null || price <= 0 || high <= low) {
+    return '변동성 확인 필요';
+  }
+
+  return (high - low) / price >= 0.05 ? '변동성 큼' : '변동성 작음';
+};
+
+const buildLuciaVolumeSignal = (marketData: Record<string, unknown>): string => {
+  const volume = toNumericMarketValue(marketData.rawVolume ?? marketData.volume);
+  const avgVolume = toNumericMarketValue(marketData.avgVolume);
+
+  if (volume === null || avgVolume === null || avgVolume <= 0) {
+    return '거래량 흐름 확인 필요';
+  }
+
+  if (volume > avgVolume * 1.2) return '거래량 증가';
+  if (volume < avgVolume * 0.8) return '거래량 감소';
+  return '거래량 보통';
+};
+
+const buildLuciaMovementTone = (marketData: Record<string, unknown>): string => {
+  const change = toNumericMarketValue(marketData.change);
+  if (change === null) return '방향성 확인 필요';
+  if (change > 0) return '상승 흐름';
+  if (change < 0) return '하락 흐름';
+  return '방향성 제한';
+};
+
+const buildLuciaJudgmentPressure = (
+  priceLocation: string,
+  volatility: string,
+): string => (
+  priceLocation === '고점 근접' ||
+  priceLocation === '저점 근접' ||
+  volatility === '변동성 큼'
+    ? '판단 압박이 큰 구간'
+    : '판단 압박이 비교적 낮은 구간'
+);
+
+const buildLuciaMarketData = (marketData: Record<string, unknown>): Record<string, unknown> => {
+  const priceLocation = buildLuciaPriceLocation(marketData);
+  const volatility = buildLuciaVolatilitySignal(marketData);
+
+  return {
+    asset: typeof marketData.name === 'string' ? marketData.name : '감지된 자산',
+    emotionalMarketSignals: {
+      locationSignal: priceLocation,
+      rangeSignal: volatility,
+      activitySignal: buildLuciaVolumeSignal(marketData),
+      movementSignal: buildLuciaMovementTone(marketData),
+      pressureSignal: buildLuciaJudgmentPressure(priceLocation, volatility),
+    },
+  };
+};
+
+const readContextLine = (context: string, key: string): string => (
+  context.match(new RegExp(`^${key}:\\s*(.+)$`, 'm'))?.[1]?.trim() ?? ''
+);
+
+const buildLuciaMarketContext = (
+  marketDataPromptContext: string,
+  marketData: Record<string, unknown>,
+): string => {
+  const assetType = readContextLine(marketDataPromptContext, 'assetType');
+  const detectedAsset = readContextLine(marketDataPromptContext, 'detectedAsset');
+  const query = readContextLine(marketDataPromptContext, 'query');
+  const isEtf = readContextLine(marketDataPromptContext, 'isEtf');
+
+  return `## Market Data
+assetType: ${assetType}
+detectedAsset: ${detectedAsset}
+query: ${query}
+isEtf: ${isEtf}
+marketData:
+${JSON.stringify(buildLuciaMarketData(marketData), null, 2)}
+
+LUCIA marketData scope:
+- LUCIA receives qualitative market pressure only.
+- Concrete market quote values, range values, activity counts, raw market feed fields, identifier fields, data-origin fields, and calculated trading fields are intentionally omitted for LUCIA.
+- Do not infer or recreate omitted market numbers, stop lines, sizing, or calculated entry/exit conditions.
+- Interpret the emotional pressure created by the market state without repeating market numbers.`;
+};
+
 const findJsonObjectEnd = (text: string, startIndex: number): number => {
   let depth = 0;
   let inString = false;
@@ -434,6 +548,10 @@ export function buildMarketDataPromptContextForPersona(
 
   try {
     const parsed = JSON.parse(marketDataPromptContext.slice(jsonStart, jsonEnd)) as Record<string, unknown>;
+    if (persona === 'lucia') {
+      return buildLuciaMarketContext(marketDataPromptContext, parsed);
+    }
+
     delete parsed.derived;
 
     return `${marketDataPromptContext.slice(0, jsonStart)}${JSON.stringify(parsed, null, 2)}
