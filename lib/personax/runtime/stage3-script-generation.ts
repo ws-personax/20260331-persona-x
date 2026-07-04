@@ -910,10 +910,18 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${personaRoleRules}${clo
     const closerRaw = extractTag(scriptRaw, 'CLOSER') || '';
     const orderUpper = router.order.map((k) => k.toUpperCase());
     const closerLabel = (router.closerPersona || 'jack').toUpperCase();
+    const echoMarketDataContext = marketDataContext
+      ? `${marketDataContext}
+ECHO 전용 derived 사용 규칙:
+- marketData.derived가 있어도 숫자·가격·손절선·비중을 나열하지 말 것.
+- confidence, entryCondition, positionSizing, breakdown은 구조 분석의 근거로만 보고 패턴/원칙 문장으로 변환할 것.
+- 새 숫자·새 조건 창작 금지.`
+      : '';
     const retryPrompt = `[1] ${orderUpper[0] || 'RAY'}: ${firstRaw}
 [2] ${orderUpper[1] || 'JACK'}: ${secondRaw}
 [3] ${orderUpper[2] || 'LUCIA'}: ${thirdRaw}
 [CLOSER] ${closerLabel}: ${closerRaw}
+${echoMarketDataContext}
 
 위 대화에서 RAY/JACK/LUCIA(및 CLOSER) 발언을 보고 ECHO 대표로서 Pattern → Action Translation 판결을 작성하라.
 ${ECHO_VERDICT_TURNING_POINT_RULE}
