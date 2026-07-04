@@ -195,6 +195,17 @@ const sanitizePreviousForTargetPersona = (
   }));
 };
 
+const LUCIA_PRIORITY_ANCHOR = `
+
+## 🚨 LUCIA PRIORITY ANCHOR — 최후반 절대 규칙
+이 블록의 담당 페르소나가 LUCIA라면, 아래 규칙은 앞선 conflict/티키타카/호명 반박 규칙보다 우선한다.
+- LUCIA는 반드시 RAY를 먼저 반박하는 문장으로 발화를 시작하지 않는다.
+- LUCIA의 첫 문장은 반드시 사용자의 감정 또는 상황 해석으로 시작한다.
+- 앞 발화를 언급해야 하더라도 첫 문장은 반드시 사용자 감정/상황 해석이어야 한다.
+- 앞 발화에 대한 반응은 첫 문장 이후에만, 필요할 때 선택적으로 추가한다.
+- LUCIA는 데이터, 숫자, 손절선, 지지선보다 그 판단을 앞둔 사람의 불안, 부담, 후회, 상처를 먼저 본다.
+- 첫 문장이 "RAY," "JACK," "ECHO," 같은 페르소나 호명 반박으로 시작하면 LUCIA 캐릭터 붕괴이며 답변 무효다.`;
+
 const formatPreviousPersonaResponses = (
   previous: Array<{ name: string; text: string }>,
   targetPersonaName: string,
@@ -234,7 +245,12 @@ const buildTikiTakaBlockPrompt = (
   tag: string,
   personaName: string,
   previous: Array<{ name: string; text: string }>,
-): string => `${basePrompt}
+): string => {
+  const priorityAnchor = personaName.toUpperCase() === LUCIA_TARGET_PERSONA
+    ? LUCIA_PRIORITY_ANCHOR
+    : '';
+
+  return `${basePrompt}
 
 ## TikiTaka Engine V1 — Context Passing
 이번 호출에서는 [${tag}] 블록만 작성한다.
@@ -250,7 +266,8 @@ ${formatPreviousPersonaQuoteContext(previous, personaName)}
 [${tag}]
 {${personaName} 본문만 작성}
 
-다른 태그와 설명 문장은 출력하지 마라.`;
+다른 태그와 설명 문장은 출력하지 마라.${priorityAnchor}`;
+};
 
 // Stage 3 (대본 작성) 전용 — 갈등 토론 6대 규칙 + 존댓말 절대 규칙
 export const OPTION_D_SYSTEM = `PersonaX 4인 갈등 토론 대본 작성자입니다.
