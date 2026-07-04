@@ -244,7 +244,7 @@ const ensureFourPersonaOrder = (baseOrder: TaggedPersonaKey[]): TaggedPersonaKey
  * FIRST·CLOSER 코드 레벨 정렬.
  *  - FIRST가 ray/jack/lucia이면 order[0]로 이동
  *  - CLOSER가 ray/jack/lucia이고 FIRST와 다르면 order[2]로 이동
- *  - ECHO인 경우 order 배열 조작 불가 (ECHO는 [ECHO_QUESTION] 슬롯)
+ *  - ECHO인 경우에도 principle처럼 FIRST=ECHO가 명시된 카테고리는 order에 반영
  *  - invest는 ECHO를 order에서 제외하고 [ray, jack, lucia] 3원소로 반환
  *    (ECHO_QUESTION 하드코딩 슬롯과 중복/누락 방지)
  */
@@ -277,8 +277,8 @@ export const enforceOrder = (
     return ['ray', 'lucia', 'jack', 'echo'];
   }
   if (categoryV3 === 'principle') {
-    const withoutJackEcho = arr.filter((k) => k !== 'jack' && k !== 'echo');
-    arr = [...withoutJackEcho, 'echo', 'jack'];
+    const middle = arr.filter((k) => k !== 'jack' && k !== 'echo');
+    arr = ['echo', ...middle, 'jack'];
   }
   if (categoryV3 === 'emotional') {
     const withoutJack = arr.filter((k) => k !== 'jack');
