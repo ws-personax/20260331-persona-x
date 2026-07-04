@@ -23,6 +23,7 @@ import {
   recordSpeaker,
 } from '@/lib/personax/conversation-state';
 import {
+  buildPersonaRoleRulesSection,
   ECHO_VERDICT_MIN_STRUCTURE_RULE,
   ECHO_VERDICT_TURNING_POINT_RULE,
 } from '@/lib/personax/prompts/rules';
@@ -752,6 +753,12 @@ export async function runStage3ScriptGeneration(params: {
   const secondKey2 = ((router.order[1] || 'jack') as AllPersonaKey).toUpperCase();
   const thirdKey2 = ((router.order[2] || 'ray') as AllPersonaKey).toUpperCase();
   const closerKey2 = ((router.closerPersona || router.order[router.order.length - 1] || 'jack') as AllPersonaKey).toUpperCase();
+  const personaRoleRules = buildPersonaRoleRulesSection([
+    (router.order[0] || router.firstPersona || 'lucia') as AllPersonaKey,
+    (router.order[1] || 'jack') as AllPersonaKey,
+    (router.order[2] || 'ray') as AllPersonaKey,
+    (router.closerPersona || router.order[router.order.length - 1] || 'jack') as AllPersonaKey,
+  ]);
   const emotionalBanLine = router.firstPersona !== 'lucia'
     ? `\n⛔ [FIRST]가 ${firstKey2}이므로 감정 공감 오프닝("마음이", "덜컥", "걱정되셨겠다") 금지.`
     : '';
@@ -772,7 +779,7 @@ export async function runStage3ScriptGeneration(params: {
 [SECOND] = 반드시 ${secondKey2} 캐릭터만 발언.
 [THIRD] = 반드시 ${thirdKey2} 캐릭터만 발언.
 [CLOSER] = 반드시 ${closerKey2} 캐릭터만 발언.
-FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${closerJackRule}`;
+FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${personaRoleRules}${closerJackRule}`;
   // Stage 3 — 기본 GPT-4.1-mini, USE_GEMINI_STAGE3=true 시 Gemini Flash로 분기.
   // solo·Stage 1·Stage 2는 기존 callLLM 유지.
   // 어휘 차단 규칙은 user prompt(buildScriptPrompt) 말미에 이미 포함 — system 중복 제거.
