@@ -275,19 +275,131 @@ PR4 작업 중 위 항목을 반드시 수정해야 하는 의존성이 발견�
 - 결정 대상 기능: `confidence`, `breakdown`, `entryCondition`, `positionSizing`,
   ETF/지수 처리, 종목/섹터 비교, 장마감/주말 시장 세션 라벨,
   `market-quick-handlers.ts` 특수 질문 핸들러.
-- 마스터 방향성: **즉시 삭제보다 흡수 후 폐기를 우선 검토한다.** 단, 이는 아직
-  확정된 제품 결정이 아니라 PR4-C에서 검증해야 할 방향성 제안이다.
-- 흡수 후 폐기 시 예상 작업 순서:
-  1. Legacy deterministic scoring 결과를 LLM Runtime의 RAY 프롬프트 또는
-     Stage data context에 참고 데이터로 주입하는 방식 검토.
-  2. 흡수 완료 확인 후 `route.ts`의 `teaMode=false` finance legacy 경로를
-     명시적으로 차단하거나 LLM Runtime으로 이관.
-  3. `templates.ts`, `market-quick-handlers.ts`, legacy builder를 단계적으로 제거.
-     단, `stock-response-builders.ts`의 live 함수
-     `normalizeNoMarketDataInvestmentPersonaText()`는 제거 대상에서 제외.
+- 마스터 방향성: **즉시 삭제보다 흡수 후 폐기를 우선 검토한다.** 아래는 이
+  방향성을 실제로 어떻게 구현할지에 대한 구체 설계안(작성 완료, 코드 변경
+  없음)이다.
+
+#### PR4-C.1 Legacy deterministic scoring 로직 분석
+
+전체 스코어링 파이프라인은 **100% 순수 함수**다. `lib/personax/runtime/route-market.ts:69`의
+`buildLegacyStockDetailResult(params)`는 이미 fetch된 데이터(`marketData`/
+`nasdaqData`/`news`)를 파라미터로만 받고, 함수 내부에서 외부 API를 전혀
+호출하지 않는다. 내부에서 쓰는 `lib/personax/scoring.ts`의 모든 함수
+(`getVolumeInfo`/`getVolatility`/`getPricePos`/`getNewsData`/`calcScores`/
+`getPositionSizing`/`buildEntryCondition`/`detectMarketSituation`/
+`analyzeTrendContext`/`determineWatchLevel`/`detectPersonaConflict`)는 부수효과가
+전혀 없는 순수 계산이며, `calcScores`의 `confidence`는
+`55 + hasData?15 + newsCount>0?10 + newsCount≥5?5 + volScore>0?5 + volScore≥2?5 + align?3`
+가산식(최대 93)으로 산출된다.
+
+입력 데이터 출처: `marketData`는 `lib/personax/market.ts:424`의 `fetchMarketPrice()`가
+공급하며, 이 함수는 **LLM Runtime도 이미 동일하게 호출 중**이다
+(`lib/personax/market-data.ts:217` `fetchMappedMarketData` → `buildMarketDataPromptContext`,
+Stage1/2/3에 주입되는 바로 그 함수). 즉 원 데이터 소스는 이미 완전히 공유되어
+있고, 다른 것은 그 데이터를 가지고 계산하는 후처리 레이어뿐이다.
+
+유일한 진짜 차이는 **뉴스**다. `getNewsData()`가 요구하는 `{title, source}[]`
+구조화 뉴스는 `lib/news.ts:140`의 `fetchInvestmentNews()`(네이버 뉴스 검색 API,
+`NAVER_CLIENT_ID/SECRET` 필요, 5분 캐시)가 공급하며, 이는 LLM Runtime Stage1의
+Gemini/Claude `enableSearch` grounding과 완전히 별개의 외부 호출이다 — Stage1은
+비정형 텍스트 요약만 받으므로 `getNewsData()`의 제목 키워드 정규식 감성
+스코어링에 바로 쓸 수 없다.
+
+참고로 `buildMarketDataPromptContext()`(`market-data.ts:240`)는 이미
+`rawPrice`/`rawHigh`/`rawLow`/`rawVolume`/`avgVolume`을 JSON으로 프롬프트에
+주입하고 "RAY may use only numeric values present in this Market Data block"
+규칙까지 걸어두고 있다 — 흡수를 위한 배관은 절반 이미 존재한다. `trend`(5·20일
+이평선)와 계산된 `confidence`/`breakdown`/`entryCondition`/`positionSizing`/
+`verdict`만 이 JSON에 없는 상태다.
+
+#### PR4-C.2 흡수 방식 옵션 비교 — **방안 B 채택**
+
+| 비교 | A. 텍스트 요약 주입 | **B. 구조화 JSON + 인용 규칙 (채택)** | C. Tool-calling 전환 |
+|---|---|---|---|
+| 설명 | 계산 결과를 문장으로 미리 조립해 `marketDataPromptContext`에 텍스트로 첨부 | 계산 결과를 `buildMarketDataPromptContext()`가 이미 하는 방식 그대로 JSON 필드로 확장(`confidence`/`verdict`/`entryCondition`/`positionSizing`/`breakdown`/`trendContext`), "이 숫자만 인용 가능, 창작 금지" 규칙 부여 | LLM이 스코어링 함수를 함수 호출로 직접 트리거 — 텍스트completion 프롬프팅에서 tool-calling 아키텍처로 전환 |
+| 기존 코드 재사용 | 높음(계산 함수 그대로, 포매팅만 추가) | 매우 높음(기존 JSON 패턴 그대로 확장) | 낮음(호출 인터페이스 전체 재설계) |
+| 구현 난이도 | 낮음 | 낮음~중간 | 높음 |
+| 숫자 창작(hallucination) 방지력 | 약함 — 문장 재구성 과정에서 숫자가 틀리게 옮겨질 여지 | 강함 — 기존 ECHO Verdict Rule V2("인용만, 창작 금지")와 동일 패턴 재사용 | 최강이나 과설계 |
+| 회귀 위험 | 낮음 | 낮음(JSON 스키마에 필드만 추가, 파서 영향 없음) | 높음(Stage1/2/3 호출 방식 전체 변경) |
+| 비용/지연 영향 | 없음(로컬 계산) | 없음(로컬 계산) | LLM 왕복 추가 가능 |
+
+**마스터 결정: 방안 B(구조화 JSON + 인용 규칙)를 채택한다.** 이미
+`buildMarketDataPromptContext()`가 정확히 이 패턴으로 동작 중이므로 새 메커니즘을
+만드는 게 아니라 기존 필드 집합을 확장하는 작업이 된다.
+
+#### PR4-C.3 비용/지연시간 영향 추정
+
+- **LLM 콜 수 영향: 0.** 스코어링 전체가 로컬 순수 함수이므로 흡수해도 Stage1/2/3
+  호출 횟수는 변하지 않는다 — 5절 기준 현재(PR #259 이후) invest 카테고리
+  **7 call/turn**은 그대로 유지.
+- 시세(`fetchMarketPrice`)는 이미 LLM Runtime도 호출하므로 추가 호출 없음.
+  **뉴스(`fetchInvestmentNews`, 네이버 API)만 순수 추가분**이며, 병렬(`Promise.all`)
+  로 묶으면 전체 응답 지연에 실질적으로 추가되는 시간은 미미할 것으로 추정되나
+  정확한 ms 단위 수치는 실측 없이는 확정할 수 없다.
+- **마스터 결정: 1단계에서는 뉴스 감성 스코어링을 제외한다.** `calcScores`에
+  `newsCount:0, newsAvg:0`을 대입하는 축소판으로 시작 — 네이버 API 신규 의존성
+  없이(외부 호출 추가 0) confidence 상한만 소폭 낮아지는 트레이드오프를 받아들인다.
+  뉴스 감성 포함 여부는 1단계 검증 후 별도로 재검토한다.
+
+#### PR4-C.4 단계적 마이그레이션 순서 (마스터 결정 반영)
+
+**1단계 — 프로토타입 (종목 한정)**
+- **마스터 결정: 1단계 프로토타입은 `detectKnownAsset()`(market-data.ts:65)이
+  하드코딩 인식하는 삼성전자/SK하이닉스/비트코인 3종목으로 한정한다.**
+- Stage1/2 실행 직전에 `calcScores` 등 계산을 로컬 호출(뉴스 제외판)하고 결과를
+  `marketDataPromptContext`의 JSON에 `derived: {confidence, verdict,
+  entryCondition, positionSizing, breakdown}` 필드로 추가.
+- RAY 시스템 프롬프트에 "derived 필드가 있으면 그 confidence/verdict/entryCondition을
+  인용하되 새 숫자를 만들지 말 것" 규칙 추가(ECHO Rule V2 문구 패턴 재사용).
+- 이 단계에서는 `teaMode=false` 레거시 경로를 건드리지 않는다 — 두 경로 공존.
+
+**2단계 — 흡수 완료 확인 후 레거시 경로 차단/이관**
+- 1단계가 QA(아래 E)를 통과하면, `route.ts`의 `teaMode=false` finance 진입점
+  (1081행 이하)에서 `buildLegacyStockDetailResult` 호출 대신 LLM Runtime
+  (`buildFinanceMultiPersonaResponse`)으로 리다이렉트하거나, 과도기적으로
+  "곧 통합됩니다" 안내를 포함한 응답을 얹는 절충안 적용 가능.
+- **마스터 결정: raw API(`teaMode=false`) 차단 시점은 지금 확정하지 않는다.**
+  1단계 배포 후 실제 raw API 호출 트래픽 로그를 관측한 뒤 그 결과를 근거로
+  별도 결정한다(트래픽이 0에 가까우면 즉시 차단, 유의미하면 이관 유예 기간 설정).
+- 이 시점에도 코드 자체(`route-market.ts`, `templates.ts`)는 삭제하지 않고
+  호출부만 차단 — 롤백 여지를 남긴다.
+
+**3단계 — 완전 제거**
+- 2단계 이후 raw API 트래픽이 실제로 0에 수렴함을 로그로 확인한 뒤
+  `templates.ts`(`buildJackText`/`buildLuciaText`/`buildEchoText`/`buildFinalRay`),
+  `market-quick-handlers.ts`, `route-market.ts`의 `buildLegacyStockDetailResult`를
+  제거.
+- **단, `stock-response-builders.ts`의 `normalizeNoMarketDataInvestmentPersonaText()`는
+  제거 대상에서 제외** — `lib/personax/runtime/route-response-guard.ts:286`에서
+  현재 LLM Runtime의 live 응답 가드로 실사용 중임을 확인했다. 파일 자체를 삭제하지
+  않고 legacy 전용 함수(`buildFinalRay`, `buildJackDetail`, `buildLuciaDetail`,
+  `buildRayDetail`, `buildStockDetailResponse`)만 선택적으로 제거한다.
+
+#### PR4-C.5 리스크 및 되돌리기 계획
+
+QA로 감지할 실패 시나리오:
+1. `derived` 필드 주입 후 RAY가 confidence/entryCondition 숫자를 실제로
+   인용하는지, 아니면 여전히 무시하고 창작하는지(1단계 필수 확인 항목).
+2. entryCondition의 가격 조건(`rawHigh`/`rawLow` 기반)이 실제 응답에 정확히
+   반영되는지 — 반영 안 되면 방안 B의 "인용 강제" 실효성이 없다는 뜻이므로
+   방안 A/C 재검토.
+3. 뉴스 감성 생략판 confidence가 부자연스럽게 낮게 나오는지 체감 QA.
+
+되돌리기 어려운 지점: **2단계에서 raw API를 완전히 차단한 이후**가 유일한
+비가역 근접 지점 — 이 경로에 의존하는 외부 클라이언트가 있다면 그 시점부터
+되돌리기 어려워진다(그래서 차단 시점을 지금 확정하지 않고 트래픽 로그 관측 후
+결정하기로 함). 1단계(필드·규칙 추가)와 3단계(코드 삭제, git 히스토리로 복구
+가능)는 상대적으로 안전하다.
+
+#### PR4-C.6 남은 결정 사항
+
 - LUCIA가 emotional에서 CLOSER 후보가 될 수 있는지 여부 결정.
 - action/principle에서 ECHO를 order(디베이트 슬롯)에서 아예 제외할지 검토
   (현재는 생성 후 폐기되는 낭비 호출 — 5절 참고).
+- 뉴스 감성 스코어링을 향후 흡수 범위에 포함할지(1단계는 제외로 확정, 재검토는
+  1단계 검증 이후).
+- raw API(`teaMode=false`) 차단 구체 시점 — 트래픽 로그 관측 후 결정(보류).
+
 - **이 단계는 코드 변경 전 별도 승인이 필요한 제품/캐릭터 결정을 포함**하므로,
   PR4-A/B와 분리해 독립 PR로 진행한다.
 
