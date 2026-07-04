@@ -343,7 +343,11 @@ isEtf: ${asset.isEtf ? 'true' : 'false'}
 marketData:
 ${JSON.stringify(promptMarketData, null, 2)}
 
-RAY may use only numeric values present in this Market Data block. If marketData.derived exists, RAY may cite only these derived fields as provided: confidence, verdict, entryCondition, positionSizing, breakdown. RAY must not create any new number, price, ratio, condition, support, resistance, stop-loss, entry, buy, or sell value outside this block. Treat derived values as quote-only data, not permission to invent additional analysis.`;
+RAY may use only numeric values present in this Market Data block. If marketData.derived exists, RAY may cite only these derived fields as provided: confidence, verdict, entryCondition, positionSizing, breakdown. RAY must not create any new number, price, ratio, condition, support, resistance, stop-loss, entry, buy, or sell value outside this block. Treat derived values as quote-only data, not permission to invent additional analysis.
+Persona-specific derived rules:
+- JACK may use derived only as a decision discipline / action 기준. JACK must not list the derived numbers, prices, stop-loss lines, ratios, or sizing values.
+- LUCIA must not mention or repeat any concrete numbers, prices, stop-loss lines, ratios, or sizing values inside derived. LUCIA may only interpret the emotional pressure created by the existence of such 기준.
+- ECHO may use derived only as structural evidence. ECHO must not list numbers and must translate derived into pattern/principle language.`;
 }
 
 export async function buildMarketDataPromptContext(question: string): Promise<string> {
