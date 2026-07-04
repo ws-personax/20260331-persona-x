@@ -91,6 +91,63 @@ RAY 발화는 코드 공유가 전혀 없는 두 개의 독립 시스템에서 �
 연결돼 있음) 프론트가 보내는 값 하나(`teaMode`)에 의해 practically 비활성화된
 상태 — `route.ts:842` 주석도 이를 "사실상 deprecated"라고 직접 언급한다.
 
+**2026-07-04 추가 진단 결과**: RAY Legacy Template 경로는 단순 dead code로
+정리하면 안 된다. 도달 가능성은 세 단계로 나뉜다.
+
+1. **일반 UI 기준 dead**: `ChatWindow.tsx`가 `isTeaSend=true`를 하드코딩해
+   모든 `/api/chat` 요청에 `teaMode:true`를 보낸다. 이 때문에 일반 채팅 화면에서는
+   `route.ts`의 Option D / TikiTaka Runtime이 먼저 실행되고 Legacy Template 경로는
+   조기 return 뒤에 남는다.
+2. **raw API 기준 live**: `/api/chat`을 직접 호출하면서 `teaMode:false` 또는
+   `teaMode` 누락 상태로 finance/종목 질문을 보내면 `tryBuildMarketQuickResponse()`
+   또는 `buildLegacyStockDetailResult()`까지 내려갈 수 있다. 따라서 코드 그래프상
+   완전히 끊긴 dead path는 아니다.
+3. **Legacy 내부 기능 기준 손실 위험**: Legacy에는 LLM Runtime에 그대로 흡수되지
+   않은 deterministic 기능이 남아 있다. 즉시 삭제하면 사용자 UI에서는 티가 덜 나도
+   raw API, 구버전 클라이언트, 테스트 경로에서 기능이 조용히 사라질 수 있다.
+
+Legacy 관련 코드의 현재 목록과 규모는 다음과 같다.
+
+- `app/api/chat/route.ts`: legacy 진입/import 및 호출부
+  (`tryBuildMarketQuickResponse`, `buildLegacyStockDetailResult`) 약 150줄 영향.
+- `lib/personax/runtime/route-market.ts`: `buildLegacyStockDetailResult()` 중심
+  약 591줄.
+- `lib/personax/stock-response-builders.ts`: `buildFinalRay()`,
+  `buildRayDetail()`, `buildStockDetailResponse()` 등 약 453줄. 단,
+  `normalizeNoMarketDataInvestmentPersonaText()`는 현재
+  `runtime/route-response-guard.ts`에서 live 사용 중이므로 파일 전체 삭제 대상이
+  아니다.
+- `lib/personax/templates.ts`: `buildJackText()`, `buildLuciaText()`,
+  `buildEchoText()` 및 투자 template helper 약 1193줄.
+- `lib/personax/market-quick-handlers.ts`: 특수 투자 질문 quick response 약 516줄.
+
+합산하면 삭제 후보는 약 2500줄 규모지만, live helper와 import 의존성이 섞여 있어
+단순 파일 삭제로 처리할 수 없다.
+
+⑨⑩ dead path와 원인은 같다. 둘 다 `isTeaSend=true` 하드코딩과
+`isExplicitPersonaPick=false` 고정 때문에 일반 프론트 경로에서 막힌다. 다만 결과는
+다르다. ⑨⑩은 프론트 기준 완전 차단에 가깝지만, RAY Legacy Template은 raw API로는
+아직 도달 가능하다.
+
+PR #251이 고친 것은 `lib/personax/market-data.ts`의 LLM Runtime용
+`detectMarketAsset()` / `buildMarketDataPromptContext()` 경로다. Legacy Template이
+사용하는 `lib/personax/market.ts`의 `STOCK_MAP`, `extractKeyword()`,
+`fetchMarketPrice(keyword)` 체계와는 별개이며 PR #251의 수정이 Legacy stock detail
+경로를 직접 개선하지는 않았다.
+
+Legacy에만 남아 있는 기능은 다음과 같다.
+
+- `calcScores()` 기반 deterministic `verdict`, `confidence`, `breakdown`.
+- `positionSizing`, `entryCondition`.
+- 시장 세션 라벨: 장마감, 주말, 한국장/미국장 상태.
+- ETF/지수 전용 처리.
+- 이전 종목과 현재 종목의 섹터 비교.
+- `market-quick-handlers.ts`의 특수 질문 핸들러: 추천, 외국인 수급, 섹터 타이밍,
+  손절선 안내, 장 초반 거래량, 다음 날 전략 등.
+
+따라서 PR4-C는 "Legacy 삭제"가 아니라 "Legacy deterministic 기능을 버릴지,
+LLM Runtime으로 흡수한 뒤 폐기할지"를 결정하는 작업으로 재정의해야 한다.
+
 ### 1.4 Dead path / 삭제된 기능 잔여 코드
 
 기존 확인분(⑨⑩) + `runtime-bottleneck-map.md` G절 + 이번에 새로 확정한 항목:
@@ -175,6 +232,10 @@ PR4는 Persona Runtime을 통합하는 작업이다.
   다룬다.
 - **Decision OS 기능 추가 금지** — Review, Memory, Timeline, Analytics 등은
   이번 범위가 아니다.
+- **주의: RAY Legacy Runtime 흡수/폐기는 Non-goal이 아니다.** 이번 진단으로
+  PR4-C의 정식 결정 범위에 편입됐으므로 Scope Guard 대상이 아니다. 다만
+  PR4-A/B에서 조기 삭제하거나 임의로 Runtime을 합치는 것은 금지하고, PR4-C에서
+  별도 판단 후 진행한다.
 
 ### 3.2 Scope Guard
 
@@ -208,9 +269,22 @@ PR4 작업 중 위 항목을 반드시 수정해야 하는 의존성이 발견�
 - **범위 제한**: 카테고리별 슬롯 배정(order/closerPersona 계산)은 건드리지
   않는다 — 순수하게 "그 슬롯에 누가 오든 지켜야 할 규칙 텍스트"만 추가/정리.
 
-### PR4-C — 구조 결정 (Decision, 리스크 높음·제품 판단 필요)
-- RAY 이중 체계 최종 처리: (a) Legacy Template을 teaMode=false 전용 안전망으로
-  명시적으로 남기고 문서화할지, (b) 완전 삭제하고 LLM Runtime 단일화할지 결정.
+### PR4-C — RAY Runtime 통합 및 Legacy Finance Runtime 폐기/흡수 결정 (Decision, 리스크 높음·제품 판단 필요)
+- 핵심 결정: Legacy deterministic scoring 기능을 버릴 것인가, LLM Runtime 안으로
+  흡수한 뒤 Legacy를 폐기할 것인가.
+- 결정 대상 기능: `confidence`, `breakdown`, `entryCondition`, `positionSizing`,
+  ETF/지수 처리, 종목/섹터 비교, 장마감/주말 시장 세션 라벨,
+  `market-quick-handlers.ts` 특수 질문 핸들러.
+- 마스터 방향성: **즉시 삭제보다 흡수 후 폐기를 우선 검토한다.** 단, 이는 아직
+  확정된 제품 결정이 아니라 PR4-C에서 검증해야 할 방향성 제안이다.
+- 흡수 후 폐기 시 예상 작업 순서:
+  1. Legacy deterministic scoring 결과를 LLM Runtime의 RAY 프롬프트 또는
+     Stage data context에 참고 데이터로 주입하는 방식 검토.
+  2. 흡수 완료 확인 후 `route.ts`의 `teaMode=false` finance legacy 경로를
+     명시적으로 차단하거나 LLM Runtime으로 이관.
+  3. `templates.ts`, `market-quick-handlers.ts`, legacy builder를 단계적으로 제거.
+     단, `stock-response-builders.ts`의 live 함수
+     `normalizeNoMarketDataInvestmentPersonaText()`는 제거 대상에서 제외.
 - LUCIA가 emotional에서 CLOSER 후보가 될 수 있는지 여부 결정.
 - action/principle에서 ECHO를 order(디베이트 슬롯)에서 아예 제외할지 검토
   (현재는 생성 후 폐기되는 낭비 호출 — 5절 참고).
