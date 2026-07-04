@@ -70,6 +70,8 @@ export interface DerivedMarketScoring {
   breakdown: string;
 }
 
+export type MarketDataPersonaKey = 'ray' | 'jack' | 'lucia' | 'echo';
+
 type MarketDataAdapter = (asset: DetectedMarketAsset) => Promise<PersonaXMarketData | null>;
 
 const INVESTMENT_ASSET_PATTERN =
@@ -348,6 +350,98 @@ Persona-specific derived rules:
 - JACK may use derived only as a decision discipline / action 기준. JACK must not list the derived numbers, prices, stop-loss lines, ratios, or sizing values.
 - LUCIA must not mention or repeat any concrete numbers, prices, stop-loss lines, ratios, or sizing values inside derived. LUCIA may only interpret the emotional pressure created by the existence of such 기준.
 - ECHO may use derived only as structural evidence. ECHO must not list numbers and must translate derived into pattern/principle language.`;
+}
+
+const MARKET_DATA_JSON_MARKER = 'marketData:\n';
+const DERIVED_OMITTED_RULES: Record<Exclude<MarketDataPersonaKey, 'ray'>, string> = {
+  jack: `JACK marketData scope:
+- Base marketData remains available: price, high, low, volume, source, and related raw market fields.
+- Derived scoring fields are intentionally omitted for JACK: confidence, verdict, entryCondition, positionSizing, breakdown.
+- Do not infer or recreate omitted derived values, stop lines, sizing, or calculated entry/exit conditions.
+- Use base marketData only as market context and translate decisions into 책임, 기준, and 대가 language.`,
+  lucia: `LUCIA marketData scope:
+- Base marketData remains available for context, but LUCIA should avoid directly repeating market numbers.
+- Derived scoring fields are intentionally omitted for LUCIA: confidence, verdict, entryCondition, positionSizing, breakdown.
+- Do not infer or recreate omitted derived values, stop lines, sizing, or calculated entry/exit conditions.
+- Interpret the emotional pressure of market movement without listing numeric trading criteria.`,
+  echo: `ECHO marketData scope:
+- Base marketData remains available: price, high, low, volume, source, and related raw market fields.
+- Derived scoring fields are intentionally omitted for ECHO: confidence, verdict, entryCondition, positionSizing, breakdown.
+- Do not infer or recreate omitted derived values, stop lines, sizing, or calculated entry/exit conditions.
+- Translate market context into pattern/principle language without listing trading calculations.`,
+};
+
+const findJsonObjectEnd = (text: string, startIndex: number): number => {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = startIndex; i < text.length; i += 1) {
+    const char = text[i];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) continue;
+
+    if (char === '{') {
+      depth += 1;
+    } else if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return i + 1;
+      }
+    }
+  }
+
+  return -1;
+};
+
+export function buildMarketDataPromptContextForPersona(
+  marketDataPromptContext: string,
+  persona: MarketDataPersonaKey,
+): string {
+  if (!marketDataPromptContext || persona === 'ray') {
+    return marketDataPromptContext;
+  }
+
+  const markerIndex = marketDataPromptContext.indexOf(MARKET_DATA_JSON_MARKER);
+  if (markerIndex < 0) {
+    return marketDataPromptContext;
+  }
+
+  const jsonStart = marketDataPromptContext.indexOf('{', markerIndex + MARKET_DATA_JSON_MARKER.length);
+  if (jsonStart < 0) {
+    return marketDataPromptContext;
+  }
+
+  const jsonEnd = findJsonObjectEnd(marketDataPromptContext, jsonStart);
+  if (jsonEnd < 0) {
+    return marketDataPromptContext;
+  }
+
+  try {
+    const parsed = JSON.parse(marketDataPromptContext.slice(jsonStart, jsonEnd)) as Record<string, unknown>;
+    delete parsed.derived;
+
+    return `${marketDataPromptContext.slice(0, jsonStart)}${JSON.stringify(parsed, null, 2)}
+
+${DERIVED_OMITTED_RULES[persona]}`;
+  } catch {
+    return marketDataPromptContext;
+  }
 }
 
 export async function buildMarketDataPromptContext(question: string): Promise<string> {

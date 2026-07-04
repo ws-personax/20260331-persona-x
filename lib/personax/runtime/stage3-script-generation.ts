@@ -27,6 +27,10 @@ import {
   ECHO_VERDICT_MIN_STRUCTURE_RULE,
   ECHO_VERDICT_TURNING_POINT_RULE,
 } from '@/lib/personax/prompts/rules';
+import {
+  buildMarketDataPromptContextForPersona,
+  type MarketDataPersonaKey,
+} from '@/lib/personax/market-data';
 import { extractKeySentence } from '@/lib/personax/quote-engine';
 import { STRUCTURAL_LABEL_LINE_RE, extractTag } from '@/lib/personax/runtime/stage1-data-collection';
 import type {
@@ -439,10 +443,10 @@ export async function runSoloScriptGeneration(params: {
   //   TEA_SYSTEM_* 는 각 페르소나의 어조/말투/위계/금지 표현 등 정체성 핵심.
   //   OPTION_D_SYSTEM의 "태그 블록만 출력" 지시와 결합해 [FIRST] 태그 + 페르소나 톤 둘 다 강제.
   const personaSystem: Record<AllPersonaKey, string> = {
-    jack: TEA_SYSTEM_JACK,
-    lucia: TEA_SYSTEM_LUCIA,
+    jack: marketDataPromptContext ? `${TEA_SYSTEM_JACK}\n\n${buildMarketDataPromptContextForPersona(marketDataPromptContext, 'jack')}` : TEA_SYSTEM_JACK,
+    lucia: marketDataPromptContext ? `${TEA_SYSTEM_LUCIA}\n\n${buildMarketDataPromptContextForPersona(marketDataPromptContext, 'lucia')}` : TEA_SYSTEM_LUCIA,
     ray: marketDataPromptContext ? `${TEA_SYSTEM_RAY}\n\n${marketDataPromptContext}` : TEA_SYSTEM_RAY,
-    echo: TEA_SYSTEM_ECHO,
+    echo: marketDataPromptContext ? `${TEA_SYSTEM_ECHO}\n\n${buildMarketDataPromptContextForPersona(marketDataPromptContext, 'echo')}` : TEA_SYSTEM_ECHO,
   };
   const soloSystem = `${personaSystem[effectiveSoloPersona]}\n\n---\n\n${OPTION_D_SYSTEM}`;
   // 의견/주제 질문 패턴 감지 — JACK 안부 섹션을 프롬프트에서 제외할지 결정.
@@ -735,12 +739,16 @@ export async function runStage3ScriptGeneration(params: {
   const dataContext = dataPack
     ? `\n\n## 실시간 수집 데이터 (반박 시 이 숫자 사용 필수)\n${dataPack}\n\n⛔ 위 실시간 데이터의 숫자를 반박 시 반드시 인용할 것. 데이터에 없는 숫자를 만들어내지 말 것.\n\n`
     : '';
+  const buildMarketDataContextForSlot = (persona: AllPersonaKey): string => {
+    const scoped = buildMarketDataPromptContextForPersona(
+      marketDataPromptContext,
+      persona as MarketDataPersonaKey,
+    );
+    return scoped ? `\n\n${scoped}\n\n` : '';
+  };
   // CLOSER=JACK일 때 ~요 종결 위반이 stage3-guard에 반복 적발 → 재호출 비용 발생.
   // OPTION_D_SYSTEM·buildScriptPrompt의 JACK 톤 규칙이 있음에도 GPT-4.1-mini가 어김 →
   // 프롬프트 말미(recency bias 작용 지점)에 CLOSER 슬롯 한정 마동석 톤 Few-shot + ~요 금지 재명시.
-  const marketDataContext = marketDataPromptContext
-    ? `\n\n${marketDataPromptContext}\n\n`
-    : '';
   const closerJackRule = router.closerPersona === 'jack'
     ? `\n\n🚨 [CLOSER] JACK 말투 절대 규칙 (위반 시 답변 무효 — 다른 모든 규칙보다 우선):
 - [CLOSER] 블록은 JACK이 담당. JACK은 ~요 / ~습니다 / ~입니다로 끝나는 문장 절대 금지.
@@ -762,7 +770,7 @@ export async function runStage3ScriptGeneration(params: {
   const emotionalBanLine = router.firstPersona !== 'lucia'
     ? `\n⛔ [FIRST]가 ${firstKey2}이므로 감정 공감 오프닝("마음이", "덜컥", "걱정되셨겠다") 금지.`
     : '';
-  const scriptPrompt = `${marketDataContext}${dataContext}${buildScriptPrompt(
+  const buildBaseScriptPromptForSlot = (persona: AllPersonaKey): string => `${buildMarketDataContextForSlot(persona)}${dataContext}${buildScriptPrompt(
     messages,
     personaViews,
     legacyCategory,
@@ -788,45 +796,57 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${personaRoleRules}${clo
     question: lastMessage,
     topic: router.categoryV3 ?? legacyCategory,
   });
-  const firstPrompt = buildTikiTakaBlockPrompt(scriptPrompt, 'FIRST', firstKey2, []);
+  const firstPrompt = buildTikiTakaBlockPrompt(buildBaseScriptPromptForSlot(firstKey2.toLowerCase() as AllPersonaKey), 'FIRST', firstKey2, []);
   const firstRawBlock = await callStage3(stage3System, firstPrompt);
-  const firstTikiTakaRaw = extractTag(firstRawBlock, 'FIRST') || '';
+  let firstTikiTakaRaw = extractTag(firstRawBlock, 'FIRST') || '';
+  if (!firstTikiTakaRaw.trim()) {
+    firstTikiTakaRaw = extractTag(await callStage3(stage3System, firstPrompt), 'FIRST') || '';
+  }
   conversationState = recordMessage(
     recordSpeaker(conversationState, firstKey2),
     firstKey2,
     firstTikiTakaRaw,
   );
 
-  const secondPrompt = buildTikiTakaBlockPrompt(scriptPrompt, 'SECOND', secondKey2, [
+  const secondPrompt = buildTikiTakaBlockPrompt(buildBaseScriptPromptForSlot(secondKey2.toLowerCase() as AllPersonaKey), 'SECOND', secondKey2, [
     { name: firstKey2, text: firstTikiTakaRaw },
   ]);
   const secondRawBlock = await callStage3(stage3System, secondPrompt);
-  const secondTikiTakaRaw = extractTag(secondRawBlock, 'SECOND') || '';
+  let secondTikiTakaRaw = extractTag(secondRawBlock, 'SECOND') || '';
+  if (!secondTikiTakaRaw.trim()) {
+    secondTikiTakaRaw = extractTag(await callStage3(stage3System, secondPrompt), 'SECOND') || '';
+  }
   conversationState = recordMessage(
     recordSpeaker(conversationState, secondKey2),
     secondKey2,
     secondTikiTakaRaw,
   );
 
-  const thirdPrompt = buildTikiTakaBlockPrompt(scriptPrompt, 'THIRD', thirdKey2, [
+  const thirdPrompt = buildTikiTakaBlockPrompt(buildBaseScriptPromptForSlot(thirdKey2.toLowerCase() as AllPersonaKey), 'THIRD', thirdKey2, [
     { name: firstKey2, text: firstTikiTakaRaw },
     { name: secondKey2, text: secondTikiTakaRaw },
   ]);
   const thirdRawBlock = await callStage3(stage3System, thirdPrompt);
-  const thirdTikiTakaRaw = extractTag(thirdRawBlock, 'THIRD') || '';
+  let thirdTikiTakaRaw = extractTag(thirdRawBlock, 'THIRD') || '';
+  if (!thirdTikiTakaRaw.trim()) {
+    thirdTikiTakaRaw = extractTag(await callStage3(stage3System, thirdPrompt), 'THIRD') || '';
+  }
   conversationState = recordMessage(
     recordSpeaker(conversationState, thirdKey2),
     thirdKey2,
     thirdTikiTakaRaw,
   );
 
-  const closerPrompt = buildTikiTakaBlockPrompt(scriptPrompt, 'CLOSER', closerKey2, [
+  const closerPrompt = buildTikiTakaBlockPrompt(buildBaseScriptPromptForSlot(closerKey2.toLowerCase() as AllPersonaKey), 'CLOSER', closerKey2, [
     { name: firstKey2, text: firstTikiTakaRaw },
     { name: secondKey2, text: secondTikiTakaRaw },
     { name: thirdKey2, text: thirdTikiTakaRaw },
   ]);
   const closerRawBlock = await callStage3(stage3System, closerPrompt);
-  const closerTikiTakaRaw = extractTag(closerRawBlock, 'CLOSER') || '';
+  let closerTikiTakaRaw = extractTag(closerRawBlock, 'CLOSER') || '';
+  if (!closerTikiTakaRaw.trim()) {
+    closerTikiTakaRaw = extractTag(await callStage3(stage3System, closerPrompt), 'CLOSER') || '';
+  }
   conversationState = recordMessage(
     recordSpeaker(conversationState, closerKey2),
     closerKey2,
@@ -835,7 +855,7 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${personaRoleRules}${clo
 
   let luciaCloseRawBlock = '';
   if (router.categoryV3 === 'emotional') {
-    const luciaClosePrompt = buildTikiTakaBlockPrompt(scriptPrompt, 'LUCIA_CLOSE', 'LUCIA', [
+    const luciaClosePrompt = buildTikiTakaBlockPrompt(buildBaseScriptPromptForSlot('lucia'), 'LUCIA_CLOSE', 'LUCIA', [
       { name: firstKey2, text: firstTikiTakaRaw },
       { name: secondKey2, text: secondTikiTakaRaw },
       { name: thirdKey2, text: thirdTikiTakaRaw },
@@ -858,14 +878,7 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${personaRoleRules}${clo
     luciaCloseRawBlock ? `[LUCIA_CLOSE]\n${extractTag(luciaCloseRawBlock, 'LUCIA_CLOSE') || ''}` : '',
   ].filter(Boolean).join('\n\n');
 
-  const hasTikiTakaCoreBlocks =
-    firstTikiTakaRaw.trim() &&
-    secondTikiTakaRaw.trim() &&
-    thirdTikiTakaRaw.trim() &&
-    closerTikiTakaRaw.trim();
-  const scriptRaw = hasTikiTakaCoreBlocks
-    ? scriptRawFromTikiTaka
-    : await callStage3(stage3System, scriptPrompt);
+  const scriptRaw = scriptRawFromTikiTaka;
   console.log('[stage3-raw]', {
     length: scriptRaw.length,
     hasFirst: scriptRaw.includes('[FIRST]'),
@@ -910,11 +923,11 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${personaRoleRules}${clo
     const closerRaw = extractTag(scriptRaw, 'CLOSER') || '';
     const orderUpper = router.order.map((k) => k.toUpperCase());
     const closerLabel = (router.closerPersona || 'jack').toUpperCase();
-    const echoMarketDataContext = marketDataContext
-      ? `${marketDataContext}
+    const echoMarketDataContext = buildMarketDataContextForSlot('echo')
+      ? `${buildMarketDataContextForSlot('echo')}
 ECHO 전용 derived 사용 규칙:
-- marketData.derived가 있어도 숫자·가격·손절선·비중을 나열하지 말 것.
-- confidence, entryCondition, positionSizing, breakdown은 구조 분석의 근거로만 보고 패턴/원칙 문장으로 변환할 것.
+- ECHO에게는 marketData.derived 계산값을 제공하지 않는다.
+- confidence, entryCondition, positionSizing, breakdown을 추론하거나 복원하지 말 것.
 - 새 숫자·새 조건 창작 금지.`
       : '';
     const retryPrompt = `[1] ${orderUpper[0] || 'RAY'}: ${firstRaw}
