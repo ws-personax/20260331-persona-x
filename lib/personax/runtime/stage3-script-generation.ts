@@ -736,9 +736,17 @@ export async function runStage3ScriptGeneration(params: {
     router,
   } = params;
 
-  const dataContext = dataPack
-    ? `\n\n## 실시간 수집 데이터 (반박 시 이 숫자 사용 필수)\n${dataPack}\n\n⛔ 위 실시간 데이터의 숫자를 반박 시 반드시 인용할 것. 데이터에 없는 숫자를 만들어내지 말 것.\n\n`
-    : '';
+  // ✅ LUCIA는 Stage1 dataPack(원본 시장 숫자 + "반박 시 인용 필수" 지시)을 보지 않는다.
+  //   LUCIA는 buildMarketDataContextForSlot()이 제공하는 emotionalMarketSignals(PR #270)만
+  //   본다 — dataContext는 RAY/JACK/ECHO의 반박용 채널이므로 LUCIA 슬롯(LUCIA_CLOSE 포함)에는
+  //   아예 삽입하지 않는다. LUCIA_CLOSE도 buildBaseScriptPromptForSlot('lucia')를 그대로 쓰므로
+  //   여기서 함께 제외된다.
+  const buildDataContextForSlot = (persona: AllPersonaKey): string => {
+    if (persona === 'lucia') return '';
+    return dataPack
+      ? `\n\n## 실시간 수집 데이터 (반박 시 이 숫자 사용 필수)\n${dataPack}\n\n⛔ 위 실시간 데이터의 숫자를 반박 시 반드시 인용할 것. 데이터에 없는 숫자를 만들어내지 말 것.\n\n`
+      : '';
+  };
   const buildMarketDataContextForSlot = (persona: AllPersonaKey): string => {
     const scoped = buildMarketDataPromptContextForPersona(
       marketDataPromptContext,
@@ -770,7 +778,7 @@ export async function runStage3ScriptGeneration(params: {
   const emotionalBanLine = router.firstPersona !== 'lucia'
     ? `\n⛔ [FIRST]가 ${firstKey2}이므로 감정 공감 오프닝("마음이", "덜컥", "걱정되셨겠다") 금지.`
     : '';
-  const buildBaseScriptPromptForSlot = (persona: AllPersonaKey): string => `${buildMarketDataContextForSlot(persona)}${dataContext}${buildScriptPrompt(
+  const buildBaseScriptPromptForSlot = (persona: AllPersonaKey): string => `${buildMarketDataContextForSlot(persona)}${buildDataContextForSlot(persona)}${buildScriptPrompt(
     messages,
     personaViews,
     legacyCategory,
