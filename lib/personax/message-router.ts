@@ -424,12 +424,20 @@ export async function runRoutedRequest(
     memoryContext?: string;
   },
 ): Promise<RoutedRequestResult | null> {
+  // ✅ 관측성 전용 — 예외 발생 시 catch 블록에서 "어느 Stage까지 완료됐는지" 보고하기 위한
+  //   기록용 변수. 로직/제어 흐름에는 관여하지 않음(읽기 전용 로그 컨텍스트).
+  let _lastCompletedStage:
+    | 'entry' | 'router-resolved' | 'solo' | 'stage1' | 'stage2' | 'stage3'
+    = 'entry';
+  let _categoryV3ForLog: string | undefined;
   try {
     const messages = params.messages;
     const lastMessage = params.lastMessage;
     const router =
       params.router ||
       routeMessage(messages, lastMessage, '');
+    _categoryV3ForLog = router.categoryV3;
+    _lastCompletedStage = 'router-resolved';
     const legacyCategory = router.legacyCategory || '';
     const marketDataPromptContext = await resolveMarketDataPromptContext(
       lastMessage,
@@ -471,6 +479,7 @@ export async function runRoutedRequest(
         decisionType,
         marketDataPromptContext,
       });
+      _lastCompletedStage = 'solo';
       return {
         first: '',
         second: '',
@@ -488,6 +497,7 @@ export async function runRoutedRequest(
     if (params.precomputedStages) {
       dataPack = params.precomputedStages.dataPack;
       personaViews = params.precomputedStages.personaViews;
+      _lastCompletedStage = 'stage2';
     } else {
       dataPack = await collectStageOneData({
         callLLM,
@@ -496,6 +506,7 @@ export async function runRoutedRequest(
         lastMessage,
         categoryV3: router.categoryV3,
       });
+      _lastCompletedStage = 'stage1';
       personaViews = await analyzePersonaViews({
         callLLM,
         messages,
@@ -506,6 +517,7 @@ export async function runRoutedRequest(
         marketDataPromptContext,
         memoryContext,
       });
+      _lastCompletedStage = 'stage2';
     }
 
     // Stage 3 — 일반 (4명 대본, TikiTaka 순차 호출)
@@ -519,6 +531,7 @@ export async function runRoutedRequest(
       marketDataPromptContext,
       router,
     });
+    _lastCompletedStage = 'stage3';
     const {
       first,
       second,
@@ -577,7 +590,17 @@ export async function runRoutedRequest(
       _stage12Cache: { dataPack, personaViews },
     };
   } catch (e) {
-    console.warn('[runRoutedRequest] 실행 실패', e);
+    console.warn(
+      '[runRoutedRequest] 실행 실패',
+      JSON.stringify({
+        lastCompletedStage: _lastCompletedStage,
+        failedAt: _lastCompletedStage === 'stage3'
+          ? 'post-stage3(decision-summary/return 구간)'
+          : `${_lastCompletedStage} 다음 단계`,
+        categoryV3: _categoryV3ForLog,
+      }),
+      e,
+    );
     return null;
   }
 }
