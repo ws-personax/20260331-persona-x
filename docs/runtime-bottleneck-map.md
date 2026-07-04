@@ -277,3 +277,7 @@ PR2에서 나온 항목 + route.ts에서 새로 나온 항목을 합친 목록.
 
 4. **invest 안전망 비대칭** (G-1/M-4): r1(1라운드)에는 `applyInvestVocabSafetyNet`이 있지만 r2(2라운드, ECHO_QUESTION 후속 답변)에는 동일 로직이 없어, 2라운드 응답에서는 '손절선'/'지지선' 누락 시에도 보강되지 않을 수 있음.
 5. **Save 전략 불일치** (K/M-6): 동일한 "저장 실패가 응답에 영향 없어야 한다"는 목표를 tea_logs(await+try/catch)/saveTeaConversation(void fire-and-forget)/saveHistory(await+5초 timeout) 세 가지 다른 방식으로 구현 — Vercel 서버리스 환경에서 `saveTeaConversation`만 fire-and-forget인 것이 의도적인지 누락인지 불명확.
+
+## O. TODO — PR3.5-D 후속 후보
+
+1. **principle/knowledge 결론 문구 중복**: PR4-A 배포 후 QA에서 "행복의 기준은 무엇인가요"와 "성공하려면 어떤 원칙을 가져야 할까요"의 Decision Summary 헤드라인이 모두 "이 질문은 하나의 정의가 아니라 어떤 관점에서 삶을 해석할지의 문제입니다"로 동일하게 출력됨. 추정 원인은 `lib/personax/decision-summary.ts`의 `philosophy_definition` / `principle` 계열 템플릿 재사용 또는 분기 부족. PR4 Non-goals가 `decision-summary.ts` 재설계 금지이므로 이번 단계에서는 수정하지 않고, PR3.5-D 후속 후보로 별도 추적한다.
