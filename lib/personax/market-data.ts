@@ -1,5 +1,14 @@
 import { CRYPTO_MAP, STOCK_MAP, fetchMarketPrice } from './market';
 import type { MarketData } from './types';
+import type { AssetType } from './types';
+import {
+  buildEntryCondition,
+  calcScores,
+  getPositionSizing,
+  getPricePos,
+  getVolatility,
+  getVolumeInfo,
+} from './scoring';
 
 export type PersonaXAssetType =
   | 'korean_stock'
@@ -53,6 +62,14 @@ export interface PersonaXMarketData {
   };
 }
 
+export interface DerivedMarketScoring {
+  confidence: number;
+  verdict: string;
+  entryCondition: string;
+  positionSizing: string;
+  breakdown: string;
+}
+
 type MarketDataAdapter = (asset: DetectedMarketAsset) => Promise<PersonaXMarketData | null>;
 
 const INVESTMENT_ASSET_PATTERN =
@@ -100,6 +117,53 @@ const detectKnownAsset = (question: string): DetectedMarketAsset | null => {
   }
 
   return null;
+};
+
+const DERIVED_SCORING_SYMBOLS = new Set(['005930.KS', '005930', '000660.KS', '000660', 'KRW-BTC', 'BTC']);
+
+const supportsDerivedScoring = (asset: DetectedMarketAsset): boolean =>
+  DERIVED_SCORING_SYMBOLS.has(asset.symbol ?? '') ||
+  DERIVED_SCORING_SYMBOLS.has(asset.alternateSymbol ?? '') ||
+  ['삼성전자', 'SK하이닉스', 'BTC'].includes(asset.lookupKey);
+
+const toScoringAssetType = (asset: DetectedMarketAsset): AssetType =>
+  asset.assetType === 'crypto'
+    ? 'CRYPTO'
+    : asset.assetType === 'korean_stock'
+      ? 'KOREAN_STOCK'
+      : 'US_STOCK';
+
+export const buildDerivedMarketScoring = (
+  asset: DetectedMarketAsset,
+  data: MarketData,
+): DerivedMarketScoring | null => {
+  if (!supportsDerivedScoring(asset)) return null;
+
+  const assetType = toScoringAssetType(asset);
+  const volume = getVolumeInfo(data.rawVolume || 0, data.avgVolume || 0, assetType);
+  const volatility = getVolatility(data.rawPrice || 0, data.rawHigh || 0, data.rawLow || 0, assetType);
+  const pricePosition = getPricePos(data.rawPrice || 0, data.rawHigh || 0, data.rawLow || 0);
+  const { total, verdict, confidence, breakdown } = calcScores({
+    volScore: volume.score,
+    change: data.change || '0',
+    newsAvg: 0,
+    posScore: pricePosition.score,
+    vitScore: volatility.score,
+    hasData: true,
+    newsCount: 0,
+    volLabel: volume.label,
+    posLabel: pricePosition.label,
+    vixLabel: volatility.label,
+    newsSentiment: '중립',
+  });
+
+  return {
+    confidence,
+    verdict,
+    entryCondition: buildEntryCondition(data, pricePosition.ratio, volume.isHigh, verdict, asset.lookupKey),
+    positionSizing: getPositionSizing(verdict, total),
+    breakdown,
+  };
 };
 
 const findMappedAsset = (question: string): DetectedMarketAsset | null => {
@@ -237,30 +301,9 @@ export async function fetchPersonaXMarketData(
   return MARKET_DATA_ADAPTERS[asset.assetType](asset);
 }
 
-export async function buildMarketDataPromptContext(question: string): Promise<string> {
-  const asset = detectMarketAsset(question);
-  if (!asset) return '';
-  if (asset.assetType === 'real_estate') return '';
-
-  const marketData = await fetchPersonaXMarketData(asset);
-
-  if (!marketData) {
-    return `## Market Data
-assetType: ${asset.assetType}
-detectedAsset: ${asset.name}
-query: ${asset.query}
-lookupKey: ${asset.lookupKey}
-symbol: ${asset.symbol ?? 'unknown'}
-alternateSymbol: ${asset.alternateSymbol ?? 'none'}
-isEtf: ${asset.isEtf ? 'true' : 'false'}
-marketData: null
-
-확인 가능한 데이터가 필요합니다.
-RAY must not create or infer any price, PER, PBR, volume, market cap, 52-week high/low, return rate, support, resistance, stop-loss, entry, buy, or sell numbers.
-RAY must say: "확인 가능한 데이터가 필요합니다. 확인된 marketData 없이는 숫자 분석을 하지 않겠습니다. 판단 기준은 실적, 업황, 투자 기간, 감당 가능한 손실 범위입니다."`;
-  }
-
-  const promptMarketData: Record<string, string | number> = {
+export function buildMarketDataPromptContextFromData(marketData: PersonaXMarketData): string {
+  const { asset } = marketData;
+  const promptMarketData: Record<string, unknown> = {
     price: marketData.data.price,
     currency: marketData.data.currency,
     source: marketData.data.source,
@@ -285,6 +328,11 @@ RAY must say: "확인 가능한 데이터가 필요합니다. 확인된 marketDa
   addIfPresent('avgVolume', marketData.data.avgVolume);
   addIfPresent('volume', marketData.data.volume);
 
+  const derived = buildDerivedMarketScoring(asset, marketData.data);
+  if (derived) {
+    promptMarketData.derived = derived;
+  }
+
   return `## Market Data
 assetType: ${asset.assetType}
 detectedAsset: ${asset.name}
@@ -295,5 +343,31 @@ isEtf: ${asset.isEtf ? 'true' : 'false'}
 marketData:
 ${JSON.stringify(promptMarketData, null, 2)}
 
-RAY may use only numeric values present in this Market Data block. LLM memory, estimates, or old numbers are forbidden.`;
+RAY may use only numeric values present in this Market Data block. If marketData.derived exists, RAY may cite only these derived fields as provided: confidence, verdict, entryCondition, positionSizing, breakdown. RAY must not create any new number, price, ratio, condition, support, resistance, stop-loss, entry, buy, or sell value outside this block. Treat derived values as quote-only data, not permission to invent additional analysis.`;
+}
+
+export async function buildMarketDataPromptContext(question: string): Promise<string> {
+  const asset = detectMarketAsset(question);
+  if (!asset) return '';
+  if (asset.assetType === 'real_estate') return '';
+
+  const marketData = await fetchPersonaXMarketData(asset);
+
+  if (!marketData) {
+    return `## Market Data
+assetType: ${asset.assetType}
+detectedAsset: ${asset.name}
+query: ${asset.query}
+lookupKey: ${asset.lookupKey}
+symbol: ${asset.symbol ?? 'unknown'}
+alternateSymbol: ${asset.alternateSymbol ?? 'none'}
+isEtf: ${asset.isEtf ? 'true' : 'false'}
+marketData: null
+
+확인 가능한 데이터가 필요합니다.
+RAY must not create or infer any price, PER, PBR, volume, market cap, 52-week high/low, return rate, support, resistance, stop-loss, entry, buy, or sell numbers.
+RAY must say: "확인 가능한 데이터가 필요합니다. 확인된 marketData 없이는 숫자 분석을 하지 않겠습니다. 판단 기준은 실적, 업황, 투자 기간, 감당 가능한 손실 범위입니다."`;
+  }
+
+  return buildMarketDataPromptContextFromData(marketData);
 }
