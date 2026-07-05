@@ -26,7 +26,6 @@ import {
   buildPersonaRoleRulesSection,
   ECHO_VERDICT_MIN_STRUCTURE_RULE,
   ECHO_VERDICT_TURNING_POINT_RULE,
-  PERSONA_RULE,
 } from '@/lib/personax/prompts/rules';
 import {
   buildMarketDataPromptContextForPersona,
@@ -34,6 +33,7 @@ import {
 } from '@/lib/personax/market-data';
 import { extractKeySentence } from '@/lib/personax/quote-engine';
 import { STRUCTURAL_LABEL_LINE_RE, extractTag } from '@/lib/personax/runtime/stage1-data-collection';
+import { generatePersonaIndependently } from '@/lib/personax/runtime/persona-independent-generator';
 import type { ResearchLayerOutput } from '@/lib/personax/research-layer';
 import type {
   ChatMessage,
@@ -133,7 +133,7 @@ async function callGeminiStage3(system: string, user: string): Promise<string> {
  * true → callGeminiStage3 (gemini-3.5-flash 기본)
  * false/미설정 → callGPTMini (기존 gpt-4.1-mini)
  */
-async function callStage3(system: string, user: string): Promise<string> {
+export async function callStage3(system: string, user: string): Promise<string> {
   if (process.env.USE_GEMINI_STAGE3 === 'true') {
     return callGeminiStage3(system, user);
   }
@@ -275,74 +275,7 @@ ${formatPreviousPersonaQuoteContext(previous, personaName)}
 // PR4-D(docs/pr4-persona-runtime-design.md 8절): 반박은 강제가 아니라 선택이다.
 // 다른 페르소나의 발화를 참고하더라도, 반드시 반박하는 것이 아니라 자기 관점에서
 // 그 지점을 어떻게 해석하는지 말한다.
-type ScriptSlotTag = 'FIRST' | 'SECOND' | 'THIRD' | 'CLOSER' | 'LUCIA_CLOSE';
-
-const buildLuciaIndependentResearchContext = (
-  researchLayerOutput: ResearchLayerOutput,
-): string => JSON.stringify({
-  rawFacts: researchLayerOutput.rawFacts,
-  interpretedFacts: researchLayerOutput.interpretedFacts,
-  metadata: researchLayerOutput.metadata,
-}, null, 2);
-
-const generateLuciaIndependently = async (params: {
-  tag: ScriptSlotTag;
-  lastMessage: string;
-  legacyCategory: string;
-  categoryV3: CategoryV3;
-  decisionType: string;
-  researchLayerOutput: ResearchLayerOutput;
-}): Promise<string> => {
-  const {
-    tag,
-    lastMessage,
-    legacyCategory,
-    categoryV3,
-    decisionType,
-    researchLayerOutput,
-  } = params;
-  const system = `${TEA_SYSTEM_LUCIA}
-
----
-
-## LUCIA PERSONA_RULE
-${PERSONA_RULE.lucia}
-
----
-
-${OPTION_D_SYSTEM}`;
-  const user = `## PR4-vNext LUCIA Independent Call
-이번 호출은 LUCIA만 별도로 생성한다.
-다른 페르소나(RAY/JACK/ECHO)의 발화, 요약, 인용, 참고자료는 제공되지 않는다.
-LUCIA는 앞 발화자를 반박하는 사람이 아니라 사용자 감정과 상황을 먼저 해석하는 사람이다.
-
-출력 형식:
-[${tag}]
-{LUCIA 본문만 작성}
-
-- [${tag}] 블록 하나만 출력한다.
-- RAY, JACK, ECHO를 언급하거나 호명하지 않는다.
-- 첫 문장은 반드시 사용자 감정 또는 상황 해석으로 시작한다.
-- 데이터/숫자/손절선/지지선보다 그 판단을 앞둔 사람의 불안, 부담, 후회, 상처를 먼저 본다.
-
-사용자 질문:
-${lastMessage}
-
-분류:
-- legacyCategory: ${legacyCategory || '(none)'}
-- categoryV3: ${categoryV3}
-- decisionType: ${decisionType}
-
-ResearchLayerOutput:
-${buildLuciaIndependentResearchContext(researchLayerOutput)}`;
-
-  const raw = await callStage3(system, user);
-  let extracted = extractTag(raw, tag) || '';
-  if (!extracted.trim()) {
-    extracted = extractTag(await callStage3(system, user), tag) || '';
-  }
-  return extracted;
-};
+export type ScriptSlotTag = 'FIRST' | 'SECOND' | 'THIRD' | 'CLOSER' | 'LUCIA_CLOSE';
 
 export const OPTION_D_SYSTEM = `PersonaX 4인 토론 대본 작성자입니다.
 
@@ -973,7 +906,8 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${personaRoleRules}${clo
   ): Promise<string> => {
     let slotText = '';
     if (personaName.toUpperCase() === LUCIA_TARGET_PERSONA) {
-      slotText = await generateLuciaIndependently({
+      slotText = await generatePersonaIndependently({
+        personaId: 'lucia',
         tag,
         lastMessage,
         legacyCategory,
