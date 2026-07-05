@@ -141,6 +141,7 @@ export async function callStage3(system: string, user: string): Promise<string> 
 }
 
 const LUCIA_TARGET_PERSONA = 'LUCIA';
+const RAY_TARGET_PERSONA = 'RAY';
 
 const LUCIA_MARKET_NUMERIC_PATTERN =
   /(?:\d[\d,.]*\s*(?:원|달러|만원|억원|조원|%|퍼센트|주|계약|개|배|달러대|원대|만|억|조|USD|KRW|BTC|ETH))|(?:[$₩]\s*\d[\d,.]*)|(?:\b\d[\d,.]*\b\s*(?:price|volume|support|resistance|stop|target)\b)/gi;
@@ -908,6 +909,16 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${personaRoleRules}${clo
     if (personaName.toUpperCase() === LUCIA_TARGET_PERSONA) {
       slotText = await generatePersonaIndependently({
         personaId: 'lucia',
+        tag,
+        lastMessage,
+        legacyCategory,
+        categoryV3: router.categoryV3,
+        decisionType,
+        researchLayerOutput,
+      });
+    } else if (personaName.toUpperCase() === RAY_TARGET_PERSONA) {
+      slotText = await generatePersonaIndependently({
+        personaId: 'ray',
         tag,
         lastMessage,
         legacyCategory,
