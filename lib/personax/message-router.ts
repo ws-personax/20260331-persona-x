@@ -539,6 +539,7 @@ export async function runRoutedRequest(
       dataPack: researchLayerOutput.rawFacts.dataPack,
       decisionType,
       marketDataPromptContext: researchLayerOutput.rawFacts.marketDataPromptContext,
+      researchLayerOutput,
       router,
     });
     _lastCompletedStage = 'stage3';
