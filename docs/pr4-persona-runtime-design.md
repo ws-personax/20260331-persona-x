@@ -5,6 +5,10 @@
 LUCIA 역할 고정·RAY 이중 체계·죽은 경로까지 합쳐 "무엇을 통합하고 무엇을 의도적으로
 분기 유지할지"를 결정하기 위한 자료다. **이 문서는 설계만 하며 코드를 수정하지 않는다.**
 
+**최종 방향 안내**: 이 문서의 최종 결론은 10절의 4-Layer Persona Runtime 목표
+아키텍처(vNext)다. 앞선 PR4-A/B/C/D 기록은 이 결론에 도달하기 위한 진단과
+실험 이력으로 읽는다.
+
 ---
 
 ## 1. 문제 정의
@@ -687,3 +691,87 @@ PR4-D(4절)는 "규칙 추가"가 아니라 이제 **"conflict 강제 → 선택
 여전히 자연스럽게 유도"하는 문구 설계이며(8.2 참고), 이 문구가 실제로
 효과가 있는지는 이 문서에서 결론짓지 않고 PR4-D 구현 단계에서 QA로 신중히
 검증할 항목으로 남긴다.
+
+---
+
+## 10. Persona Runtime 목표 아키텍처 (vNext)
+
+이 섹션은 구현 명세(Implementation Specification)가 아니라 아키텍처 방향(Architecture Direction)을 정의한다. 세부 구현은 이후 PR과 QA를 통해 변경될 수 있으며, 이 문서는 그 변경의 기준이 되는 상위 설계 원칙을 기록한다.
+
+> **Runtime Surgery 교훈**
+>
+> 이번 실험은 Prompt 규칙을 수정하는 것으로는 Persona 독립성을 회복할 수 없음을 보여주었다.
+> 앞으로의 Runtime 개선은 프롬프트 추가보다 정보 흐름과 호출 구조를 우선적으로 개선한다.
+
+> **Runtime Surgery 핵심 산출물**
+>
+> 1. Prompt보다 Runtime이 우선이다.
+> 2. 정보 흐름이 Persona 품질을 결정한다.
+> 3. 구현보다 아키텍처 방향을 먼저 확정한다.
+
+오늘 확정된 사실은 하나다. **동일 컨텍스트의 순차 생성이 Persona 독립성을 약화시킨다.** 이 섹션은 그 사실을 기준으로 향후 6개월의 Runtime 개선 방향을 정의한다. 다만 완전 독립 호출, 부분 공유, 공유 Context 최소화 같은 구체적 해법은 아직 확정하지 않는다. 이후 Research Layer 구현과 QA 결과를 바탕으로 단계적으로 확정한다.
+
+### 10.1 목표 구조: 4-Layer Runtime
+
+vNext Persona Runtime은 다음 4개 논리 레이어를 목표 구조로 둔다.
+
+| Layer | 역할 | 확정 수준 |
+|---|---|---|
+| ① Research Layer | 분류, 데이터 수집, 사실 수집 및 구조화 | 방향 확정, 판단/해석 포함 여부 미확정 |
+| ② Persona Layer | JACK/LUCIA/RAY/ECHO의 독립적 해석 | 독립 실행 구조 목표 확정, 호출 방식 미확정 |
+| ③ Debate Layer | 의견 비교, 충돌점 추출, 합의점 정리 | 논리 레이어 존재 확정, 물리 구현 미정 |
+| ④ Decision Layer | 최종 결론, 다음 행동 | 방향 확정 |
+
+### 10.2 Research Layer
+
+Research Layer는 저렴한 모델을 사용한다. 기본 역할은 분류, 데이터 수집, 사실 수집 및 구조화다. 이 레이어는 페르소나가 아니며, 순수 리서치 엔진이다.
+
+판단/해석을 포함할 수 있는지는 아직 검증되지 않았다. Research Layer가 이미 판단까지 내려 버리면, JACK/LUCIA/RAY/ECHO가 모두 그 판단을 출발점으로 삼는 'Research 관성'이 새로 생길 위험이 있다 — 이는 오늘 확정된 'RAY 관성' 문제와 같은 종류의 위험일 수 있다. Research Layer 구현 및 QA 결과를 바탕으로 추후 확정한다.
+
+Research Layer QA에서는 단순히 데이터 정확도만 보지 않는다. 반드시 **Research 관성 발생 여부**를 확인해야 한다. 즉, 리서치 결과가 뒤 레이어의 페르소나 판단을 과도하게 선점하거나 고정시키는지 검증한다.
+
+### 10.3 Persona Layer
+
+Persona Layer는 JACK / LUCIA / RAY / ECHO 각각 독립적으로 실행되는 구조를 목표로 한다. RAY도 이제 "조사자"가 아니라 Research Layer 결과를 받아 자기 방식대로 해석하는 하나의 페르소나로 재정의된다.
+
+Persona Layer는 고성능 모델 사용을 기본 방향으로 둔다. 사용자가 실제로 체감하는 캐릭터 정체성, 판단 프레임, 말투, 관점 차이가 이 레이어에서 결정되기 때문이다.
+
+Persona Layer는 독립 실행 구조를 목표로 한다. 기본 방향은 Persona별 독립 호출을 우선 검토하는 것이나, 구체적인 호출 방식(완전 독립 호출, 부분 공유, 공유 Context 최소화 등)은 Research Layer 결과 및 QA를 바탕으로 최종 확정한다.
+
+### 10.4 Debate Layer
+
+Debate Layer의 역할은 의견 비교, 충돌점 추출, 합의점 정리다. 이 레이어는 "누가 무슨 말을 했는지"를 단순 요약하는 것이 아니라, 서로 다른 페르소나의 관점 차이를 구조화한다.
+
+Debate Layer는 별도 LLM 호출일 수도 있고, Decision Layer 내부에서 구현될 수도 있다. 이는 '논리 레이어'로서 반드시 존재해야 하는 개념이지만, 물리적 구현 방식은 아직 미정이며 구현 단계에서 자유롭게 결정한다.
+
+### 10.5 Decision Layer
+
+Decision Layer는 최종 결론과 다음 행동을 만든다. 현재 방향은 ECHO가 이 역할을 맡거나, 별도 Summarizer가 맡는 두 가능성을 모두 열어둔다.
+
+Decision Layer는 Research 결과를 직접 반복하는 레이어가 아니다. Persona Layer의 4개 의견과 Debate Layer의 충돌/합의 구조를 바탕으로 사용자에게 필요한 최종 판단 단위로 정리한다.
+
+### 10.6 단계적 구현 순서
+
+1단계: Research Layer를 저렴한 모델로 분리 — QA에서 "Research 관성 발생 여부" 반드시 검증
+
+2단계: Persona Layer를 독립 실행 구조로 전환한다. 기본 방향은 Persona별 독립 호출을 우선 검토한다. 단, 구체적인 호출 방식은 Research Layer 결과 및 QA를 바탕으로 최종 확정한다.
+
+3단계: Decision Layer가 4개 의견을 종합 (Debate Layer 구현 방식은 이 단계에서 결정)
+
+### 10.7 SNS/Room 확장과의 연결
+
+4-Layer Runtime은 SNS/Room 확장과 자연스럽게 연결된다. Research Layer는 방 안의 공통 사실 기반을 만들고, Persona Layer는 각 캐릭터를 독립 참여자처럼 실행하며, Debate Layer는 참여자 간 관점 차이를 정리하고, Decision Layer는 방의 최종 응답 또는 다음 액션을 만든다.
+
+즉 vNext 구조는 단순히 현재 채팅 품질을 개선하기 위한 임시 패치가 아니라, 이후 Room, Multi Speaker, SNS형 대화 구조로 확장할 때도 그대로 사용할 수 있는 상위 Runtime 방향이다.
+
+### 10.8 기존 PR4-A/B/C/D 및 Non-goals와의 관계
+
+PR4-A/B/C/D는 폐기하지 않는다. 다만 10절의 4-Layer Runtime 방향이 이후 설계의 상위 기준이 된다.
+
+- PR4-A: dead code 삭제와 비용 절감 작업은 계속 유효하다. vNext 구조에서도 죽은 경로 정리는 필요하다.
+- PR4-B: 규칙 계층 통합은 계속 유효하다. 다만 앞으로는 규칙 추가보다 정보 흐름과 호출 구조 개선이 우선이다.
+- PR4-C: RAY Legacy 통합은 이 재설계와 어떻게 맞물리는지 아직 미정이다. **결정 필요** 항목으로 유지한다.
+- PR4-D(#277): conflict 강제 → 선택 전환은 유효한 실험이었고 유지한다. 다만 이번 실험은 프롬프트 규칙 조정만으로 Persona 독립성을 회복하기 어렵다는 상위 결론을 만들었다.
+- PR4-E: PR4-E는 4-Layer Runtime을 우선 채택함에 따라 보류한다. 이는 폐기가 아니라 우선순위 변경이다.
+
+3절의 PR4 Non-goals도 유지한다. 특히 Memory / History / Review Card, Room / Speaker 확장, 결제 / 구독 구조, Decision OS 기능 추가는 이번 vNext 방향 정의의 직접 구현 범위가 아니다. 10절은 이 기능들을 지금 구현하자는 뜻이 아니라, 향후 Runtime 설계가 어떤 방향을 기준으로 삼아야 하는지 기록하는 상위 아키텍처 문서다.
