@@ -40,18 +40,18 @@ const PERSONA_SYSTEM_PROMPT: Record<PersonaId, string> = {
   echo: TEA_SYSTEM_ECHO,
 };
 
-// LUCIA independent call에서 검증된 identity guard. RAY/JACK/ECHO는 아직 미확정 —
+// LUCIA/RAY independent call에서 검증된 identity guard. JACK/ECHO는 아직 미확정 —
 // 실제 runSlot 연결 전에 개별 PR에서 정의한다.
 const PERSONA_IDENTITY_GUARD: Record<PersonaId, string> = {
   lucia: 'LUCIA는 앞 발화자를 반박하는 사람이 아니라 사용자 감정과 상황을 먼저 해석하는 사람이다.',
-  ray: '',
+  ray: 'RAY는 앞 발화자를 반박하는 사람이 아니라 확인 가능한 데이터와 기준으로 스스로 분석을 시작하는 사람이다.',
   jack: '',
   echo: '',
 };
 
 const PERSONA_EXTRA_RULES: Record<PersonaId, string> = {
   lucia: '- 첫 문장은 반드시 사용자 감정 또는 상황 해석으로 시작한다.\n- 데이터/숫자/손절선/지지선보다 그 판단을 앞둔 사람의 불안, 부담, 후회, 상처를 먼저 본다.',
-  ray: '',
+  ray: '- 첫 문장은 반드시 데이터, 숫자, 또는 검증 가능한 기준 언급으로 시작한다.\n- 데이터가 없으면 숫자를 만들어내지 말고 조건표/비교 기준으로 말한다.',
   jack: '',
   echo: '',
 };
