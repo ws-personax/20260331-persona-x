@@ -37,6 +37,7 @@ import {
   resolveMarketDataPromptContext,
   collectStageOneData,
 } from '@/lib/personax/runtime/stage1-data-collection';
+import { wrapResearchLayerOutput } from '@/lib/personax/research-layer';
 import { analyzePersonaViews } from '@/lib/personax/runtime/stage2-persona-analysis';
 import {
   runSoloScriptGeneration,
@@ -507,18 +508,27 @@ export async function runRoutedRequest(
         categoryV3: router.categoryV3,
       });
       _lastCompletedStage = 'stage1';
+      const stage2ResearchLayerOutput = wrapResearchLayerOutput({
+        marketDataPromptContext,
+        dataPack,
+      });
       personaViews = await analyzePersonaViews({
         callLLM,
         messages,
-        dataPack,
+        dataPack: stage2ResearchLayerOutput.rawFacts.dataPack,
         legacyCategory,
         categoryV3: router.categoryV3,
         lastMessage,
-        marketDataPromptContext,
+        marketDataPromptContext: stage2ResearchLayerOutput.rawFacts.marketDataPromptContext,
         memoryContext,
       });
       _lastCompletedStage = 'stage2';
     }
+
+    const researchLayerOutput = wrapResearchLayerOutput({
+      marketDataPromptContext,
+      dataPack,
+    });
 
     // Stage 3 — 일반 (4명 대본, TikiTaka 순차 호출)
     const stage3Result = await runStage3ScriptGeneration({
@@ -526,9 +536,9 @@ export async function runRoutedRequest(
       lastMessage,
       legacyCategory,
       personaViews,
-      dataPack,
+      dataPack: researchLayerOutput.rawFacts.dataPack,
       decisionType,
-      marketDataPromptContext,
+      marketDataPromptContext: researchLayerOutput.rawFacts.marketDataPromptContext,
       router,
     });
     _lastCompletedStage = 'stage3';
