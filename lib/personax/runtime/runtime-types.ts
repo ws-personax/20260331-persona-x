@@ -1,9 +1,10 @@
 /**
  * Runtime v1 shared contract.
  *
- * This file defines only the stable type boundary for the Runtime pipeline.
+ * This file defines the stable type boundary for future Runtime layers.
  * It intentionally does not import existing runtime modules, change current
- * execution flow, or introduce implementation helpers.
+ * execution flow, or introduce implementation helpers. Runtime v1 is a
+ * persona-id-based pipeline; display position belongs only to Speaker output.
  *
  * Runtime v1 layers:
  * - Classifier
@@ -11,14 +12,17 @@
  * - Persona
  * - Decision
  * - Speaker
+ *
+ * Debate is intentionally excluded from Runtime v1. Debate contracts belong to
+ * a later v1.5 layer after the core Runtime boundary is stable.
  */
 
 /**
  * Canonical persona identifiers used by Runtime v1.
  *
- * Keep this union aligned with the active registry for now. When a dedicated
- * registry is introduced later, this contract can expand without changing the
- * meaning of downstream Runtime layer payloads.
+ * These ids are static for the first Runtime contract. A future Persona
+ * Registry may make this set dynamic, but all Runtime layers should still
+ * exchange persona identity through this common id shape.
  */
 export type PersonaId =
   | 'ray'
@@ -31,6 +35,7 @@ export type PersonaId =
  *
  * The contract uses explicit layer names so logs, tracing, and orchestration
  * can share one vocabulary before implementations are rewired to this shape.
+ * Debate is not a Runtime v1 layer.
  */
 export type RuntimeLayer =
   | 'Classifier'
@@ -43,7 +48,8 @@ export type RuntimeLayer =
  * Classifier output defines routing metadata only.
  *
  * The classifier decides how the question should be interpreted and which
- * personas should participate, but it does not provide facts or conclusions.
+ * personas should participate in this request. It does not provide facts,
+ * conclusions, order, or display slots.
  */
 export interface ClassifierOutput {
   category: string;
@@ -54,48 +60,53 @@ export interface ClassifierOutput {
 /**
  * Research output is fact-only by design.
  *
- * This contract deliberately avoids verdict, recommendation, opinion, and
- * decision-like fields so the Decision layer remains the only place where a
- * final conclusion is synthesized.
+ * Research may collect facts, market facts, contextual notes, and references.
+ * It must never express verdict, decision, recommendation, stance, or opinion.
+ * Those concepts belong to Persona and Decision layers, not Research.
  */
 export interface ResearchBrief {
-  userQuestionFacts: string[];
+  facts: string[];
   marketFacts: string[];
-  contextFacts: string[];
-  sourceNotes: string[];
+  context: string[];
+  references: string[];
 }
 
 /**
  * Persona input stays isolated.
  *
  * Each persona receives only the user question and the shared fact brief.
- * Other persona outputs are intentionally excluded so Runtime v1 preserves
- * independent first-pass reasoning at the Persona layer.
+ * Runtime v1 does not pass previousPersonaResponses, previousContext,
+ * dialogHistory, quoteContext, or other persona utterances into Persona input.
+ * This prevents persona bleeding at the contract level.
  */
 export interface PersonaInput {
   personaId: PersonaId;
   userQuestion: string;
-  researchBrief: ResearchBrief;
+  research: ResearchBrief;
 }
 
 /**
  * Persona layer output.
  *
- * This is an opinionated interpretation built from the shared fact set.
- * Confidence is a normalized numeric signal intended for later aggregation.
+ * This is one persona's independent opinion built from the shared fact set.
+ * References are optional because not every persona response needs to cite
+ * external material, but cited facts should point back to Research references
+ * when available.
  */
 export interface PersonaOpinion {
   personaId: PersonaId;
   summary: string;
   reasoning: string;
   confidence: number;
+  references?: string[];
 }
 
 /**
  * Persona outputs are keyed by canonical persona id.
  *
- * The map shape keeps Runtime contracts stable even if caller-side filtering
- * or selective participation rules evolve in later implementation PRs.
+ * This type intentionally has no first, second, third, closer, position, slot,
+ * or display-order concept. Runtime reasoning is persona-id based; presentation
+ * order is introduced only by the Speaker layer.
  */
 export type PersonaOutputMap = Record<PersonaId, PersonaOpinion>;
 
@@ -104,9 +115,10 @@ export type PersonaOutputMap = Record<PersonaId, PersonaOpinion>;
  * final answer. Earlier layers prepare evidence and viewpoints only.
  */
 export interface DecisionResult {
-  finalConclusion: string;
+  summary: string;
   nextAction: string;
-  supportingReasons: string[];
+  reasons: string[];
+  confidence?: number;
 }
 
 /**
@@ -118,7 +130,6 @@ export interface DecisionResult {
  */
 export interface SpeakerPayload {
   displayOrder: PersonaId[];
-  leadSummary: string;
   messages: Array<{
     personaId: PersonaId;
     content: string;
