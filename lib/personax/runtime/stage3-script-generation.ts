@@ -26,6 +26,7 @@ import {
   buildPersonaRoleRulesSection,
   ECHO_VERDICT_MIN_STRUCTURE_RULE,
   ECHO_VERDICT_TURNING_POINT_RULE,
+  PERSONA_RULE,
 } from '@/lib/personax/prompts/rules';
 import {
   buildMarketDataPromptContextForPersona,
@@ -33,6 +34,7 @@ import {
 } from '@/lib/personax/market-data';
 import { extractKeySentence } from '@/lib/personax/quote-engine';
 import { STRUCTURAL_LABEL_LINE_RE, extractTag } from '@/lib/personax/runtime/stage1-data-collection';
+import type { ResearchLayerOutput } from '@/lib/personax/research-layer';
 import type {
   ChatMessage,
   LLMCaller,
@@ -273,6 +275,75 @@ ${formatPreviousPersonaQuoteContext(previous, personaName)}
 // PR4-D(docs/pr4-persona-runtime-design.md 8절): 반박은 강제가 아니라 선택이다.
 // 다른 페르소나의 발화를 참고하더라도, 반드시 반박하는 것이 아니라 자기 관점에서
 // 그 지점을 어떻게 해석하는지 말한다.
+type ScriptSlotTag = 'FIRST' | 'SECOND' | 'THIRD' | 'CLOSER' | 'LUCIA_CLOSE';
+
+const buildLuciaIndependentResearchContext = (
+  researchLayerOutput: ResearchLayerOutput,
+): string => JSON.stringify({
+  rawFacts: researchLayerOutput.rawFacts,
+  interpretedFacts: researchLayerOutput.interpretedFacts,
+  metadata: researchLayerOutput.metadata,
+}, null, 2);
+
+const generateLuciaIndependently = async (params: {
+  tag: ScriptSlotTag;
+  lastMessage: string;
+  legacyCategory: string;
+  categoryV3: CategoryV3;
+  decisionType: string;
+  researchLayerOutput: ResearchLayerOutput;
+}): Promise<string> => {
+  const {
+    tag,
+    lastMessage,
+    legacyCategory,
+    categoryV3,
+    decisionType,
+    researchLayerOutput,
+  } = params;
+  const system = `${TEA_SYSTEM_LUCIA}
+
+---
+
+## LUCIA PERSONA_RULE
+${PERSONA_RULE.lucia}
+
+---
+
+${OPTION_D_SYSTEM}`;
+  const user = `## PR4-vNext LUCIA Independent Call
+이번 호출은 LUCIA만 별도로 생성한다.
+다른 페르소나(RAY/JACK/ECHO)의 발화, 요약, 인용, 참고자료는 제공되지 않는다.
+LUCIA는 앞 발화자를 반박하는 사람이 아니라 사용자 감정과 상황을 먼저 해석하는 사람이다.
+
+출력 형식:
+[${tag}]
+{LUCIA 본문만 작성}
+
+- [${tag}] 블록 하나만 출력한다.
+- RAY, JACK, ECHO를 언급하거나 호명하지 않는다.
+- 첫 문장은 반드시 사용자 감정 또는 상황 해석으로 시작한다.
+- 데이터/숫자/손절선/지지선보다 그 판단을 앞둔 사람의 불안, 부담, 후회, 상처를 먼저 본다.
+
+사용자 질문:
+${lastMessage}
+
+분류:
+- legacyCategory: ${legacyCategory || '(none)'}
+- categoryV3: ${categoryV3}
+- decisionType: ${decisionType}
+
+ResearchLayerOutput:
+${buildLuciaIndependentResearchContext(researchLayerOutput)}`;
+
+  const raw = await callStage3(system, user);
+  let extracted = extractTag(raw, tag) || '';
+  if (!extracted.trim()) {
+    extracted = extractTag(await callStage3(system, user), tag) || '';
+  }
+  return extracted;
+};
+
 export const OPTION_D_SYSTEM = `PersonaX 4인 토론 대본 작성자입니다.
 
 지켜야 할 규칙:
@@ -801,6 +872,7 @@ export async function runStage3ScriptGeneration(params: {
   dataPack: string;
   decisionType: string;
   marketDataPromptContext: string;
+  researchLayerOutput: ResearchLayerOutput;
   router: RouterDecision;
 }): Promise<{
   first: string;
@@ -822,6 +894,7 @@ export async function runStage3ScriptGeneration(params: {
     dataPack,
     decisionType,
     marketDataPromptContext,
+    researchLayerOutput,
     router,
   } = params;
 
@@ -893,77 +966,52 @@ FIRST(${firstKey2})는 CLOSER 불가.${emotionalBanLine}${personaRoleRules}${clo
     question: lastMessage,
     topic: router.categoryV3 ?? legacyCategory,
   });
-  const firstPrompt = buildTikiTakaBlockPrompt(buildBaseScriptPromptForSlot(firstKey2.toLowerCase() as AllPersonaKey), 'FIRST', firstKey2, []);
-  const firstRawBlock = await callStage3(stage3System, firstPrompt);
-  let firstTikiTakaRaw = extractTag(firstRawBlock, 'FIRST') || '';
-  if (!firstTikiTakaRaw.trim()) {
-    firstTikiTakaRaw = extractTag(await callStage3(stage3System, firstPrompt), 'FIRST') || '';
-  }
-  conversationState = recordMessage(
-    recordSpeaker(conversationState, firstKey2),
-    firstKey2,
-    firstTikiTakaRaw,
-  );
+  const sequentialPrevious: Array<{ name: string; text: string }> = [];
+  const runSlot = async (
+    tag: ScriptSlotTag,
+    personaName: string,
+  ): Promise<string> => {
+    let slotText = '';
+    if (personaName.toUpperCase() === LUCIA_TARGET_PERSONA) {
+      slotText = await generateLuciaIndependently({
+        tag,
+        lastMessage,
+        legacyCategory,
+        categoryV3: router.categoryV3,
+        decisionType,
+        researchLayerOutput,
+      });
+    } else {
+      const prompt = buildTikiTakaBlockPrompt(
+        buildBaseScriptPromptForSlot(personaName.toLowerCase() as AllPersonaKey),
+        tag,
+        personaName,
+        sequentialPrevious,
+      );
+      const rawBlock = await callStage3(stage3System, prompt);
+      slotText = extractTag(rawBlock, tag) || '';
+      if (!slotText.trim()) {
+        slotText = extractTag(await callStage3(stage3System, prompt), tag) || '';
+      }
+      sequentialPrevious.push({ name: personaName, text: slotText });
+    }
+    conversationState = recordMessage(
+      recordSpeaker(conversationState, personaName),
+      personaName,
+      slotText,
+    );
+    return slotText;
+  };
 
-  const secondPrompt = buildTikiTakaBlockPrompt(buildBaseScriptPromptForSlot(secondKey2.toLowerCase() as AllPersonaKey), 'SECOND', secondKey2, [
-    { name: firstKey2, text: firstTikiTakaRaw },
-  ]);
-  const secondRawBlock = await callStage3(stage3System, secondPrompt);
-  let secondTikiTakaRaw = extractTag(secondRawBlock, 'SECOND') || '';
-  if (!secondTikiTakaRaw.trim()) {
-    secondTikiTakaRaw = extractTag(await callStage3(stage3System, secondPrompt), 'SECOND') || '';
-  }
-  conversationState = recordMessage(
-    recordSpeaker(conversationState, secondKey2),
-    secondKey2,
-    secondTikiTakaRaw,
-  );
-
-  const thirdPrompt = buildTikiTakaBlockPrompt(buildBaseScriptPromptForSlot(thirdKey2.toLowerCase() as AllPersonaKey), 'THIRD', thirdKey2, [
-    { name: firstKey2, text: firstTikiTakaRaw },
-    { name: secondKey2, text: secondTikiTakaRaw },
-  ]);
-  const thirdRawBlock = await callStage3(stage3System, thirdPrompt);
-  let thirdTikiTakaRaw = extractTag(thirdRawBlock, 'THIRD') || '';
-  if (!thirdTikiTakaRaw.trim()) {
-    thirdTikiTakaRaw = extractTag(await callStage3(stage3System, thirdPrompt), 'THIRD') || '';
-  }
-  conversationState = recordMessage(
-    recordSpeaker(conversationState, thirdKey2),
-    thirdKey2,
-    thirdTikiTakaRaw,
-  );
-
-  const closerPrompt = buildTikiTakaBlockPrompt(buildBaseScriptPromptForSlot(closerKey2.toLowerCase() as AllPersonaKey), 'CLOSER', closerKey2, [
-    { name: firstKey2, text: firstTikiTakaRaw },
-    { name: secondKey2, text: secondTikiTakaRaw },
-    { name: thirdKey2, text: thirdTikiTakaRaw },
-  ]);
-  const closerRawBlock = await callStage3(stage3System, closerPrompt);
-  let closerTikiTakaRaw = extractTag(closerRawBlock, 'CLOSER') || '';
-  if (!closerTikiTakaRaw.trim()) {
-    closerTikiTakaRaw = extractTag(await callStage3(stage3System, closerPrompt), 'CLOSER') || '';
-  }
-  conversationState = recordMessage(
-    recordSpeaker(conversationState, closerKey2),
-    closerKey2,
-    closerTikiTakaRaw,
-  );
+  const firstTikiTakaRaw = await runSlot('FIRST', firstKey2);
+  const secondTikiTakaRaw = await runSlot('SECOND', secondKey2);
+  const thirdTikiTakaRaw = await runSlot('THIRD', thirdKey2);
+  const closerTikiTakaRaw = await runSlot('CLOSER', closerKey2);
 
   let luciaCloseRawBlock = '';
   if (router.categoryV3 === 'emotional') {
-    const luciaClosePrompt = buildTikiTakaBlockPrompt(buildBaseScriptPromptForSlot('lucia'), 'LUCIA_CLOSE', 'LUCIA', [
-      { name: firstKey2, text: firstTikiTakaRaw },
-      { name: secondKey2, text: secondTikiTakaRaw },
-      { name: thirdKey2, text: thirdTikiTakaRaw },
-      { name: closerKey2, text: closerTikiTakaRaw },
-    ]);
-    luciaCloseRawBlock = await callStage3(stage3System, luciaClosePrompt);
-    conversationState = recordMessage(
-      recordSpeaker(conversationState, 'LUCIA'),
-      'LUCIA',
-      extractTag(luciaCloseRawBlock, 'LUCIA_CLOSE') || '',
-    );
+    const luciaCloseText = await runSlot('LUCIA_CLOSE', 'LUCIA');
+    luciaCloseRawBlock = luciaCloseText ? `[LUCIA_CLOSE]\n${luciaCloseText}` : '';
   }
   void conversationState;
 
