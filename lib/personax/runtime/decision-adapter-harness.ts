@@ -32,6 +32,66 @@ const DECISION_ADAPTER_HARNESS_CASES: Array<{
       verdict: '판단을 보류하고 핵심 기준부터 확인해야 합니다.',
     },
   },
+  {
+    name: 'invest legacy decision summary',
+    input: {
+      verdict: 'Investment decisions should start from risk criteria, not price impulse.',
+      reasons: [
+        'The entry condition is still unclear.',
+        'Loss tolerance must be separated from expected upside.',
+      ],
+      nextAction: 'Write one risk limit and one confirmation condition before acting.',
+      confidence: 0.62,
+    },
+  },
+  {
+    name: 'emotional legacy decision summary',
+    input: {
+      verdict: 'The first decision is whether the person can carry this choice emotionally.',
+      reasons: [
+        'The emotional cost is part of the decision, not a side issue.',
+        'Recovery capacity changes what action is realistic today.',
+      ],
+      nextAction: 'Name the feeling that would make this decision hardest to hold.',
+      confidence: 0.68,
+    },
+  },
+  {
+    name: 'action legacy decision summary',
+    input: {
+      verdict: 'This needs one small action before a final commitment.',
+      reasons: [
+        'The question is blocked by execution uncertainty.',
+        'A short test can reduce the cost of choosing wrong.',
+      ],
+      nextAction: 'Set one action that can be completed within 24 hours.',
+      confidence: 0.74,
+    },
+  },
+  {
+    name: 'knowledge legacy decision summary',
+    input: {
+      verdict: 'The concept must be narrowed before it can be applied.',
+      reasons: [
+        'The same word can mean different things across contexts.',
+        'A usable explanation depends on which frame is being asked.',
+      ],
+      nextAction: 'Choose one frame and restate the question in that frame.',
+      confidence: 0.59,
+    },
+  },
+  {
+    name: 'relationship legacy decision summary',
+    input: {
+      verdict: 'The repeated boundary issue matters more than a single incident.',
+      reasons: [
+        'The pattern is more reliable than the latest apology.',
+        'A relationship decision needs both behavior change and emotional cost.',
+      ],
+      nextAction: 'Record one boundary and one observable change to check next time.',
+      confidence: 0.66,
+    },
+  },
 ];
 
 export function runDecisionAdapterHarness(): DecisionAdapterHarnessResult[] {
