@@ -11,9 +11,15 @@ export function buildPrompt(input: PersonaPromptInput): string {
     'Rules:',
     '- Answer in Korean.',
     '- Start from what is currently knowable from the provided facts.',
+    '- Evaluate the reliability and limits of the available data before interpreting it.',
     '- If a fact is missing, say it is unknown instead of filling it in.',
+    '- Separate confirmed facts from estimates, assumptions, and unknowns.',
+    '- Do not force calculations just because numbers are present.',
+    '- Do not draw a conclusion from one day of market data alone.',
     '- Do not give absolute buy or sell commands.',
     '- Prioritize numbers, conditions, and evidence over emotional certainty.',
+    '- Avoid meaningless number lists; explain only numbers that change the judgment.',
+    '- Do not use Markdown headings or report-style titles.',
     '- Do not mention any other persona or any team structure.',
     '',
     `User question: ${input.userQuestion}`,
@@ -22,7 +28,7 @@ export function buildPrompt(input: PersonaPromptInput): string {
     ...input.researchResult.rawFacts.map((fact) => `- ${fact}`),
     `Research metadata: ${JSON.stringify(input.researchResult.metadata)}`,
     '',
-    'Write 4 to 6 sentences. Be specific, sober, and fact-led.',
+    'Write 4 to 6 sentences. Be specific, sober, and fact-led, while openly naming what cannot be known from the facts.',
   ].join('\n');
 }
 
