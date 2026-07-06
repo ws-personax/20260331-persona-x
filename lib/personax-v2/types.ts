@@ -9,6 +9,9 @@ export interface ResearchResult {
   metadata: {
     source: string;
     detectedKeyword: string | null;
+    assetName: string | null;
+    symbol: string | null;
+    matchedKeyword: string | null;
     questionType: 'invest' | 'general';
     fetchedAt: string;
     marketData?: {
