@@ -1,12 +1,70 @@
-// Runtime v2 research layer — 이번 PR에서는 실제 조회 없이 mock 데이터만 반환한다.
-// 실제 데이터 연결은 이후 PR에서 진행한다.
+import { extractKeyword, fetchMarketPrice } from '@/lib/personax/market';
 import type { ClassifierResult, ResearchResult } from '../types';
 
-export async function research(classifierResult: ClassifierResult): Promise<ResearchResult> {
+const nowIso = (): string => new Date().toISOString();
+
+export async function research(
+  userQuestion: string,
+  classifierResult: ClassifierResult,
+): Promise<ResearchResult> {
+  const detectedKeyword = extractKeyword([{ role: 'user', content: userQuestion }]);
+  const keyword = detectedKeyword === '시장' ? null : detectedKeyword;
+
+  if (!keyword) {
+    return {
+      rawFacts: ['No quoted asset was detected from the question.'],
+      metadata: {
+        source: 'none',
+        detectedKeyword: null,
+        questionType: classifierResult.isInvest ? 'invest' : 'general',
+        fetchedAt: nowIso(),
+      },
+    };
+  }
+
+  const marketData = await fetchMarketPrice(keyword).catch(() => null);
+  if (!marketData) {
+    return {
+      rawFacts: [`Asset detected: ${keyword}`, 'Market data fetch did not return a quote.'],
+      metadata: {
+        source: 'fetch_failed',
+        detectedKeyword: keyword,
+        questionType: classifierResult.isInvest ? 'invest' : 'general',
+        fetchedAt: nowIso(),
+        error: {
+          code: 'market_data_unavailable',
+          message: `Unable to fetch quote for ${keyword}.`,
+        },
+      },
+    };
+  }
+
   return {
-    rawFacts: classifierResult.isInvest
-      ? ['mock: invest-related question']
-      : ['mock: general question'],
-    metadata: { source: 'mock', isInvest: classifierResult.isInvest },
+    rawFacts: [
+      `Asset: ${keyword}`,
+      `Price: ${marketData.price} ${marketData.currency}`,
+      `Change: ${marketData.change}%`,
+      `High: ${marketData.high}`,
+      `Low: ${marketData.low}`,
+      `Volume: ${marketData.volume}`,
+      `Market state: ${marketData.marketState}`,
+      `Quote source: ${marketData.source}`,
+    ],
+    metadata: {
+      source: 'market',
+      detectedKeyword: keyword,
+      questionType: classifierResult.isInvest ? 'invest' : 'general',
+      fetchedAt: nowIso(),
+      marketData: {
+        price: marketData.price,
+        change: marketData.change,
+        high: marketData.high,
+        low: marketData.low,
+        volume: marketData.volume,
+        currency: marketData.currency,
+        marketState: marketData.marketState,
+        source: marketData.source,
+      },
+    },
   };
 }
