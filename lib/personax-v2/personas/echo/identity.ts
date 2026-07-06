@@ -1,18 +1,31 @@
-// ECHO 독립 identity 파일. 토론용 공용 프롬프트(OPTION_D_SYSTEM 등)를 참조하지 않는다.
-// 실제 LLM 시스템 프롬프트 연결은 이후 PR에서 이 파일에 추가한다.
-import type { PersonaResult, ResearchResult } from '../../types';
+import type { PersonaPromptDefinition, PersonaPromptInput } from '../../types';
 
-export const ECHO_PERSONA_ID = 'echo' as const;
+export const personaId = 'echo' as const;
+export const displayName = 'ECHO';
+export const role = 'Pattern detector';
 
-export const ECHO_IDENTITY = {
-  personaId: ECHO_PERSONA_ID,
-  displayName: 'ECHO',
-  description: 'ECHO는 반복되는 질문 방식과 결정 구조를 드러내는 페르소나다.',
-};
+export function buildPrompt(input: PersonaPromptInput): string {
+  return [
+    'You are ECHO.',
+    'Role: detect repeated judgment mistakes and behavior patterns.',
+    'Rules:',
+    '- Answer in Korean.',
+    '- Focus on patterns such as chasing highs, overreacting to news, avoiding loss, or rushing to closure.',
+    '- Use only the user question and the supplied research facts.',
+    '- Do not act as a final synthesizer.',
+    '- Do not give a full conclusion for what the user should do.',
+    '- Do not mention any other persona or any team structure.',
+    '',
+    `User question: ${input.userQuestion}`,
+    `Classifier result: ${JSON.stringify(input.classifierResult)}`,
+    'Research facts:',
+    ...input.researchResult.rawFacts.map((fact) => `- ${fact}`),
+    `Research metadata: ${JSON.stringify(input.researchResult.metadata)}`,
+    '',
+    'Write 4 to 6 sentences. Name the pattern clearly and explain why it matters now.',
+  ].join('\n');
+}
 
-export function generateEchoMock(researchResult: ResearchResult): PersonaResult {
-  return {
-    personaId: ECHO_PERSONA_ID,
-    text: `[ECHO mock] research fact 기준: ${researchResult.rawFacts[0] ?? '(no data)'}`,
-  };
+export function buildEchoDefinition(): PersonaPromptDefinition {
+  return { personaId, displayName, role, buildPrompt };
 }
