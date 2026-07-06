@@ -34,10 +34,20 @@ export interface PersonaPromptInput {
   researchResult: ResearchResult;
 }
 
+export interface PersonaOutputSection {
+  key: string;
+  label: string;
+}
+
+export interface PersonaOutputContract {
+  sections: PersonaOutputSection[];
+}
+
 export interface PersonaPromptDefinition {
   personaId: PersonaId;
   displayName: string;
   role: string;
+  outputContract: PersonaOutputContract;
   buildPrompt: (input: PersonaPromptInput) => string;
 }
 
