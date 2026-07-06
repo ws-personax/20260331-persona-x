@@ -90,6 +90,8 @@ import {
   buildLegacyStockDetailResult,
 } from '@/lib/personax/runtime/route-market';
 import { saveTeaLog, saveLegacyStockHistorySafely } from '@/lib/personax/runtime/route-save';
+// ✅ Runtime v2 (PR290) — Feature Flag 뒤 골격. v1 로직과 완전히 분리된 별도 경로.
+import { runRuntimeV2 } from '@/lib/personax-v2/entrypoint';
 
 // ✅ Feature Flag — Router/3단계 호출/ECHO 선택/LUCIA 프레이밍 단계별 활성화
 // router만 우선 활성화. 나머지는 다음 단계에서 켠다.
@@ -181,6 +183,16 @@ export async function POST(req: NextRequest) {
   try {
     const { messages, positionContext, teaMode, teaRound, teaPersona, isAdvancedQuestion, providerUserId: requestProviderUserId } = await req.json();
     const lastMsg = messages.at(-1)?.content || "";
+
+    // ✅ Runtime v2 (PR290) — RUNTIME_VERSION=v2일 때만 진입, 기본값은 v1 유지.
+    //   v2는 lib/personax-v2/entrypoint.ts로 완전히 위임하고 기존 v1 로직은 전혀 거치지 않는다.
+    if (process.env.RUNTIME_VERSION === 'v2') {
+      const v2Result = await runRuntimeV2(lastMsg);
+      return new Response(JSON.stringify(v2Result), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     // ✅ LUCIA 허브 — 카테고리 감지 및 페르소나 라우팅
 
