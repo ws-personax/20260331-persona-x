@@ -5,7 +5,7 @@ import { buildEchoDefinition } from '../personas/echo/identity';
 import { buildJackDefinition } from '../personas/jack/identity';
 import { buildLuciaDefinition } from '../personas/lucia/identity';
 import { buildRayDefinition } from '../personas/ray/identity';
-import type { DecisionSummary, PersonaId, PersonaOutputContract, ResearchResult } from '../types';
+import type { DecisionSummary, PersonaDisplayOrder, PersonaId, PersonaOutputContract, ResearchResult } from '../types';
 import { checkContractLabelsPresent } from './checks';
 import { scanIdentityPromptsForInvestmentTerms } from './identity-scan';
 
@@ -50,13 +50,15 @@ export interface QuestionDiagnostic {
     rawFacts: string[];
   };
   decisionSummary: DecisionSummary;
+  routedOrder: PersonaDisplayOrder;
+  routedMissingPersonaIds: PersonaId[];
   personaOutcomes: PersonaDiagnosticOutcome[];
 }
 
 export async function diagnoseQuestion(question: string): Promise<QuestionDiagnostic> {
   const classifierResult = classify(question);
   const researchResult = await research(question, classifierResult);
-  const { personaResults, decisionSummary } = await runRuntimeV2(question);
+  const { personaResults, decisionSummary, routed } = await runRuntimeV2(question);
 
   const personaOutcomes: PersonaDiagnosticOutcome[] = personaResults.map((result) => {
     const contract = OUTPUT_CONTRACTS[result.personaId];
@@ -82,6 +84,8 @@ export async function diagnoseQuestion(question: string): Promise<QuestionDiagno
       rawFacts: researchResult.rawFacts,
     },
     decisionSummary,
+    routedOrder: routed.order,
+    routedMissingPersonaIds: routed.missingPersonaIds,
     personaOutcomes,
   };
 }
@@ -113,6 +117,10 @@ export function formatDiagnosticReport(diagnostics: QuestionDiagnostic[]): strin
     lines.push(`QUESTION: ${diag.question}`);
     lines.push(`classifier.isInvest = ${diag.classifierIsInvest}`);
     lines.push(`research.metadata = ${JSON.stringify(diag.researchSummary)}`);
+    lines.push(`routedOrder = ${diag.routedOrder.join(' -> ')}`);
+    if (diag.routedMissingPersonaIds.length > 0) {
+      lines.push(`routedMissingPersonaIds = ${diag.routedMissingPersonaIds.join(', ')}`);
+    }
     lines.push(`decisionSummary = ${JSON.stringify(diag.decisionSummary)}`);
 
     for (const outcome of diag.personaOutcomes) {

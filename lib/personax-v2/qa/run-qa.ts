@@ -6,7 +6,7 @@ import { buildEchoDefinition } from '../personas/echo/identity';
 import { buildJackDefinition } from '../personas/jack/identity';
 import { buildLuciaDefinition } from '../personas/lucia/identity';
 import { buildRayDefinition } from '../personas/ray/identity';
-import type { DecisionSummary, PersonaId, PersonaOutputContract } from '../types';
+import type { DecisionSummary, PersonaDisplayOrder, PersonaId, PersonaOutputContract } from '../types';
 import { QA_SAMPLES, type QaSample } from './samples';
 import {
   checkContractLabelsPresent,
@@ -43,6 +43,8 @@ export interface SampleQaResult {
   hasMarketData: boolean;
   detectedKeyword: string | null;
   decisionSummary: DecisionSummary;
+  routedOrder: PersonaDisplayOrder;
+  routedMissingPersonaIds: PersonaId[];
   personaFindings: PersonaQaFinding[];
   fallbackDuplicated: boolean;
   standardLanguageOverlap: PersonaId[];
@@ -53,7 +55,7 @@ export async function runQaSample(sample: QaSample): Promise<SampleQaResult> {
   const researchResult = await research(sample.question, classifierResult);
   const hasMarketData = researchResult.metadata.source === 'market';
 
-  const { personaResults, decisionSummary } = await runRuntimeV2(sample.question);
+  const { personaResults, decisionSummary, routed } = await runRuntimeV2(sample.question);
 
   const personaFindings: PersonaQaFinding[] = personaResults.map((result) => {
     const contract = OUTPUT_CONTRACTS[result.personaId];
@@ -76,6 +78,8 @@ export async function runQaSample(sample: QaSample): Promise<SampleQaResult> {
     hasMarketData,
     detectedKeyword: researchResult.metadata.detectedKeyword,
     decisionSummary,
+    routedOrder: routed.order,
+    routedMissingPersonaIds: routed.missingPersonaIds,
     personaFindings,
     fallbackDuplicated: checkFallbackDuplicated(personaResults, PERSONA_V2_FALLBACK_TEXT),
     standardLanguageOverlap: countStandardLanguageOverlap(personaResults),
@@ -97,6 +101,10 @@ export function formatQaReport(results: SampleQaResult[]): string {
     lines.push('='.repeat(80));
     lines.push(`[${result.sample.category}] ${result.sample.id}: ${result.sample.question}`);
     lines.push(`  detectedKeyword=${result.detectedKeyword ?? 'none'} hasMarketData=${result.hasMarketData}`);
+    lines.push(`  routedOrder=${result.routedOrder.join(' -> ')}`);
+    if (result.routedMissingPersonaIds.length > 0) {
+      lines.push(`  WARNING: routed missing personas: ${result.routedMissingPersonaIds.join(', ')}`);
+    }
     lines.push('  --- DECISION SUMMARY ---');
     lines.push(`  conclusion: ${result.decisionSummary.conclusion}`);
     lines.push(`  keyRisks: ${result.decisionSummary.keyRisks.join(' / ')}`);

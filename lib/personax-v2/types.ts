@@ -1,4 +1,5 @@
 export type PersonaId = 'ray' | 'jack' | 'lucia' | 'echo';
+export type PersonaDisplayOrder = PersonaId[];
 
 export interface ClassifierResult {
   isInvest: boolean;
@@ -90,5 +91,13 @@ export interface DecisionSummary {
 export interface RuntimeV2Response {
   personaResults: PersonaResult[];
   decisionSummary: DecisionSummary;
-  order: PersonaId[];
+  order: PersonaDisplayOrder;
+  routed: RoutedPersonaResponse;
+}
+
+export interface RoutedPersonaResponse {
+  order: PersonaDisplayOrder;
+  personas: Partial<Record<PersonaId, string>>;
+  decisionSummary: DecisionSummary;
+  missingPersonaIds: PersonaId[];
 }
