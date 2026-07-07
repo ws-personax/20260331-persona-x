@@ -5,7 +5,7 @@ import { buildEchoDefinition } from '../personas/echo/identity';
 import { buildJackDefinition } from '../personas/jack/identity';
 import { buildLuciaDefinition } from '../personas/lucia/identity';
 import { buildRayDefinition } from '../personas/ray/identity';
-import type { PersonaId, PersonaOutputContract, ResearchResult } from '../types';
+import type { DecisionSummary, PersonaId, PersonaOutputContract, ResearchResult } from '../types';
 import { checkContractLabelsPresent } from './checks';
 import { scanIdentityPromptsForInvestmentTerms } from './identity-scan';
 
@@ -49,13 +49,14 @@ export interface QuestionDiagnostic {
     questionType: ResearchResult['metadata']['questionType'];
     rawFacts: string[];
   };
+  decisionSummary: DecisionSummary;
   personaOutcomes: PersonaDiagnosticOutcome[];
 }
 
 export async function diagnoseQuestion(question: string): Promise<QuestionDiagnostic> {
   const classifierResult = classify(question);
   const researchResult = await research(question, classifierResult);
-  const { personaResults } = await runRuntimeV2(question);
+  const { personaResults, decisionSummary } = await runRuntimeV2(question);
 
   const personaOutcomes: PersonaDiagnosticOutcome[] = personaResults.map((result) => {
     const contract = OUTPUT_CONTRACTS[result.personaId];
@@ -80,6 +81,7 @@ export async function diagnoseQuestion(question: string): Promise<QuestionDiagno
       questionType: researchResult.metadata.questionType,
       rawFacts: researchResult.rawFacts,
     },
+    decisionSummary,
     personaOutcomes,
   };
 }
@@ -111,6 +113,7 @@ export function formatDiagnosticReport(diagnostics: QuestionDiagnostic[]): strin
     lines.push(`QUESTION: ${diag.question}`);
     lines.push(`classifier.isInvest = ${diag.classifierIsInvest}`);
     lines.push(`research.metadata = ${JSON.stringify(diag.researchSummary)}`);
+    lines.push(`decisionSummary = ${JSON.stringify(diag.decisionSummary)}`);
 
     for (const outcome of diag.personaOutcomes) {
       lines.push(`  --- ${outcome.personaId.toUpperCase()} (mode=${outcome.mode}) looksLikeRefusal=${outcome.looksLikeRefusal} ---`);

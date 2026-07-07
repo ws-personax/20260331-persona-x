@@ -77,9 +77,18 @@ export interface PersonaResult {
 
 export interface DecisionResult {
   personaResults: PersonaResult[];
+  decisionSummary: DecisionSummary;
+}
+
+export interface DecisionSummary {
+  conclusion: string;
+  keyRisks: string[];
+  suggestedNextStep: string;
+  confidence: 'low' | 'medium' | 'high';
 }
 
 export interface RuntimeV2Response {
   personaResults: PersonaResult[];
+  decisionSummary: DecisionSummary;
   order: PersonaId[];
 }

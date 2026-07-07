@@ -6,7 +6,7 @@ import { buildEchoDefinition } from '../personas/echo/identity';
 import { buildJackDefinition } from '../personas/jack/identity';
 import { buildLuciaDefinition } from '../personas/lucia/identity';
 import { buildRayDefinition } from '../personas/ray/identity';
-import type { PersonaId, PersonaOutputContract } from '../types';
+import type { DecisionSummary, PersonaId, PersonaOutputContract } from '../types';
 import { QA_SAMPLES, type QaSample } from './samples';
 import {
   checkContractLabelsPresent,
@@ -42,6 +42,7 @@ export interface SampleQaResult {
   sample: QaSample;
   hasMarketData: boolean;
   detectedKeyword: string | null;
+  decisionSummary: DecisionSummary;
   personaFindings: PersonaQaFinding[];
   fallbackDuplicated: boolean;
   standardLanguageOverlap: PersonaId[];
@@ -52,7 +53,7 @@ export async function runQaSample(sample: QaSample): Promise<SampleQaResult> {
   const researchResult = await research(sample.question, classifierResult);
   const hasMarketData = researchResult.metadata.source === 'market';
 
-  const { personaResults } = await runRuntimeV2(sample.question);
+  const { personaResults, decisionSummary } = await runRuntimeV2(sample.question);
 
   const personaFindings: PersonaQaFinding[] = personaResults.map((result) => {
     const contract = OUTPUT_CONTRACTS[result.personaId];
@@ -74,6 +75,7 @@ export async function runQaSample(sample: QaSample): Promise<SampleQaResult> {
     sample,
     hasMarketData,
     detectedKeyword: researchResult.metadata.detectedKeyword,
+    decisionSummary,
     personaFindings,
     fallbackDuplicated: checkFallbackDuplicated(personaResults, PERSONA_V2_FALLBACK_TEXT),
     standardLanguageOverlap: countStandardLanguageOverlap(personaResults),
@@ -95,6 +97,11 @@ export function formatQaReport(results: SampleQaResult[]): string {
     lines.push('='.repeat(80));
     lines.push(`[${result.sample.category}] ${result.sample.id}: ${result.sample.question}`);
     lines.push(`  detectedKeyword=${result.detectedKeyword ?? 'none'} hasMarketData=${result.hasMarketData}`);
+    lines.push('  --- DECISION SUMMARY ---');
+    lines.push(`  conclusion: ${result.decisionSummary.conclusion}`);
+    lines.push(`  keyRisks: ${result.decisionSummary.keyRisks.join(' / ')}`);
+    lines.push(`  suggestedNextStep: ${result.decisionSummary.suggestedNextStep}`);
+    lines.push(`  confidence: ${result.decisionSummary.confidence}`);
 
     for (const finding of result.personaFindings) {
       lines.push(`  --- ${finding.personaId.toUpperCase()} (mode=${finding.mode}) ---`);

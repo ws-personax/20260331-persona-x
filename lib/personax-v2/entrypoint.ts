@@ -13,11 +13,16 @@ export async function runRuntimeV2(lastMessage: string): Promise<RuntimeV2Respon
     classifierResult,
     researchResult,
   });
-  const decisionResult = runDecisionEngine(personaResults);
+  const decisionResult = runDecisionEngine({
+    userQuestion: lastMessage,
+    classifierResult,
+    personaResults,
+  });
   const order = routeSpeakerOrder();
 
   return {
     personaResults: decisionResult.personaResults,
+    decisionSummary: decisionResult.decisionSummary,
     order,
   };
 }
