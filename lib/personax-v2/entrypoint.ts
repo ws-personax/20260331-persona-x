@@ -2,7 +2,7 @@ import { classify } from './classifier/classifier';
 import { research } from './research/research-layer';
 import { runPersonaEngine } from './personas/persona-engine';
 import { runDecisionEngine } from './decision/decision-engine';
-import { routeSpeakerOrder } from './speaker/speaker-router';
+import { resolveSpeakerRouteCategory, routeSpeakerResponse } from './speaker/speaker-router';
 import type { RuntimeV2Response } from './types';
 
 export async function runRuntimeV2(lastMessage: string): Promise<RuntimeV2Response> {
@@ -18,11 +18,17 @@ export async function runRuntimeV2(lastMessage: string): Promise<RuntimeV2Respon
     classifierResult,
     personaResults,
   });
-  const order = routeSpeakerOrder();
+  const speakerCategory = resolveSpeakerRouteCategory(lastMessage, classifierResult);
+  const routed = routeSpeakerResponse({
+    category: speakerCategory,
+    personaResults: decisionResult.personaResults,
+    decisionSummary: decisionResult.decisionSummary,
+  });
 
   return {
     personaResults: decisionResult.personaResults,
     decisionSummary: decisionResult.decisionSummary,
-    order,
+    order: routed.order,
+    routed,
   };
 }
