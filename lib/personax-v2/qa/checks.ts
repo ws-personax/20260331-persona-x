@@ -10,7 +10,16 @@ const DISPLAY_NAMES: Record<PersonaId, string> = {
 // Output contract adherence — every section label the persona is contracted to
 // use must appear in its own text.
 export function checkContractLabelsPresent(text: string, contract: PersonaOutputContract): string[] {
-  return contract.sections.filter((section) => !text.includes(section.label)).map((section) => section.label);
+  return contract.sections.filter((section) => !hasSectionStartLabel(text, section.label)).map((section) => section.label);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function hasSectionStartLabel(text: string, label: string): boolean {
+  const sectionStartPattern = new RegExp(`(?:^|\\n)\\s*${escapeRegExp(label)}\\s*[:：]`, 'm');
+  return sectionStartPattern.test(text);
 }
 
 // No persona should call out another persona by name or reference the team structure.

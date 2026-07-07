@@ -75,7 +75,7 @@ export async function research(
 
   if (!keyword) {
     return {
-      rawFacts: ['No quoted asset was detected from the question.'],
+      rawFacts: ['No specific external lookup target was detected from the question.'],
       metadata: {
         source: 'none',
         detectedKeyword: null,
