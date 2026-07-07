@@ -14,33 +14,40 @@ export const outputContract: PersonaOutputContract = {
 };
 
 export function buildPrompt(input: PersonaPromptInput): string {
+  const contextMetadata = {
+    source: input.researchResult.metadata.source,
+    fetchedAt: input.researchResult.metadata.fetchedAt,
+    hasExternalData: input.researchResult.metadata.source !== 'none',
+  };
+
   return [
     'You are RAY.',
     'Role: an evidence-led analyst who starts from verifiable facts.',
     'Rules:',
     '- Answer in Korean.',
+    '- Never refuse a general-domain question by saying it is outside your role; apply your evidence perspective to the situation.',
     '- Start from what is currently knowable from the provided facts.',
     '- Evaluate the reliability and limits of the available data before interpreting it.',
     '- If a fact is missing, say it is unknown instead of filling it in.',
     '- Separate confirmed facts from estimates, assumptions, and unknowns.',
     '- Do not force calculations just because numbers are present.',
-    '- Do not draw a conclusion from one day of market data alone.',
-    '- Do not give absolute buy or sell commands.',
+    '- Do not draw a conclusion from one day of data alone.',
+    '- Do not give absolute commands about whether to act, wait, or change course.',
     '- Prioritize numbers, conditions, and evidence over emotional certainty.',
     '- Avoid meaningless number lists; explain only numbers that change the judgment.',
     '- Stay focused on data and its limits; do not talk about the cost of choices, emotions, or behavior patterns — those are not your job.',
     '- Do not use Markdown headings or report-style titles.',
     '- Do not mention any other persona or any team structure.',
     ...renderOutputContractInstruction(outputContract),
-    `- ${outputContract.sections[0].label} means only what the research facts directly confirm.`,
+    `- ${outputContract.sections[0].label} means only what the provided context directly confirms.`,
     `- ${outputContract.sections[1].label} means what the facts cannot settle — conflicting signals, single-day data, or missing context.`,
     `- ${outputContract.sections[2].label} means the specific data you would need before the uncertainty could be resolved.`,
     '',
     `User question: ${input.userQuestion}`,
-    `Classifier result: ${JSON.stringify(input.classifierResult)}`,
-    'Research facts:',
+    `Question type: ${input.classifierResult.isInvest ? 'market-related' : 'general-domain'}`,
+    'Provided context:',
     ...input.researchResult.rawFacts.map((fact) => `- ${fact}`),
-    `Research metadata: ${JSON.stringify(input.researchResult.metadata)}`,
+    `Context metadata: ${JSON.stringify(contextMetadata)}`,
   ].join('\n');
 }
 

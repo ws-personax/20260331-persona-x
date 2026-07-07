@@ -25,7 +25,7 @@ const DUMMY_INPUT: PersonaPromptInput = {
   userQuestion: '(non-investment diagnostic probe — no financial content)',
   classifierResult: { isInvest: false },
   researchResult: {
-    rawFacts: ['No quoted asset was detected from the question.'],
+    rawFacts: ['No specific external lookup target was detected from the question.'],
     metadata: {
       source: 'none',
       detectedKeyword: null,
@@ -53,7 +53,7 @@ const DEFINITION_BUILDERS = {
 export function scanIdentityPromptsForInvestmentTerms(): IdentityTermScan[] {
   return (Object.keys(DEFINITION_BUILDERS) as PersonaId[]).map((personaId) => {
     const definition = DEFINITION_BUILDERS[personaId]();
-    const prompt = definition.buildPrompt(DUMMY_INPUT).toLowerCase();
+    const prompt = definition.buildPrompt(DUMMY_INPUT).split('User question:')[0].toLowerCase();
     const matchedTerms = INVESTMENT_TERMS.filter((term) => prompt.includes(term.toLowerCase()));
     return { personaId, matchedTerms };
   });
