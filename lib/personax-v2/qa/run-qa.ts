@@ -112,6 +112,7 @@ export function formatQaReport(results: SampleQaResult[]): string {
   for (const result of results) {
     lines.push('='.repeat(80));
     lines.push(`[${result.sample.category}] ${result.sample.id}: ${result.sample.question}`);
+    lines.push(`  tikitakaLevel=${result.sample.tikitakaLevel}`);
     lines.push(`  detectedKeyword=${result.detectedKeyword ?? 'none'} hasMarketData=${result.hasMarketData}`);
     lines.push(`  routedOrder=${result.routedOrder.join(' -> ')}`);
     if (result.routedMissingPersonaIds.length > 0) {

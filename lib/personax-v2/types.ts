@@ -1,6 +1,11 @@
 export type PersonaId = 'ray' | 'jack' | 'lucia' | 'echo';
 export type PersonaDisplayOrder = PersonaId[];
 
+// See lib/personax-v2/docs/tikitaka-level.md for the weak/strong contract.
+// weak: independent persona responses, no cross-persona debate.
+// strong: reserved for a future Debate Layer (not implemented yet).
+export type TikitakaLevel = 'weak' | 'strong';
+
 export interface ClassifierResult {
   isInvest: boolean;
 }
