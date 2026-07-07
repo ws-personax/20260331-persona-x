@@ -6,6 +6,7 @@ import { buildEchoDefinition } from '../personas/echo/identity';
 import { buildJackDefinition } from '../personas/jack/identity';
 import { buildLuciaDefinition } from '../personas/lucia/identity';
 import { buildRayDefinition } from '../personas/ray/identity';
+import { runLabelNormalizerMockCases } from '../output-contract/label-normalizer';
 import type { DecisionSummary, PersonaDisplayOrder, PersonaId, PersonaOutputContract } from '../types';
 import { QA_SAMPLES, type QaSample } from './samples';
 import {
@@ -96,6 +97,17 @@ export async function runQaSuite(samples: QaSample[] = QA_SAMPLES): Promise<Samp
 
 export function formatQaReport(results: SampleQaResult[]): string {
   const lines: string[] = [];
+  const labelNormalizerMocks = runLabelNormalizerMockCases();
+
+  lines.push('# Label normalizer mock checks');
+  for (const mock of labelNormalizerMocks) {
+    lines.push(
+      `- changed=${mock.report.changed} corrections=${mock.report.appliedCorrections
+        .map((correction) => `${correction.from}->${correction.to}`)
+        .join(', ')} normalizedText="${mock.normalizedText}"`,
+    );
+  }
+  lines.push('');
 
   for (const result of results) {
     lines.push('='.repeat(80));

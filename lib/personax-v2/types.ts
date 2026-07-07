@@ -68,11 +68,22 @@ export interface PersonaError {
 export interface PersonaResult {
   personaId: PersonaId;
   text: string;
+  rawText?: string;
   mode: PersonaEngineMode;
   error?: PersonaError;
   metadata?: {
     provider: 'anthropic' | 'gemini' | 'openai' | 'none';
     model: string | null;
+  };
+  labelNormalization?: {
+    changed: boolean;
+    appliedCorrections: Array<{
+      from: string;
+      to: string;
+      line: number;
+    }>;
+    unresolvedWarnings: string[];
+    skippedCandidates: string[];
   };
 }
 

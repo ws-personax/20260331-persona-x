@@ -8,6 +8,7 @@ import { buildRayDefinition } from '../personas/ray/identity';
 import type { DecisionSummary, PersonaDisplayOrder, PersonaId, PersonaOutputContract, ResearchResult } from '../types';
 import { checkContractLabelsPresent } from './checks';
 import { scanIdentityPromptsForInvestmentTerms } from './identity-scan';
+import { runLabelNormalizerMockCases } from '../output-contract/label-normalizer';
 
 // The 4 non-investment questions PR295 flagged as refused/label-incomplete.
 export const NON_INVEST_DIAGNOSTIC_QUESTIONS = [
@@ -103,11 +104,21 @@ export async function diagnoseNonInvestQuestions(
 export function formatDiagnosticReport(diagnostics: QuestionDiagnostic[]): string {
   const lines: string[] = [];
   const identityScan = scanIdentityPromptsForInvestmentTerms();
+  const labelNormalizerMocks = runLabelNormalizerMockCases();
 
   lines.push('# Identity prompt investment-term scan (fixed rule text only, non-investment probe input)');
   for (const scan of identityScan) {
     lines.push(
       `- ${scan.personaId.toUpperCase()}: ${scan.matchedTerms.length ? scan.matchedTerms.join(', ') : '(none found)'}`,
+    );
+  }
+  lines.push('');
+  lines.push('# Label normalizer mock checks');
+  for (const mock of labelNormalizerMocks) {
+    lines.push(
+      `- changed=${mock.report.changed} corrections=${mock.report.appliedCorrections
+        .map((correction) => `${correction.from}->${correction.to}`)
+        .join(', ')} normalizedText="${mock.normalizedText}"`,
     );
   }
   lines.push('');
