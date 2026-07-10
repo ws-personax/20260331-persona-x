@@ -92,6 +92,7 @@ import {
 import { saveTeaLog, saveLegacyStockHistorySafely } from '@/lib/personax/runtime/route-save';
 // ✅ Runtime v2 (PR290) — Feature Flag 뒤 골격. v1 로직과 완전히 분리된 별도 경로.
 import { runRuntimeV2 } from '@/lib/personax-v2/entrypoint';
+import { adaptRuntimeV2ToChatResponse } from '@/lib/personax-v2/adapters/chat-response-adapter';
 
 // ✅ Feature Flag — Router/3단계 호출/ECHO 선택/LUCIA 프레이밍 단계별 활성화
 // router만 우선 활성화. 나머지는 다음 단계에서 켠다.
@@ -188,7 +189,8 @@ export async function POST(req: NextRequest) {
     //   v2는 lib/personax-v2/entrypoint.ts로 완전히 위임하고 기존 v1 로직은 전혀 거치지 않는다.
     if (process.env.RUNTIME_VERSION === 'v2') {
       const v2Result = await runRuntimeV2(lastMsg);
-      return new Response(JSON.stringify(v2Result), {
+      const chatResponse = adaptRuntimeV2ToChatResponse(v2Result);
+      return new Response(JSON.stringify(chatResponse), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
